@@ -144,8 +144,8 @@ pub enum Event {
     /// the qualities it comes in.
     Page(Arc<Page>),
     /// The source is a list of web pages, such as a playlist, for the
-    /// interface to play one at a time.
-    List(Vec<Entry>),
+    /// interface to play one at a time, and what the list is called.
+    List(Option<String>, Vec<Entry>),
     /// The source looks like a web page, and plaa reads those with
     /// yt-dlp, which is not installed.
     NeedsYtDlp,

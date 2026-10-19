@@ -88,8 +88,8 @@ fn main() {
                 page.heights(),
                 page.live
             ),
-            Event::List(entries) => {
-                println!("list of {}:", entries.len());
+            Event::List(title, entries) => {
+                println!("list {title:?} of {}:", entries.len());
                 for entry in entries {
                     println!("  {} {:?}", entry.url, entry.title);
                 }

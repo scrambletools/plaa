@@ -127,6 +127,8 @@ address-title = Open Address
 address-note = A web page with a video, such as a YouTube video's, or a stream or file on the network, such as https://example.com/live.m3u8.
 address-label = Address
 address-open = Open
+address-recent = Recent
+address-forget = Remove from recent
 
 ## Notices
 

@@ -931,7 +931,7 @@ fn playlist_sheet(window: &PlayerWindow) -> Element<'_, Control> {
             )
             .padding([10, 16])
             .width(Fill)
-            .style(move |theme, status| playlist_row_style(theme, status, playing))
+            .style(move |theme, status| list_row_style(theme, status, playing))
             .on_press(Control::PlayItem(index))
             .into()
         });
@@ -943,16 +943,17 @@ fn playlist_sheet(window: &PlayerWindow) -> Element<'_, Control> {
     )
 }
 
-/// A list row as scramble-ui draws one: the playing row in a tonal
-/// container, and a state layer while pointed at or pressed.
-fn playlist_row_style(
+/// A list row as scramble-ui draws one, for rows that grow with their
+/// content: the chosen row in a tonal container, and a state layer while
+/// pointed at or pressed.
+pub(crate) fn list_row_style(
     theme: &Theme,
     status: iced::widget::button::Status,
-    playing: bool,
+    chosen: bool,
 ) -> iced::widget::button::Style {
     use iced::widget::button::Status;
     let scheme = Scheme::of(theme);
-    let (background, content) = if playing {
+    let (background, content) = if chosen {
         (scheme.secondary_container, scheme.on_secondary_container)
     } else {
         (iced::Color::TRANSPARENT, scheme.on_surface_variant)

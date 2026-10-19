@@ -105,6 +105,10 @@ fn main() -> iced::Result {
     let mut options_done = false;
     for argument in std::env::args_os().skip(1) {
         let text = argument.to_string_lossy().into_owned();
+        // As a launcher passes for a field it left empty.
+        if text.is_empty() {
+            continue;
+        }
         if !options_done {
             match text.as_str() {
                 "-h" | "--help" => {

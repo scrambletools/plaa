@@ -93,8 +93,8 @@ pub(crate) fn open(
     {
         match web::read(url, stop) {
             Ok(Found::Page(found)) => page = Some(Arc::new(found)),
-            Ok(Found::List(entries)) => {
-                events(Event::List(entries));
+            Ok(Found::List(title, entries)) => {
+                events(Event::List(title, entries));
                 return None;
             }
             // Perhaps a stream FFmpeg reads.

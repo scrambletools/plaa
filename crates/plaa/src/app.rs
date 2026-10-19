@@ -12,6 +12,7 @@ use iced::{Center, Color, Element, Event, Fill, Size, Subscription, Task, Theme,
 use plaa_media::web::Page;
 use plaa_media::{Event as PlayerEvent, Options, Player, Quality, Source, Thumbnails};
 use plaa_store::positions::{self, Positions};
+use plaa_store::recent::{self, Recent};
 use plaa_store::settings::{self, Appearance, Settings, StreamQuality};
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::{Icon, Type, button, column, icon, omarchy, row, style};
@@ -59,6 +60,9 @@ pub struct Plaa {
     positions: Positions,
     positions_path: Option<PathBuf>,
     positions_saved: Instant,
+    /// The addresses opened lately, which the Open Address dialog offers.
+    recent: Recent,
+    recent_path: Option<PathBuf>,
     omarchy_dir: Option<PathBuf>,
     pub(crate) omarchy: Option<omarchy::Palette>,
     /// The desktop's, Windows' or macOS's accent color, when it has one.
@@ -183,6 +187,10 @@ pub enum Message {
     AddressChanged(window::Id, String),
     AddressSubmitted(window::Id),
     AddressCancelled(window::Id),
+    /// A recent address was chosen in the Open Address dialog.
+    AddressChosen(window::Id, String),
+    /// A recent address is to be forgotten.
+    AddressForgotten(String),
     DismissNotice(window::Id),
     ScreenshotSaved(window::Id, Result<PathBuf, String>),
     SystemTheme(iced::theme::Mode),
@@ -229,6 +237,8 @@ impl Plaa {
             .as_deref()
             .map(Positions::load)
             .unwrap_or_default();
+        let recent_path = recent::default_path();
+        let recent = recent_path.as_deref().map(Recent::load).unwrap_or_default();
         let language_drafts = [
             settings.audio_languages.join(", "),
             settings.subtitle_languages.join(", "),
@@ -241,6 +251,8 @@ impl Plaa {
             positions,
             positions_path,
             positions_saved: Instant::now(),
+            recent,
+            recent_path,
             omarchy_dir,
             omarchy: None,
             system_accent: None,
@@ -339,6 +351,7 @@ impl Plaa {
     /// Opens a window per source, going to the window already playing one
     /// where there is one; `into` is a start window the first one may use.
     fn open_sources(&mut self, sources: Vec<Source>, into: Option<window::Id>) -> Task<Message> {
+        self.remember_addresses(&sources);
         if sources.is_empty() {
             if into.is_some() {
                 return Task::none();
@@ -400,10 +413,43 @@ impl Plaa {
                 None => Source::parse(uri),
             })
             .collect();
+        self.remember_addresses(&sources);
         if let Some(list) = self.playlist_for(sources) {
             self.play_in(id, list, false);
         }
         window::gain_focus(id)
+    }
+
+    /// Puts the addresses among `sources` first among the recent ones.
+    fn remember_addresses(&mut self, sources: &[Source]) {
+        let mut changed = false;
+        for source in sources.iter().rev() {
+            if let Source::Url(url) = source {
+                self.recent.add(url);
+                changed = true;
+            }
+        }
+        if changed {
+            self.save_recent();
+        }
+    }
+
+    /// Names a recent address, once what it is called is known.
+    fn name_address(&mut self, source: &Source, title: Option<&str>) {
+        if let (Source::Url(url), Some(title)) = (source, title)
+            && title != url
+            && self.recent.name(url, title)
+        {
+            self.save_recent();
+        }
+    }
+
+    fn save_recent(&self) {
+        if let Some(path) = &self.recent_path
+            && let Err(error) = self.recent.save(path)
+        {
+            eprintln!("plaa: keeping recent addresses: {error}");
+        }
     }
 
     /// The list `sources` make together: list files' entries in their
@@ -997,6 +1043,17 @@ impl Plaa {
                 }
                 Task::none()
             }
+            Message::AddressChosen(id, url) => {
+                if let Some(window) = self.windows.get_mut(&id) {
+                    window.address = None;
+                }
+                self.open_sources(vec![Source::parse(&url)], Some(id))
+            }
+            Message::AddressForgotten(url) => {
+                self.recent.remove(&url);
+                self.save_recent();
+                Task::none()
+            }
             Message::DismissNotice(id) => {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.notice = None;
@@ -1052,6 +1109,22 @@ impl Plaa {
             .is_some_and(|window| window.fullscreen);
         let overlay = self.settings.overlay;
         let scale = self.windows.get(&id).map_or(1.0, |window| window.scale);
+        // Recent addresses take their names from what opens.
+        let named = match (&event, self.player_mut(id)) {
+            (PlayerEvent::Page(page), Some(player)) => {
+                Some((player.source().clone(), page.title.clone()))
+            }
+            (PlayerEvent::List(title, _), Some(player)) => {
+                Some((player.source().clone(), title.clone()))
+            }
+            (PlayerEvent::Opened { info, .. }, Some(player)) if player.page.is_none() => {
+                Some((player.source().clone(), info.title.clone()))
+            }
+            _ => None,
+        };
+        if let Some((source, title)) = named {
+            self.name_address(&source, title.as_deref());
+        }
         let Some(player) = self.player_mut(id) else {
             return Task::none();
         };
@@ -1110,7 +1183,7 @@ impl Plaa {
                 player.page = Some(page);
                 Task::none()
             }
-            PlayerEvent::List(entries) => {
+            PlayerEvent::List(_, entries) => {
                 let items = entries
                     .into_iter()
                     .map(|entry| (Source::Url(entry.url), entry.title))
@@ -1658,7 +1731,7 @@ impl Plaa {
             None => full(),
         };
         let address = match &window.address {
-            Some(text) => address_dialog(id, text),
+            Some(text) => address_dialog(id, text, self.recent.addresses()),
             None => full(),
         };
         let settings = if window.settings_open {
@@ -1879,7 +1952,11 @@ fn ticks() -> impl iced::futures::Stream<Item = ()> {
 
 const ADDRESS_FIELD: &str = "address";
 
-fn address_dialog(id: window::Id, text: &str) -> Element<'_, Message> {
+fn address_dialog<'a>(
+    id: window::Id,
+    text: &'a str,
+    recent: &'a [recent::Address],
+) -> Element<'a, Message> {
     let field = component::text_field(
         crate::fl!("address-label"),
         text,
@@ -1899,16 +1976,19 @@ fn address_dialog(id: window::Id, text: &str) -> Element<'_, Message> {
             .on_press_maybe((!text.trim().is_empty()).then_some(Message::AddressSubmitted(id)))
             .into(),
     ];
-    let body = column![
+    let mut body = column![
         scramble_ui::styled(crate::fl!("address-title"), Type::HeadlineSmall),
         scramble_ui::aligned(
             scramble_ui::styled(crate::fl!("address-note"), Type::BodyMedium)
                 .style(style::on_surface_variant)
         ),
         field,
-        container(scramble_ui::dir::row(actions).spacing(8)).align_right(Fill),
     ]
     .spacing(16);
+    if let Some(list) = recent_addresses(id, text, recent) {
+        body = body.push(list);
+    }
+    let body = body.push(container(scramble_ui::dir::row(actions).spacing(8)).align_right(Fill));
     let card = container(body).padding(24).width(480).style(style::dialog);
     iced::widget::mouse_area(
         container(iced::widget::opaque(card))
@@ -1918,6 +1998,89 @@ fn address_dialog(id: window::Id, text: &str) -> Element<'_, Message> {
     )
     .on_press(Message::AddressCancelled(id))
     .into()
+}
+
+/// How many recent addresses show before the list scrolls.
+const RECENT_SHOWN: f32 = 5.0;
+/// A recent address's row: its name over its address.
+const RECENT_ROW_HEIGHT: f32 = 56.0;
+
+/// The recent addresses that match what is typed, latest first, each
+/// opened when chosen and forgotten by its own button. None when none
+/// match.
+fn recent_addresses<'a>(
+    id: window::Id,
+    typed: &str,
+    recent: &'a [recent::Address],
+) -> Option<Element<'a, Message>> {
+    let typed = typed.trim().to_lowercase();
+    let matching: Vec<&recent::Address> = recent
+        .iter()
+        .filter(|address| {
+            typed.is_empty()
+                || address.url.to_lowercase().contains(&typed)
+                || address
+                    .title
+                    .as_ref()
+                    .is_some_and(|title| title.to_lowercase().contains(&typed))
+        })
+        .collect();
+    if matching.is_empty() {
+        return None;
+    }
+    // Long names and addresses are cut at the row's end.
+    let one_line = |text: &'a str, kind: Type, dim: bool| {
+        let line = scramble_ui::styled(text, kind).wrapping(iced::widget::text::Wrapping::None);
+        let line = if dim {
+            line.style(style::on_surface_variant)
+        } else {
+            line
+        };
+        container(line).width(Fill).clip(true)
+    };
+    let shown = matching.len() as f32;
+    let rows = matching.into_iter().map(|address| {
+        let lines: Element<'a, Message> = match &address.title {
+            Some(title) => column![
+                one_line(title, Type::BodyLarge, false),
+                one_line(&address.url, Type::BodySmall, true),
+            ]
+            .spacing(2)
+            .width(Fill)
+            .into(),
+            None => one_line(&address.url, Type::BodyLarge, false).into(),
+        };
+        let forget = component::tip(
+            scramble_ui::icon_button(Icon::Close)
+                .size(button::Size::ExtraSmall)
+                .on_press(Message::AddressForgotten(address.url.clone())),
+            crate::fl!("address-forget"),
+        );
+        iced::widget::button(
+            row![
+                icon::icon(Icon::History, 20).style(style::on_surface_variant),
+                lines,
+                forget
+            ]
+            .spacing(12)
+            .align_y(Center),
+        )
+        .padding([4, 8])
+        .height(RECENT_ROW_HEIGHT)
+        .width(Fill)
+        .style(|theme, status| crate::window::list_row_style(theme, status, false))
+        .on_press(Message::AddressChosen(id, address.url.clone()))
+        .into()
+    });
+    Some(
+        column![
+            component::section(crate::fl!("address-recent")),
+            component::scroll(iced::widget::Column::with_children(rows).spacing(2))
+                .height(shown.min(RECENT_SHOWN) * (RECENT_ROW_HEIGHT + 2.0)),
+        ]
+        .spacing(4)
+        .into(),
+    )
 }
 
 fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {

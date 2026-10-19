@@ -53,8 +53,8 @@ pub struct Entry {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Found {
     Page(Page),
-    /// A list of pages, such as a playlist.
-    List(Vec<Entry>),
+    /// A list of pages, such as a playlist, and what it is called.
+    List(Option<String>, Vec<Entry>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -342,7 +342,7 @@ fn found(info: Info) -> Found {
                 })
             })
             .collect();
-        return Found::List(entries);
+        return Found::List(info.title, entries);
     }
     let mut raw = info.formats.unwrap_or_default();
     if raw.is_empty() {
@@ -457,7 +457,7 @@ mod tests {
         }"#;
         match found(serde_json::from_str(json).expect("yt-dlp's answer")) {
             Found::Page(page) => page,
-            Found::List(_) => panic!("a list"),
+            Found::List(..) => panic!("a list"),
         }
     }
 
@@ -511,9 +511,10 @@ mod tests {
             {"_type": "url", "url": "two", "title": "No address"},
             {"_type": "url", "url": "https://www.youtube.com/watch?v=three"}
         ]}"#;
-        let Found::List(entries) = found(serde_json::from_str(json).expect("a list")) else {
+        let Found::List(title, entries) = found(serde_json::from_str(json).expect("a list")) else {
             panic!("not a list");
         };
+        assert_eq!(title.as_deref(), Some("Lectures"));
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].title.as_deref(), Some("One"));
         assert_eq!(entries[1].title, None);
