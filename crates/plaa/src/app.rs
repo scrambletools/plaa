@@ -74,10 +74,8 @@ pub struct Plaa {
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
     /// The window media keys and the desktop's controls act on: the one
     /// last played or used.
-    #[cfg(target_os = "linux")]
     media_window: Option<window::Id>,
-    #[cfg(target_os = "linux")]
-    mpris: Option<crate::mpris::Service>,
+    media: Option<crate::media::Service>,
     /// The window last focused, which the menu bar's items act on.
     #[cfg(target_os = "macos")]
     focused: Option<window::Id>,
@@ -244,10 +242,8 @@ impl Plaa {
             language_drafts,
             audio_devices: Vec::new(),
             awake: None,
-            #[cfg(target_os = "linux")]
             media_window: None,
-            #[cfg(target_os = "linux")]
-            mpris: crate::mpris::Service::start("plaa", |command| {
+            media: crate::media::Service::start("plaa", |command| {
                 crate::post(External::Media(command));
             }),
             #[cfg(target_os = "macos")]
@@ -560,10 +556,7 @@ impl Plaa {
     /// Plays `list`'s current item in window `id`, in place of what it
     /// showed. Moving on through a list keeps the window's size and modes.
     fn play_in(&mut self, id: window::Id, list: Playlist, moving_on: bool) {
-        #[cfg(target_os = "linux")]
-        {
-            self.media_window = Some(id);
-        }
+        self.media_window = Some(id);
         let source = list.source().clone();
         let start = match &source {
             Source::File(path) if self.settings.resume => {
@@ -616,14 +609,12 @@ impl Plaa {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         let task = self.handle(message);
         self.keep_awake();
-        #[cfg(target_os = "linux")]
         self.tell_desktop();
         task
     }
 
     /// The window media keys act on: the one last played or used, or any
     /// that plays.
-    #[cfg(target_os = "linux")]
     fn media_window(&self) -> Option<window::Id> {
         self.media_window
             .filter(|id| {
@@ -638,10 +629,10 @@ impl Plaa {
             })
     }
 
-    /// Tells the desktop what the media window plays.
-    #[cfg(target_os = "linux")]
+    /// Tells the system what the media window plays.
     fn tell_desktop(&self) {
-        let Some(service) = &self.mpris else {
+        use crate::media::{NowPlaying, Playback};
+        let Some(service) = &self.media else {
             return;
         };
         let now = self
@@ -650,24 +641,25 @@ impl Plaa {
             .map(|player| {
                 let info = player.info.as_deref();
                 let status = &player.status;
-                crate::mpris::NowPlaying {
+                NowPlaying {
                     playback: if status.ended {
-                        crate::mpris::Playback::Stopped
+                        Playback::Stopped
                     } else if status.paused {
-                        crate::mpris::Playback::Paused
+                        Playback::Paused
                     } else {
-                        crate::mpris::Playback::Playing
+                        Playback::Playing
                     },
                     track: player.surface,
                     title: player.title(),
                     artist: info.and_then(|info| info.artist.clone()),
                     album: info.and_then(|info| info.album.clone()),
                     length: status.duration,
+                    #[cfg(target_os = "linux")]
                     url: match player.source() {
-                        Source::File(path) => Some(file_uri(path)),
+                        Source::File(path) => Some(crate::mpris::file_uri(path)),
                         Source::Url(url) => Some(url.clone()),
                     },
-                    art: player.art.as_deref().map(file_uri),
+                    art: player.art.clone(),
                     position: status.position,
                     rate: status.speed,
                     can_previous: player.playlist.is_list(),
@@ -679,17 +671,18 @@ impl Plaa {
         service.update(now);
     }
 
-    /// Does what media keys or the desktop asked of the media window.
-    #[cfg(target_os = "linux")]
-    fn media(&mut self, command: crate::mpris::Command) -> Task<Message> {
-        use crate::mpris::Command;
+    /// Does what media keys or the system asked of the media window.
+    fn media(&mut self, command: crate::media::Command) -> Task<Message> {
+        use crate::media::Command;
         let Some(id) = self.media_window() else {
             return Task::none();
         };
         match command {
             Command::Next => return self.next(id),
             Command::Previous => return self.previous(id),
+            #[cfg(target_os = "linux")]
             Command::Raise => return window::gain_focus(id),
+            #[cfg(target_os = "linux")]
             Command::Quit => return self.perform(id, Action::Quit),
             Command::SeekTo(seconds) => return self.control(id, Control::SeekTo(seconds)),
             _ => {}
@@ -858,7 +851,6 @@ impl Plaa {
                 }
                 Task::none()
             }
-            #[cfg(target_os = "linux")]
             Message::External(External::Media(command)) => self.media(command),
             Message::External(External::DropsGathered(id)) => {
                 let Some(window) = self.windows.get_mut(&id) else {
@@ -974,12 +966,9 @@ impl Plaa {
         };
         match event {
             PlayerEvent::Opened { info, cover } => {
-                #[cfg(target_os = "linux")]
-                {
-                    player.art = cover
-                        .as_deref()
-                        .and_then(|cover| save_cover(player.source(), cover));
-                }
+                player.art = cover
+                    .as_deref()
+                    .and_then(|cover| save_cover(player.source(), cover));
                 player.cover = cover.map(|cover| {
                     image::Handle::from_rgba(cover.width, cover.height, cover.rgba.clone())
                 });
@@ -1298,7 +1287,6 @@ impl Plaa {
     }
 
     fn control(&mut self, id: window::Id, control: Control) -> Task<Message> {
-        #[cfg(target_os = "linux")]
         if !matches!(control, Control::Hover(_) | Control::Activity) {
             self.media_window = Some(id);
         }
@@ -1555,23 +1543,8 @@ impl Plaa {
     }
 }
 
-/// `path` as a `file://` address, characters outside a path's own escaped.
-#[cfg(target_os = "linux")]
-fn file_uri(path: &std::path::Path) -> String {
-    let mut uri = String::from("file://");
-    for byte in path.to_string_lossy().bytes() {
-        if byte.is_ascii_alphanumeric() || b"/-_.~".contains(&byte) {
-            uri.push(byte as char);
-        } else {
-            uri.push_str(&format!("%{byte:02X}"));
-        }
-    }
-    uri
-}
-
-/// Saves a file's cover as a picture in the cache folder, for the desktop
+/// Saves a file's cover as a picture in the cache folder, for the system
 /// to show with what plays. Returns where.
-#[cfg(target_os = "linux")]
 fn save_cover(source: &Source, cover: &plaa_media::Picture) -> Option<PathBuf> {
     use std::hash::{Hash, Hasher};
     let folder = plaa_store::paths::cache_dir()?.join("covers");

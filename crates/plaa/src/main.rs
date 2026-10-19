@@ -10,14 +10,19 @@ mod instance;
 #[cfg(windows)]
 #[path = "instance_windows.rs"]
 mod instance;
+mod media;
 #[cfg(target_os = "macos")]
 mod menu_macos;
 #[cfg(target_os = "linux")]
 mod mpris;
+#[cfg(target_os = "macos")]
+mod now_playing_macos;
 mod playlist;
 mod screenshot;
 mod settings_view;
 mod shortcuts;
+#[cfg(windows)]
+mod smtc_windows;
 mod timeline;
 #[cfg(target_os = "macos")]
 mod title_bar_macos;
@@ -44,8 +49,7 @@ pub enum External {
     /// A picture for a window's timeline.
     Thumbnail(iced::window::Id, plaa_media::Thumbnail),
     /// Media keys or the desktop asked something of what plays.
-    #[cfg(target_os = "linux")]
-    Media(mpris::Command),
+    Media(media::Command),
     /// Something dragged over or dropped on a window, on Wayland.
     #[cfg(target_os = "linux")]
     Drag(smithay_clipboard::dnd::DragEvent),

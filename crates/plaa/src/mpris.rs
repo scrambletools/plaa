@@ -3,60 +3,17 @@
 //! `playerctl` controlling it through the same.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
 
 use zbus::blocking::Connection;
 use zbus::interface;
 use zbus::zvariant::{ObjectPath, OwnedValue, Value};
 
+use crate::media::{Command, NowPlaying, Playback};
+
 const PATH: &str = "/org/mpris/MediaPlayer2";
 const PLAYER: &str = "org.mpris.MediaPlayer2.Player";
-
-/// What the desktop asks of the player.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Command {
-    PlayPause,
-    Play,
-    Pause,
-    Stop,
-    Next,
-    Previous,
-    /// Moves by this many seconds, back when negative.
-    SeekBy(f64),
-    /// Goes to this many seconds.
-    SeekTo(f64),
-    Raise,
-    Quit,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Playback {
-    Playing,
-    Paused,
-    #[default]
-    Stopped,
-}
-
-/// What the desktop is told plays.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct NowPlaying {
-    pub playback: Playback,
-    /// Changes with each file, so the desktop knows a new one plays.
-    pub track: u64,
-    pub title: String,
-    pub artist: Option<String>,
-    pub album: Option<String>,
-    pub length: Option<Duration>,
-    /// The file's address, and its cover's.
-    pub url: Option<String>,
-    pub art: Option<String>,
-    pub position: Duration,
-    pub rate: f64,
-    pub can_previous: bool,
-    pub can_next: bool,
-    pub can_seek: bool,
-}
 
 type Shared = Arc<Mutex<NowPlaying>>;
 type Commands = Arc<dyn Fn(Command) + Send + Sync>;
@@ -106,13 +63,7 @@ impl Service {
         if before.playback != now.playback {
             changed.insert("PlaybackStatus", Value::from(status(now.playback)));
         }
-        if before.track != now.track
-            || before.title != now.title
-            || before.artist != now.artist
-            || before.album != now.album
-            || before.length != now.length
-            || before.art != now.art
-        {
+        if now.item_changed(&before) {
             changed.insert("Metadata", Value::from(metadata(&now)));
         }
         if before.rate != now.rate {
@@ -127,12 +78,7 @@ impl Service {
                 changed.insert(name, Value::from(new));
             }
         }
-        // A jump in position, as a seek, rather than the time going on.
-        let expected = before.position.as_secs_f64() + 0.5 * before.rate.max(1.0);
-        if before.track == now.track
-            && (now.position.as_secs_f64() < before.position.as_secs_f64() - 0.5
-                || now.position.as_secs_f64() > expected + 1.0)
-        {
+        if now.jumped(&before) {
             let micros = now.position.as_micros() as i64;
             let _ = self
                 .connection
@@ -182,12 +128,25 @@ fn metadata(now: &NowPlaying) -> HashMap<String, OwnedValue> {
         values.insert("xesam:url".into(), Value::from(url.clone()));
     }
     if let Some(art) = &now.art {
-        values.insert("mpris:artUrl".into(), Value::from(art.clone()));
+        values.insert("mpris:artUrl".into(), Value::from(file_uri(art)));
     }
     values
         .into_iter()
         .filter_map(|(key, value)| Some((key, OwnedValue::try_from(value).ok()?)))
         .collect()
+}
+
+/// `path` as a `file://` address, characters outside a path's own escaped.
+pub fn file_uri(path: &Path) -> String {
+    let mut uri = String::from("file://");
+    for byte in path.to_string_lossy().bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-_.~".contains(&byte) {
+            uri.push(byte as char);
+        } else {
+            uri.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    uri
 }
 
 struct Root {
