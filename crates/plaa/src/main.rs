@@ -20,6 +20,7 @@ mod mpris;
 #[cfg(target_os = "macos")]
 mod now_playing_macos;
 mod playlist;
+mod recorder;
 mod screenshot;
 mod settings_view;
 mod shortcuts;
@@ -53,6 +54,8 @@ pub enum External {
     Thumbnail(iced::window::Id, plaa_media::Thumbnail),
     /// Media keys or the desktop asked something of what plays.
     Media(media::Command),
+    /// What a window's recording says.
+    Recorded(iced::window::Id, plaa_media::record::RecordEvent),
     /// What a window's export says.
     Export(iced::window::Id, plaa_media::export::ExportEvent),
     /// The encoder an export of this format, size and depth would use,

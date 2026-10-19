@@ -28,6 +28,7 @@ use crate::window::{
 
 mod edits;
 mod export;
+mod recording;
 
 /// plaa's id, reversed domain style: its desktop entry on Linux, and how
 /// it names itself to the system's services everywhere.
@@ -41,6 +42,8 @@ pub const APP_ID: &str = if plaa_store::paths::PRODUCTION {
 const NOTICE_TIME: Duration = Duration::from_secs(6);
 /// How often windows take the players' status while something plays.
 const TICK: Duration = Duration::from_millis(100);
+/// How often recording windows' meters move.
+const METER_TICK: Duration = Duration::from_millis(33);
 /// How often positions are saved while playing, in case plaa stops
 /// without closing its windows.
 const POSITIONS_SAVE: Duration = Duration::from_secs(60);
@@ -88,6 +91,8 @@ pub struct Plaa {
     probing: HashSet<export::Encoding>,
     /// What the Export dialog chose last, which it starts with next.
     export_choice: Option<export::Choice>,
+    /// The sound input devices, as they were when last looked at.
+    input_devices: Vec<plaa_media::record::InputDevice>,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -173,6 +178,7 @@ pub(crate) struct Window {
 enum Content {
     Start,
     Player(Box<PlayerWindow>),
+    Recorder(Box<crate::recorder::Recorder>),
 }
 
 #[derive(Debug, Clone)]
@@ -208,6 +214,10 @@ pub enum Message {
     /// A recent address is to be forgotten.
     AddressForgotten(String),
     DismissNotice(window::Id),
+    /// What a recording window's controls send.
+    Recorder(window::Id, crate::recorder::RecorderControl),
+    /// Time for the recording windows' meters to move.
+    MeterTick,
     ExportFormat(window::Id, plaa_media::export::Format),
     /// The Export dialog's size: the picture's shorter side, or its own.
     ExportSize(window::Id, Option<u32>),
@@ -297,6 +307,7 @@ impl Plaa {
             encoders: HashMap::new(),
             probing: HashSet::new(),
             export_choice: None,
+            input_devices: Vec::new(),
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -603,6 +614,15 @@ impl Plaa {
             None => Size::new(640.0, 440.0),
             Some(_) => Size::new(960.0, 600.0),
         };
+        let (id, task) = self.new_window(size);
+        if let Some(list) = list {
+            self.play_in(id, list, false);
+        }
+        task
+    }
+
+    /// Opens a window `size` big, showing the start view to begin with.
+    fn new_window(&mut self, size: Size) -> (window::Id, Task<Message>) {
         let (id, opened) = window::open(window::Settings {
             size,
             min_size: Some(Size::new(360.0, 240.0)),
@@ -633,10 +653,7 @@ impl Plaa {
                 title_bar: 0.0,
             },
         );
-        if let Some(list) = list {
-            self.play_in(id, list, false);
-        }
-        opened.then(move |_| {
+        let task = opened.then(move |_| {
             Task::batch([
                 Task::done(Message::WindowOpened),
                 window::scale_factor(id).map(move |scale| Message::Rescaled(id, scale)),
@@ -644,7 +661,8 @@ impl Plaa {
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
                 window::run(id, window_surface).map(move |surface| Message::Surface(id, surface)),
             ])
-        })
+        });
+        (id, task)
     }
 
     /// Plays `list`'s current item in window `id`, in place of what it
@@ -754,7 +772,7 @@ impl Plaa {
     fn player_mut(&mut self, id: window::Id) -> Option<&mut PlayerWindow> {
         match &mut self.windows.get_mut(&id)?.content {
             Content::Player(player) => Some(player),
-            Content::Start => None,
+            Content::Start | Content::Recorder(_) => None,
         }
     }
 
@@ -866,9 +884,12 @@ impl Plaa {
                 })
             })
         };
+        let recording = self.windows.values().any(|window| {
+            matches!(&window.content, Content::Recorder(recorder) if recorder.is_recording())
+        });
         let wanted = if playing(true) {
             Some(Awake::Screen)
-        } else if playing(false) {
+        } else if playing(false) || recording {
             Some(Awake::Computer)
         } else {
             None
@@ -1172,6 +1193,16 @@ impl Plaa {
                 self.save_recent();
                 Task::none()
             }
+            Message::Recorder(id, control) => self.recorder_control(id, control),
+            Message::MeterTick => {
+                for window in self.windows.values_mut() {
+                    if let Content::Recorder(recorder) = &mut window.content {
+                        recorder.tick();
+                    }
+                }
+                Task::none()
+            }
+            Message::External(External::Recorded(id, event)) => self.recorded(id, event),
             Message::DismissNotice(id) => {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.notice = None;
@@ -1436,6 +1467,10 @@ impl Plaa {
             }
         }
         match shortcuts::action_for(&key, modifiers) {
+            // Play and pause starts and stops a recording.
+            Some(Action::PlayPause) if matches!(window.content, Content::Recorder(_)) => {
+                self.recorder_control(id, crate::recorder::RecorderControl::Toggle)
+            }
             Some(action) => self.perform(id, action),
             None => Task::none(),
         }
@@ -1483,6 +1518,7 @@ impl Plaa {
                 return Task::none();
             }
             Action::PictureInPicture => return self.toggle_pip(id),
+            Action::RecordSound => return self.open_recorder(id),
             Action::Previous => return self.previous(id),
             Action::Next => return self.next(id),
             Action::FullScreen => {
@@ -1864,6 +1900,7 @@ impl Plaa {
     pub fn title(&self, id: window::Id) -> String {
         let base = match self.windows.get(&id).map(|window| &window.content) {
             Some(Content::Player(player)) => player.window_title(),
+            Some(Content::Recorder(_)) => crate::fl!("record-title"),
             _ => crate::fl!("app-name"),
         };
         if plaa_store::paths::PRODUCTION {
@@ -1893,8 +1930,18 @@ impl Plaa {
         } else {
             Subscription::none()
         };
+        let metering = self
+            .windows
+            .values()
+            .any(|window| matches!(window.content, Content::Recorder(_)));
+        let meter_ticks = if metering {
+            Subscription::run(meter_ticks).map(|_| Message::MeterTick)
+        } else {
+            Subscription::none()
+        };
         Subscription::batch([
             ticks,
+            meter_ticks,
             iced::system::theme_changes().map(Message::SystemTheme),
             Subscription::run(scramble_ui::desktop::accent_changes).map(Message::SystemAccent),
             Subscription::run(crate::external_events).map(Message::External),
@@ -1934,6 +1981,7 @@ impl Plaa {
         let close_button = !scramble_ui::desktop::draws_title_bars();
         let body: Element<'_, Message> = match &window.content {
             Content::Start => start_view(id, close_button),
+            Content::Recorder(recorder) => self.recorder_view(id, recorder, close_button),
             Content::Player(player) => player_window::view(
                 player,
                 &player_window::Context {
@@ -2092,7 +2140,7 @@ impl Window {
     pub(crate) fn player(&self) -> Option<&PlayerWindow> {
         match &self.content {
             Content::Player(player) => Some(player),
-            Content::Start => None,
+            Content::Start | Content::Recorder(_) => None,
         }
     }
 }
@@ -2208,6 +2256,22 @@ fn screenshot_name(name: &str, position: Duration) -> String {
         seconds / 60 % 60,
         seconds % 60
     )
+}
+
+/// A tick every `METER_TICK`, for meters, as `ticks` are.
+fn meter_ticks() -> impl iced::futures::Stream<Item = ()> {
+    let (sender, receiver) = iced::futures::channel::mpsc::unbounded();
+    let _ = std::thread::Builder::new()
+        .name("plaa-meter-tick".into())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(METER_TICK);
+                if sender.unbounded_send(()).is_err() {
+                    return;
+                }
+            }
+        });
+    receiver
 }
 
 /// A tick every `TICK` from a thread of its own, as iced's executor has
@@ -2361,18 +2425,23 @@ fn recent_addresses<'a>(
 }
 
 fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
-    let hints = [Action::Open, Action::OpenAddress, Action::Settings]
-        .into_iter()
-        .filter_map(|action| Some((action, shortcuts::label(action)?)))
-        .map(|(action, label)| {
-            row![
-                scramble_ui::styled(action_name(action), Type::BodyMedium)
-                    .style(style::on_surface_variant),
-                scramble_ui::styled(label, Type::LabelLarge),
-            ]
-            .spacing(8)
-            .into()
-        });
+    let hints = [
+        Action::Open,
+        Action::OpenAddress,
+        Action::RecordSound,
+        Action::Settings,
+    ]
+    .into_iter()
+    .filter_map(|action| Some((action, shortcuts::label(action)?)))
+    .map(|(action, label)| {
+        row![
+            scramble_ui::styled(action_name(action), Type::BodyMedium)
+                .style(style::on_surface_variant),
+            scramble_ui::styled(label, Type::LabelLarge),
+        ]
+        .spacing(8)
+        .into()
+    });
     let content = container(
         column![
             icon::filled(Icon::Movie, 64).style(style::primary_text),
@@ -2394,6 +2463,13 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
                 )
                 .size(button::Size::Medium)
                 .on_press(Message::Perform(id, Action::OpenAddress)),
+                scramble_ui::with_icon(
+                    button::Kind::Tonal,
+                    Icon::Mic,
+                    crate::fl!("start-record-sound")
+                )
+                .size(button::Size::Medium)
+                .on_press(Message::Perform(id, Action::RecordSound)),
             ]
             .spacing(12),
             scramble_ui::dir::row(hints).spacing(24),
@@ -2441,6 +2517,7 @@ fn action_name(action: Action) -> String {
     match action {
         Action::Open => crate::fl!("action-open"),
         Action::OpenAddress => crate::fl!("action-open-address"),
+        Action::RecordSound => crate::fl!("action-record-sound"),
         Action::Settings => crate::fl!("action-settings"),
         _ => String::new(),
     }

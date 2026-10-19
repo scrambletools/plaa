@@ -35,8 +35,9 @@ fn write((width, height, rgba): &(u32, u32, Vec<u8>), path: &Path) -> Result<Pat
     Ok(path)
 }
 
-/// `path`, or "name 2.png", "name 3.png" and so on when it is taken.
-fn unused(path: &Path) -> PathBuf {
+/// `path`, or "name 2.png", "name 3.png" and so on when it is taken,
+/// with the path's own ending.
+pub(crate) fn unused(path: &Path) -> PathBuf {
     if !path.exists() {
         return path.to_path_buf();
     }
@@ -44,8 +45,12 @@ fn unused(path: &Path) -> PathBuf {
         .file_stem()
         .map(|stem| stem.to_string_lossy().into_owned())
         .unwrap_or_default();
+    let ending = path
+        .extension()
+        .map(|extension| format!(".{}", extension.to_string_lossy()))
+        .unwrap_or_default();
     (2..)
-        .map(|number| path.with_file_name(format!("{stem} {number}.png")))
+        .map(|number| path.with_file_name(format!("{stem} {number}{ending}")))
         .find(|candidate| !candidate.exists())
         .unwrap_or_else(|| path.to_path_buf())
 }

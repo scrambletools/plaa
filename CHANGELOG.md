@@ -41,3 +41,5 @@ The first build.
 - Exporting to H.264, HEVC, AV1 or sound alone, as edited and made
   smaller, on the graphics card's encoder where one opens; sound alone
   as AAC, MP3, Opus, FLAC, ALAC or WAV, at a quality chosen.
+- Recording sound from a microphone, or what the computer plays, with a
+  level meter, played back once saved.

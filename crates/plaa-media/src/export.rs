@@ -61,6 +61,25 @@ impl Sound {
         Sound::Wav,
     ];
 
+    /// Its name in settings, as `flac`.
+    pub fn key(self) -> &'static str {
+        match self {
+            Sound::Aac => "aac",
+            Sound::Mp3 => "mp3",
+            Sound::Opus => "opus",
+            Sound::Flac => "flac",
+            Sound::Alac => "alac",
+            Sound::Wav => "wav",
+        }
+    }
+
+    /// The format of that name in settings.
+    pub fn from_key(key: &str) -> Option<Sound> {
+        Sound::ALL
+            .into_iter()
+            .find(|sound| sound.key().eq_ignore_ascii_case(key.trim()))
+    }
+
     /// Whether it keeps the sound exactly.
     pub fn lossless(self) -> bool {
         matches!(self, Sound::Flac | Sound::Alac | Sound::Wav)
@@ -96,7 +115,7 @@ impl Sound {
     }
 
     /// FFmpeg's muxer for its files.
-    fn muxer(self) -> &'static str {
+    pub(crate) fn muxer(self) -> &'static str {
         match self {
             Sound::Aac | Sound::Alac => "ipod",
             Sound::Mp3 => "mp3",
@@ -247,14 +266,18 @@ impl Drop for Export {
 }
 
 /// Where an export is written until it is done: a hidden file beside the
-/// one asked for, so a file of that name stays until it is replaced
-/// whole.
-fn temporary_path(destination: &Path) -> PathBuf {
-    let name = destination
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
+/// one asked for, ending as it does, so a file of that name stays until
+/// it is replaced whole.
+pub(crate) fn temporary_path(destination: &Path) -> PathBuf {
+    let stem = destination
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
         .unwrap_or_else(|| "export".to_owned());
-    destination.with_file_name(format!(".{name}.part"))
+    let name = match destination.extension() {
+        Some(extension) => format!(".{stem}.part.{}", extension.to_string_lossy()),
+        None => format!(".{stem}.part"),
+    };
+    destination.with_file_name(name)
 }
 
 /// The encoders to try for `format` on this system, best first: the
@@ -542,10 +565,12 @@ fn picture_filters(transform: Transform, size: (u32, u32), format: Pixel) -> Str
 }
 
 /// The output's streams, as each is fed.
-struct Output {
-    context: ffmpeg::format::context::Output,
+pub(crate) struct Output {
+    pub context: ffmpeg::format::context::Output,
     /// Packets to write, through `interleaved` order.
-    packet: ffmpeg::Packet,
+    pub packet: ffmpeg::Packet,
+    /// Bytes of packets written.
+    pub written: u64,
 }
 
 impl Output {
@@ -553,7 +578,7 @@ impl Output {
     /// `index`, from `time_base` to the stream's. Packets that do not
     /// say how long they last get `duration`, as an encoder's last ones
     /// may not, which would leave out the last picture.
-    fn drain(
+    pub fn drain(
         &mut self,
         encoder: &mut ffmpeg::encoder::Encoder,
         index: usize,
@@ -568,6 +593,7 @@ impl Output {
             if self.packet.duration() <= 0 {
                 self.packet.set_duration(duration);
             }
+            self.written += self.packet.size() as u64;
             self.packet.set_stream(index);
             self.packet.rescale_ts(time_base, stream_base);
             self.packet
@@ -578,7 +604,7 @@ impl Output {
     }
 }
 
-fn failed(error: impl std::fmt::Display) -> ExportError {
+pub(crate) fn failed(error: impl std::fmt::Display) -> ExportError {
     ExportError::Failed(error.to_string())
 }
 
@@ -692,6 +718,7 @@ fn run(
     let mut output = Output {
         context,
         packet: ffmpeg::Packet::empty(),
+        written: 0,
     };
 
     let mut packet = ffmpeg::Packet::empty();
@@ -1066,36 +1093,25 @@ fn sample_rate(file: u32, takes: &[i32]) -> u32 {
     }
 }
 
-/// Sets up the sound's side: its decoder, an encoder for `sound` at
-/// `quality`, and its stream in the output.
-fn audio_side(
-    input: &ffmpeg::format::context::Input,
-    info: &MediaInfo,
-    index: usize,
+/// An encoder for `sound` at `quality`, opened for sound of `rate` Hz in
+/// `channels` channels, and its codec: at the file's rate and channels
+/// where the format takes them.
+pub(crate) fn sound_encoder(
     (sound, quality): (Sound, u32),
-    context: &mut ffmpeg::format::context::Output,
+    rate: u32,
+    channels: u16,
     global_header: bool,
-) -> Result<AudioSide, ExportError> {
-    let stream = input
-        .stream(index)
-        .ok_or_else(|| failed("the sound's stream is gone"))?;
-    let (decoder, time_base) = crate::decode::open_decoder(input, index).map_err(failed)?;
-    let decoder = decoder.audio().map_err(failed)?;
+) -> Result<(ffmpeg::Codec, ffmpeg::encoder::audio::Encoder), ExportError> {
     let codec = sound
         .encoders(quality)
         .iter()
         .find_map(|name| ffmpeg::encoder::find_by_name(name))
         .ok_or_else(|| failed("no encoder for this sound format"))?;
     let audio = codec.audio().map_err(failed)?;
-    let file_rate = info
-        .audio
-        .iter()
-        .find(|track| track.track.index == index)
-        .map_or(decoder.rate(), |track| track.sample_rate);
-    let rate = sound.rate_for(quality, file_rate);
+    let rate = sound.rate_for(quality, rate);
     // MP3 holds two channels at most.
     let most = if sound == Sound::Mp3 { 2 } else { 8 };
-    let channels = decoder.channels().clamp(1, most);
+    let channels = channels.clamp(1, most);
     let formats: Vec<ffmpeg::format::Sample> =
         audio.formats().map(Iterator::collect).unwrap_or_default();
     let sample = sample_format(sound, quality, &formats)
@@ -1120,9 +1136,78 @@ fn audio_side(
     let encoder = encoder
         .open_as_with(codec, ffmpeg::Dictionary::new())
         .map_err(failed)?;
+    Ok((codec, encoder))
+}
+
+/// The graph that turns sound of `rate` Hz, `format` and channel
+/// `layout` into what `encoder` takes, in frames of the size it takes,
+/// filling any gap in the timestamps.
+pub(crate) fn sound_graph(
+    (rate, format, layout): (u32, ffmpeg::format::Sample, &str),
+    encoder: &ffmpeg::encoder::audio::Encoder,
+) -> Result<ffmpeg::filter::Graph, ExportError> {
+    let mut graph = ffmpeg::filter::Graph::new();
+    let arguments = format!(
+        "time_base=1/{rate}:sample_rate={rate}:sample_fmt={}:channel_layout={layout}",
+        format.name(),
+    );
+    let abuffer = ffmpeg::filter::find("abuffer").ok_or_else(|| failed("no abuffer filter"))?;
+    let sink =
+        ffmpeg::filter::find("abuffersink").ok_or_else(|| failed("no abuffersink filter"))?;
+    graph.add(&abuffer, "in", &arguments).map_err(failed)?;
+    graph.add(&sink, "out", "").map_err(failed)?;
+    let mut filters = format!(
+        "aresample={rate}:async=1:first_pts=0,\
+         aformat=sample_fmts={format}:channel_layouts={layout}",
+        rate = encoder.rate(),
+        format = encoder.format().name(),
+        layout = ffi::default_layout(i32::from(encoder.channels())),
+    );
+    // In the frames the encoder takes, unless it takes any; the last one
+    // short, which FFmpeg pads for encoders that need it, so lossless
+    // sound ends where it does.
+    let size = encoder.frame_size();
+    if size > 0 {
+        filters.push_str(&format!(",asetnsamples=n={size}:p=0"));
+    }
+    graph
+        .output("in", 0)
+        .and_then(|parser| parser.input("out", 0))
+        .and_then(|parser| parser.parse(&filters))
+        .map_err(failed)?;
+    graph.validate().map_err(failed)?;
+    Ok(graph)
+}
+
+/// Sets up the sound's side: its decoder, an encoder for `sound` at
+/// `quality`, and its stream in the output.
+fn audio_side(
+    input: &ffmpeg::format::context::Input,
+    info: &MediaInfo,
+    index: usize,
+    (sound, quality): (Sound, u32),
+    context: &mut ffmpeg::format::context::Output,
+    global_header: bool,
+) -> Result<AudioSide, ExportError> {
+    let stream = input
+        .stream(index)
+        .ok_or_else(|| failed("the sound's stream is gone"))?;
+    let (decoder, time_base) = crate::decode::open_decoder(input, index).map_err(failed)?;
+    let decoder = decoder.audio().map_err(failed)?;
+    let file_rate = info
+        .audio
+        .iter()
+        .find(|track| track.track.index == index)
+        .map_or(decoder.rate(), |track| track.sample_rate);
+    let (codec, encoder) = sound_encoder(
+        (sound, quality),
+        file_rate,
+        decoder.channels(),
+        global_header,
+    )?;
     let mut out = context.add_stream(codec).map_err(failed)?;
     out.set_parameters(&encoder);
-    out.set_time_base(ffmpeg::Rational::new(1, rate as i32));
+    out.set_time_base(ffmpeg::Rational::new(1, encoder.rate() as i32));
     out.set_metadata(stream.metadata().to_owned());
     let output = out.index();
     Ok(AudioSide {
@@ -1197,43 +1282,12 @@ impl AudioSide {
         Ok(())
     }
 
-    /// The graph that turns sound like `frame` into the encoder's format,
-    /// in frames of the size it takes, filling any gap between parts.
+    /// The graph that turns sound like `frame` into the encoder's.
     fn build(&self, frame: &ffmpeg::frame::Audio) -> Result<ffmpeg::filter::Graph, ExportError> {
-        let mut graph = ffmpeg::filter::Graph::new();
-        let arguments = format!(
-            "time_base=1/{}:sample_rate={}:sample_fmt={}:channel_layout={}",
-            frame.rate(),
-            frame.rate(),
-            frame.format().name(),
-            ffi::frame_layout(frame),
-        );
-        let abuffer = ffmpeg::filter::find("abuffer").ok_or_else(|| failed("no abuffer filter"))?;
-        let sink =
-            ffmpeg::filter::find("abuffersink").ok_or_else(|| failed("no abuffersink filter"))?;
-        graph.add(&abuffer, "in", &arguments).map_err(failed)?;
-        graph.add(&sink, "out", "").map_err(failed)?;
-        let mut filters = format!(
-            "aresample={rate}:async=1:first_pts=0,\
-             aformat=sample_fmts={format}:channel_layouts={layout}",
-            rate = self.encoder.rate(),
-            format = self.encoder.format().name(),
-            layout = ffi::default_layout(i32::from(self.encoder.channels())),
-        );
-        // In the frames the encoder takes, unless it takes any; the last
-        // one short, which FFmpeg pads for encoders that need it, so
-        // lossless sound ends where it does.
-        let size = self.encoder.frame_size();
-        if size > 0 {
-            filters.push_str(&format!(",asetnsamples=n={size}:p=0"));
-        }
-        graph
-            .output("in", 0)
-            .and_then(|parser| parser.input("out", 0))
-            .and_then(|parser| parser.parse(&filters))
-            .map_err(failed)?;
-        graph.validate().map_err(failed)?;
-        Ok(graph)
+        sound_graph(
+            (frame.rate(), frame.format(), &ffi::frame_layout(frame)),
+            &self.encoder,
+        )
     }
 
     fn pull(&mut self, output: &mut Output) -> Result<(), ExportError> {
@@ -1337,6 +1391,7 @@ mod tests {
         assert_eq!(sample_rate(96000, &[44100, 32000]), 44100);
         for sound in Sound::ALL {
             assert!(sound.qualities().contains(&sound.usual_quality()));
+            assert_eq!(Sound::from_key(sound.key()), Some(sound));
         }
     }
 
@@ -1347,7 +1402,7 @@ mod tests {
         assert_eq!(muxer(Path::new("a")), "mp4");
         assert_eq!(
             temporary_path(Path::new("/tmp/clip.mp4")),
-            Path::new("/tmp/.clip.mp4.part")
+            Path::new("/tmp/.clip.part.mp4")
         );
     }
 }

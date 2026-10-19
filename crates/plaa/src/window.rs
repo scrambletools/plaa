@@ -481,6 +481,12 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
                 Control::Action(Action::OpenAddress),
             )
             .icon(Icon::Link),
+            Entry::divider(),
+            Entry::item(
+                crate::fl!("open-record-sound"),
+                Control::Action(Action::RecordSound),
+            )
+            .icon(Icon::Mic),
         ],
     )
     .size(button::Size::Small)

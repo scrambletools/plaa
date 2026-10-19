@@ -75,6 +75,14 @@ pub struct Settings {
     /// Where recordings are saved.
     #[serde(with = "home_path")]
     pub recordings: PathBuf,
+    /// The sound input device recordings come from, by the id the system
+    /// gives it; the system's default when none.
+    pub microphone: Option<String>,
+    /// What sound is recorded as: `aac`, `mp3`, `opus`, `flac`, `alac`
+    /// or `wav`.
+    pub recording_format: String,
+    /// Its quality: kb/s for compressed sound, bits for lossless.
+    pub recording_quality: u32,
     /// Where frames saved as pictures go.
     #[serde(with = "home_path")]
     pub screenshots: PathBuf,
@@ -109,6 +117,9 @@ impl Default for Settings {
             audio_languages: Vec::new(),
             subtitle_languages: Vec::new(),
             recordings: paths::default_recordings(),
+            microphone: None,
+            recording_format: "aac".to_owned(),
+            recording_quality: 256,
             screenshots: paths::default_screenshots(),
             keys: toml::Table::new(),
         }

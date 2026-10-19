@@ -320,3 +320,20 @@ close-unexported = The changes to “{ $name }” are lost unless you export the
 close-exporting = Exporting “{ $name }” stops, and what it wrote so far is lost.
 close-anyway = Close
 close-quit-anyway = Quit
+
+## Recording
+
+record-title = Sound recording
+record-file-name = Sound recording
+record-start = Record
+record-stop = Stop recording
+record-no-input = No microphone
+record-microphone = Microphone
+record-default-microphone = The system’s default
+record-playing = What the computer plays
+action-record-sound = Record sound
+open-record-sound = New sound recording
+start-record-sound = Record Sound
+menu-record-sound = New Sound Recording
+notice-recorded = Saved “{ $name }” in { $folder }
+notice-record-failed = Couldn’t record: { $error }

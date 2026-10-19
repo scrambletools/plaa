@@ -62,6 +62,7 @@ const ACTIONS: &[(&str, Action)] = &[
     ("audio-track", Action::AudioTrack),
     ("screenshot", Action::Screenshot),
     ("export", Action::Export),
+    ("record-sound", Action::RecordSound),
     ("undo", Action::Undo),
     ("redo", Action::Redo),
     ("trim", Action::Trim),
@@ -261,6 +262,7 @@ fn build() -> muda::Result<Menu> {
         &[
             &item("open", fl!("menu-open")),
             &item("open-address", fl!("menu-open-address")),
+            &item("record-sound", fl!("menu-record-sound")),
             &separator(),
             &item("export", fl!("menu-export")),
             &separator(),

@@ -84,8 +84,9 @@ trimming and splitting, and Intel Macs.
    flip, with undo, the edit playing without gaps; export to H.264,
    HEVC or AV1, as edited and made smaller, on hardware encoders where
    they open, or the sound alone, compressed or lossless.
-5. **Recording**: microphone, camera, screen (the ScreenCast portal and
-   PipeWire, ScreenCaptureKit, Windows.Graphics.Capture), AVB streams.
+5. **Recording**: microphone (done), screen (the ScreenCast portal and
+   PipeWire, ScreenCaptureKit, Windows.Graphics.Capture), camera; AVB
+   streams with the entity, in milestone 7.
 6. **Visualizer**: waveform, spectrum and cover art for sound.
 7. **AVB and Milan**: the entity, talker and listener.
 8. **Casting**: Chromecast and DLNA/UPnP.
@@ -179,6 +180,17 @@ with older drivers, takes them in eight unless they are HDR. What it
 writes goes to a hidden file beside the one chosen, renamed once done,
 and removed if it is stopped.
 
+### Recording
+
+A recording window opens its input device at once, so its meter moves
+before recording starts: the device's callback, on cpal's thread, notes
+each channel's peak and, while recording, queues its samples. A thread
+of the recording's own takes them through the same filter graph and
+encoder as exporting sound alone, timestamped by the samples counted,
+into a hidden file renamed once stopped; the window then plays it. The
+sound server lists what each output plays as an input too, offered
+apart from microphones.
+
 ### Pictures
 
 The picture is a shader widget that asks the player for the picture due
@@ -226,6 +238,7 @@ next pixel, so it moves a pixel at a time at any width.
 | Screen kept on | the screen saver's D-Bus service, else logind's idle lock (keepawake) | execution state (keepawake) | power assertions (keepawake) |
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
 | Hardware encoding | NVENC, VAAPI, Quick Sync | NVENC, AMF, Quick Sync | VideoToolbox |
+| Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI) | cpal (Core Audio) |
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |
@@ -274,4 +287,5 @@ Targets, to be measured as prev's are.
 | `atempo` holds a little sound, so speed changes are a fraction of a second late | Acceptable; the clock follows what is heard |
 | Patented codecs in bundled FFmpeg builds | Linux uses the system's FFmpeg; the Windows and macOS builds are chosen with this in mind before release |
 | Screen recording differs by desktop | The ScreenCast portal on Wayland, the system APIs elsewhere |
+| macOS asks before an app hears the microphone, naming the app by its bundle | Until plaa is packaged, macOS asks for the terminal that started it; the package's Info.plist gives the reason (`NSMicrophoneUsageDescription`) |
 | AVB needs hardware timestamping and ptp4l | Follow triib: Linux first, the entity off where the interface cannot do it |

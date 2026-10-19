@@ -33,6 +33,19 @@ pub fn kilohertz(rate: u32) -> String {
     text.strip_suffix(".0").unwrap_or(&text).to_owned()
 }
 
+/// A sound format's name, such as "FLAC".
+pub fn sound_name(sound: plaa_media::export::Sound) -> String {
+    use plaa_media::export::Sound;
+    match sound {
+        Sound::Aac => crate::fl!("export-aac"),
+        Sound::Mp3 => crate::fl!("export-mp3"),
+        Sound::Opus => crate::fl!("export-opus"),
+        Sound::Flac => crate::fl!("export-flac"),
+        Sound::Alac => crate::fl!("export-alac"),
+        Sound::Wav => crate::fl!("export-wav"),
+    }
+}
+
 /// A playback speed, such as "1.25×".
 pub fn speed(speed: f64) -> String {
     let text = format!("{speed:.2}");

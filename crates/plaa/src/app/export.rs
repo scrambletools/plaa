@@ -419,7 +419,7 @@ pub(super) fn dialog<'a>(
             .into_iter()
             .filter(|sound| sound.available())
             .map(|sound| {
-                scramble_ui::button(Kind::Tonal, sound_name(sound))
+                scramble_ui::button(Kind::Tonal, crate::format::sound_name(sound))
                     .selected(choice.sound == sound)
                     .on_press(Message::ExportSound(id, sound))
             })
@@ -520,17 +520,6 @@ fn size_buttons<'a>(
         })
         .collect();
     Some(component::connected(buttons))
-}
-
-fn sound_name(sound: Sound) -> String {
-    match sound {
-        Sound::Aac => crate::fl!("export-aac"),
-        Sound::Mp3 => crate::fl!("export-mp3"),
-        Sound::Opus => crate::fl!("export-opus"),
-        Sound::Flac => crate::fl!("export-flac"),
-        Sound::Alac => crate::fl!("export-alac"),
-        Sound::Wav => crate::fl!("export-wav"),
-    }
 }
 
 /// What a sound format is good for, as the dialog says.
