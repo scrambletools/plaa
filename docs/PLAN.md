@@ -155,7 +155,9 @@ and a close button where the window manager draws no title bar. The
 overlay is scramble-ui's floating bars; the picture widget notes pointer
 moves without rebuilding the window, and a tick every 100 ms while
 something plays takes the status and hides the bars once the pointer
-rests.
+rests. The timeline, too, places its handle from the player's position
+as it draws, and asks to draw again when the handle reaches the screen's
+next pixel, so it moves a pixel at a time at any width.
 
 ### Platform layer
 

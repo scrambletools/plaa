@@ -16,6 +16,7 @@ use scramble_ui::dropdown::{self, Entry};
 use scramble_ui::{Icon, Scheme, Type, button, column, icon, style};
 
 use crate::format;
+use crate::timeline::Timeline;
 
 /// The speeds the speed menu offers.
 pub const SPEEDS: [f64; 8] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
@@ -203,6 +204,8 @@ pub enum Control {
 pub struct Context {
     pub fullscreen: bool,
     pub width: f32,
+    /// The window's scale factor.
+    pub scale: f32,
     /// The window manager draws no title bar, so the toolbar ends with a
     /// close button.
     pub close_button: bool,
@@ -364,16 +367,16 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
     let long = duration.unwrap_or(position) >= 3600.0;
     let elapsed = format::time(position, long);
     let timeline: Element<'a, Control> = match duration.filter(|_| seekable) {
-        Some(duration) if duration > 0.0 => {
-            slider(0.0..=duration, position.min(duration), Control::Scrub)
-                .step(0.01)
-                .on_release(Control::ScrubEnded)
-                .height(style::SLIDER_HEIGHT)
-                .style(|theme: &Theme, status| {
-                    style::slider(timeline_backdrop(theme))(theme, status)
-                })
-                .into()
-        }
+        Some(duration) if duration > 0.0 => Timeline::new(
+            &window.player,
+            duration,
+            context.scale,
+            Control::Scrub,
+            Control::ScrubEnded,
+        )
+        .height(style::SLIDER_HEIGHT)
+        .style(|theme: &Theme, status| style::slider(timeline_backdrop(theme))(theme, status))
+        .into(),
         // Live streams: no timeline, only the time played.
         _ => space().width(Fill).into(),
     };

@@ -13,6 +13,7 @@ mod instance;
 mod screenshot;
 mod settings_view;
 mod shortcuts;
+mod timeline;
 mod video;
 mod window;
 

@@ -145,6 +145,13 @@ impl Clock {
     pub fn rate(&self) -> f64 {
         self.state().rate
     }
+
+    /// Media seconds a second the clock moves at now: its rate while it
+    /// runs, else none.
+    pub fn pace(&self) -> f64 {
+        let state = self.state();
+        if state.running() { state.rate } else { 0.0 }
+    }
 }
 
 #[cfg(test)]
@@ -158,6 +165,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(5));
         assert_eq!(clock.now(), 5.0);
         assert_eq!(clock.instant_of(6.0), None);
+        assert_eq!(clock.pace(), 0.0);
     }
 
     #[test]
@@ -170,6 +178,7 @@ mod tests {
         let later = start + Duration::from_secs(1);
         let position = clock.at(later);
         assert!((position - 12.0).abs() < 0.01, "{position}");
+        assert_eq!(clock.pace(), 2.0);
     }
 
     #[test]
@@ -181,6 +190,7 @@ mod tests {
         let held = clock.now();
         std::thread::sleep(Duration::from_millis(5));
         assert_eq!(clock.now(), held);
+        assert_eq!(clock.pace(), 0.0);
         clock.anchor(2.0, Instant::now());
         assert!(clock.running());
     }

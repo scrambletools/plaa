@@ -348,6 +348,12 @@ impl Player {
         }
     }
 
+    /// Media seconds a second the position moves at now: the speed while
+    /// playing, none while paused or waiting for sound.
+    pub fn pace(&self) -> f64 {
+        self.shared.clock.pace()
+    }
+
     pub fn status(&self) -> Status {
         check_ended(&self.shared);
         let state = self.shared.state().clone();

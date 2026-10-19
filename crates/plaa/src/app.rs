@@ -63,6 +63,7 @@ pub struct Plaa {
 pub(crate) struct Window {
     content: Content,
     pub(crate) size: Size,
+    scale: f32,
     fullscreen: bool,
     pub(crate) settings_open: bool,
     notice: Option<(String, Instant)>,
@@ -82,6 +83,7 @@ pub enum Message {
     WindowClosed(window::Id),
     CloseRequested(window::Id),
     Resized(window::Id, Size),
+    Rescaled(window::Id, f32),
     Key(window::Id, Key, Modifiers),
     Pointer(window::Id, bool),
     FileDropped(window::Id, PathBuf),
@@ -295,6 +297,7 @@ impl Plaa {
             Window {
                 content: Content::Start,
                 size,
+                scale: 1.0,
                 fullscreen: false,
                 settings_open: false,
                 notice: None,
@@ -304,7 +307,12 @@ impl Plaa {
         if let Some(source) = source {
             self.play_in(id, source);
         }
-        opened.map(|_| Message::WindowOpened)
+        opened.then(move |_| {
+            Task::batch([
+                Task::done(Message::WindowOpened),
+                window::scale_factor(id).map(move |scale| Message::Rescaled(id, scale)),
+            ])
+        })
     }
 
     /// Plays `source` in window `id`, in place of what it showed.
@@ -378,6 +386,12 @@ impl Plaa {
             Message::Resized(id, size) => {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.size = size;
+                }
+                Task::none()
+            }
+            Message::Rescaled(id, scale) => {
+                if let Some(window) = self.windows.get_mut(&id) {
+                    window.scale = scale;
                 }
                 Task::none()
             }
@@ -928,6 +942,9 @@ impl Plaa {
                 (Event::Window(window::Event::Resized(size)), _) => {
                     Some(Message::Resized(id, size))
                 }
+                (Event::Window(window::Event::Rescaled(scale)), _) => {
+                    Some(Message::Rescaled(id, scale))
+                }
                 (Event::Window(window::Event::FileDropped(path)), _) => {
                     Some(Message::FileDropped(id, path))
                 }
@@ -948,6 +965,7 @@ impl Plaa {
                 &player_window::Context {
                     fullscreen: window.fullscreen,
                     width: window.size.width,
+                    scale: window.scale,
                     close_button,
                 },
             )
