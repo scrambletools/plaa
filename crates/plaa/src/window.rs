@@ -800,7 +800,7 @@ fn edit_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
             item(crate::fl!("edit-rotate-left"), Action::RotateLeft).icon(Icon::RotateLeft),
             item(crate::fl!("edit-rotate-right"), Action::RotateRight).icon(Icon::RotateRight),
             item(crate::fl!("edit-flip-horizontal"), Action::FlipHorizontal).icon(Icon::Flip),
-            item(crate::fl!("edit-flip-vertical"), Action::FlipVertical),
+            item(crate::fl!("edit-flip-vertical"), Action::FlipVertical).icon(Icon::FlipVertical),
         ]);
     }
     let editor = &window.editor;
