@@ -284,21 +284,24 @@ impl PlayerWindow {
         }
     }
 
-    /// Whether the floating overlay should show now: always for sound and
-    /// while paused, else while the pointer moved lately inside the window,
-    /// a menu is open or the timeline is dragged.
+    /// Whether the floating overlay should show now: always for sound, and
+    /// while a menu is open or something is dragged; else while the
+    /// pointer is inside the window and it is paused, being edited, shows
+    /// a sheet, or the pointer moved lately.
     pub fn wants_overlay(&self, delay: Duration) -> bool {
-        if !self.is_video() || self.status.paused || self.error.is_some() {
+        if !self.is_video() || self.error.is_some() {
             return true;
         }
-        if self.menu.is_some()
-            || self.dragging.is_some()
+        if self.menu.is_some() || self.dragging.is_some() {
+            return true;
+        }
+        if !self.pointer_inside {
+            return false;
+        }
+        self.status.paused
             || self.sheet.is_some()
             || self.editor.mode.is_some()
-        {
-            return true;
-        }
-        self.pointer_inside && self.activity.idle() < delay
+            || self.activity.idle() < delay
     }
 
     /// Shows or hides the overlay as `wants_overlay` says, returning
