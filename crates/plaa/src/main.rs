@@ -10,6 +10,8 @@ mod instance;
 #[cfg(windows)]
 #[path = "instance_windows.rs"]
 mod instance;
+#[cfg(target_os = "linux")]
+mod mpris;
 mod playlist;
 mod screenshot;
 mod settings_view;
@@ -37,6 +39,9 @@ pub enum External {
     DropsGathered(iced::window::Id),
     /// A picture for a window's timeline.
     Thumbnail(iced::window::Id, plaa_media::Thumbnail),
+    /// Media keys or the desktop asked something of what plays.
+    #[cfg(target_os = "linux")]
+    Media(mpris::Command),
 }
 
 static EXTERNAL_EVENTS: Mutex<Option<UnboundedReceiver<External>>> = Mutex::new(None);

@@ -79,6 +79,8 @@ pub struct PlayerWindow {
     pub surface: u64,
     pub info: Option<Arc<MediaInfo>>,
     pub cover: Option<image::Handle>,
+    /// The cover saved as a picture, for the desktop to show.
+    pub art: Option<std::path::PathBuf>,
     pub status: Status,
     /// The graphics card API pictures decode on, or none for the
     /// processor; unknown before the file opens.
@@ -119,6 +121,7 @@ impl PlayerWindow {
             surface,
             info: None,
             cover: None,
+            art: None,
             decoding: None,
             error: None,
             no_sound: None,

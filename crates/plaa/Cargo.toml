@@ -21,11 +21,18 @@ i18n-embed = { version = "0.16", features = ["desktop-requester", "fluent-system
 i18n-embed-fl = "0.10"
 rust-embed = { version = "8", features = ["debug-embed"] }
 toml = "1"
+# Keeps the screen on while video plays: the screen saver's D-Bus service
+# and logind on Linux, power assertions on macOS, execution state on
+# Windows.
+keepawake = "0.6"
 
 # The file dialogs: the XDG desktop portal on Linux, the system's own
 # dialogs elsewhere, as prev has them.
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd = { version = "0.13", default-features = false, features = ["async-io", "file_chooser"] }
+# MPRIS, which media keys and panels play and pause through: the same
+# D-Bus library as the portal's.
+zbus = "5"
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rfd = { version = "0.15", default-features = false }

@@ -21,7 +21,7 @@ use crate::subtitle::{self, Cue, Cues};
 
 /// What to open: a file, or an address FFmpeg reads, such as an HTTP or
 /// RTSP stream.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Source {
     File(PathBuf),
     Url(String),

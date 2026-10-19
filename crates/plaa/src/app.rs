@@ -68,7 +68,53 @@ pub struct Plaa {
     pub(crate) language_drafts: [String; 2],
     /// The sound output devices, as they were when Settings last opened.
     pub(crate) audio_devices: Vec<plaa_media::OutputDevice>,
+    /// What is kept awake while something plays, and the hold on it when
+    /// the system gave one.
+    awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
+    /// The window media keys and the desktop's controls act on: the one
+    /// last played or used.
+    media_window: Option<window::Id>,
+    #[cfg(target_os = "linux")]
+    mpris: Option<crate::mpris::Service>,
     next_surface: u64,
+}
+
+/// Holds the screen on for video, or the computer for sound. Where the
+/// screen saver's service is missing, as on some tiling desktops, the
+/// computer's idle hold still keeps idle daemons such as hypridle off.
+fn hold_awake(kind: Awake) -> Option<keepawake::KeepAwake> {
+    let hold = |display: bool| {
+        keepawake::Builder::default()
+            .display(display)
+            .idle(true)
+            .reason(match kind {
+                Awake::Screen => "Playing video",
+                Awake::Computer => "Playing sound",
+            })
+            .app_name("plaa")
+            .app_reverse_domain(APP_ID)
+            .create()
+    };
+    let held = match kind {
+        Awake::Screen => hold(true).or_else(|_| hold(false)),
+        Awake::Computer => hold(false),
+    };
+    match held {
+        Ok(held) => Some(held),
+        Err(error) => {
+            eprintln!("plaa: keeping the screen on: {error}");
+            None
+        }
+    }
+}
+
+/// What playback keeps awake.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Awake {
+    /// The screen, as video plays.
+    Screen,
+    /// The computer, not the screen, as sound plays.
+    Computer,
 }
 
 pub(crate) struct Window {
@@ -177,6 +223,12 @@ impl Plaa {
             settings_tab: SettingsTab::default(),
             language_drafts,
             audio_devices: Vec::new(),
+            awake: None,
+            media_window: None,
+            #[cfg(target_os = "linux")]
+            mpris: crate::mpris::Service::start("plaa", |command| {
+                crate::post(External::Media(command));
+            }),
             next_surface: 1,
         };
         plaa.apply_looks();
@@ -440,6 +492,7 @@ impl Plaa {
     /// Plays `list`'s current item in window `id`, in place of what it
     /// showed. Moving on through a list keeps the window's size and modes.
     fn play_in(&mut self, id: window::Id, list: Playlist, moving_on: bool) {
+        self.media_window = Some(id);
         let source = list.source().clone();
         let start = match &source {
             Source::File(path) if self.settings.resume => {
@@ -490,6 +543,128 @@ impl Plaa {
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        let task = self.handle(message);
+        self.keep_awake();
+        #[cfg(target_os = "linux")]
+        self.tell_desktop();
+        task
+    }
+
+    /// The window media keys act on: the one last played or used, or any
+    /// that plays.
+    fn media_window(&self) -> Option<window::Id> {
+        self.media_window
+            .filter(|id| {
+                self.windows
+                    .get(id)
+                    .is_some_and(|window| window.player().is_some())
+            })
+            .or_else(|| {
+                self.windows
+                    .iter()
+                    .find_map(|(id, window)| window.player().map(|_| *id))
+            })
+    }
+
+    /// Tells the desktop what the media window plays.
+    #[cfg(target_os = "linux")]
+    fn tell_desktop(&self) {
+        let Some(service) = &self.mpris else {
+            return;
+        };
+        let now = self
+            .media_window()
+            .and_then(|id| self.windows.get(&id)?.player())
+            .map(|player| {
+                let info = player.info.as_deref();
+                let status = &player.status;
+                crate::mpris::NowPlaying {
+                    playback: if status.ended {
+                        crate::mpris::Playback::Stopped
+                    } else if status.paused {
+                        crate::mpris::Playback::Paused
+                    } else {
+                        crate::mpris::Playback::Playing
+                    },
+                    track: player.surface,
+                    title: player.title(),
+                    artist: info.and_then(|info| info.artist.clone()),
+                    album: info.and_then(|info| info.album.clone()),
+                    length: status.duration,
+                    url: match player.source() {
+                        Source::File(path) => Some(file_uri(path)),
+                        Source::Url(url) => Some(url.clone()),
+                    },
+                    art: player.art.as_deref().map(file_uri),
+                    position: status.position,
+                    rate: status.speed,
+                    can_previous: player.playlist.is_list(),
+                    can_next: player.playlist.next().is_some(),
+                    can_seek: info.is_some_and(|info| info.seekable),
+                }
+            })
+            .unwrap_or_default();
+        service.update(now);
+    }
+
+    /// Does what media keys or the desktop asked of the media window.
+    #[cfg(target_os = "linux")]
+    fn media(&mut self, command: crate::mpris::Command) -> Task<Message> {
+        use crate::mpris::Command;
+        let Some(id) = self.media_window() else {
+            return Task::none();
+        };
+        match command {
+            Command::Next => return self.next(id),
+            Command::Previous => return self.previous(id),
+            Command::Raise => return window::gain_focus(id),
+            Command::Quit => return self.perform(id, Action::Quit),
+            Command::SeekTo(seconds) => return self.control(id, Control::SeekTo(seconds)),
+            _ => {}
+        }
+        if let Some(player) = self.player_mut(id) {
+            match command {
+                Command::PlayPause => player.player.toggle(),
+                Command::Play => player.player.play(),
+                Command::Pause => player.player.pause(),
+                Command::Stop => {
+                    player.player.pause();
+                    player.player.seek(Duration::ZERO, true);
+                }
+                Command::SeekBy(seconds) => player.player.seek_by(seconds),
+                _ => {}
+            }
+            player.refresh();
+        }
+        Task::none()
+    }
+
+    /// Keeps the screen on while video plays, and the computer from
+    /// sleeping while sound does; lets go once nothing plays.
+    fn keep_awake(&mut self) {
+        let playing = |video: bool| {
+            self.windows.values().any(|window| {
+                window.player().is_some_and(|player| {
+                    !player.status.paused && !player.status.ended && player.is_video() == video
+                })
+            })
+        };
+        let wanted = if playing(true) {
+            Some(Awake::Screen)
+        } else if playing(false) {
+            Some(Awake::Computer)
+        } else {
+            None
+        };
+        if self.awake.as_ref().map(|(kind, _)| *kind) == wanted {
+            return;
+        }
+        // Tried once for each change, held or not, so a system without the
+        // services is not asked again on every message.
+        self.awake = wanted.map(|kind| (kind, hold_awake(kind)));
+    }
+
+    fn handle(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::External(External::OpenSources(sources)) => self.open_sources(sources, None),
             Message::External(External::OmarchyThemeChanged) => {
@@ -567,6 +742,8 @@ impl Plaa {
                 }
                 Task::none()
             }
+            #[cfg(target_os = "linux")]
+            Message::External(External::Media(command)) => self.media(command),
             Message::External(External::DropsGathered(id)) => {
                 let Some(window) = self.windows.get_mut(&id) else {
                     return Task::none();
@@ -681,6 +858,9 @@ impl Plaa {
         };
         match event {
             PlayerEvent::Opened { info, cover } => {
+                player.art = cover
+                    .as_deref()
+                    .and_then(|cover| save_cover(player.source(), cover));
                 player.cover = cover.map(|cover| {
                     image::Handle::from_rgba(cover.width, cover.height, cover.rgba.clone())
                 });
@@ -1000,6 +1180,9 @@ impl Plaa {
     }
 
     fn control(&mut self, id: window::Id, control: Control) -> Task<Message> {
+        if !matches!(control, Control::Hover(_) | Control::Activity) {
+            self.media_window = Some(id);
+        }
         let delay = self.settings.overlay_delay();
         match control {
             Control::Open => return self.perform(id, Action::Open),
@@ -1231,6 +1414,43 @@ impl Plaa {
 }
 
 /// Remembers where `player` is, for its file to start there next time.
+/// `path` as a `file://` address, characters outside a path's own escaped.
+fn file_uri(path: &std::path::Path) -> String {
+    let mut uri = String::from("file://");
+    for byte in path.to_string_lossy().bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-_.~".contains(&byte) {
+            uri.push(byte as char);
+        } else {
+            uri.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    uri
+}
+
+/// Saves a file's cover as a picture in the cache folder, for the desktop
+/// to show with what plays. Returns where.
+fn save_cover(source: &Source, cover: &plaa_media::Picture) -> Option<PathBuf> {
+    use std::hash::{Hash, Hasher};
+    let folder = plaa_store::paths::cache_dir()?.join("covers");
+    std::fs::create_dir_all(&folder).ok()?;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    source.hash(&mut hasher);
+    let path = folder.join(format!("{:016x}.png", hasher.finish()));
+    if path.exists() {
+        return Some(path);
+    }
+    let mut bytes = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut bytes, cover.width, cover.height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().ok()?;
+        writer.write_image_data(&cover.rgba).ok()?;
+    }
+    plaa_store::atomic::write(&path, &bytes).ok()?;
+    Some(path)
+}
+
 /// A file by its canonical path, so the same file is known however it was
 /// named.
 fn canonical(source: Source) -> Source {
