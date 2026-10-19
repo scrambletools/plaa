@@ -275,20 +275,16 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
     )
 }
 
-/// The toolbar: open, the file's name, and the window's tools.
+/// The toolbar: open, and the window's tools at the other end. The file's
+/// name is the window's title, as tools would cover it in a narrow window.
 fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
-    let name = text(window.title())
-        .size(Type::TitleSmall.size())
-        .font(Type::TitleSmall.font(false))
-        .wrapping(text::Wrapping::None)
-        .width(Fill);
     let mut tools = vec![
         component::tool(
             Icon::FolderOpen,
             crate::fl!("action-open"),
             Some(Control::Open),
         ),
-        container(name).padding([0, 8]).width(Fill).into(),
+        space().width(Fill).into(),
     ];
     if window.is_video() {
         tools.push(component::tool(
@@ -327,7 +323,7 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
     row(tools).spacing(4).align_y(Center).width(Fill).into()
 }
 
-/// The playback controls: play, skip, the timeline, volume, speed, tracks
+/// The playback controls: play, skip, the timeline, speed, volume, tracks
 /// and full screen.
 fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
     let status = &window.status;
@@ -419,13 +415,13 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
         container(time(elapsed)).padding([0, 4]).into(),
         timeline,
         container(time(remaining)).padding([0, 4]).into(),
+        speed_menu(window),
         mute,
     ];
     // Narrow windows keep the mute button and lose the slider.
     if context.width >= 640.0 {
         controls.push(volume.into());
     }
-    controls.push(speed_menu(window));
     if let Some(menu) = tracks_menu(window) {
         controls.push(menu);
     }
@@ -462,6 +458,7 @@ fn speed_menu(window: &PlayerWindow) -> Element<'_, Control> {
         })
         .collect();
     dropdown::icon_menu(Icon::Speed, entries)
+        .size(button::Size::Small)
         .tip(crate::fl!("action-speed"))
         .selected((current - 1.0).abs() > 1e-6)
         .open(window.menu == Some(Menu::Speed), |open| {
@@ -511,6 +508,7 @@ fn tracks_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
     }
     Some(
         dropdown::icon_menu(Icon::Subtitles, entries)
+            .size(button::Size::Small)
             .tip(crate::fl!("action-tracks"))
             .selected(window.status.subtitles.is_some())
             .open(window.menu == Some(Menu::Tracks), |open| {
