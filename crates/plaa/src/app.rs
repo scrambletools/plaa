@@ -712,10 +712,11 @@ impl Plaa {
             paused: player.status.paused,
             moving_on: true,
         };
-        let (list, ab_loop) = (player.playlist.clone(), player.ab_loop);
+        let (list, ab_loop, zoom) = (player.playlist.clone(), player.ab_loop, player.zoom);
         self.open_player(id, list, opening);
         if let Some(player) = self.player_mut(id) {
             player.ab_loop = ab_loop;
+            player.zoom = zoom;
             if let Some((from, Some(to))) = ab_loop {
                 player.player.set_ab_loop(Some((
                     Duration::from_secs_f64(from),
@@ -1822,6 +1823,12 @@ impl Plaa {
                     }
                 }
                 self.save_settings();
+                return Task::none();
+            }
+            Control::Zoom(step) => {
+                if let Some(player) = self.player_mut(id) {
+                    player.zoom = player.zoom.step(step);
+                }
                 return Task::none();
             }
             Control::Wheel(lines) => {

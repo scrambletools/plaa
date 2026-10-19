@@ -67,6 +67,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   `Film.en.srt` or in a `Subs` folder.
 - **Picture in picture** (Ctrl+Shift+P): a small window kept over others
   in a corner, where the system lets apps place windows.
+- **Zoom in** on the picture with Ctrl and the wheel, at the pointer, up
+  to 16 times; zooming all the way out fits it again.
 - **The system's media controls**: media keys, and what plays with its
   cover in the system's panels, through MPRIS on Linux (and
   `playerctl`), the media flyout on Windows and Now Playing on macOS.
@@ -194,6 +196,7 @@ On macOS, use ⌘ in place of Ctrl.
 | Previous, next chapter | Page Up, Page Down |
 | Playlist | Ctrl+P |
 | Picture in picture | Ctrl+Shift+P |
+| Zoom in, out at the pointer | Ctrl+wheel up, down |
 | Save frame as picture | S |
 | Trim, split clip | Ctrl+T, Ctrl+Y |
 | Trim from, to the playhead | I, O (while trimming) |

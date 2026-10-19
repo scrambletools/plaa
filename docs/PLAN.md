@@ -241,6 +241,16 @@ single samples would skip texels and make text and fine lines shimmer.
 At its size or larger, one linear sample. Every window shares one
 pipeline, keyed by a surface id per window.
 
+Ctrl and the wheel zoom the picture at the pointer: the widget sends
+each turn, with where the pointer is and how the picture fits, and the
+window applies them in turn, so quick turns of a touchpad all count. A
+zoom is a scale and the point of the picture in the widget's middle;
+the shader moves and scales the picture's corners, and the widget's
+edges cut it. Where the zoomed picture is larger than the widget it is
+kept covering it, its edge stopping at the widget's, and where it is
+smaller, in the middle; so near an edge the point under the pointer can
+move toward it. A new file starts fitted.
+
 ### Interface
 
 Windows follow prev: an iced daemon, one window per file, a start window

@@ -8,35 +8,135 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use iced::advanced::graphics::Viewport;
-use iced::mouse;
 use iced::wgpu;
 use iced::widget::shader::{self, Action};
 use iced::{Element, Fill, Rectangle};
+use iced::{keyboard, mouse};
 use plaa_media::frame::{Layout, Matrix, Transfer};
 use plaa_media::{Player, SubtitlePicture, Transform, VideoFrame};
 
 use crate::window::Activity;
 
+/// How much a step of the wheel zooms in.
+const ZOOM_STEP: f32 = 1.25;
+/// How far the picture zooms in at most.
+const MOST_ZOOM: f32 = 16.0;
+
+/// How far the picture is zoomed in, and where: the point of it shown in
+/// the middle of the widget, from the picture's own middle, in fractions
+/// of its width and height, rightward and downward.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Zoom {
+    pub scale: f32,
+    pub center: (f32, f32),
+}
+
+impl Default for Zoom {
+    fn default() -> Self {
+        Self {
+            scale: 1.0,
+            center: (0.0, 0.0),
+        }
+    }
+}
+
+/// A turn of the wheel zooming the picture: `steps`, out where negative,
+/// at `pointer`, in fractions of the widget from its middle, the picture
+/// fitted to `extent` of it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ZoomStep {
+    steps: f32,
+    pointer: (f32, f32),
+    extent: (f32, f32),
+}
+
+impl Zoom {
+    /// Zoomed by `step`.
+    pub fn step(self, step: ZoomStep) -> Self {
+        self.at(step.steps, step.pointer, step.extent)
+    }
+
+    /// Zoomed in `steps` steps of the wheel, out where negative, keeping
+    /// the point of the picture at `pointer` where it is: `pointer` in
+    /// fractions of the widget from its middle, for a picture fitted to
+    /// `extent` of it.
+    fn at(self, steps: f32, pointer: (f32, f32), extent: (f32, f32)) -> Self {
+        let scale = (self.scale * ZOOM_STEP.powf(steps)).clamp(1.0, MOST_ZOOM);
+        // The picture's point under the pointer, before and after.
+        let under = |center: f32, pointer: f32, extent: f32, scale: f32| {
+            center + pointer / (extent * scale)
+        };
+        let keep = |center: f32, pointer: f32, extent: f32| {
+            under(center, pointer, extent, self.scale) - pointer / (extent * scale)
+        };
+        Self {
+            scale,
+            center: (
+                keep(self.center.0, pointer.0, extent.0),
+                keep(self.center.1, pointer.1, extent.1),
+            ),
+        }
+        .clamped(extent)
+    }
+
+    /// Kept so the picture covers the widget where it is larger than it,
+    /// and in its middle where it is not.
+    fn clamped(self, extent: (f32, f32)) -> Self {
+        let clamp = |center: f32, extent: f32| {
+            // How wide the picture shows, in widgets.
+            let shown = extent * self.scale;
+            if shown <= 1.0 {
+                0.0
+            } else {
+                let most = 0.5 - 0.5 / shown;
+                center.clamp(-most, most)
+            }
+        };
+        Self {
+            scale: self.scale,
+            center: (
+                clamp(self.center.0, extent.0),
+                clamp(self.center.1, extent.1),
+            ),
+        }
+    }
+
+    /// Half the picture's size, and where its middle is, in clip space,
+    /// for a picture fitted to `extent`.
+    fn placed(self, extent: (f32, f32)) -> ((f32, f32), (f32, f32)) {
+        let zoom = self.clamped(extent);
+        let size = (extent.0 * zoom.scale, extent.1 * zoom.scale);
+        // Clip space is two units across and points up.
+        let middle = (-2.0 * zoom.center.0 * size.0, 2.0 * zoom.center.1 * size.1);
+        (size, middle)
+    }
+}
+
 /// Draws `player`'s pictures, fitted inside the widget, turned and
-/// flipped as `transform` says. `surface` tells windows apart, as every
-/// window's pictures share one pipeline. Pointer moves are noted in
-/// `activity`, and `on_activity` is sent when one should bring the hidden
-/// overlay back.
+/// flipped as `transform` says, and zoomed in as `zoom` says; the command
+/// key and the wheel zoom it at the pointer, each turn sent as `on_zoom`
+/// for the window to apply in turn. `surface`
+/// tells windows apart, as every window's pictures share one pipeline.
+/// Pointer moves are noted in `activity`, and `on_activity` is sent when
+/// one should bring the hidden overlay back.
 pub fn view<'a, Message: Clone + 'a>(
     player: &'a Player,
     surface: u64,
-    transform: Transform,
+    (transform, zoom): (Transform, Zoom),
     activity: Arc<Activity>,
     hide_cursor: bool,
     on_activity: Message,
+    on_zoom: fn(ZoomStep) -> Message,
 ) -> Element<'a, Message> {
     shader::Shader::new(Program {
         player,
         surface,
         transform,
+        zoom,
         activity,
         hide_cursor,
         on_activity,
+        on_zoom,
     })
     .width(Fill)
     .height(Fill)
@@ -47,21 +147,24 @@ struct Program<'a, Message> {
     player: &'a Player,
     surface: u64,
     transform: Transform,
+    zoom: Zoom,
     activity: Arc<Activity>,
     hide_cursor: bool,
     on_activity: Message,
+    on_zoom: fn(ZoomStep) -> Message,
 }
 
 impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
-    type State = ();
+    /// The keys held, as the wheel zooms with the command key.
+    type State = keyboard::Modifiers;
     type Primitive = Primitive;
 
     fn update(
         &self,
-        _state: &mut Self::State,
+        modifiers: &mut Self::State,
         event: &iced::Event,
-        _bounds: Rectangle,
-        _cursor: mouse::Cursor,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
     ) -> Option<Action<Message>> {
         // Each drawn frame asks for the next at the time its picture is
         // due, so playback runs without the interface being rebuilt.
@@ -73,22 +176,51 @@ impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
                 .activity
                 .touch()
                 .then(|| Action::publish(self.on_activity.clone())),
+            iced::Event::Keyboard(keyboard::Event::ModifiersChanged(held)) => {
+                *modifiers = *held;
+                None
+            }
+            iced::Event::Mouse(mouse::Event::WheelScrolled { delta }) if modifiers.command() => {
+                let pointer = cursor.position_in(bounds)?;
+                let frame = self.player.picture()?;
+                let steps = match delta {
+                    mouse::ScrollDelta::Lines { y, .. } => *y,
+                    mouse::ScrollDelta::Pixels { y, .. } => y / 40.0,
+                };
+                let pointer = (
+                    pointer.x / bounds.width.max(1.0) - 0.5,
+                    pointer.y / bounds.height.max(1.0) - 0.5,
+                );
+                let step = ZoomStep {
+                    steps,
+                    pointer,
+                    extent: fitted_extent(&frame, self.transform, &bounds),
+                };
+                // Taken here, so the wheel does not change the volume too.
+                Some(Action::publish((self.on_zoom)(step)).and_capture())
+            }
             _ => None,
         }
     }
 
-    fn draw(&self, _state: &Self::State, _cursor: mouse::Cursor, _bounds: Rectangle) -> Primitive {
+    fn draw(
+        &self,
+        _modifiers: &Self::State,
+        _cursor: mouse::Cursor,
+        _bounds: Rectangle,
+    ) -> Primitive {
         Primitive {
             surface: self.surface,
             frame: self.player.picture(),
             subtitle: self.player.subtitle_picture(),
             transform: self.transform,
+            zoom: self.zoom,
         }
     }
 
     fn mouse_interaction(
         &self,
-        _state: &Self::State,
+        _modifiers: &Self::State,
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> mouse::Interaction {
@@ -108,16 +240,17 @@ pub struct Primitive {
     subtitle: Option<Arc<SubtitlePicture>>,
     /// How an edit turns and flips the picture.
     transform: Transform,
+    zoom: Zoom,
 }
 
-/// The size of the shader's `Uniforms`: 32 words.
-const UNIFORMS: usize = 128;
+/// The size of the shader's `Uniforms`: 36 words.
+const UNIFORMS: usize = 144;
 
 /// The values the shader reads, laid out as its `Uniforms`.
 fn uniforms(
     frame: &VideoFrame,
     transform: Transform,
-    extent: (f32, f32),
+    (extent, middle): ((f32, f32), (f32, f32)),
     srgb_target: bool,
     subtitle: Option<&SubtitlePicture>,
 ) -> [u8; UNIFORMS] {
@@ -205,6 +338,8 @@ fn uniforms(
         words[30] = (subtitle.width as f32 / width).to_bits();
         words[31] = (subtitle.height as f32 / height).to_bits();
     }
+    words[32] = middle.0.to_bits();
+    words[33] = middle.1.to_bits();
     let mut bytes = [0u8; UNIFORMS];
     for (chunk, word) in bytes.as_chunks_mut::<4>().0.iter_mut().zip(words) {
         *chunk = word.to_ne_bytes();
@@ -249,7 +384,9 @@ impl shader::Primitive for Primitive {
             pipeline.surfaces.remove(&self.surface);
             return;
         };
-        let extent = fitted_extent(frame, self.transform, bounds);
+        let placed = self
+            .zoom
+            .placed(fitted_extent(frame, self.transform, bounds));
         let srgb = pipeline.srgb;
         let surface = pipeline
             .surfaces
@@ -271,7 +408,7 @@ impl shader::Primitive for Primitive {
         queue.write_buffer(
             &surface.uniforms,
             0,
-            &uniforms(frame, self.transform, extent, srgb, subtitle),
+            &uniforms(frame, self.transform, placed, srgb, subtitle),
         );
     }
 
@@ -834,6 +971,69 @@ impl shader::Pipeline for Pipeline {
 
 #[cfg(test)]
 mod tests {
+    use super::Zoom;
+
+    /// Where the picture's point `point`, from its middle in fractions,
+    /// shows in the widget, from its middle in fractions.
+    fn shown_at(zoom: Zoom, point: (f32, f32), extent: (f32, f32)) -> (f32, f32) {
+        let (size, middle) = zoom.placed(extent);
+        (
+            (middle.0 + point.0 * 2.0 * size.0) / 2.0,
+            -(middle.1 - point.1 * 2.0 * size.1) / 2.0,
+        )
+    }
+
+    fn close(left: (f32, f32), right: (f32, f32)) -> bool {
+        (left.0 - right.0).abs() < 1e-4 && (left.1 - right.1).abs() < 1e-4
+    }
+
+    #[test]
+    fn zooming_keeps_the_point_under_the_pointer() {
+        // A wide picture, filling the widget's width but not its height.
+        let extent = (1.0, 0.6);
+        let pointer = (0.2, -0.05);
+        let fitted = Zoom::default();
+        let under = (pointer.0 / extent.0, pointer.1 / extent.1);
+        assert!(close(shown_at(fitted, under, extent), pointer));
+        let zoomed = fitted.at(3.0, pointer, extent);
+        assert!((zoomed.scale - 1.25f32.powi(3)).abs() < 1e-4);
+        // Taller than the widget now, so the point stays on both axes.
+        assert!(close(shown_at(zoomed, under, extent), pointer));
+        let further = zoomed.at(2.0, (-0.3, 0.2), extent);
+        let under = (
+            zoomed.center.0 - 0.3 / (extent.0 * zoomed.scale),
+            zoomed.center.1 + 0.2 / (extent.1 * zoomed.scale),
+        );
+        assert!(close(shown_at(further, under, extent), (-0.3, 0.2)));
+        // Near its top edge, it moves down rather than show the gap
+        // above it: the top of the picture stays at the widget's top.
+        let top = fitted.at(3.0, (0.0, -0.25), extent);
+        assert!(close(shown_at(top, (0.0, -0.5), extent), (0.0, -0.5)));
+    }
+
+    #[test]
+    fn the_picture_covers_the_widget_while_zoomed() {
+        let extent = (1.0, 1.0);
+        // Zoomed in at the very corner: the corner stays in the corner.
+        let zoomed = Zoom::default().at(4.0, (0.5, 0.5), extent);
+        let edge = 0.5 - 0.5 / zoomed.scale;
+        assert!(close(zoomed.center, (edge, edge)));
+        // Out again all the way: fitted and in the middle.
+        let back = zoomed.at(-10.0, (0.1, 0.1), extent);
+        assert_eq!(back, Zoom::default());
+        // Never smaller than fitted, nor beyond the most.
+        assert_eq!(Zoom::default().at(-1.0, (0.0, 0.0), extent).scale, 1.0);
+        assert_eq!(
+            Zoom::default().at(100.0, (0.0, 0.0), extent).scale,
+            super::MOST_ZOOM
+        );
+        // An axis where the picture is still smaller than the widget
+        // stays in the middle.
+        let narrow = Zoom::default().at(1.0, (0.3, 0.3), (0.5, 1.0));
+        assert_eq!(narrow.center.0, 0.0);
+        assert!(narrow.center.1 > 0.0);
+    }
+
     #[test]
     fn the_shader_is_valid_wgsl() {
         let module = naga::front::wgsl::parse_str(include_str!("video.wgsl"))

@@ -2,7 +2,7 @@
 // screen pixel covers when shrunk, turns Y'CbCr into R'G'B', maps HDR and
 // wide gamut pictures into what a standard screen shows, lays a subtitle
 // picture over it, and fits it inside the widget, turned upright and as
-// an edit turns and flips it.
+// an edit turns and flips it, zoomed in where asked.
 
 struct Uniforms {
     // Rows of the Y'CbCr to R'G'B' matrix; w is unused.
@@ -41,6 +41,9 @@ struct Uniforms {
     // Where it goes on the picture, in 0 to 1 units: left, top, width,
     // height.
     subtitle_rect: vec4<f32>,
+    // Where the picture's middle is within the widget, in clip space, as
+    // it is zoomed in.
+    middle: vec2<f32>,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -73,7 +76,7 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOut {
     // top right.
     let corner = vec2<f32>(f32(index & 1u), f32(index >> 1u));
     var out: VertexOut;
-    out.position = vec4<f32>((corner * 2.0 - 1.0) * uniforms.extent, 0.0, 1.0);
+    out.position = vec4<f32>(uniforms.middle + (corner * 2.0 - 1.0) * uniforms.extent, 0.0, 1.0);
     out.screen = vec2<f32>(corner.x, 1.0 - corner.y);
     out.uv = turned(out.screen, uniforms.turns);
     if uniforms.mirrored == 1u {

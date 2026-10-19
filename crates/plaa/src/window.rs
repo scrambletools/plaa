@@ -141,6 +141,8 @@ pub struct PlayerWindow {
     pub quality: Quality,
     /// The edit of the file, its history and what is being edited.
     pub editor: Editor,
+    /// How far the picture is zoomed in, and where.
+    pub zoom: crate::video::Zoom,
     /// The file's chapters as they fall in the edit.
     pub chapters: Vec<Chapter>,
     /// Pictures along the file for the editing bars' filmstrips, by the
@@ -180,6 +182,7 @@ impl PlayerWindow {
             page: None,
             quality: Quality::Best,
             editor: Editor::default(),
+            zoom: crate::video::Zoom::default(),
             chapters: Vec::new(),
             strip: Vec::new(),
             stills: Vec::new(),
@@ -380,6 +383,8 @@ pub enum Control {
     Activity,
     /// The wheel turned over the picture, by lines.
     Wheel(f32),
+    /// The command key and the wheel zoomed the picture.
+    Zoom(crate::video::ZoomStep),
     /// Does what a menu item or shortcut would.
     Action(Action),
     /// The trim bar keeps from and to these seconds, showing the third.
@@ -426,10 +431,11 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
     let picture = mouse_area(crate::video::view(
         &window.player,
         window.surface,
-        window.transform(),
+        (window.transform(), window.zoom),
         window.activity.clone(),
         !window.overlay_shown,
         Control::Activity,
+        Control::Zoom,
     ))
     .on_double_click(Control::ToggleFullScreen)
     .on_scroll(|delta| {
