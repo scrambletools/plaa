@@ -37,9 +37,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   when it moves; Settings can dock them above and below instead. Sound
   files show their cover art, title, artist and album, with the controls
   docked.
-- **Seeking** by dragging the timeline, to keyframes while dragging and
-  exactly where it is let go; back and forward 5 and 10 seconds, and frame
-  by frame.
+- **Seeking** by dragging the timeline, the picture following the
+  handle exactly and only the way it goes; back and forward 5 and 10
+  seconds, and frame by frame.
 - **Speed** from a quarter to three times, keeping the sound's pitch.
 - **Audio and subtitle tracks**, picked by preferred languages or from the
   menu; text subtitles (SubRip, ASS, WebVTT, MP4 text and more).

@@ -12,7 +12,8 @@ The first build.
   free of moiré.
 - Controls float over the picture and slide away while the pointer rests,
   or dock above and below it; sound files show their cover and tags.
-- A timeline that moves a pixel at a time at any window size.
+- A timeline that moves a pixel at a time at any window size, and
+  shows the frame under its handle as it is dragged.
 - Seeking, skipping, frame steps, speed with the pitch kept, looping,
   audio and subtitle tracks, text subtitles, the inspector, saving the
   frame, resuming where a file was left.

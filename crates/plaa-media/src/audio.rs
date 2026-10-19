@@ -129,6 +129,37 @@ impl Shared {
         }
     }
 
+    /// Drops `serial`'s sound before media time `position`, as the
+    /// timeline is dragged on from where it was.
+    pub fn discard_before(&self, serial: u64, position: f64) {
+        let channels = usize::from(self.channels.max(1));
+        let mut queue = self.queue();
+        while let Some(chunk) = queue.chunks.front_mut() {
+            let left = (chunk.samples.len() - chunk.played) / channels;
+            let at = chunk.position + (chunk.played / channels) as f64 * chunk.step;
+            let skip = if chunk.serial != serial {
+                left
+            } else {
+                // Less a hair, so a frame right at `position` stays.
+                (((position - at) / chunk.step - 1e-6).ceil().max(0.0) as usize).min(left)
+            };
+            chunk.played += skip * channels;
+            let done = skip == left;
+            queue.frames = queue.frames.saturating_sub(skip);
+            if !done {
+                break;
+            }
+            queue.chunks.pop_front();
+        }
+        self.room.notify_all();
+    }
+
+    /// Whether sound of `serial` has come, or none will.
+    pub fn reached(&self, serial: u64) -> bool {
+        let queue = self.queue();
+        queue.serial == serial && (queue.frames > 0 || queue.finished)
+    }
+
     /// Whether everything decoded has been played and nothing more comes.
     pub fn drained(&self) -> bool {
         let queue = self.queue();
@@ -166,7 +197,7 @@ impl Shared {
         let channels = usize::from(self.channels.max(1));
         let gain = self.gain();
         let silence = T::from_sample(0.0f32);
-        if self.clock.paused() {
+        if self.clock.still() {
             out.fill(silence);
             return;
         }
@@ -317,6 +348,39 @@ mod tests {
         assert_eq!(&out[12..], &[0.0; 4]);
         // Four frames were played before the second fill.
         assert!((shared.clock.now() - 2.004).abs() < 0.01);
+    }
+
+    #[test]
+    fn dragging_on_drops_the_sound_passed() {
+        let shared = shared();
+        let stop = AtomicBool::new(false);
+        // Two chunks of ten frames from 1.0 s, a frame a millisecond.
+        let first: Vec<f32> = (0..20).map(|sample| sample as f32).collect();
+        assert!(shared.push(0, 1.0, 0.001, first, &stop));
+        assert!(shared.push(0, 1.01, 0.001, vec![0.5; 20], &stop));
+        shared.discard_before(0, 1.004);
+        assert_eq!(shared.queue().frames, 16);
+        let mut out = [0.0f32; 2];
+        shared.fill(&mut out, Duration::ZERO);
+        // The fifth frame plays first.
+        assert_eq!(out, [8.0, 9.0]);
+        assert!((shared.clock.now() - 1.004).abs() < 0.01);
+        shared.discard_before(0, 2.0);
+        assert_eq!(shared.queue().frames, 0);
+        assert!(!shared.reached(1));
+    }
+
+    #[test]
+    fn held_clock_keeps_the_sound() {
+        let shared = shared();
+        let stop = AtomicBool::new(false);
+        assert!(shared.push(0, 0.0, 0.001, vec![0.5; 20], &stop));
+        shared.clock.hold(true);
+        let mut out = [1.0f32; 4];
+        shared.fill(&mut out, Duration::ZERO);
+        assert_eq!(out, [0.0; 4]);
+        assert_eq!(shared.queue().frames, 10);
+        assert!(shared.reached(0));
     }
 
     #[test]

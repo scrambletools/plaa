@@ -320,6 +320,33 @@ impl Queue {
         self.shown.clone()
     }
 
+    /// Whether a picture waiting is due at media time `now`.
+    pub fn has_due(&self, now: f64) -> bool {
+        self.frames
+            .front()
+            .is_some_and(|frame| frame.position <= now)
+    }
+
+    /// Whether the picture for media time `target` of `serial` shows: one
+    /// of that serial is shown and none waiting is due by then.
+    pub fn settled(&self, serial: u64, target: f64) -> bool {
+        self.serial == serial
+            && self
+                .shown
+                .as_ref()
+                .is_some_and(|shown| shown.serial == serial)
+            && !self.has_due(target)
+    }
+
+    /// Whether the first picture after a seek is still being decoded.
+    pub fn waiting(&self) -> bool {
+        let shown_is_current = self
+            .shown
+            .as_ref()
+            .is_some_and(|shown| shown.serial == self.serial);
+        !shown_is_current && self.frames.is_empty() && !self.finished
+    }
+
     /// The media time the next picture is due.
     pub fn next_due(&self) -> Option<f64> {
         self.frames.front().map(|frame| frame.position)
@@ -375,6 +402,25 @@ mod tests {
         queue.push(frame(1, 30.0));
         assert!(queue.has_new());
         assert_eq!(queue.take_due(0.0).unwrap().position, 30.0);
+    }
+
+    #[test]
+    fn a_seek_settles_once_its_picture_shows() {
+        let mut queue = Queue::default();
+        queue.flush(1);
+        assert!(queue.waiting());
+        assert!(!queue.settled(1, 5.0));
+        queue.push(frame(1, 5.0));
+        queue.push(frame(1, 5.04));
+        assert!(!queue.waiting());
+        assert!(!queue.settled(1, 5.0), "not shown yet");
+        queue.take_due(5.0);
+        assert!(queue.settled(1, 5.0));
+        // Dragged on: the next picture is due, so it has to show first.
+        assert!(queue.has_due(5.05));
+        assert!(!queue.settled(1, 5.05));
+        queue.take_due(5.05);
+        assert!(queue.settled(1, 5.05));
     }
 
     #[test]

@@ -34,8 +34,6 @@ const TICK: Duration = Duration::from_millis(100);
 /// How often positions are saved while playing, in case plaa stops
 /// without closing its windows.
 const POSITIONS_SAVE: Duration = Duration::from_secs(60);
-/// A seek at most this often while the timeline is dragged.
-const SCRUB_INTERVAL: Duration = Duration::from_millis(40);
 
 pub struct Plaa {
     pub(crate) windows: BTreeMap<window::Id, Window>,
@@ -57,7 +55,6 @@ pub struct Plaa {
     /// Language lists as typed in Settings, applied as they change.
     pub(crate) language_drafts: [String; 2],
     next_surface: u64,
-    last_scrub: Instant,
 }
 
 pub(crate) struct Window {
@@ -162,7 +159,6 @@ impl Plaa {
             settings_tab: SettingsTab::default(),
             language_drafts,
             next_surface: 1,
-            last_scrub: Instant::now(),
         };
         plaa.apply_looks();
         plaa.reload_omarchy();
@@ -839,27 +835,20 @@ impl Plaa {
             }
             _ => {}
         }
-        let scrub_due = self.last_scrub.elapsed() >= SCRUB_INTERVAL;
         let Some(player) = self.player_mut(id) else {
             return Task::none();
         };
-        let mut scrubbed = false;
         match control {
             Control::TogglePlay => player.player.toggle(),
             Control::Scrub(position) => {
                 player.dragging = Some(position);
-                if scrub_due {
-                    player
-                        .player
-                        .seek(Duration::from_secs_f64(position.max(0.0)), false);
-                    scrubbed = true;
-                }
+                player
+                    .player
+                    .scrub(Duration::from_secs_f64(position.max(0.0)));
             }
             Control::ScrubEnded => {
-                if let Some(position) = player.dragging.take() {
-                    player
-                        .player
-                        .seek(Duration::from_secs_f64(position.max(0.0)), true);
+                if player.dragging.take().is_some() {
+                    player.player.end_scrub();
                 }
             }
             Control::SkipBy(seconds) => player.player.seek_by(seconds),
@@ -886,9 +875,6 @@ impl Plaa {
         player.refresh();
         player.activity.touch();
         player.refresh_overlay(delay);
-        if scrubbed {
-            self.last_scrub = Instant::now();
-        }
         Task::none()
     }
 

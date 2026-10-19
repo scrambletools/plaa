@@ -21,11 +21,13 @@ struct State {
     paused: bool,
     /// Waiting for sound, after a seek or while a stream buffers.
     stalled: bool,
+    /// Held while the timeline is dragged, without pausing.
+    held: bool,
 }
 
 impl State {
     fn running(&self) -> bool {
-        !self.paused && !self.stalled
+        !self.paused && !self.stalled && !self.held
     }
 
     fn position_at(&self, instant: Instant) -> f64 {
@@ -55,6 +57,7 @@ impl Clock {
                 rate: 1.0,
                 paused: true,
                 stalled: false,
+                held: false,
             }),
         }
     }
@@ -130,6 +133,30 @@ impl Clock {
         self.state().paused
     }
 
+    /// Holds the clock where it is while the timeline is dragged, or lets
+    /// it go on, paused or playing as it was.
+    pub fn hold(&self, held: bool) {
+        let mut state = self.state();
+        if state.held == held {
+            return;
+        }
+        let now = Instant::now();
+        state.position = state.position_at(now);
+        state.at = now;
+        state.held = held;
+    }
+
+    pub fn held(&self) -> bool {
+        self.state().held
+    }
+
+    /// Whether the clock is kept still, paused or held, so the sound
+    /// waits where it is.
+    pub fn still(&self) -> bool {
+        let state = self.state();
+        state.paused || state.held
+    }
+
     pub fn running(&self) -> bool {
         self.state().running()
     }
@@ -179,6 +206,22 @@ mod tests {
         let position = clock.at(later);
         assert!((position - 12.0).abs() < 0.01, "{position}");
         assert_eq!(clock.pace(), 2.0);
+    }
+
+    #[test]
+    fn held_clock_stands_still_and_goes_on_after() {
+        let clock = Clock::new();
+        clock.set_paused(false);
+        clock.anchor(3.0, Instant::now());
+        clock.hold(true);
+        let held = clock.now();
+        std::thread::sleep(Duration::from_millis(5));
+        assert_eq!(clock.now(), held);
+        assert!(clock.still() && !clock.paused());
+        clock.jump(8.0);
+        clock.hold(false);
+        assert!(clock.running());
+        assert!(clock.now() >= 8.0);
     }
 
     #[test]

@@ -129,7 +129,14 @@ pub struct Status {
 }
 
 pub(crate) enum Command {
-    Seek { position: f64, exact: bool },
+    Seek {
+        position: f64,
+        exact: bool,
+    },
+    /// The timeline's handle moved to `Shared::scrub_to`.
+    Scrub,
+    /// The drag ended.
+    EndScrub,
     SelectAudio(Option<usize>),
     SelectSubtitles(Option<usize>),
 }
@@ -147,6 +154,10 @@ pub(crate) struct Shared {
     /// Where an exact seek lands, for its serial: decoders drop what comes
     /// before it.
     pub target: Mutex<Option<(u64, f64)>>,
+    /// The latest picture decoded, shown or not: its serial and media time.
+    pub decoded: Mutex<(u64, f64)>,
+    /// Where the timeline's handle is while it is dragged.
+    pub scrub_to: Mutex<Option<f64>>,
     /// Set to stop every thread, and to cut FFmpeg's reads short.
     pub stop: Arc<AtomicBool>,
     /// The playback speed, as f64 bits.
@@ -223,6 +234,8 @@ impl Player {
             cues: Mutex::new(Cues::default()),
             serial: AtomicU64::new(0),
             target: Mutex::new(None),
+            decoded: Mutex::new((0, 0.0)),
+            scrub_to: Mutex::new(None),
             stop: Arc::new(AtomicBool::new(false)),
             speed: AtomicU64::new(1.0f64.to_bits()),
             state: Mutex::new(State::default()),
@@ -303,6 +316,36 @@ impl Player {
     pub fn seek_by(&self, seconds: f64) {
         let now = self.shared.clock.now();
         self.seek(Duration::from_secs_f64((now + seconds).max(0.0)), true);
+    }
+
+    /// Follows the timeline's handle while it is dragged to `position`:
+    /// pictures land exactly there and only move the way it goes, the
+    /// clock held meanwhile. `end_scrub` lets go.
+    pub fn scrub(&self, position: Duration) {
+        let duration = self
+            .shared
+            .state()
+            .info
+            .as_ref()
+            .and_then(|info| info.duration);
+        let position = match duration {
+            Some(duration) => position.min(duration),
+            None => position,
+        };
+        self.shared.state().ended = false;
+        self.shared.clock.hold(true);
+        *self
+            .shared
+            .scrub_to
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(position.as_secs_f64());
+        let _ = self.commands.send(Command::Scrub);
+    }
+
+    /// Ends a drag: lands where the handle was let go, then plays on if
+    /// playing.
+    pub fn end_scrub(&self) {
+        let _ = self.commands.send(Command::EndScrub);
     }
 
     pub fn set_volume(&self, volume: f32) {
@@ -393,19 +436,29 @@ impl Player {
     /// playing, at once when a picture after a seek waits, or `None` when
     /// nothing will change by itself.
     pub fn next_redraw(&self) -> Option<Instant> {
+        let soon = || Some(Instant::now() + Duration::from_millis(10));
+        let now = self.shared.clock.now();
         let video = self.shared.video();
-        if video.has_new() {
+        if video.has_new() || video.has_due(now) {
             return Some(Instant::now());
         }
         let due = video.next_due();
+        let waiting = video.waiting();
         drop(video);
-        if self.shared.clock.paused() {
-            return None;
+        if self.shared.clock.still() {
+            // Pictures on their way after a seek, or while the timeline is
+            // dragged, show as they come.
+            let seeking = waiting && self.shared.state().has_video;
+            return if seeking || self.shared.clock.held() {
+                soon()
+            } else {
+                None
+            };
         }
         match due.and_then(|due| self.shared.clock.instant_of(due)) {
             Some(at) => Some(at),
             // Waiting for pictures: look again soon.
-            None => Some(Instant::now() + Duration::from_millis(10)),
+            None => soon(),
         }
     }
 
@@ -592,13 +645,30 @@ fn read(
 
     let mut read_all = false;
     let mut announced_end = false;
+    let mut scrub: Option<Scrub> = None;
     let mut packet = ffmpeg::Packet::empty();
     while !shared.stopping() {
+        if info.seekable
+            && scrub.is_some()
+            && steer(
+                &mut scrub,
+                &mut input,
+                &shared,
+                &mut decoders,
+                video_stream,
+                start,
+            )
+        {
+            read_all = false;
+            announced_end = false;
+            shared.state().read_all = false;
+        }
         // Commands first, waiting for one only while there is nothing to
-        // read for now.
+        // read for now, and not long while the timeline is dragged.
         let idle = read_all || decoders.has_enough();
+        let wait = if scrub.is_some() { 4 } else { 20 };
         let command = if idle {
-            match commands.recv_timeout(Duration::from_millis(20)) {
+            match commands.recv_timeout(Duration::from_millis(wait)) {
                 Ok(command) => Some(command),
                 Err(RecvTimeoutError::Timeout) => None,
                 Err(RecvTimeoutError::Disconnected) => break,
@@ -616,6 +686,30 @@ fn read(
                         shared.state().read_all = false;
                     }
                 }
+                Command::Scrub => {
+                    if !info.seekable {
+                        *shared
+                            .scrub_to
+                            .lock()
+                            .unwrap_or_else(PoisonError::into_inner) = None;
+                        shared.clock.hold(false);
+                    } else if steer(
+                        &mut scrub,
+                        &mut input,
+                        &shared,
+                        &mut decoders,
+                        video_stream,
+                        start,
+                    ) {
+                        read_all = false;
+                        announced_end = false;
+                        shared.state().read_all = false;
+                    }
+                }
+                Command::EndScrub => match &mut scrub {
+                    Some(scrub) => scrub.ending = true,
+                    None => shared.clock.hold(false),
+                },
                 Command::SelectAudio(index) => {
                     decoders.stop_audio();
                     let mut chosen = None;
@@ -717,6 +811,143 @@ fn read(
     }
     decoders.stop();
     drop(output);
+}
+
+/// A drag along the timeline: where its pictures are headed.
+struct Scrub {
+    /// The exact target pictures and sound go to, for `serial`.
+    target: f64,
+    serial: u64,
+    /// When the seek for `serial` began.
+    since: Instant,
+    /// The drag ended: land on the last position, then let the clock go.
+    ending: bool,
+}
+
+/// How long a drag waits for a seek's picture before seeking again.
+const PATIENCE: Duration = Duration::from_secs(1);
+
+/// How far ahead decoding goes on rather than seeking, in a file without
+/// an index of its keyframes.
+const DECODE_ON: f64 = 1.0;
+
+/// Moves a drag's pictures toward the handle. Ahead of them, with no
+/// keyframe between, decoding goes on to it; otherwise a seek lands
+/// exactly on it, once the last seek's picture has come, so pictures
+/// follow the handle instead of starting over from a keyframe at every
+/// move. Returns whether it sought.
+fn steer(
+    scrub: &mut Option<Scrub>,
+    input: &mut ffmpeg::format::context::Input,
+    shared: &Shared,
+    decoders: &mut Decoders,
+    video_stream: Option<usize>,
+    start: f64,
+) -> bool {
+    let wanted = *shared
+        .scrub_to
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let Some(wanted) = wanted else {
+        return false;
+    };
+    let serial = shared.serial.load(Ordering::Relaxed);
+    let Some(current) = scrub else {
+        seek(input, shared, decoders, wanted, true, start);
+        *scrub = Some(Scrub {
+            target: wanted,
+            serial: shared.serial.load(Ordering::Relaxed),
+            since: Instant::now(),
+            ending: false,
+        });
+        return true;
+    };
+    let same = current.serial == serial;
+    if current.target == wanted {
+        if current.ending
+            && (!same || arrived(shared, serial, wanted) || current.since.elapsed() > PATIENCE)
+        {
+            *shared
+                .scrub_to
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = None;
+            *scrub = None;
+            shared.clock.hold(false);
+        }
+        return false;
+    }
+    if same
+        && wanted > current.target
+        && decodes_on(input, shared, video_stream, start, current, wanted)
+    {
+        *shared.target.lock().unwrap_or_else(PoisonError::into_inner) = Some((serial, wanted));
+        shared.clock.jump(wanted);
+        if let Some(output) = shared.audio_output() {
+            output.discard_before(serial, wanted);
+        }
+        current.target = wanted;
+        return false;
+    }
+    if same && !arrived(shared, serial, current.target) && current.since.elapsed() < PATIENCE {
+        return false;
+    }
+    seek(input, shared, decoders, wanted, true, start);
+    current.target = wanted;
+    current.serial = shared.serial.load(Ordering::Relaxed);
+    current.since = Instant::now();
+    true
+}
+
+/// Whether decoding on reaches `wanted` sooner than a seek would: no
+/// keyframe lies between it and where the decoder is.
+fn decodes_on(
+    input: &ffmpeg::format::context::Input,
+    shared: &Shared,
+    video_stream: Option<usize>,
+    start: f64,
+    scrub: &Scrub,
+    wanted: f64,
+) -> bool {
+    // Sound alone seeks quickly.
+    let Some(stream) = video_stream else {
+        return false;
+    };
+    let keyframe = |seconds| crate::ffi::keyframe_before(input, stream, seconds, start);
+    let (of, decoded) = *shared
+        .decoded
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    // Before its first picture, the decoder starts from the target's
+    // keyframe.
+    let reached = if of == scrub.serial {
+        decoded
+    } else {
+        keyframe(scrub.target).unwrap_or(scrub.target)
+    };
+    match keyframe(wanted) {
+        Some(keyframe) => keyframe <= reached + 1e-3,
+        None => wanted - reached <= DECODE_ON,
+    }
+}
+
+/// Whether a seek of `serial` has reached `target`: its picture shown, so
+/// the next seek does not throw it away unseen, or for sound alone, its
+/// sound come.
+fn arrived(shared: &Shared, serial: u64, target: f64) -> bool {
+    if shared.state().has_video {
+        let (of, decoded) = *shared
+            .decoded
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let video = shared.video();
+        // Pictures kept start at most half a frame before the target.
+        let decoded = of == serial && decoded >= target - 0.05;
+        (decoded && video.settled(serial, target)) || (video.serial() == serial && video.finished)
+    } else {
+        shared
+            .audio_output()
+            .is_none_or(|output| output.reached(serial))
+    }
 }
 
 /// Notices the end of playback: everything read, decoded and played,

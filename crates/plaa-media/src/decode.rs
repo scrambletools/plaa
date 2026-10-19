@@ -197,6 +197,11 @@ impl VideoDecoder {
             .or_else(|| self.last_position.map(|last| last + self.frame_duration))
             .unwrap_or(0.0);
         self.last_position = Some(position);
+        *self
+            .shared
+            .decoded
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = (serial, position);
         if let Some(target) = self.shared.target(serial)
             && position + self.frame_duration / 2.0 < target
         {

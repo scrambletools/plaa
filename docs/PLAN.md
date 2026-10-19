@@ -125,8 +125,16 @@ rather than run ahead. Without sound, it starts from the first picture
 after a seek and runs on the system's clock. Every seek bumps a serial
 that packets, pictures and samples carry, so anything from before it is
 dropped wherever it is. Exact seeks also drop what decodes before the
-target; dragging the timeline seeks to keyframes and lands exactly when
-let go.
+target.
+
+Dragging the timeline holds the clock and seeks exactly, so the picture
+only moves the way the handle does; seeking to keyframes instead would
+show each keyframe before the frames after it, rocking back and forth.
+Ahead of the picture, with no keyframe between in the file's index, the
+target moves on and decoding carries on to it, which keeps up with the
+handle; otherwise one seek at a time, the next once the last one's
+picture shows, to the handle's latest position. Letting go lands on the
+handle and lets the clock go on.
 
 ### Pictures
 

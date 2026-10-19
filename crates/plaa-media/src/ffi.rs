@@ -1,5 +1,6 @@
 //! The few FFmpeg calls the safe wrapper lacks: hardware decoding, moving
-//! a decoded picture out of graphics memory, and a stream's rotation.
+//! a decoded picture out of graphics memory, a stream's rotation and its
+//! index of keyframes.
 #![allow(unsafe_code)]
 
 use ffmpeg::ffi;
@@ -254,6 +255,34 @@ pub fn start_time(input: &ffmpeg::format::context::Input) -> f64 {
     } else {
         start as f64 / f64::from(ffi::AV_TIME_BASE)
     }
+}
+
+/// The media time of the last keyframe at or before `seconds` in
+/// `stream`, from the file's index, if it has one there. `start` is where
+/// the file's timestamps start.
+pub fn keyframe_before(
+    input: &ffmpeg::format::context::Input,
+    stream: usize,
+    seconds: f64,
+    start: f64,
+) -> Option<f64> {
+    let stream = input.stream(stream)?;
+    let base = f64::from(stream.time_base());
+    if base <= 0.0 {
+        return None;
+    }
+    let timestamp = ((seconds + start) / base).floor() as i64;
+    // SAFETY: the stream is valid while `input` is borrowed, and FFmpeg
+    // only reads its index; the entry it returns lives in that index.
+    let entry = unsafe {
+        ffi::avformat_index_get_entry_from_timestamp(
+            stream.as_ptr().cast_mut(),
+            timestamp,
+            ffi::AVSEEK_FLAG_BACKWARD,
+        )
+        .as_ref()
+    }?;
+    Some(entry.timestamp as f64 * base - start)
 }
 
 /// FFmpeg's release, such as "n9.0.1", as it was built.
