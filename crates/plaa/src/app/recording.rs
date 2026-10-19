@@ -32,6 +32,22 @@ pub(super) struct Hidden {
     _tray: Option<crate::tray::Tray>,
 }
 
+/// What recording `offered` takes: its capture, or why it would not open.
+#[cfg(windows)]
+fn offered_screen(offered: recorder::Offered) -> recorder::Screen {
+    use plaa_media::screen::{ScreenCapture, Target};
+    let target = if offered.window {
+        Target::Window(offered.id)
+    } else {
+        Target::Screen(offered.id as u32)
+    };
+    recorder::Screen {
+        capture: ScreenCapture::open(target),
+        window: offered.window,
+        offered: Some(offered),
+    }
+}
+
 /// Whether a dot in the tray can stop a hidden recording.
 fn tray_shows() -> bool {
     #[cfg(target_os = "linux")]
@@ -108,13 +124,28 @@ impl Plaa {
         (opened, task)
     }
 
-    /// Asks the system what screen or window to record, for window `id`.
+    /// Asks the system what screen or window to record, for window `id`;
+    /// on Windows, a window opens to record the main screen, with a menu
+    /// of the others and of windows.
     pub(super) fn open_screen_recorder(&mut self, id: window::Id) -> Task<Message> {
         #[cfg(target_os = "linux")]
         return Task::perform(crate::screen_share::share(), move |result| {
             Message::ScreenShared(id, result)
         });
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(windows)]
+        {
+            self.offers = crate::screens_windows::offered();
+            let Some(first) = self.offers.first().cloned() else {
+                return Task::none();
+            };
+            let sound = self
+                .settings
+                .screen_sound
+                .then_some(self.settings.microphone.as_deref());
+            let recorder = Recorder::screen(offered_screen(first), sound);
+            self.show_recorder(id, recorder, SCREEN_RECORDER_SIZE).1
+        }
+        #[cfg(not(any(target_os = "linux", windows)))]
         {
             let _ = id;
             Task::none()
@@ -147,6 +178,7 @@ impl Plaa {
         let screen = recorder::Screen {
             capture,
             window: sharing.window,
+            offered: None,
             _sharing: sharing,
         };
         let sound = self
@@ -191,6 +223,7 @@ impl Plaa {
                 sound,
                 quality,
                 video: self.recording_video(),
+                offers: &self.offers,
                 close_button,
             },
         )
@@ -206,6 +239,11 @@ impl Plaa {
             RecorderControl::Settings => return self.perform(id, Action::Settings),
             RecorderControl::Close => return window::close(id),
             RecorderControl::Reshare => return self.open_screen_recorder(id),
+            // Windows come and go: the menu lists them as they are.
+            #[cfg(windows)]
+            RecorderControl::Choosing(true) => {
+                self.offers = crate::screens_windows::offered();
+            }
             _ => {}
         }
         let sound = self.recording_sound();
@@ -281,6 +319,19 @@ impl Plaa {
                 }
             }
             RecorderControl::Cancel => recorder.warning = None,
+            RecorderControl::Choosing(open) => recorder.choosing = open,
+            RecorderControl::Choose(offered) => {
+                recorder.choosing = false;
+                if recorder.is_recording() || recorder.saving {
+                    return Task::none();
+                }
+                #[cfg(windows)]
+                {
+                    recorder.screen = Some(offered_screen(offered));
+                }
+                #[cfg(not(windows))]
+                let _ = offered;
+            }
             RecorderControl::Microphone(device) => {
                 if recorder.is_recording() || recorder.saving {
                     return Task::none();

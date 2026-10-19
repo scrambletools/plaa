@@ -344,6 +344,11 @@ menu-record-sound = New Sound Recording
 record-screen-title = Screen recording
 record-screen-file-name = Screen recording
 record-screen-whole = Screen
+record-screen-number = Screen { $number }
+record-screen-main = Screen { $number } (main)
+record-screens = Screens
+record-windows = Windows
+record-screen-what = What to record
 record-screen-window = Window
 # What is shared and its size, as "Whole screen · 3840 × 2160".
 record-screen-size = { $what } · { $width } × { $height }

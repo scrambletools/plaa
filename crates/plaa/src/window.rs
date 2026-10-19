@@ -494,7 +494,7 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
                 Control::Action(Action::RecordSound),
             )
             .icon(Icon::Mic),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Entry::item(
                 crate::fl!("open-record-screen"),
                 Control::Action(Action::RecordScreen),

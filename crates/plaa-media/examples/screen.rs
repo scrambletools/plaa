@@ -1,19 +1,22 @@
-//! Records a PipeWire video node, as the screen recording window records
-//! the stream the ScreenCast portal shares, with the sound of an input
-//! device when one is given.
+//! Records the screen as the screen recording window does, with the
+//! sound of an input device when one is given: on Linux a PipeWire video
+//! node, as the ScreenCast portal shares one, and on Windows a screen by
+//! its number.
 //!
 //! cargo run --release -p plaa-media --example screen -- [--format
-//! h264|hevc|av1] [--software] [--sound <device id>] <node> <seconds> <to>
+//! h264|hevc|av1] [--software] [--sound <device id>] <node or screen>
+//! <seconds> <to>
 
 fn main() {
-    #[cfg(target_os = "linux")]
-    linux::main();
-    #[cfg(not(target_os = "linux"))]
-    eprintln!("screen recording through PipeWire is Linux's");
+    #[cfg(any(target_os = "linux", windows))]
+    record::main();
+    #[cfg(not(any(target_os = "linux", windows)))]
+    eprintln!("screen recording here comes later");
 }
 
-#[cfg(target_os = "linux")]
-mod linux {
+#[cfg(any(target_os = "linux", windows))]
+mod record {
+    #[cfg(target_os = "linux")]
     use std::os::unix::net::UnixStream;
     use std::path::PathBuf;
     use std::sync::mpsc;
@@ -52,24 +55,14 @@ mod linux {
         ) else {
             eprintln!(
                 "usage: screen [--format h264|hevc|av1] [--software] [--sound <device id>] \
-                 <node> <seconds> <to>"
+                 <node or screen> <seconds> <to>"
             );
             std::process::exit(2);
         };
-        // The portal hands over a connection of its own; this one is the
-        // sound server's, which reaches every node.
-        let runtime = std::env::var_os("XDG_RUNTIME_DIR").unwrap_or_default();
-        let socket = match UnixStream::connect(PathBuf::from(runtime).join("pipewire-0")) {
-            Ok(socket) => socket,
-            Err(error) => {
-                eprintln!("could not reach PipeWire: {error}");
-                std::process::exit(1);
-            }
-        };
-        let mut capture = match ScreenCapture::open(socket.into(), node) {
+        let mut capture = match open(node) {
             Ok(capture) => capture,
             Err(error) => {
-                eprintln!("could not open node {node}: {error}");
+                eprintln!("could not open {node}: {error}");
                 std::process::exit(1);
             }
         };
@@ -128,5 +121,21 @@ mod linux {
                 std::process::exit(1);
             }
         }
+    }
+
+    /// PipeWire node `node`, through the sound server's own connection,
+    /// which reaches every node; the portal hands over one of its own.
+    #[cfg(target_os = "linux")]
+    fn open(node: u32) -> Result<ScreenCapture, String> {
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR").unwrap_or_default();
+        let socket = UnixStream::connect(PathBuf::from(runtime).join("pipewire-0"))
+            .map_err(|error| format!("could not reach PipeWire: {error}"))?;
+        ScreenCapture::open(socket.into(), node)
+    }
+
+    /// Screen number `screen`.
+    #[cfg(windows)]
+    fn open(screen: u32) -> Result<ScreenCapture, String> {
+        ScreenCapture::open(plaa_media::screen::Target::Screen(screen))
     }
 }

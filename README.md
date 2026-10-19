@@ -12,10 +12,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 > **Status:** early development, not yet released. Files, streams and
 > web videos play, with the controls floating over the picture, and
 > files can be trimmed, split, turned and exported, and sound and the
-> screen (on Linux, so far) recorded; see the [development
+> screen (on Linux and Windows, so far) recorded; see the [development
 > plan](docs/PLAN.md) for what comes next: recording the screen on
-> Windows and macOS, a camera, casting, an AVB/Milan talker and
-> listener, and an assistant.
+> macOS, a camera, casting, an AVB/Milan talker and listener, and an
+> assistant.
 
 ## Features
 
@@ -93,16 +93,19 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   or lossless as FLAC, ALAC or WAV in 16 or 24 bits. Closing with
   changes not exported asks first.
 - **Record sound** (Ctrl+Shift+N) from a microphone, or from what the
-  computer plays where the sound server offers it, with a level meter,
+  computer plays where the system offers it (the sound server's
+  monitors on Linux, every output on Windows), with a level meter,
   in any of the export's sound formats, to the Recordings folder; the
   window then plays the recording, ready to trim and export.
-- **Record the screen** (Ctrl+Alt+N) on Linux: a screen, a window or a
-  region, as the system's picker offers, with the pointer, and the sound
+- **Record the screen** (Ctrl+Alt+N) on Linux and Windows: a screen, a
+  window or (on Linux) a region, as the system's picker offers on
+  Linux and plaa lists them on Windows, with the pointer, and the sound
   of a microphone or of what the computer plays if chosen, as H.264,
   HEVC or AV1 on the graphics card's encoder where one opens. Recording
   a screen, the recording window gets out of the way, after saying how
-  to stop: click the red dot plaa puts in the tray, or open plaa again.
-  A recording also ends when the screen is no longer shared.
+  to stop: click the red dot plaa puts in the tray (on Linux), or open
+  plaa again. A recording also ends when the screen is no longer shared
+  or the window recorded closes.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
@@ -116,7 +119,7 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Recording the screen on Windows and macOS and a camera, a visualizer,
+Recording the screen on macOS and a camera, a visualizer,
 casting, the AVB/Milan
 entity, the assistant and MCP, packages and translations. The [plan](docs/PLAN.md) has the
 order.

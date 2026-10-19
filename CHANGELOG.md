@@ -50,3 +50,6 @@ The first build.
   computer plays, encoded on the graphics card where it can. Recording
   a screen, plaa's recording window hides, and a red dot in the tray,
   or opening plaa again, stops it.
+- Recording the screen or a window on Windows, through Windows.Graphics.
+  Capture, and recording what the computer plays there through each
+  output's loopback.

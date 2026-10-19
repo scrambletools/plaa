@@ -84,10 +84,10 @@ trimming and splitting, and Intel Macs.
    flip, with undo, the edit playing without gaps; export to H.264,
    HEVC or AV1, as edited and made smaller, on hardware encoders where
    they open, or the sound alone, compressed or lossless.
-5. **Recording**: microphone (done), screen (on Linux, done: the
-   ScreenCast portal and PipeWire; FFmpeg's ddagrab on Windows,
-   ScreenCaptureKit on macOS), camera; AVB streams with the entity, in
-   milestone 7.
+5. **Recording**: microphone (done), screen (done on Linux, through
+   the ScreenCast portal and PipeWire, and on Windows, through
+   Windows.Graphics.Capture; ScreenCaptureKit on macOS next), camera;
+   AVB streams with the entity, in milestone 7.
 6. **Visualizer**: waveform, spectrum and cover art for sound.
 7. **AVB and Milan**: the entity, talker and listener.
 8. **Casting**: Chromecast and DLNA/UPnP.
@@ -221,6 +221,22 @@ only the second where no tray is shown. Once saved, a new window plays
 the recording. Other plaa windows stay, so a video plaa plays can be
 recorded.
 
+On Windows there is no picker of the system's that names what it picked
+in a way FFmpeg takes, so plaa lists the screens, in the order Windows
+lists them, which gfxcapture numbers them by, and the windows Alt+Tab
+would show, but its own and minimized ones; the menu lists them again
+each time it opens. FFmpeg's gfxcapture (Windows.Graphics.Capture, from
+FFmpeg 8) captures either, with the pointer, on the graphics card;
+hwdownload brings each picture into memory as BGRA for the same graph
+and encoders as on Linux. Like PipeWire, it sends pictures only as the
+screen changes, and looks for one a second at a time, so its thread
+checks whether to stop between; a window recorded that closes ends the
+stream, and so the recording. What an output plays is recorded through
+its loopback, which sends nothing at all while nothing plays, so sound
+that comes after a silence is timed by the clock rather than by the
+samples counted, and the filter graph fills the silence; a recording
+whose input fell quiet ends with silence up to where the clock does.
+
 ### Pictures
 
 The picture is a shader widget that asks the player for the picture due
@@ -281,8 +297,8 @@ next pixel, so it moves a pixel at a time at any width.
 | Screen kept on | the screen saver's D-Bus service, else logind's idle lock (keepawake) | execution state (keepawake) | power assertions (keepawake) |
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
 | Hardware encoding | NVENC, VAAPI, Quick Sync | NVENC, AMF, Quick Sync | VideoToolbox |
-| Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI) | cpal (Core Audio) |
-| Screen in | the ScreenCast portal (ashpd), its picture through PipeWire | FFmpeg's ddagrab (planned) | ScreenCaptureKit (planned) |
+| Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI; what an output plays through its loopback) | cpal (Core Audio) |
+| Screen in | the ScreenCast portal (ashpd), its picture through PipeWire | Windows.Graphics.Capture through FFmpeg's gfxcapture, screens and windows listed by plaa (Win32) | ScreenCaptureKit (planned) |
 | Tray, while recording hidden | StatusNotifierItem over D-Bus (zbus) | the notification area (planned) | a menu bar item (planned) |
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |

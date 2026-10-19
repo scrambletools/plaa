@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ffmpeg_next as ffmpeg;
@@ -25,21 +25,34 @@ pub struct InputDevice {
     pub name: String,
 }
 
-/// The system's sound input devices.
+/// How the id of what an output plays ends, as PulseAudio names its
+/// monitors; on Windows, the output's id with this added.
+const PLAYS_BACK: &str = ".monitor";
+
+/// The system's sound input devices, and what each output plays where
+/// the system offers it.
 pub fn input_devices() -> Vec<InputDevice> {
     crate::init();
-    let host = cpal::default_host();
-    let Ok(devices) = host.input_devices() else {
-        return Vec::new();
-    };
-    devices
-        .filter_map(|device| {
-            Some(InputDevice {
-                id: device.id().ok()?.to_string(),
-                name: device.description().ok()?.name().to_owned(),
+    fn listed(devices: impl Iterator<Item = cpal::Device>, suffix: &str) -> Vec<InputDevice> {
+        devices
+            .filter_map(|device| {
+                Some(InputDevice {
+                    id: format!("{}{suffix}", device.id().ok()?),
+                    name: device.description().ok()?.name().to_owned(),
+                })
             })
-        })
-        .collect()
+            .collect()
+    }
+    let host = cpal::default_host();
+    #[cfg_attr(not(windows), expect(unused_mut))]
+    let mut devices = listed(host.input_devices().into_iter().flatten(), "");
+    // Windows records what an output plays from the output itself.
+    #[cfg(windows)]
+    devices.extend(listed(
+        host.output_devices().into_iter().flatten(),
+        PLAYS_BACK,
+    ));
+    devices
 }
 
 /// What a recording says once it ends: the file it made, or why it
@@ -54,6 +67,74 @@ const OPENING: Duration = Duration::from_secs(5);
 /// How long the encoding thread waits for sound before looking at its
 /// flags.
 const WAIT: Duration = Duration::from_millis(100);
+/// How far behind the clock the sound may fall before it is timed by the
+/// clock, in fractions of a second: further than an input's own latency.
+const BEHIND: i64 = 5;
+
+/// Where `frames` frames of sound taken now begin, in frames at `rate`
+/// from `start`: right after those before, `counted`, unless the input
+/// sent nothing for a while, as WASAPI sends nothing while the computer
+/// plays nothing; then where the clock says, and the filter graph fills
+/// the gap with silence.
+pub(crate) fn sound_time(counted: i64, frames: usize, rate: u32, start: Instant) -> i64 {
+    let by_clock = (start.elapsed().as_secs_f64() * f64::from(rate)) as i64 - frames as i64;
+    if by_clock - counted > i64::from(rate) / BEHIND {
+        by_clock
+    } else {
+        counted
+    }
+}
+
+/// A frame of interleaved `samples` of `channels` channels at `rate`, at
+/// `pts` in frames; none when there are none.
+pub(crate) fn sound_frame(
+    samples: &[f32],
+    (rate, channels): (u32, u16),
+    pts: i64,
+) -> Option<ffmpeg::frame::Audio> {
+    let frames = samples.len() / usize::from(channels.max(1));
+    if frames == 0 {
+        return None;
+    }
+    let mut frame = ffmpeg::frame::Audio::new(
+        ffmpeg::format::Sample::F32(ffmpeg::format::sample::Type::Packed),
+        frames,
+        ffmpeg::ChannelLayout::default(i32::from(channels)),
+    );
+    frame.set_rate(rate);
+    for (target, sample) in frame
+        .data_mut(0)
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(samples)
+    {
+        *target = sample.to_ne_bytes();
+    }
+    frame.set_pts(Some(pts));
+    Some(frame)
+}
+
+/// The silence of a hundredth of a second, at `pts`, which ends a
+/// recording where the clock does when the input fell quiet before: the
+/// filter graph fills the gap up to it.
+pub(crate) fn closing_silence(
+    counted: i64,
+    (rate, channels): (u32, u16),
+    start: Instant,
+) -> Option<ffmpeg::frame::Audio> {
+    let frames = (rate / 100).max(1) as usize;
+    let at = sound_time(counted, frames, rate, start);
+    (at > counted)
+        .then(|| {
+            sound_frame(
+                &vec![0.0; frames * usize::from(channels.max(1))],
+                (rate, channels),
+                at,
+            )
+        })
+        .flatten()
+}
 
 /// What the device's callback, the recording thread and the handle share.
 struct Shared {
@@ -303,21 +384,35 @@ impl SoundTap {
 /// what it shares, and the device's name.
 fn open_stream(device: Option<&str>) -> Result<(cpal::Stream, Arc<Shared>, String), String> {
     let host = cpal::default_host();
-    let chosen = device.and_then(|wanted| {
-        host.input_devices()
-            .ok()?
-            .find(|candidate| candidate.id().is_ok_and(|id| id.to_string() == wanted))
-    });
+    fn find(mut devices: impl Iterator<Item = cpal::Device>, wanted: &str) -> Option<cpal::Device> {
+        devices.find(|candidate| candidate.id().is_ok_and(|id| id.to_string() == wanted))
+    }
+    let chosen = device.and_then(|wanted| find(host.input_devices().into_iter().flatten(), wanted));
+    // What an output plays, on Windows: an input stream on the output.
+    let playing = match (
+        &chosen,
+        device.and_then(|wanted| wanted.strip_suffix(PLAYS_BACK)),
+    ) {
+        (None, Some(output)) if cfg!(windows) => {
+            find(host.output_devices().into_iter().flatten(), output)
+        }
+        _ => None,
+    };
+    let plays_back = playing.is_some();
     let device = chosen
+        .or(playing)
         .or_else(|| host.default_input_device())
         .ok_or_else(|| "no sound input device".to_owned())?;
     let name = device
         .description()
         .map(|description| description.name().to_owned())
         .unwrap_or_default();
-    let supported = device
-        .default_input_config()
-        .map_err(|error| error.to_string())?;
+    let supported = if plays_back {
+        device.default_output_config()
+    } else {
+        device.default_input_config()
+    }
+    .map_err(|error| error.to_string())?;
     #[cfg_attr(not(target_os = "linux"), expect(unused_mut))]
     let mut config = supported.config();
     // The sound server hands sound over in large pieces unless asked for
@@ -420,6 +515,7 @@ fn write(
         }
         Ok(())
     };
+    let start = Instant::now();
     let mut recorded: i64 = 0;
     loop {
         let finishing = finish.load(Ordering::Relaxed);
@@ -438,24 +534,9 @@ fn write(
                 .unwrap_or_default()
         };
         let frames = samples.len() / channels;
-        if frames > 0 {
-            let mut frame = ffmpeg::frame::Audio::new(
-                samples_format,
-                frames,
-                ffmpeg::ChannelLayout::default(i32::from(shared.channels)),
-            );
-            frame.set_rate(shared.rate);
-            let bytes = frame.data_mut(0);
-            for (target, sample) in bytes
-                .as_chunks_mut::<4>()
-                .0
-                .iter_mut()
-                .zip(&samples[..frames * channels])
-            {
-                *target = sample.to_ne_bytes();
-            }
-            frame.set_pts(Some(recorded));
-            recorded += frames as i64;
+        let at = sound_time(recorded, frames, shared.rate, start);
+        if let Some(frame) = sound_frame(&samples, (shared.rate, shared.channels), at) {
+            recorded = at + frames as i64;
             if let Some(mut source) = graph.get("in") {
                 source.source().add(&frame).map_err(export::failed)?;
             }
@@ -467,6 +548,11 @@ fn write(
             break;
         }
     }
+    if let Some(silence) = closing_silence(recorded, (shared.rate, shared.channels), start)
+        && let Some(mut source) = graph.get("in")
+    {
+        source.source().add(&silence).map_err(export::failed)?;
+    }
     if let Some(mut source) = graph.get("in") {
         let _ = source.source().flush();
     }
@@ -475,4 +561,29 @@ fn write(
     output.drain(&mut encoder, 0, time_base, 0)?;
     output.context.write_trailer().map_err(export::failed)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::{closing_silence, sound_time};
+
+    #[test]
+    fn sound_follows_the_clock_after_a_silence() {
+        let rate = 48_000;
+        let start = Instant::now() - Duration::from_secs(2);
+        // Sound coming steadily is timed by what came before.
+        assert_eq!(sound_time(95_000, 480, rate, start), 95_000);
+        // A little late, as an input's latency makes it: still so.
+        assert_eq!(sound_time(90_000, 480, rate, start), 90_000);
+        // Nothing for a second and more: where the clock says.
+        let at = sound_time(40_000, 480, rate, start);
+        assert!((95_000..96_100).contains(&at), "{at}");
+        // A recording whose input fell quiet ends where the clock does.
+        let silence = closing_silence(40_000, (rate, 2), start).unwrap();
+        let end = silence.pts().unwrap() + silence.samples() as i64;
+        assert!((95_500..96_100).contains(&end), "{end}");
+        assert!(closing_silence(95_900, (rate, 2), start).is_none());
+    }
 }

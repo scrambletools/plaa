@@ -95,6 +95,9 @@ pub struct Plaa {
     input_devices: Vec<plaa_media::record::InputDevice>,
     /// A screen recording whose window closed so as not to be in it.
     hidden: Option<recording::Hidden>,
+    /// The screens and windows plaa offers to record, where it lists them,
+    /// as when last looked at.
+    offers: Vec<crate::recorder::Offered>,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -317,6 +320,7 @@ impl Plaa {
             export_choice: None,
             input_devices: Vec::new(),
             hidden: None,
+            offers: Vec::new(),
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -2469,7 +2473,7 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
         Action::Open,
         Action::OpenAddress,
         Action::RecordSound,
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         Action::RecordScreen,
         Action::Settings,
     ]
@@ -2484,7 +2488,7 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
         .spacing(8)
         .into()
     });
-    #[cfg_attr(not(target_os = "linux"), expect(unused_mut))]
+    #[cfg_attr(not(any(target_os = "linux", windows)), expect(unused_mut))]
     let mut starts = vec![
         (
             button::Kind::Filled,
@@ -2505,7 +2509,7 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
             Action::RecordSound,
         ),
     ];
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     starts.push((
         button::Kind::Tonal,
         Icon::ScreenRecord,

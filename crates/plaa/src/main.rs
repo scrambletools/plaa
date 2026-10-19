@@ -23,6 +23,8 @@ mod playlist;
 mod recorder;
 #[cfg(target_os = "linux")]
 mod screen_share;
+#[cfg(windows)]
+mod screens_windows;
 mod screenshot;
 mod settings_view;
 mod shortcuts;

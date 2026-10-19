@@ -1,7 +1,7 @@
 //! Recording the screen: pictures a capture hands over, as the ScreenCast
-//! portal shares them through PipeWire on Linux, encoded as exports
-//! encode pictures, with the sound of a recording input when one is
-//! given, into an MP4.
+//! portal shares them through PipeWire on Linux and Windows.Graphics.
+//! Capture takes them on Windows, encoded as exports encode pictures, with
+//! the sound of a recording input when one is given, into an MP4.
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -15,17 +15,17 @@ use ffmpeg_next as ffmpeg;
 
 use crate::export::{self, Colors, ExportError, Format, Output, Picture, Sound};
 use crate::ffi;
-use crate::record::{RecordEvent, SoundTap};
+use crate::record::{self, RecordEvent, SoundTap};
 
 /// Pictures waiting for the encoder; more than this, and the newest are
 /// dropped until it catches up.
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(target_os = "linux", windows, test))]
 const MOST_WAITING: usize = 8;
 /// How long the capture may take to say its size.
 const FIRST_PICTURE: Duration = Duration::from_secs(5);
 /// How often a picture is kept while not recording: a still screen sends
 /// none, so the last one kept starts a recording.
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(target_os = "linux", windows, test))]
 const KEEP_EVERY: Duration = Duration::from_millis(250);
 /// The frame rate encoders are told, for their rate control; pictures
 /// come as the screen changes.
@@ -51,7 +51,7 @@ struct Waiting {
 }
 
 impl Frames {
-    #[cfg(any(target_os = "linux", test))]
+    #[cfg(any(target_os = "linux", windows, test))]
     fn new() -> Self {
         Self {
             waiting: Mutex::new(Waiting::default()),
@@ -64,7 +64,7 @@ impl Frames {
     }
 
     /// Whether a picture that came at `at` is wanted.
-    #[cfg(any(target_os = "linux", test))]
+    #[cfg(any(target_os = "linux", windows, test))]
     pub fn wanted(&self, at: Instant) -> bool {
         let waiting = self.waiting();
         waiting.queue.is_some()
@@ -75,7 +75,7 @@ impl Frames {
     }
 
     /// Hands over a picture taken at `at`, unless too many wait.
-    #[cfg(any(target_os = "linux", test))]
+    #[cfg(any(target_os = "linux", windows, test))]
     pub fn push(&self, at: Instant, frame: ffmpeg::frame::Video) {
         let mut waiting = self.waiting();
         match waiting.queue.as_mut() {
@@ -142,6 +142,17 @@ pub struct ScreenCapture {
     recording: Option<Recording>,
     #[cfg(target_os = "linux")]
     capture: Option<pipewire_capture::Capture>,
+    #[cfg(windows)]
+    capture: Option<graphics_capture::Capture>,
+}
+
+/// A screen to record on Windows, by its number in the order Windows lists
+/// screens in from 0, or a window, by its handle.
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Target {
+    Screen(u32),
+    Window(u64),
 }
 
 /// What a capture says of itself.
@@ -162,6 +173,22 @@ impl ScreenCapture {
         let frames = Arc::new(Frames::new());
         let shared = Arc::new(CaptureShared::default());
         let capture = pipewire_capture::Capture::open(fd, node, frames.clone(), shared.clone())?;
+        Ok(Self {
+            frames,
+            shared,
+            progress: Arc::new(Progress::default()),
+            recording: None,
+            capture: Some(capture),
+        })
+    }
+
+    /// Takes the pictures of `target` through Windows.Graphics.Capture.
+    #[cfg(windows)]
+    pub fn open(target: Target) -> Result<Self, String> {
+        crate::init();
+        let frames = Arc::new(Frames::new());
+        let shared = Arc::new(CaptureShared::default());
+        let capture = graphics_capture::Capture::open(target, frames.clone(), shared.clone())?;
         Ok(Self {
             frames,
             shared,
@@ -288,7 +315,7 @@ impl Drop for ScreenCapture {
     fn drop(&mut self) {
         self.stop();
         self.ended();
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         drop(self.capture.take());
     }
 }
@@ -409,32 +436,18 @@ struct SoundSide {
     format: (u32, u16),
     /// Frames of sound taken so far, which time it.
     taken: i64,
+    /// When the sound began to be taken.
+    start: Instant,
 }
 
 impl SoundSide {
     fn encode(&mut self, samples: &[f32], output: &mut Output) -> Result<(), ExportError> {
-        let channels = usize::from(self.format.1.max(1));
-        let frames = samples.len() / channels;
-        if frames == 0 {
+        let frames = samples.len() / usize::from(self.format.1.max(1));
+        let at = record::sound_time(self.taken, frames, self.format.0, self.start);
+        let Some(frame) = record::sound_frame(samples, self.format, at) else {
             return Ok(());
-        }
-        let mut frame = ffmpeg::frame::Audio::new(
-            ffmpeg::format::Sample::F32(ffmpeg::format::sample::Type::Packed),
-            frames,
-            ffmpeg::ChannelLayout::default(i32::from(self.format.1)),
-        );
-        frame.set_rate(self.format.0);
-        for (target, sample) in frame
-            .data_mut(0)
-            .as_chunks_mut::<4>()
-            .0
-            .iter_mut()
-            .zip(&samples[..frames * channels])
-        {
-            *target = sample.to_ne_bytes();
-        }
-        frame.set_pts(Some(self.taken));
-        self.taken += frames as i64;
+        };
+        self.taken = at + frames as i64;
         if let Some(mut source) = self.graph.get("in") {
             source.source().add(&frame).map_err(export::failed)?;
         }
@@ -454,6 +467,11 @@ impl SoundSide {
     }
 
     fn finish(&mut self, output: &mut Output) -> Result<(), ExportError> {
+        if let Some(silence) = record::closing_silence(self.taken, self.format, self.start)
+            && let Some(mut source) = self.graph.get("in")
+        {
+            source.source().add(&silence).map_err(export::failed)?;
+        }
         if let Some(mut source) = self.graph.get("in") {
             let _ = source.source().flush();
         }
@@ -539,6 +557,7 @@ fn write(
                 graph,
                 format: (rate, channels),
                 taken: 0,
+                start: Instant::now(),
             })
         }
         None => None,
@@ -576,6 +595,9 @@ fn write(
     let start = Instant::now();
     if let Some(sound) = sound {
         sound.start();
+    }
+    if let Some(side) = &mut sound_side {
+        side.start = start;
     }
     let micros = |at: Instant| at.saturating_duration_since(start).as_micros() as i64;
     let mut last: Option<(i64, ffmpeg::frame::Video)> = None;
@@ -624,6 +646,131 @@ fn write(
     output.context.write_trailer().map_err(export::failed)?;
     progress.written.store(output.written, Ordering::Relaxed);
     Ok(())
+}
+
+/// Windows.Graphics.Capture's pictures, through FFmpeg's gfxcapture.
+#[cfg(windows)]
+mod graphics_capture {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, PoisonError, mpsc};
+    use std::thread::JoinHandle;
+    use std::time::{Duration, Instant};
+
+    use ffmpeg_next as ffmpeg;
+
+    use super::{CaptureShared, Frames, Target};
+
+    /// The capture's thread, and the flag that ends it.
+    pub struct Capture {
+        quit: Arc<AtomicBool>,
+        thread: Option<JoinHandle<()>>,
+    }
+
+    impl Capture {
+        pub fn open(
+            target: Target,
+            frames: Arc<Frames>,
+            shared: Arc<CaptureShared>,
+        ) -> Result<Self, String> {
+            let quit = Arc::new(AtomicBool::new(false));
+            let (ready, readied) = mpsc::channel();
+            let thread = {
+                let quit = quit.clone();
+                std::thread::Builder::new()
+                    .name("plaa-screen".into())
+                    .spawn(move || match graph(target) {
+                        Ok(graph) => {
+                            let _ = ready.send(Ok(()));
+                            run(graph, &frames, &shared, &quit);
+                        }
+                        Err(error) => {
+                            let _ = ready.send(Err(error));
+                        }
+                    })
+                    .map_err(|error| error.to_string())?
+            };
+            readied
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|_| "the screen did not open".to_owned())??;
+            Ok(Self {
+                quit,
+                thread: Some(thread),
+            })
+        }
+    }
+
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            // The filter looks for a picture for a second at most.
+            self.quit.store(true, Ordering::Relaxed);
+            if let Some(thread) = self.thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
+
+    /// The graph that brings `target`'s pictures from the graphics card
+    /// into memory, as BGRA.
+    fn graph(target: Target) -> Result<ffmpeg::filter::Graph, String> {
+        let failed = |error: ffmpeg::Error| error.to_string();
+        let capture = ffmpeg::filter::find("gfxcapture")
+            .ok_or_else(|| "this FFmpeg cannot capture the screen".to_owned())?;
+        let sink = ffmpeg::filter::find("buffersink").ok_or_else(|| "no buffersink".to_owned())?;
+        // A window may change size: it is fitted into the size it began
+        // with, as it is, rather than cut.
+        let arguments = match target {
+            Target::Screen(number) => {
+                format!("monitor_idx={number}:capture_cursor=1:max_framerate=60")
+            }
+            Target::Window(window) => {
+                format!("hwnd={window}:capture_cursor=1:max_framerate=60:resize_mode=scale_aspect")
+            }
+        };
+        let mut graph = ffmpeg::filter::Graph::new();
+        graph.add(&capture, "in", &arguments).map_err(failed)?;
+        graph.add(&sink, "out", "").map_err(failed)?;
+        graph
+            .output("in", 0)
+            .and_then(|parser| parser.input("out", 0))
+            .and_then(|parser| parser.parse("hwdownload,format=bgra"))
+            .map_err(failed)?;
+        graph.validate().map_err(failed)?;
+        Ok(graph)
+    }
+
+    fn run(
+        mut graph: ffmpeg::filter::Graph,
+        frames: &Frames,
+        shared: &CaptureShared,
+        quit: &AtomicBool,
+    ) {
+        let end = |reason: String| {
+            *shared.ended.lock().unwrap_or_else(PoisonError::into_inner) = Some(reason);
+        };
+        while !quit.load(Ordering::Relaxed) {
+            let Some(mut sink) = graph.get("out") else {
+                return end("the screen's graph broke".to_owned());
+            };
+            let mut frame = ffmpeg::frame::Video::empty();
+            match sink.sink().frame(&mut frame) {
+                Ok(()) => {
+                    let at = Instant::now();
+                    *shared.size.lock().unwrap_or_else(PoisonError::into_inner) =
+                        Some((frame.width(), frame.height()));
+                    if frames.wanted(at) {
+                        frames.push(at, frame);
+                    }
+                }
+                // Nothing changed on screen within a second.
+                Err(ffmpeg::Error::Other {
+                    errno: ffmpeg::error::EAGAIN,
+                }) => {}
+                // A window recorded closed.
+                Err(ffmpeg::Error::Eof) => return end(String::new()),
+                Err(error) => return end(error.to_string()),
+            }
+        }
+    }
 }
 
 /// The ScreenCast portal's pictures, through PipeWire.

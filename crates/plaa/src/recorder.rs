@@ -32,6 +32,10 @@ pub enum RecorderControl {
     Video(Format),
     /// Asks the system again what to record.
     Reshare,
+    /// Records this screen or window, where plaa offers them.
+    Choose(Offered),
+    /// The menu of what to record opened, or closed.
+    Choosing(bool),
     /// Records the screen with plaa hidden, as the warning said.
     Hide,
     /// Closes the warning, recording nothing.
@@ -60,6 +64,18 @@ pub struct Recorder {
     /// The window closes while it records the screen, so as not to be in
     /// the recording.
     pub hiding: bool,
+    /// The menu of what to record is open.
+    pub choosing: bool,
+}
+
+/// A screen or window plaa offers to record, where it lists them itself,
+/// as on Windows.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Offered {
+    /// The screen's number, or the window's handle.
+    pub id: u64,
+    pub window: bool,
+    pub name: String,
 }
 
 /// How a recording that hides plaa is stopped, as its warning says.
@@ -74,6 +90,8 @@ pub struct Screen {
     pub capture: Result<ScreenCapture, String>,
     /// A window is shared, not a whole screen.
     pub window: bool,
+    /// What plaa offered and this records, where it offers them.
+    pub offered: Option<Offered>,
     /// Keeps it shared, until dropped.
     #[cfg(target_os = "linux")]
     pub _sharing: crate::screen_share::Sharing,
@@ -89,12 +107,13 @@ impl Recorder {
             screen: None,
             warning: None,
             hiding: false,
+            choosing: false,
         }
     }
 
     /// Records `screen`, with the sound of `sound` when given: an input
     /// device, or the system's default.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     pub fn screen(screen: Screen, sound: Option<Option<&str>>) -> Self {
         Self {
             microphone: sound.map(Microphone::open),
@@ -103,6 +122,7 @@ impl Recorder {
             screen: Some(screen),
             warning: None,
             hiding: false,
+            choosing: false,
         }
     }
 
@@ -164,6 +184,8 @@ pub struct Context<'a> {
     pub quality: u32,
     /// What a screen recording is recorded as.
     pub video: Format,
+    /// The screens and windows plaa offers to record, where it lists them.
+    pub offers: &'a [Offered],
     pub close_button: bool,
 }
 
@@ -308,17 +330,47 @@ fn screen_body<'a>(
         icon::icon(glyph, 20)
             .style(style::on_surface_variant)
             .into(),
-        scramble_ui::styled(shared, Type::LabelLarge)
-            .style(style::on_surface_variant)
-            .into(),
     ];
-    if !busy {
-        source.push(
-            scramble_ui::button(button::Kind::Text, crate::fl!("record-screen-again"))
-                .size(button::Size::Small)
-                .on_press(RecorderControl::Reshare)
+    match &screen.offered {
+        // Offered by plaa: a menu of the others.
+        Some(offered) if !busy => {
+            let label = match capture.size() {
+                Some((width, height)) if !ended => crate::fl!(
+                    "record-screen-size",
+                    what = shortened(&offered.name),
+                    width = width,
+                    height = height
+                ),
+                _ => shared,
+            };
+            source.push(
+                dropdown::menu(label, offer_entries(context.offers, offered))
+                    .tip(crate::fl!("record-screen-what"))
+                    .open(recorder.choosing, RecorderControl::Choosing)
+                    .into(),
+            );
+        }
+        Some(offered) => source.push(
+            scramble_ui::styled(shortened(&offered.name), Type::LabelLarge)
+                .style(style::on_surface_variant)
                 .into(),
-        );
+        ),
+        // Picked through the system: it is asked again.
+        None => {
+            source.push(
+                scramble_ui::styled(shared, Type::LabelLarge)
+                    .style(style::on_surface_variant)
+                    .into(),
+            );
+            if !busy {
+                source.push(
+                    scramble_ui::button(button::Kind::Text, crate::fl!("record-screen-again"))
+                        .size(button::Size::Small)
+                        .on_press(RecorderControl::Reshare)
+                        .into(),
+                );
+            }
+        }
     }
     let sound_name = match &recorder.microphone {
         None => crate::fl!("record-no-sound"),
@@ -389,6 +441,43 @@ fn warning_body<'a>(warning: &Warning) -> Element<'a, RecorderControl> {
     )
     .center(Fill)
     .into()
+}
+
+/// The screens and windows to record, `chosen` checked.
+fn offer_entries(offers: &[Offered], chosen: &Offered) -> Vec<Entry<RecorderControl>> {
+    let item = |offered: &Offered| {
+        let glyph = if offered.window {
+            Icon::DesktopWindows
+        } else {
+            Icon::ScreenshotMonitor
+        };
+        Entry::item(
+            shortened(&offered.name),
+            RecorderControl::Choose(offered.clone()),
+        )
+        .icon(glyph)
+        .checked(offered.id == chosen.id && offered.window == chosen.window)
+    };
+    let (windows, screens): (Vec<&Offered>, Vec<&Offered>) =
+        offers.iter().partition(|offered| offered.window);
+    let mut entries = vec![Entry::heading(crate::fl!("record-screens"))];
+    entries.extend(screens.into_iter().map(item));
+    if !windows.is_empty() {
+        entries.push(Entry::divider());
+        entries.push(Entry::heading(crate::fl!("record-windows")));
+        entries.extend(windows.into_iter().map(item));
+    }
+    entries
+}
+
+/// A window's title, cut short where it is long.
+fn shortened(name: &str) -> String {
+    const MOST: usize = 48;
+    if name.chars().count() <= MOST {
+        return name.to_owned();
+    }
+    let kept: String = name.chars().take(MOST - 1).collect();
+    format!("{}…", kept.trim_end())
 }
 
 /// How long the recording lasts and how large it is, shown while it goes
