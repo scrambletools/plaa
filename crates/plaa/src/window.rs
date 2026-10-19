@@ -1,6 +1,6 @@
-//! A window playing one file: the picture or the cover art, the toolbar
-//! and the playback controls, docked or floating over the picture, and the
-//! inspector.
+//! A window playing a file, or a list of them one at a time: the picture
+//! or the cover art, the toolbar and the playback controls, docked or
+//! floating over the picture, and the inspector and the list beside it.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -9,14 +9,15 @@ use std::time::{Duration, Instant};
 use iced::widget::{container, image, mouse_area, slider, space, stack, text};
 use iced::{Center, Element, Fill, Length, Theme};
 use plaa_media::subtitle::Cue;
-use plaa_media::{MediaInfo, Player, Source, Status};
+use plaa_media::{MediaInfo, Player, Source, Status, Thumbnails};
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::dir::row;
 use scramble_ui::dropdown::{self, Entry};
 use scramble_ui::{Icon, Scheme, Type, button, column, icon, style};
 
 use crate::format;
-use crate::timeline::Timeline;
+use crate::playlist::Playlist;
+use crate::timeline::{self, Timeline};
 
 /// The speeds the speed menu offers.
 pub const SPEEDS: [f64; 8] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
@@ -25,11 +26,19 @@ pub const SPEEDS: [f64; 8] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
 pub const SKIP: f64 = 10.0;
 pub const SKIP_SHORT: f64 = 5.0;
 
+/// What can show in the sheet beside the picture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sheet {
+    Inspector,
+    Playlist,
+}
+
 /// The menus a window can have open, which keep its overlay shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Menu {
     Speed,
     Tracks,
+    Chapters,
 }
 
 /// When the pointer last moved over the picture, kept where the picture
@@ -84,15 +93,26 @@ pub struct PlayerWindow {
     pub pointer_inside: bool,
     pub overlay_shown: bool,
     pub menu: Option<Menu>,
-    pub inspector: bool,
+    pub sheet: Option<Sheet>,
     pub looping: bool,
+    /// What the window plays, the player's source being the current item.
+    pub playlist: Playlist,
+    /// The window fits itself to the picture when it opens: not when a
+    /// list moves on.
+    pub fit_window: bool,
+    /// Where a loop within the file starts, and once set, where it ends.
+    pub ab_loop: Option<(f64, Option<f64>)>,
+    /// Makes the pictures shown over the timeline, for files with video.
+    pub thumbnails: Option<Thumbnails>,
+    /// The latest of them, and its width over its height.
+    pub thumbnail: Option<(image::Handle, f32)>,
     pub subtitle: Option<Cue>,
     pub volume: f32,
     pub muted: bool,
 }
 
 impl PlayerWindow {
-    pub fn new(player: Player, surface: u64, volume: f32, muted: bool) -> Self {
+    pub fn new(player: Player, playlist: Playlist, surface: u64, volume: f32, muted: bool) -> Self {
         Self {
             status: player.status(),
             player,
@@ -107,8 +127,13 @@ impl PlayerWindow {
             pointer_inside: true,
             overlay_shown: true,
             menu: None,
-            inspector: false,
+            sheet: None,
             looping: false,
+            playlist,
+            fit_window: true,
+            ab_loop: None,
+            thumbnails: None,
+            thumbnail: None,
             subtitle: None,
             volume,
             muted,
@@ -141,7 +166,7 @@ impl PlayerWindow {
         if !self.is_video() || self.status.paused || self.error.is_some() {
             return true;
         }
-        if self.menu.is_some() || self.dragging.is_some() || self.inspector {
+        if self.menu.is_some() || self.dragging.is_some() || self.sheet.is_some() {
             return true;
         }
         self.pointer_inside && self.activity.idle() < delay
@@ -155,6 +180,11 @@ impl PlayerWindow {
         let changed = shown != self.overlay_shown;
         self.overlay_shown = shown;
         changed
+    }
+
+    /// Opens `sheet`, in place of another, or closes it.
+    pub fn toggle_sheet(&mut self, sheet: Sheet) {
+        self.sheet = (self.sheet != Some(sheet)).then_some(sheet);
     }
 
     /// Takes the player's latest status and subtitle.
@@ -176,6 +206,10 @@ pub enum Control {
     TogglePlay,
     /// The timeline moved to this many seconds.
     Scrub(f64),
+    /// The timeline is pointed at this many seconds, or no longer.
+    Hover(Option<f64>),
+    /// Goes to this many seconds exactly, as to a chapter.
+    SeekTo(f64),
     ScrubEnded,
     SkipBy(f64),
     Volume(f32),
@@ -187,6 +221,12 @@ pub enum Control {
     Menu(Menu, bool),
     ToggleFullScreen,
     ToggleInspector,
+    TogglePlaylist,
+    TogglePip,
+    /// Plays the list's item at this index.
+    PlayItem(usize),
+    Previous,
+    Next,
     ToggleLoop,
     /// Floats the bars over pictures or docks them, for every window.
     ToggleOverlay,
@@ -203,6 +243,8 @@ pub enum Control {
 /// Everything the window's view needs besides its own state.
 pub struct Context {
     pub fullscreen: bool,
+    /// In picture in picture.
+    pub pip: bool,
     pub width: f32,
     /// The window's scale factor.
     pub scale: f32,
@@ -251,15 +293,16 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
         Some(cue) => stack![picture, subtitle_view(cue, window, context)].into(),
         None => picture.into(),
     };
-    let body: Element<'a, Control> = if window.inspector {
-        let sheet = component::between_bars(
-            inspector(window),
-            component::floating_room(true),
-            component::floating_room(true),
-        );
-        iced::widget::row![with_subtitles, sheet].into()
-    } else {
-        with_subtitles
+    let body: Element<'a, Control> = match sheet(window) {
+        Some(sheet) => {
+            let sheet = component::between_bars(
+                sheet,
+                component::floating_room(true),
+                component::floating_room(true),
+            );
+            iced::widget::row![with_subtitles, sheet].into()
+        }
+        None => with_subtitles,
     };
     // In full screen the toolbar stays away; the controls are enough.
     let top: Element<'a, Control> = if context.fullscreen && component::floating_bars_enabled() {
@@ -299,13 +342,27 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
         window.looping,
         Control::ToggleLoop,
     ));
+    if window.playlist.is_list() {
+        tools.push(component::toggle_tool(
+            Icon::PlaylistPlay,
+            crate::fl!("action-playlist"),
+            window.sheet == Some(Sheet::Playlist),
+            Control::TogglePlaylist,
+        ));
+    }
     tools.push(component::toggle_tool(
         Icon::Info,
         crate::fl!("action-info"),
-        window.inspector,
+        window.sheet == Some(Sheet::Inspector),
         Control::ToggleInspector,
     ));
     if window.is_video() {
+        tools.push(component::toggle_tool(
+            Icon::PictureInPicture,
+            crate::fl!("action-picture-in-picture"),
+            context.pip,
+            Control::TogglePip,
+        ));
         tools.push(component::floating_bars_toggle(Control::ToggleOverlay));
     }
     tools.push(component::tool(
@@ -323,7 +380,8 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
     row(tools).spacing(4).align_y(Center).width(Fill).into()
 }
 
-/// The playback controls: play, skip, the timeline, speed, volume, tracks
+/// The playback controls: play, between the list's previous and next
+/// items when there is a list, skip, the timeline, speed, volume, tracks
 /// and full screen.
 fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
     let status = &window.status;
@@ -347,6 +405,22 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
             .on_press(Control::TogglePlay),
         play_label,
     );
+    let (previous, next) = if window.playlist.is_list() {
+        (
+            Some(component::tool(
+                Icon::SkipPrevious,
+                crate::fl!("action-previous"),
+                Some(Control::Previous),
+            )),
+            Some(component::tool(
+                Icon::SkipNext,
+                crate::fl!("action-next"),
+                window.playlist.next().map(|_| Control::Next),
+            )),
+        )
+    } else {
+        (None, None)
+    };
     let seekable = window.info.as_ref().is_some_and(|info| info.seekable);
     let back = component::tool(
         Icon::Replay10,
@@ -370,6 +444,15 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
             Control::Scrub,
             Control::ScrubEnded,
         )
+        .chapters(
+            window
+                .info
+                .as_ref()
+                .map_or(&[][..], |info| info.chapters.as_slice()),
+        )
+        .ab_loop(window.ab_loop)
+        .on_hover(Control::Hover)
+        .thumbnail(window.thumbnail.clone())
         .height(style::SLIDER_HEIGHT)
         .style(|theme: &Theme, status| style::slider(timeline_backdrop(theme))(theme, status))
         .into(),
@@ -408,8 +491,11 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
         .width(96)
         .height(style::SLIDER_HEIGHT)
         .style(|theme: &Theme, status| style::slider(timeline_backdrop(theme))(theme, status));
-    let mut controls: Vec<Element<'a, Control>> = vec![
-        play,
+    let mut controls: Vec<Element<'a, Control>> = Vec::new();
+    controls.extend(previous);
+    controls.push(play);
+    controls.extend(next);
+    controls.extend([
         back,
         forward,
         container(time(elapsed)).padding([0, 4]).into(),
@@ -417,10 +503,13 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
         container(time(remaining)).padding([0, 4]).into(),
         speed_menu(window),
         mute,
-    ];
+    ]);
     // Narrow windows keep the mute button and lose the slider.
     if context.width >= 640.0 {
         controls.push(volume.into());
+    }
+    if let Some(menu) = chapters_menu(window) {
+        controls.push(menu);
     }
     if let Some(menu) = tracks_menu(window) {
         controls.push(menu);
@@ -465,6 +554,45 @@ fn speed_menu(window: &PlayerWindow) -> Element<'_, Control> {
             Control::Menu(Menu::Speed, open)
         })
         .into()
+}
+
+/// The chapters to go to, when there are some.
+fn chapters_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
+    let info = window.info.as_ref()?;
+    if info.chapters.len() < 2 {
+        return None;
+    }
+    let long = info
+        .duration
+        .is_some_and(|duration| duration.as_secs() >= 3600);
+    let current =
+        timeline::chapter_at(&info.chapters, window.shown_position()).map(|chapter| chapter.start);
+    let entries = info
+        .chapters
+        .iter()
+        .enumerate()
+        .map(|(number, chapter)| {
+            let title = chapter
+                .title
+                .clone()
+                .unwrap_or_else(|| crate::fl!("chapters-numbered", number = (number + 1)));
+            let start = chapter.start.as_secs_f64();
+            Entry::item(
+                format!("{title} · {}", format::time(start, long)),
+                Control::SeekTo(start),
+            )
+            .checked(current == Some(chapter.start))
+        })
+        .collect();
+    Some(
+        dropdown::icon_menu(Icon::Bookmarks, entries)
+            .size(button::Size::Small)
+            .tip(crate::fl!("action-chapters"))
+            .open(window.menu == Some(Menu::Chapters), |open| {
+                Control::Menu(Menu::Chapters, open)
+            })
+            .into(),
+    )
 }
 
 /// The audio and subtitle tracks to choose from, when there is a choice.
@@ -600,10 +728,9 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
     let body = container(column![art, lines].spacing(24).align_x(Center).padding(24))
         .center(Fill)
         .style(style::surface);
-    let body: Element<'a, Control> = if window.inspector {
-        iced::widget::row![body, inspector(window)].into()
-    } else {
-        body.into()
+    let body: Element<'a, Control> = match sheet(window) {
+        Some(sheet) => iced::widget::row![body, sheet].into(),
+        None => body.into(),
     };
     column![
         docked(toolbar(window, context)),
@@ -622,6 +749,42 @@ fn docked<'a>(content: Element<'a, Control>) -> Element<'a, Control> {
         .align_y(Center)
         .style(style::chrome)
         .into()
+}
+
+/// The sheet beside the picture, if one is open.
+fn sheet(window: &PlayerWindow) -> Option<Element<'_, Control>> {
+    match window.sheet? {
+        Sheet::Inspector => Some(inspector(window)),
+        Sheet::Playlist => Some(playlist_sheet(window)),
+    }
+}
+
+/// The list: each item, the one playing marked, played when chosen.
+fn playlist_sheet(window: &PlayerWindow) -> Element<'_, Control> {
+    let current = window.playlist.current();
+    let rows = window
+        .playlist
+        .items()
+        .iter()
+        .enumerate()
+        .map(|(index, source)| {
+            let playing = index == current;
+            component::content_list_row(
+                playing.then_some(Icon::PlayArrow),
+                source.name(),
+                // Where the icon is in the playing row.
+                if playing { 0.0 } else { 20.0 },
+                playing,
+                Some(Control::PlayItem(index)),
+            )
+            .into()
+        });
+    component::side_sheet_sized(
+        crate::fl!("playlist-title"),
+        Control::TogglePlaylist,
+        iced::widget::Column::with_children(rows).spacing(2),
+        Length::Fixed(component::SIDE_SHEET_WIDTH),
+    )
 }
 
 /// The inspector: what the file holds and how it plays.

@@ -59,6 +59,11 @@ action-unmute = Unmute
 action-speed = Speed
 action-tracks = Audio and Subtitles
 action-full-screen = Full Screen
+action-playlist = Playlist
+action-chapters = Chapters
+action-picture-in-picture = Picture in Picture
+action-previous = Previous
+action-next = Next
 action-exit-full-screen = Exit Full Screen
 
 ## The floating controls
@@ -77,6 +82,8 @@ tracks-numbered = Track { $number }
 ## Inspector
 
 info-title = Inspector
+playlist-title = Playlist
+chapters-numbered = Chapter { $number }
 info-file = File
 info-name = Name
 info-folder = Folder
@@ -119,6 +126,9 @@ notice-dialog-failed = The file dialog could not open: { $error }
 notice-screenshot-saved = Saved “{ $name }”.
 notice-screenshot-failed = The picture could not be saved: { $error }
 notice-no-sound = Playing without sound: { $reason }
+notice-loop-from = Loop from { $time }. Press again where it should end.
+notice-loop-between = Looping { $from } to { $to }.
+notice-loop-off = Loop off.
 
 ## Settings
 
@@ -161,6 +171,8 @@ settings-audio-device = Sound output
 settings-audio-device-system = System default
 settings-resume = Resume where you left off
 settings-resume-note = Files start where they were when last closed.
+settings-folder-playlists = Play the folder's other files
+settings-folder-playlists-note = Opening one file lists the others in its folder, which play after it.
 settings-folders = Folders
 settings-recordings = Recordings
 settings-screenshots = Saved frames

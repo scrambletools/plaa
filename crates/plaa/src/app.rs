@@ -9,16 +9,17 @@ use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{container, image, space, stack};
 use iced::window::{self, settings::PlatformSpecific};
 use iced::{Center, Color, Element, Event, Fill, Size, Subscription, Task, Theme, event};
-use plaa_media::{Event as PlayerEvent, Options, Player, Source};
+use plaa_media::{Event as PlayerEvent, Options, Player, Source, Thumbnails};
 use plaa_store::positions::{self, Positions};
 use plaa_store::settings::{self, Appearance, Settings};
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::{Icon, Type, button, column, icon, omarchy, row, style};
 
 use crate::External;
+use crate::playlist::{self, Playlist};
 use crate::settings_view::{self, SettingsMessage, SettingsTab};
 use crate::shortcuts::{self, Action};
-use crate::window::{self as player_window, Control, Menu, PlayerWindow, SPEEDS};
+use crate::window::{self as player_window, Control, Menu, PlayerWindow, SPEEDS, Sheet};
 
 #[cfg(target_os = "linux")]
 pub const APP_ID: &str = if plaa_store::paths::PRODUCTION {
@@ -34,6 +35,17 @@ const TICK: Duration = Duration::from_millis(100);
 /// How often positions are saved while playing, in case plaa stops
 /// without closing its windows.
 const POSITIONS_SAVE: Duration = Duration::from_secs(60);
+/// Going back this far into an item starts it over rather than going to
+/// the item before.
+const RESTART_WITHIN: Duration = Duration::from_secs(3);
+/// The most a window opens to for a picture, and in picture in picture.
+const WINDOW_ROOM: Size = Size::new(1280.0, 800.0);
+const PIP_ROOM: Size = Size::new(400.0, 400.0);
+/// How far picture in picture keeps from the screen's corner.
+const PIP_MARGIN: f32 = 24.0;
+
+/// How long the files of one drop take to arrive, at most.
+const DROP_GATHER: Duration = Duration::from_millis(150);
 
 pub struct Plaa {
     pub(crate) windows: BTreeMap<window::Id, Window>,
@@ -68,6 +80,10 @@ pub(crate) struct Window {
     notice: Option<(String, Instant)>,
     /// The address being typed in the Open Address dialog, while it shows.
     address: Option<String>,
+    /// Files dropped on the window, gathering while a drop arrives.
+    dropped: Vec<Source>,
+    /// In picture in picture: the size to go back to.
+    pip: Option<Size>,
 }
 
 enum Content {
@@ -246,27 +262,132 @@ impl Plaa {
             }
             return self.open_window(None);
         }
-        let mut tasks = Vec::new();
-        let mut into = into.filter(|id| {
+        let sources: Vec<Source> = sources.into_iter().map(canonical).collect();
+        // A file playing already: its window comes forward.
+        if let [source] = sources.as_slice()
+            && let Some(id) = self.window_playing(source)
+        {
+            return window::gain_focus(id);
+        }
+        let Some(list) = self.playlist_for(sources) else {
+            return Task::none();
+        };
+        let into = into.filter(|id| {
             self.windows
                 .get(id)
                 .is_some_and(|window| matches!(window.content, Content::Start))
         });
-        for source in sources {
-            let source = match source {
-                Source::File(path) => Source::File(plaa_store::paths::canonical(&path)),
-                other => other,
-            };
-            if let Some(id) = self.window_playing(&source) {
-                tasks.push(window::gain_focus(id));
-                continue;
+        match into {
+            Some(id) => {
+                self.play_in(id, list, false);
+                Task::none()
             }
-            match into.take() {
-                Some(id) => self.play_in(id, source),
-                None => tasks.push(self.open_window(Some(source))),
+            None => self.open_window(Some(list)),
+        }
+    }
+
+    /// The list `sources` make together: list files' entries in their
+    /// place, or for one file alone, the files in its folder when Settings
+    /// asks for them.
+    fn playlist_for(&self, sources: Vec<Source>) -> Option<Playlist> {
+        let items: Vec<Source> = playlist::expand(sources)
+            .into_iter()
+            .map(canonical)
+            .collect();
+        if self.settings.folder_playlists
+            && let [Source::File(path)] = items.as_slice()
+            && let Some((files, at)) = playlist::folder(path)
+        {
+            return Playlist::new(files.into_iter().map(Source::File).collect(), at);
+        }
+        Playlist::new(items, 0)
+    }
+
+    /// Shrinks a video's window to a corner and keeps it over others, or
+    /// brings it back. Wayland lets apps do neither of the last two: there
+    /// it only shrinks, and a compositor rule can pin it.
+    fn toggle_pip(&mut self, id: window::Id) -> Task<Message> {
+        let overlay = self.settings.overlay;
+        let Some(window) = self.windows.get_mut(&id) else {
+            return Task::none();
+        };
+        if let Some(size) = window.pip.take() {
+            return Task::batch([
+                window::set_level(id, window::Level::Normal),
+                window::resize(id, size),
+            ]);
+        }
+        let Some(video) = window
+            .player()
+            .and_then(|player| player.info.as_ref())
+            .and_then(|info| info.video.iter().find(|track| !track.cover))
+            .map(|track| (track.width, track.height, track.aspect, track.quarter_turns))
+        else {
+            return Task::none();
+        };
+        window.pip = Some(window.size);
+        let leave_fullscreen = if window.fullscreen {
+            self.set_fullscreen(id, false)
+        } else {
+            Task::none()
+        };
+        let (width, height, aspect, turns) = video;
+        let size = fitted_window(width, height, aspect, turns, overlay, PIP_ROOM);
+        let corner = window::monitor_size(id).then(move |monitor| match monitor {
+            Some(monitor) => window::move_to(
+                id,
+                iced::Point::new(
+                    monitor.width - size.width - PIP_MARGIN,
+                    monitor.height - size.height - 2.0 * PIP_MARGIN,
+                ),
+            ),
+            None => Task::none(),
+        });
+        Task::batch([
+            leave_fullscreen,
+            window::set_level(id, window::Level::AlwaysOnTop),
+            window::resize(id, size),
+            corner,
+        ])
+    }
+
+    /// Plays item `index` of window `id`'s list.
+    fn play_item(&mut self, id: window::Id, index: usize) -> Task<Message> {
+        let Some(player) = self.player_mut(id) else {
+            return Task::none();
+        };
+        let mut list = player.playlist.clone();
+        if list.select(index) {
+            self.play_in(id, list, true);
+        }
+        Task::none()
+    }
+
+    fn next(&mut self, id: window::Id) -> Task<Message> {
+        match self
+            .player_mut(id)
+            .and_then(|player| player.playlist.next())
+        {
+            Some(next) => self.play_item(id, next),
+            None => Task::none(),
+        }
+    }
+
+    /// The previous item, or the start of this one once it has played a
+    /// few seconds.
+    fn previous(&mut self, id: window::Id) -> Task<Message> {
+        let Some(player) = self.player_mut(id) else {
+            return Task::none();
+        };
+        match player.playlist.previous() {
+            Some(previous) if player.player.position() < RESTART_WITHIN => {
+                self.play_item(id, previous)
+            }
+            _ => {
+                player.player.seek(Duration::ZERO, true);
+                Task::none()
             }
         }
-        Task::batch(tasks)
     }
 
     fn window_playing(&self, source: &Source) -> Option<window::Id> {
@@ -278,8 +399,8 @@ impl Plaa {
             })
     }
 
-    fn open_window(&mut self, source: Option<Source>) -> Task<Message> {
-        let size = match source {
+    fn open_window(&mut self, list: Option<Playlist>) -> Task<Message> {
+        let size = match list {
             None => Size::new(640.0, 440.0),
             Some(_) => Size::new(960.0, 600.0),
         };
@@ -301,10 +422,12 @@ impl Plaa {
                 settings_open: false,
                 notice: None,
                 address: None,
+                dropped: Vec::new(),
+                pip: None,
             },
         );
-        if let Some(source) = source {
-            self.play_in(id, source);
+        if let Some(list) = list {
+            self.play_in(id, list, false);
         }
         opened.then(move |_| {
             Task::batch([
@@ -314,8 +437,10 @@ impl Plaa {
         })
     }
 
-    /// Plays `source` in window `id`, in place of what it showed.
-    fn play_in(&mut self, id: window::Id, source: Source) {
+    /// Plays `list`'s current item in window `id`, in place of what it
+    /// showed. Moving on through a list keeps the window's size and modes.
+    fn play_in(&mut self, id: window::Id, list: Playlist, moving_on: bool) {
+        let source = list.source().clone();
         let start = match &source {
             Source::File(path) if self.settings.resume => {
                 self.positions.get(&path.to_string_lossy())
@@ -338,15 +463,22 @@ impl Plaa {
         let surface = self.next_surface;
         self.next_surface += 1;
         if let Some(window) = self.windows.get_mut(&id) {
-            if let Content::Player(previous) = &window.content {
-                remember_position(&mut self.positions, previous);
-            }
-            window.content = Content::Player(Box::new(PlayerWindow::new(
+            let mut playing = PlayerWindow::new(
                 player,
+                list,
                 surface,
                 self.settings.volume,
                 self.settings.muted,
-            )));
+            );
+            playing.fit_window = !moving_on;
+            if let Content::Player(previous) = &window.content {
+                remember_position(&mut self.positions, previous);
+                if moving_on {
+                    playing.looping = previous.looping;
+                    playing.sheet = previous.sheet;
+                }
+            }
+            window.content = Content::Player(Box::new(playing));
         }
     }
 
@@ -408,9 +540,41 @@ impl Plaa {
                 Task::none()
             }
             Message::FileDropped(id, path) => {
-                let source = Source::File(plaa_store::paths::canonical(&path));
-                if self.windows.contains_key(&id) {
-                    self.play_in(id, source);
+                // A drop of several files arrives a file at a time; they
+                // play as one list once the last has come.
+                if let Some(window) = self.windows.get_mut(&id) {
+                    if window.dropped.is_empty() {
+                        std::thread::spawn(move || {
+                            std::thread::sleep(DROP_GATHER);
+                            crate::post(External::DropsGathered(id));
+                        });
+                    }
+                    window.dropped.push(Source::File(path));
+                }
+                Task::none()
+            }
+            Message::External(External::Thumbnail(id, thumbnail)) => {
+                if let Some(player) = self.player_mut(id) {
+                    let picture = &thumbnail.picture;
+                    player.thumbnail = Some((
+                        image::Handle::from_rgba(
+                            picture.width,
+                            picture.height,
+                            picture.rgba.clone(),
+                        ),
+                        picture.width as f32 / picture.height.max(1) as f32,
+                    ));
+                }
+                Task::none()
+            }
+            Message::External(External::DropsGathered(id)) => {
+                let Some(window) = self.windows.get_mut(&id) else {
+                    return Task::none();
+                };
+                let dropped = std::mem::take(&mut window.dropped);
+                let sources = dropped.into_iter().map(canonical).collect();
+                if let Some(list) = self.playlist_for(sources) {
+                    self.play_in(id, list, false);
                 }
                 Task::none()
             }
@@ -448,17 +612,8 @@ impl Plaa {
                 if text.is_empty() {
                     return Task::none();
                 }
-                let source = Source::parse(text);
-                let start = self
-                    .windows
-                    .get(&id)
-                    .is_some_and(|window| matches!(window.content, Content::Start));
-                if start {
-                    self.play_in(id, source);
-                    Task::none()
-                } else {
-                    self.open_sources(vec![source], None)
-                }
+                // Into this window when it shows nothing yet.
+                self.open_sources(vec![Source::parse(text)], Some(id))
             }
             Message::AddressCancelled(id) => {
                 if let Some(window) = self.windows.get_mut(&id) {
@@ -519,6 +674,8 @@ impl Plaa {
             .windows
             .get(&id)
             .is_some_and(|window| window.fullscreen);
+        let overlay = self.settings.overlay;
+        let scale = self.windows.get(&id).map_or(1.0, |window| window.scale);
         let Some(player) = self.player_mut(id) else {
             return Task::none();
         };
@@ -531,15 +688,27 @@ impl Plaa {
                     info.video.iter().find(|track| !track.cover).map(|track| {
                         (track.width, track.height, track.aspect, track.quarter_turns)
                     });
+                // Pictures over the timeline, for files: a stream would be
+                // read a second time over the network.
+                if let Source::File(path) = player.source()
+                    && info.has_video()
+                    && info.seekable
+                {
+                    let width = (crate::timeline::THUMBNAIL_SIZE * scale).round() as u32;
+                    player.thumbnails =
+                        Some(Thumbnails::open(path.clone(), width, move |thumbnail| {
+                            crate::post(External::Thumbnail(id, thumbnail));
+                        }));
+                }
                 player.info = Some(info);
                 player.refresh();
                 let size = match video {
                     Some((width, height, aspect, turns)) => {
-                        fitted_window(width, height, aspect, turns, self.settings.overlay)
+                        fitted_window(width, height, aspect, turns, overlay, WINDOW_ROOM)
                     }
                     None => Size::new(440.0, 600.0),
                 };
-                if fullscreen {
+                if fullscreen || !player.fit_window {
                     Task::none()
                 } else {
                     window::resize(id, size)
@@ -563,6 +732,9 @@ impl Plaa {
                     player.player.play();
                 }
                 player.refresh();
+                if !player.looping && player.playlist.next().is_some() {
+                    return self.next(id);
+                }
                 Task::none()
             }
         }
@@ -607,10 +779,10 @@ impl Plaa {
                 return Task::none();
             }
             if let Content::Player(player) = &mut window.content
-                && (player.menu.is_some() || player.inspector)
+                && (player.menu.is_some() || player.sheet.is_some())
             {
                 player.menu = None;
-                player.inspector = false;
+                player.sheet = None;
                 return Task::none();
             }
             if window.fullscreen {
@@ -652,6 +824,9 @@ impl Plaa {
                 }
                 return Task::none();
             }
+            Action::PictureInPicture => return self.toggle_pip(id),
+            Action::Previous => return self.previous(id),
+            Action::Next => return self.next(id),
             Action::FullScreen => {
                 let fullscreen = self
                     .windows
@@ -673,7 +848,12 @@ impl Plaa {
             .and_then(|track| track.frame_rate)
             .map_or(1.0 / 25.0, |rate| 1.0 / rate);
         match action {
-            Action::Info => player.inspector = !player.inspector,
+            Action::Info => player.toggle_sheet(Sheet::Inspector),
+            Action::Playlist => {
+                if player.playlist.is_list() {
+                    player.toggle_sheet(Sheet::Playlist);
+                }
+            }
             Action::PlayPause => player.player.toggle(),
             Action::Back => player.player.seek_by(-player_window::SKIP_SHORT),
             Action::Forward => player.player.seek_by(player_window::SKIP_SHORT),
@@ -751,6 +931,52 @@ impl Plaa {
                 }
             }
             Action::ToStart => player.player.seek(Duration::ZERO, true),
+            Action::AbLoop => {
+                let position = player.player.position().as_secs_f64();
+                let long = player
+                    .status
+                    .duration
+                    .is_some_and(|duration| duration.as_secs() >= 3600);
+                let time = |seconds: f64| crate::format::time(seconds, long);
+                let notice = match player.ab_loop {
+                    Some((from, None)) if position > from + 0.1 => {
+                        player.player.set_ab_loop(Some((
+                            Duration::from_secs_f64(from),
+                            Duration::from_secs_f64(position),
+                        )));
+                        player.ab_loop = Some((from, Some(position)));
+                        crate::fl!(
+                            "notice-loop-between",
+                            from = time(from),
+                            to = time(position)
+                        )
+                    }
+                    Some((_, Some(_))) => {
+                        player.player.set_ab_loop(None);
+                        player.ab_loop = None;
+                        crate::fl!("notice-loop-off")
+                    }
+                    // A start, or a new one before the last.
+                    _ => {
+                        player.ab_loop = Some((position, None));
+                        crate::fl!("notice-loop-from", time = time(position))
+                    }
+                };
+                self.notify(id, notice);
+                return Task::none();
+            }
+            Action::PreviousChapter | Action::NextChapter => {
+                if let Some(info) = &player.info
+                    && let Some(target) = crate::timeline::chapter_step(
+                        &info.chapters,
+                        player.player.position().as_secs_f64(),
+                        action == Action::NextChapter,
+                        RESTART_WITHIN.as_secs_f64(),
+                    )
+                {
+                    player.player.seek(Duration::from_secs_f64(target), true);
+                }
+            }
             _ => {}
         }
         player.refresh();
@@ -780,6 +1006,10 @@ impl Plaa {
             Control::Settings => return self.perform(id, Action::Settings),
             Control::Close => return window::close(id),
             Control::ToggleFullScreen => return self.perform(id, Action::FullScreen),
+            Control::PlayItem(index) => return self.play_item(id, index),
+            Control::TogglePip => return self.toggle_pip(id),
+            Control::Previous => return self.previous(id),
+            Control::Next => return self.next(id),
             Control::ToggleOverlay => {
                 self.settings.overlay = !self.settings.overlay;
                 self.apply_looks();
@@ -857,6 +1087,22 @@ impl Plaa {
                 }
             }
             Control::SkipBy(seconds) => player.player.seek_by(seconds),
+            Control::Hover(seconds) => {
+                match (seconds, &player.thumbnails) {
+                    (Some(seconds), Some(thumbnails)) => thumbnails.request(seconds),
+                    // Gone, so pointing again shows no picture from before.
+                    (None, _) => player.thumbnail = None,
+                    _ => {}
+                }
+                // The overlay stays while the timeline is pointed at.
+                return Task::none();
+            }
+            Control::SeekTo(seconds) => {
+                player
+                    .player
+                    .seek(Duration::from_secs_f64(seconds.max(0.0)), true);
+                player.menu = None;
+            }
             Control::Speed(speed) => {
                 player.player.set_speed(speed);
                 player.menu = None;
@@ -872,7 +1118,8 @@ impl Plaa {
             Control::Menu(menu, open) => {
                 player.menu = if open { Some(menu) } else { None::<Menu> };
             }
-            Control::ToggleInspector => player.inspector = !player.inspector,
+            Control::ToggleInspector => player.toggle_sheet(Sheet::Inspector),
+            Control::TogglePlaylist => player.toggle_sheet(Sheet::Playlist),
             Control::ToggleLoop => player.looping = !player.looping,
             Control::Activity => {}
             _ => {}
@@ -955,6 +1202,7 @@ impl Plaa {
                 player,
                 &player_window::Context {
                     fullscreen: window.fullscreen,
+                    pip: window.pip.is_some(),
                     width: window.size.width,
                     scale: window.scale,
                     close_button,
@@ -983,6 +1231,15 @@ impl Plaa {
 }
 
 /// Remembers where `player` is, for its file to start there next time.
+/// A file by its canonical path, so the same file is known however it was
+/// named.
+fn canonical(source: Source) -> Source {
+    match source {
+        Source::File(path) => Source::File(plaa_store::paths::canonical(&path)),
+        other => other,
+    }
+}
+
 impl Window {
     /// What the window plays, if anything.
     pub(crate) fn player(&self) -> Option<&PlayerWindow> {
@@ -1007,7 +1264,16 @@ fn remember_position(positions: &mut Positions, player: &PlayerWindow) {
 
 /// A window the video's size, made smaller to fit a typical screen, with
 /// room for docked bars.
-fn fitted_window(width: u32, height: u32, aspect: f64, turns: u8, overlay: bool) -> Size {
+/// A window that shows a `width` by `height` picture whole, at most
+/// `room` big, and the bars when they dock.
+fn fitted_window(
+    width: u32,
+    height: u32,
+    aspect: f64,
+    turns: u8,
+    overlay: bool,
+    room: Size,
+) -> Size {
     let shown_width = if aspect.is_finite() && aspect > 0.0 {
         height as f32 * aspect as f32
     } else {
@@ -1020,7 +1286,7 @@ fn fitted_window(width: u32, height: u32, aspect: f64, turns: u8, overlay: bool)
     if turns % 2 == 1 {
         std::mem::swap(&mut width, &mut height);
     }
-    let scale = (1280.0 / width).min(800.0 / height).min(1.0);
+    let scale = (room.width / width).min(room.height / height).min(1.0);
     let bars = if overlay {
         0.0
     } else {
@@ -1227,13 +1493,16 @@ mod tests {
     #[test]
     fn windows_fit_the_video_and_a_screen() {
         assert_eq!(
-            fitted_window(640, 360, 16.0 / 9.0, 0, true),
+            fitted_window(640, 360, 16.0 / 9.0, 0, true, WINDOW_ROOM),
             Size::new(640.0, 360.0)
         );
-        let big = fitted_window(3840, 2160, 16.0 / 9.0, 0, true);
+        let big = fitted_window(3840, 2160, 16.0 / 9.0, 0, true, WINDOW_ROOM);
         assert!(big.width <= 1280.0 && big.height <= 800.0);
-        let portrait = fitted_window(1920, 1080, 16.0 / 9.0, 1, true);
+        let portrait = fitted_window(1920, 1080, 16.0 / 9.0, 1, true, WINDOW_ROOM);
         assert!(portrait.height > portrait.width);
+        // Picture in picture is small, yet no smaller than a window gets.
+        let pip = fitted_window(3840, 2160, 16.0 / 9.0, 0, true, PIP_ROOM);
+        assert_eq!(pip, Size::new(400.0, 240.0));
     }
 
     #[test]

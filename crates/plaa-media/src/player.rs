@@ -164,6 +164,8 @@ pub(crate) struct Shared {
     pub decoded: Mutex<(u64, f64)>,
     /// Where the timeline's handle is while it is dragged.
     pub scrub_to: Mutex<Option<f64>>,
+    /// Plays from the first time again on reaching the second.
+    pub ab_loop: Mutex<Option<(f64, f64)>>,
     /// The cues of the subtitle file beside the video that shows, all read
     /// at once, in place of the video's own.
     pub file_cues: Mutex<Option<Arc<Vec<Cue>>>>,
@@ -245,6 +247,7 @@ impl Player {
             target: Mutex::new(None),
             decoded: Mutex::new((0, 0.0)),
             scrub_to: Mutex::new(None),
+            ab_loop: Mutex::new(None),
             file_cues: Mutex::new(None),
             stop: Arc::new(AtomicBool::new(false)),
             speed: AtomicU64::new(1.0f64.to_bits()),
@@ -350,6 +353,18 @@ impl Player {
             .lock()
             .unwrap_or_else(PoisonError::into_inner) = Some(position.as_secs_f64());
         let _ = self.commands.send(Command::Scrub);
+    }
+
+    /// Plays from `from` again each time playback reaches `to`, or stops
+    /// looping.
+    pub fn set_ab_loop(&self, between: Option<(Duration, Duration)>) {
+        *self
+            .shared
+            .ab_loop
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = between
+            .filter(|(from, to)| from < to)
+            .map(|(from, to)| (from.as_secs_f64(), to.as_secs_f64()));
     }
 
     /// Ends a drag: lands where the handle was let go, then plays on if
@@ -693,8 +708,28 @@ fn read(
     let mut read_all = false;
     let mut announced_end = false;
     let mut scrub: Option<Scrub> = None;
+    // Where playback was last time round, to see it reach a loop's end.
+    let mut played = shared.clock.now();
     let mut packet = ffmpeg::Packet::empty();
     while !shared.stopping() {
+        let now = shared.clock.now();
+        let between = *shared
+            .ab_loop
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        // Playing on past the end, not a seek past it.
+        if let Some((from, to)) = between
+            && info.seekable
+            && played < to
+            && now >= to
+            && now - played < 0.5
+        {
+            seek(&mut input, &shared, &mut decoders, from, true, start);
+            read_all = false;
+            announced_end = false;
+            shared.state().read_all = false;
+        }
+        played = shared.clock.now();
         if info.seekable
             && scrub.is_some()
             && steer(

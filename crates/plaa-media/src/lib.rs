@@ -11,12 +11,14 @@ pub mod info;
 pub mod player;
 mod queue;
 pub mod subtitle;
+pub mod thumbnails;
 
 pub use audio::{OutputDevice, output_devices};
 pub use decode::{Picture, same_language};
 pub use frame::VideoFrame;
 pub use info::MediaInfo;
 pub use player::{Event, Options, Player, Source, Status};
+pub use thumbnails::{Thumbnail, Thumbnails};
 
 /// Sets FFmpeg up once: its network support, and only errors in its log.
 pub fn init() {

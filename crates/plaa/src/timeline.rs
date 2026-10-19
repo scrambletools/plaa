@@ -1,22 +1,49 @@
 //! The timeline: a slider whose handle is placed from the player's
 //! position each time the window draws, asking to draw again when the
 //! handle reaches the next pixel, so it moves smoothly at any width
-//! without the window being rebuilt.
+//! without the window being rebuilt. Chapters mark it, and pointing at it
+//! shows the time and chapter there, and a picture from there.
 
 use std::cell::Cell;
 use std::time::{Duration, Instant};
 
+use iced::advanced::image::{self, Renderer as _};
 use iced::advanced::layout::{self, Layout};
+use iced::advanced::overlay;
 use iced::advanced::renderer::{self, Renderer as _};
+use iced::advanced::text::{self, Renderer as _};
 use iced::advanced::widget::{Tree, Widget, tree};
 use iced::advanced::{Clipboard, Shell};
 use iced::widget::slider::{HandleShape, Status, Style};
-use iced::{Border, Element, Event, Length, Point, Rectangle, Size, Theme, mouse, touch, window};
+use iced::{
+    Border, Element, Event, Length, Pixels, Point, Rectangle, Size, Theme, Vector, mouse, touch,
+    window,
+};
 use plaa_media::Player;
+use plaa_media::info::Chapter;
+use scramble_ui::Scheme;
+use scramble_ui::font::Type;
+
+use crate::format;
 
 /// How long a released handle stays where it was let go while the
 /// player seeks there.
 const HOLD: Duration = Duration::from_secs(1);
+
+/// The gap in the rail where a chapter starts.
+const CHAPTER_GAP: f32 = 2.0;
+
+/// The bar under the rail that marks a loop: its thickness, its distance
+/// from the rail, and its length when only the start is set.
+const LOOP_BAR: f32 = 3.0;
+const LOOP_GAP: f32 = 4.0;
+const LOOP_START: f32 = 6.0;
+
+/// The longer side of the picture over the timeline.
+pub const THUMBNAIL_SIZE: f32 = 160.0;
+
+/// What the timeline is told of where it is pointed at.
+type HoverFn<'a, Message> = Box<dyn Fn(Option<f64>) -> Message + 'a>;
 
 /// How the rail and handle look in each status, as for a slider.
 type StyleFn<'a> = Box<dyn Fn(&Theme, Status) -> Style + 'a>;
@@ -30,6 +57,11 @@ pub struct Timeline<'a, Message> {
     on_release: Message,
     height: f32,
     style: StyleFn<'a>,
+    chapters: &'a [Chapter],
+    ab_loop: Option<(f64, Option<f64>)>,
+    on_hover: Option<HoverFn<'a, Message>>,
+    /// The picture near where it is pointed at, and its shape.
+    thumbnail: Option<(image::Handle, f32)>,
 }
 
 impl<'a, Message> Timeline<'a, Message> {
@@ -51,7 +83,36 @@ impl<'a, Message> Timeline<'a, Message> {
             on_release,
             height: 16.0,
             style: Box::new(iced::widget::slider::default),
+            chapters: &[],
+            ab_loop: None,
+            on_hover: None,
+            thumbnail: None,
         }
+    }
+
+    /// Sends the seconds pointed at as the pointer moves over the
+    /// timeline or drags it, and none once it leaves.
+    pub fn on_hover(mut self, on_hover: impl Fn(Option<f64>) -> Message + 'a) -> Self {
+        self.on_hover = Some(Box::new(on_hover));
+        self
+    }
+
+    /// The picture to show over where it is pointed at, and its width over
+    /// its height.
+    pub fn thumbnail(mut self, thumbnail: Option<(image::Handle, f32)>) -> Self {
+        self.thumbnail = thumbnail;
+        self
+    }
+
+    /// A loop's start, and its end once set, marked under the rail.
+    pub fn ab_loop(mut self, ab_loop: Option<(f64, Option<f64>)>) -> Self {
+        self.ab_loop = ab_loop;
+        self
+    }
+
+    pub fn chapters(mut self, chapters: &'a [Chapter]) -> Self {
+        self.chapters = chapters;
+        self
     }
 
     pub fn height(mut self, height: f32) -> Self {
@@ -62,6 +123,17 @@ impl<'a, Message> Timeline<'a, Message> {
     pub fn style(mut self, style: impl Fn(&Theme, Status) -> Style + 'a) -> Self {
         self.style = Box::new(style);
         self
+    }
+
+    /// Where `seconds` are along the rail, the handle's centre there.
+    fn x_of(&self, bounds: Rectangle, handle: f32, seconds: f64) -> f32 {
+        let travel = (bounds.width - handle).max(0.0);
+        let along = if self.duration > 0.0 {
+            (seconds / self.duration).clamp(0.0, 1.0) as f32
+        } else {
+            0.0
+        };
+        bounds.x + handle / 2.0 + travel * along
     }
 
     /// Where the player is, in seconds along the timeline.
@@ -111,6 +183,8 @@ struct State {
     /// Where it was let go and when, shown until the player is there.
     released: Option<(f64, Instant)>,
     hovered: bool,
+    /// Where the pointer is along the timeline, while over it or dragging.
+    pointer: Option<f32>,
     /// The handle's width as last drawn, which its style sets.
     handle: Cell<f32>,
 }
@@ -157,6 +231,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
         let state = tree.state.downcast_mut::<State>();
         let bounds = layout.bounds();
         let handle = state.handle.get();
+        let pointed = state.pointer;
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
@@ -174,6 +249,7 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
                 if state.dragged.is_some() {
                     if let Some(Point { x, .. }) = cursor.land().position() {
                         let seconds = self.locate(bounds, handle, x);
+                        state.pointer = Some(x);
                         if state.dragged != Some(seconds) {
                             state.dragged = Some(seconds);
                             shell.publish((self.on_change)(seconds));
@@ -181,19 +257,28 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
                         }
                     }
                     shell.capture_event();
-                } else if cursor.is_over(bounds) != state.hovered {
-                    state.hovered = !state.hovered;
-                    shell.request_redraw();
+                } else {
+                    let over = cursor.position_over(bounds).map(|at| at.x);
+                    if over != state.pointer {
+                        state.pointer = over;
+                        state.hovered = over.is_some();
+                        shell.request_redraw();
+                    }
                 }
             }
-            Event::Mouse(mouse::Event::CursorLeft) if state.hovered => {
-                state.hovered = false;
-                shell.request_redraw();
+            Event::Mouse(mouse::Event::CursorLeft) if state.dragged.is_none() => {
+                if state.hovered || state.pointer.is_some() {
+                    state.hovered = false;
+                    state.pointer = None;
+                    shell.request_redraw();
+                }
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. } | touch::Event::FingerLost { .. }) => {
                 if let Some(seconds) = state.dragged.take() {
                     state.released = Some((seconds, Instant::now()));
+                    state.pointer = cursor.position_over(bounds).map(|at| at.x);
+                    state.hovered = state.pointer.is_some();
                     shell.publish(self.on_release.clone());
                     shell.request_redraw();
                 }
@@ -213,6 +298,12 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
                 }
             }
             _ => {}
+        }
+        if state.pointer != pointed
+            && let Some(on_hover) = &self.on_hover
+        {
+            let seconds = state.pointer.map(|x| self.locate(bounds, handle, x));
+            shell.publish(on_hover(seconds));
         }
     }
 
@@ -269,6 +360,45 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
             rail(bounds.x + middle, bounds.width - middle),
             style.rail.backgrounds.1,
         );
+        if let Some((from, to)) = self.ab_loop {
+            let start = self.x_of(bounds, handle_width, from);
+            let end = to.map_or(start + LOOP_START, |to| self.x_of(bounds, handle_width, to));
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: Rectangle {
+                        x: start,
+                        y: rail_y + style.rail.width + LOOP_GAP,
+                        width: (end - start).max(LOOP_BAR),
+                        height: LOOP_BAR,
+                    },
+                    border: iced::border::rounded(LOOP_BAR / 2.0),
+                    snap: true,
+                    ..renderer::Quad::default()
+                },
+                style.rail.backgrounds.0,
+            );
+        }
+        // Chapters part the rail, in the color of the gap by the handle.
+        for chapter in self.chapters {
+            let start = chapter.start.as_secs_f64();
+            if start <= 0.0 || start >= self.duration {
+                continue;
+            }
+            let x = self.x_of(bounds, handle_width, start);
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: Rectangle {
+                        x: x - CHAPTER_GAP / 2.0,
+                        y: rail_y,
+                        width: CHAPTER_GAP,
+                        height: style.rail.width,
+                    },
+                    snap: true,
+                    ..renderer::Quad::default()
+                },
+                style.handle.border_color,
+            );
+        }
         renderer.fill_quad(
             renderer::Quad {
                 bounds: Rectangle {
@@ -287,6 +417,31 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
             },
             style.handle.background,
         );
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        _renderer: &iced::Renderer,
+        _viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, iced::Renderer>> {
+        let state = tree.state.downcast_ref::<State>();
+        let x = state.pointer?;
+        let bounds = layout.bounds();
+        let handle = state.handle.get();
+        let seconds = self.locate(bounds, handle, x);
+        let anchor = Point::new(self.x_of(bounds, handle, seconds), bounds.y) + translation;
+        let below = bounds.y + bounds.height + translation.y;
+        let chapter = chapter_at(self.chapters, seconds).and_then(|chapter| chapter.title.clone());
+        Some(overlay::Element::new(Box::new(Preview {
+            anchor,
+            below,
+            time: format::time(seconds, self.duration >= 3600.0),
+            chapter,
+            thumbnail: self.thumbnail.clone(),
+        })))
     }
 
     fn mouse_interaction(
@@ -317,6 +472,165 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
     }
 }
 
+/// The chapter `seconds` are in: the last to start by then.
+pub fn chapter_at(chapters: &[Chapter], seconds: f64) -> Option<&Chapter> {
+    chapters
+        .iter()
+        .rev()
+        .find(|chapter| chapter.start.as_secs_f64() <= seconds + 1e-3)
+}
+
+/// Where the next or previous chapter starts from `seconds`. Going back
+/// from more than `restart` into a chapter goes to its start.
+pub fn chapter_step(
+    chapters: &[Chapter],
+    seconds: f64,
+    forward: bool,
+    restart: f64,
+) -> Option<f64> {
+    let starts = chapters.iter().map(|chapter| chapter.start.as_secs_f64());
+    if forward {
+        return starts.into_iter().find(|start| *start > seconds + 0.5);
+    }
+    let before: Vec<f64> = starts.filter(|start| *start <= seconds + 1e-3).collect();
+    match before.as_slice() {
+        [] => None,
+        [.., current] if seconds - current > restart => Some(*current),
+        [.., previous, _] => Some(*previous),
+        [only] => Some(*only),
+    }
+}
+
+/// What the timeline shows over the point the pointer is at: the time
+/// there, and its chapter's title.
+struct Preview {
+    /// The top of the timeline at that point, which the preview stands
+    /// over.
+    anchor: Point,
+    /// The timeline's bottom, which the preview hangs from when there is
+    /// no room over it, as with the bars docked at the top.
+    below: f32,
+    time: String,
+    chapter: Option<String>,
+    thumbnail: Option<(image::Handle, f32)>,
+}
+
+/// Room around a preview's text, across and down, and between it and the
+/// timeline.
+const PREVIEW_PADDING: (f32, f32) = (8.0, 4.0);
+const PREVIEW_GAP: f32 = 8.0;
+/// The widest a preview gets; longer titles are cut.
+const PREVIEW_WIDTH: f32 = 320.0;
+
+impl Preview {
+    /// The picture's size: its longer side `THUMBNAIL_SIZE`.
+    fn thumbnail_size(&self) -> Option<Size> {
+        let (_, aspect) = self.thumbnail.as_ref()?;
+        let aspect = if aspect.is_finite() && *aspect > 0.0 {
+            *aspect
+        } else {
+            16.0 / 9.0
+        };
+        Some(if aspect >= 1.0 {
+            Size::new(THUMBNAIL_SIZE, (THUMBNAIL_SIZE / aspect).round())
+        } else {
+            Size::new((THUMBNAIL_SIZE * aspect).round(), THUMBNAIL_SIZE)
+        })
+    }
+
+    fn lines(&self) -> impl Iterator<Item = (&str, Type)> {
+        self.chapter
+            .as_deref()
+            .map(|chapter| (chapter, Type::BodySmall))
+            .into_iter()
+            .chain([(self.time.as_str(), Type::LabelLarge)])
+    }
+}
+
+impl<Message> overlay::Overlay<Message, Theme, iced::Renderer> for Preview {
+    fn layout(&mut self, _renderer: &iced::Renderer, bounds: Size) -> layout::Node {
+        let (across, down) = PREVIEW_PADDING;
+        let mut width: f32 = 0.0;
+        let mut height = 2.0 * down;
+        if let Some(picture) = self.thumbnail_size() {
+            width = picture.width;
+            height += picture.height + down;
+        }
+        for (line, style) in self.lines() {
+            width = width.max(scramble_ui::font::measure(line, style));
+            height += style.metrics().1;
+        }
+        let width = (width + 2.0 * across).min(PREVIEW_WIDTH).min(bounds.width);
+        let x = (self.anchor.x - width / 2.0).clamp(0.0, (bounds.width - width).max(0.0));
+        let over = self.anchor.y - PREVIEW_GAP - height;
+        let y = if over >= 0.0 {
+            over
+        } else {
+            self.below + PREVIEW_GAP
+        };
+        layout::Node::new(Size::new(width, height)).move_to(Point::new(x, y))
+    }
+
+    fn draw(
+        &self,
+        renderer: &mut iced::Renderer,
+        theme: &Theme,
+        _style: &renderer::Style,
+        layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+    ) {
+        let scheme = Scheme::of(theme);
+        let bounds = layout.bounds();
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds,
+                border: iced::border::rounded(scramble_ui::shape::EXTRA_SMALL),
+                ..renderer::Quad::default()
+            },
+            scheme.inverse_surface,
+        );
+        let (across, down) = PREVIEW_PADDING;
+        let mut y = bounds.y + down;
+        if let (Some((handle, _)), Some(size)) = (&self.thumbnail, self.thumbnail_size()) {
+            let picture = Rectangle {
+                x: bounds.center_x() - size.width / 2.0,
+                y,
+                width: size.width,
+                height: size.height,
+            };
+            renderer.draw_image(
+                image::Image {
+                    border_radius: iced::border::radius(scramble_ui::shape::EXTRA_SMALL),
+                    ..image::Image::new(handle.clone())
+                },
+                picture,
+                bounds,
+            );
+            y += size.height + down;
+        }
+        for (line, style) in self.lines() {
+            let (size, line_height) = style.metrics();
+            renderer.fill_text(
+                text::Text {
+                    content: line.to_owned(),
+                    bounds: Size::new(bounds.width - 2.0 * across, line_height),
+                    size: Pixels(size),
+                    line_height: text::LineHeight::Absolute(Pixels(line_height)),
+                    font: style.font(false),
+                    align_x: text::Alignment::Center,
+                    align_y: iced::alignment::Vertical::Top,
+                    shaping: text::Shaping::Advanced,
+                    wrapping: text::Wrapping::None,
+                },
+                Point::new(bounds.center_x(), y),
+                scheme.inverse_on_surface,
+                bounds,
+            );
+            y += line_height;
+        }
+    }
+}
+
 impl<'a, Message: Clone + 'a> From<Timeline<'a, Message>> for Element<'a, Message> {
     fn from(timeline: Timeline<'a, Message>) -> Self {
         Element::new(timeline)
@@ -325,7 +639,34 @@ impl<'a, Message: Clone + 'a> From<Timeline<'a, Message>> for Element<'a, Messag
 
 #[cfg(test)]
 mod tests {
-    use super::until_next_pixel;
+    use super::{chapter_at, chapter_step, until_next_pixel};
+    use plaa_media::info::Chapter;
+    use std::time::Duration;
+
+    fn chapters() -> Vec<Chapter> {
+        [0, 60, 120]
+            .into_iter()
+            .map(|start| Chapter {
+                title: Some(format!("At {start}")),
+                start: Duration::from_secs(start),
+                end: Duration::from_secs(start + 60),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn chapters_are_found_and_stepped_through() {
+        let chapters = chapters();
+        assert_eq!(chapter_at(&chapters, 59.0).unwrap().start.as_secs(), 0);
+        assert_eq!(chapter_at(&chapters, 60.0).unwrap().start.as_secs(), 60);
+        assert_eq!(chapter_step(&chapters, 10.0, true, 3.0), Some(60.0));
+        assert_eq!(chapter_step(&chapters, 130.0, true, 3.0), None);
+        // Well into a chapter, back goes to its start; just after, to the
+        // one before.
+        assert_eq!(chapter_step(&chapters, 90.0, false, 3.0), Some(60.0));
+        assert_eq!(chapter_step(&chapters, 61.0, false, 3.0), Some(0.0));
+        assert_eq!(chapter_step(&chapters, 1.0, false, 3.0), Some(0.0));
+    }
 
     #[test]
     fn the_handle_redraws_as_it_reaches_each_pixel() {

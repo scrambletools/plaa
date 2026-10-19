@@ -45,6 +45,7 @@ pub enum SettingsMessage {
     /// An output device by id, or the system's default.
     AudioDevice(Option<String>),
     Resume(bool),
+    FolderPlaylists(bool),
     Language(String),
     /// The audio (0) or subtitle (1) languages, as typed.
     Languages(usize, String),
@@ -437,6 +438,12 @@ impl Plaa {
                 self.settings.resume,
                 SettingsMessage::Resume,
             ),
+            switch_row(
+                crate::fl!("settings-folder-playlists"),
+                crate::fl!("settings-folder-playlists-note"),
+                self.settings.folder_playlists,
+                SettingsMessage::FolderPlaylists,
+            ),
             component::section(crate::fl!("settings-folders")),
             folder_row(
                 crate::fl!("settings-recordings"),
@@ -584,6 +591,7 @@ impl Plaa {
                 self.settings.audio_device = device;
             }
             SettingsMessage::Resume(on) => self.settings.resume = on,
+            SettingsMessage::FolderPlaylists(on) => self.settings.folder_playlists = on,
             SettingsMessage::Language(tag) => {
                 self.settings.language = tag;
                 crate::i18n::set_language(self.settings.chosen_language());

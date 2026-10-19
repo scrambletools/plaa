@@ -57,6 +57,9 @@ pub struct Settings {
     pub muted: bool,
     /// Start a file where it was left off.
     pub resume: bool,
+    /// When one file opens, list the other files in its folder with it,
+    /// to play on to.
+    pub folder_playlists: bool,
     /// Audio and subtitle languages to pick first, as ISO 639 codes such
     /// as `en` or `jpn`, most wanted first. Empty follows the file's own
     /// defaults.
@@ -93,6 +96,7 @@ impl Default for Settings {
             volume: 1.0,
             muted: false,
             resume: true,
+            folder_playlists: false,
             audio_languages: Vec::new(),
             subtitle_languages: Vec::new(),
             recordings: paths::default_recordings(),

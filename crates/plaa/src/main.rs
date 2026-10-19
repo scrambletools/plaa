@@ -10,6 +10,7 @@ mod instance;
 #[cfg(windows)]
 #[path = "instance_windows.rs"]
 mod instance;
+mod playlist;
 mod screenshot;
 mod settings_view;
 mod shortcuts;
@@ -32,6 +33,10 @@ pub enum External {
     OmarchyThemeChanged,
     /// What a window's player says.
     Player(iced::window::Id, plaa_media::Event),
+    /// The files dropped on a window have all arrived.
+    DropsGathered(iced::window::Id),
+    /// A picture for a window's timeline.
+    Thumbnail(iced::window::Id, plaa_media::Thumbnail),
 }
 
 static EXTERNAL_EVENTS: Mutex<Option<UnboundedReceiver<External>>> = Mutex::new(None);

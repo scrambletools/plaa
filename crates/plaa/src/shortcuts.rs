@@ -32,6 +32,13 @@ pub enum Action {
     Subtitles,
     AudioTrack,
     ToStart,
+    Previous,
+    Next,
+    Playlist,
+    PreviousChapter,
+    NextChapter,
+    AbLoop,
+    PictureInPicture,
 }
 
 /// Every action, its name in the settings file and its default
@@ -62,6 +69,17 @@ const ACTIONS: &[(Action, &str, &[&str])] = &[
     (Action::Subtitles, "subtitles", &["C"]),
     (Action::AudioTrack, "audio-track", &["A"]),
     (Action::ToStart, "to-start", &["Home"]),
+    (Action::Previous, "previous", &["P", "Ctrl+Left"]),
+    (Action::Next, "next", &["N", "Ctrl+Right"]),
+    (Action::Playlist, "playlist", &["Ctrl+P"]),
+    (Action::PreviousChapter, "previous-chapter", &["PageUp"]),
+    (Action::NextChapter, "next-chapter", &["PageDown"]),
+    (Action::AbLoop, "ab-loop", &["B"]),
+    (
+        Action::PictureInPicture,
+        "picture-in-picture",
+        &["Ctrl+Shift+P"],
+    ),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -219,12 +237,14 @@ pub fn configure(keys: &toml::Table) -> Vec<String> {
     } else {
         "linux"
     };
-    let mut chosen: Vec<(Action, Vec<String>)> = ACTIONS
+    // Each action's shortcuts, and whether the settings chose them.
+    let mut chosen: Vec<(Action, Vec<String>, bool)> = ACTIONS
         .iter()
         .map(|(action, _, defaults)| {
             (
                 *action,
                 defaults.iter().map(|text| (*text).to_owned()).collect(),
+                false,
             )
         })
         .collect();
@@ -259,9 +279,13 @@ pub fn configure(keys: &toml::Table) -> Vec<String> {
             }
         };
         chosen[slot].1 = texts;
+        chosen[slot].2 = true;
     }
+    // The settings' shortcuts last, so a key they give one action is
+    // taken from any default it had.
+    chosen.sort_by_key(|(_, _, from_settings)| *from_settings);
     let mut bindings: Vec<(Shortcut, Action)> = Vec::new();
-    for (action, texts) in chosen {
+    for (action, texts, _) in chosen {
         for text in texts {
             match parse(&text) {
                 Ok(shortcut) => {
