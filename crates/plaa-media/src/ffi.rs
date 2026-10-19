@@ -34,13 +34,16 @@ const DEVICES: &[ffi::AVHWDeviceType] = {
 /// codec, which leaves the context decoding on the processor.
 pub fn attach_hardware(context: &mut ffmpeg::codec::Context) -> Option<&'static str> {
     // SAFETY: `context` owns a valid AVCodecContext that has not been
-    // opened; the codec pointer FFmpeg returns is static.
+    // opened; the codec pointer FFmpeg returns is static, and each device
+    // reference is either handed to the context or released.
     unsafe {
         let context = context.as_mut_ptr();
         let codec = ffi::avcodec_find_decoder((*context).codec_id);
         if codec.is_null() {
             return None;
         }
+        // NVIDIA's VAAPI driver, kept for when nothing else opens.
+        let mut deferred: Option<(*mut ffi::AVBufferRef, ffi::AVPixelFormat)> = None;
         for &device in DEVICES {
             let Some(pixel) = hardware_format(codec, device) else {
                 continue;
@@ -56,21 +59,78 @@ pub fn attach_hardware(context: &mut ffmpeg::codec::Context) -> Option<&'static 
             if opened < 0 || reference.is_null() {
                 continue;
             }
-            (*context).hw_device_ctx = reference;
-            // The format to pick, read back by `choose_format`.
-            (*context).opaque = pixel as i32 as isize as *mut std::ffi::c_void;
-            (*context).get_format = Some(choose_format);
-            let name = ffi::av_hwdevice_get_type_name(device);
-            return Some(if name.is_null() {
-                "hardware"
-            } else {
-                // FFmpeg's names are static strings.
-                std::ffi::CStr::from_ptr(name)
-                    .to_str()
-                    .unwrap_or("hardware")
-            });
+            #[cfg(target_os = "linux")]
+            if device == ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_VAAPI
+                && deferred.is_none()
+                && wraps_nvidia(reference)
+            {
+                deferred = Some((reference, pixel));
+                continue;
+            }
+            if let Some((mut unused, _)) = deferred.take() {
+                ffi::av_buffer_unref(&mut unused);
+            }
+            return Some(use_device(context, reference, pixel, device));
         }
-        None
+        deferred.map(|(reference, pixel)| {
+            use_device(
+                context,
+                reference,
+                pixel,
+                ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_VAAPI,
+            )
+        })
+    }
+}
+
+/// Hands `reference`, a device of type `device`, to `context`, to decode
+/// to `pixel`. Returns the device's name.
+unsafe fn use_device(
+    context: *mut ffi::AVCodecContext,
+    reference: *mut ffi::AVBufferRef,
+    pixel: ffi::AVPixelFormat,
+    device: ffi::AVHWDeviceType,
+) -> &'static str {
+    // SAFETY: the caller passes a valid, unopened context and a device
+    // reference it gives up; FFmpeg's device names are static strings.
+    unsafe {
+        (*context).hw_device_ctx = reference;
+        // The format to pick, read back by `choose_format`.
+        (*context).opaque = pixel as i32 as isize as *mut std::ffi::c_void;
+        (*context).get_format = Some(choose_format);
+        let name = ffi::av_hwdevice_get_type_name(device);
+        if name.is_null() {
+            "hardware"
+        } else {
+            std::ffi::CStr::from_ptr(name)
+                .to_str()
+                .unwrap_or("hardware")
+        }
+    }
+}
+
+/// Whether a VAAPI device is NVIDIA's VAAPI driver. It decodes on the same
+/// engine CUDA does but copies pictures out of graphics memory several
+/// times slower, so CUDA goes first.
+#[cfg(target_os = "linux")]
+unsafe fn wraps_nvidia(device: *mut ffi::AVBufferRef) -> bool {
+    type QueryVendor = unsafe extern "C" fn(*mut std::ffi::c_void) -> *const std::ffi::c_char;
+    // SAFETY: libva, which FFmpeg loaded to open the device, has this
+    // function with this signature; the device is a VAAPI one, whose
+    // context holds its display; the vendor string is libva's own.
+    unsafe {
+        let symbol = libc::dlsym(libc::RTLD_DEFAULT, c"vaQueryVendorString".as_ptr());
+        if symbol.is_null() {
+            return false;
+        }
+        let query = std::mem::transmute::<*mut std::ffi::c_void, QueryVendor>(symbol);
+        let context = (*device).data.cast::<ffi::AVHWDeviceContext>();
+        let vaapi = (*context).hwctx.cast::<ffi::AVVAAPIDeviceContext>();
+        let vendor = query((*vaapi).display);
+        !vendor.is_null()
+            && std::ffi::CStr::from_ptr(vendor)
+                .to_string_lossy()
+                .contains("NVDEC")
     }
 }
 
@@ -130,23 +190,171 @@ pub fn is_hardware(frame: &ffmpeg::frame::Video) -> bool {
     unsafe { !(*frame.as_ptr()).hw_frames_ctx.is_null() }
 }
 
-/// Copies a frame from graphics memory into memory, with its timing and
-/// colors.
-pub fn download(frame: &ffmpeg::frame::Video) -> Result<ffmpeg::frame::Video, ffmpeg::Error> {
-    let mut copy = ffmpeg::frame::Video::empty();
-    // SAFETY: both frames are valid; FFmpeg allocates the copy's buffers
-    // in the card's preferred memory format.
-    unsafe {
-        let result = ffi::av_hwframe_transfer_data(copy.as_mut_ptr(), frame.as_ptr(), 0);
-        if result < 0 {
-            return Err(ffmpeg::Error::from(result));
-        }
-        let result = ffi::av_frame_copy_props(copy.as_mut_ptr(), frame.as_ptr());
-        if result < 0 {
-            return Err(ffmpeg::Error::from(result));
+/// Rows and planes start on this many bytes, as in FFmpeg's own buffers.
+const ALIGN: usize = 64;
+
+/// ENOMEM, the same on every system plaa runs on.
+const NO_MEMORY: ffmpeg::Error = ffmpeg::Error::Other { errno: 12 };
+
+/// Memory that pictures are copied into from graphics memory, reused
+/// rather than fresh for each one: at 8K, the system handing out fresh
+/// memory a page at a time costs several times what the copy does.
+pub struct Downloads {
+    pool: *mut ffi::AVBufferPool,
+    /// The format and size the pool's buffers fit.
+    shape: (ffi::AVPixelFormat, i32, i32),
+    linesizes: [i32; 4],
+    offsets: [usize; 4],
+}
+
+// SAFETY: FFmpeg's buffer pools take a lock of their own, and buffers go
+// back to them from whichever thread lets go of a picture.
+unsafe impl Send for Downloads {}
+
+impl Default for Downloads {
+    fn default() -> Self {
+        Self {
+            pool: std::ptr::null_mut(),
+            shape: (ffi::AVPixelFormat::AV_PIX_FMT_NONE, 0, 0),
+            linesizes: [0; 4],
+            offsets: [0; 4],
         }
     }
-    Ok(copy)
+}
+
+impl Downloads {
+    /// Copies `frame` from graphics memory into memory, with its timing and
+    /// colors.
+    pub fn download(
+        &mut self,
+        frame: &ffmpeg::frame::Video,
+    ) -> Result<ffmpeg::frame::Video, ffmpeg::Error> {
+        let mut copy = ffmpeg::frame::Video::empty();
+        // SAFETY: `frame` is a valid frame in graphics memory; the copy is
+        // empty until it takes one of the pool's buffers, laid out for its
+        // format and size by `reshape`, and FFmpeg only writes inside it.
+        unsafe {
+            let source = frame.as_ptr();
+            let format = transfer_format(source)?;
+            let shape = (format, (*source).width, (*source).height);
+            if self.pool.is_null() || self.shape != shape {
+                self.reshape(shape)?;
+            }
+            let buffer = ffi::av_buffer_pool_get(self.pool);
+            if buffer.is_null() {
+                return Err(NO_MEMORY);
+            }
+            let target = copy.as_mut_ptr();
+            (*target).buf[0] = buffer;
+            for plane in 0..4 {
+                if self.linesizes[plane] > 0 {
+                    (*target).data[plane] = (*buffer).data.add(self.offsets[plane]);
+                    (*target).linesize[plane] = self.linesizes[plane];
+                }
+            }
+            (*target).format = format as i32;
+            (*target).width = shape.1;
+            (*target).height = shape.2;
+            let result = ffi::av_hwframe_transfer_data(target, source, 0);
+            if result < 0 {
+                return Err(ffmpeg::Error::from(result));
+            }
+            let result = ffi::av_frame_copy_props(target, source);
+            if result < 0 {
+                return Err(ffmpeg::Error::from(result));
+            }
+        }
+        Ok(copy)
+    }
+
+    /// Starts a pool of buffers for pictures of `shape`; the last one goes
+    /// once its buffers come back.
+    unsafe fn reshape(
+        &mut self,
+        shape: (ffi::AVPixelFormat, i32, i32),
+    ) -> Result<(), ffmpeg::Error> {
+        let (format, width, height) = shape;
+        let mut linesizes = [0i32; 4];
+        // SAFETY: FFmpeg fills four line sizes and four plane sizes; the
+        // old pool is released, not freed, while its buffers are out.
+        let offsets = unsafe {
+            let result = ffi::av_image_fill_linesizes(linesizes.as_mut_ptr(), format, width);
+            if result < 0 {
+                return Err(ffmpeg::Error::from(result));
+            }
+            let mut strides = [0isize; 4];
+            for (linesize, stride) in linesizes.iter_mut().zip(&mut strides) {
+                *linesize = (*linesize as usize).next_multiple_of(ALIGN) as i32;
+                *stride = *linesize as isize;
+            }
+            let mut sizes = [0usize; 4];
+            let result = ffi::av_image_fill_plane_sizes(
+                sizes.as_mut_ptr(),
+                format,
+                height,
+                strides.as_ptr(),
+            );
+            if result < 0 {
+                return Err(ffmpeg::Error::from(result));
+            }
+            let mut offsets = [0usize; 4];
+            let mut total = 0;
+            for (offset, size) in offsets.iter_mut().zip(sizes) {
+                *offset = total;
+                total += size.next_multiple_of(ALIGN);
+            }
+            if !self.pool.is_null() {
+                ffi::av_buffer_pool_uninit(&mut self.pool);
+            }
+            // Room past the end, as FFmpeg's readers may read a little over.
+            self.pool = ffi::av_buffer_pool_init(total + ALIGN, None);
+            if self.pool.is_null() {
+                return Err(NO_MEMORY);
+            }
+            offsets
+        };
+        self.shape = shape;
+        self.linesizes = linesizes;
+        self.offsets = offsets;
+        Ok(())
+    }
+}
+
+impl Drop for Downloads {
+    fn drop(&mut self) {
+        if !self.pool.is_null() {
+            // SAFETY: the pool is freed once the last buffer out comes back.
+            unsafe { ffi::av_buffer_pool_uninit(&mut self.pool) };
+        }
+    }
+}
+
+/// The format a picture comes out of graphics memory in: the first the
+/// card offers.
+unsafe fn transfer_format(frame: *const ffi::AVFrame) -> Result<ffi::AVPixelFormat, ffmpeg::Error> {
+    let mut formats = std::ptr::null_mut();
+    // SAFETY: a frame in graphics memory has a frames context; FFmpeg
+    // allocates the list, ending in AV_PIX_FMT_NONE, and it is freed here.
+    unsafe {
+        let result = ffi::av_hwframe_transfer_get_formats(
+            (*frame).hw_frames_ctx,
+            ffi::AVHWFrameTransferDirection::AV_HWFRAME_TRANSFER_DIRECTION_FROM,
+            &mut formats,
+            0,
+        );
+        if result < 0 {
+            return Err(ffmpeg::Error::from(result));
+        }
+        if formats.is_null() {
+            return Err(NO_MEMORY);
+        }
+        let format = *formats;
+        ffi::av_free(formats.cast());
+        if format == ffi::AVPixelFormat::AV_PIX_FMT_NONE {
+            return Err(ffmpeg::Error::InvalidData);
+        }
+        Ok(format)
+    }
 }
 
 /// The clockwise turn, in quarter turns, a stream's display matrix asks
@@ -296,5 +504,25 @@ pub fn version() -> String {
         std::ffi::CStr::from_ptr(info)
             .to_string_lossy()
             .into_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn copies_are_laid_out_as_ffmpeg_lays_out_pictures() {
+        use ffi::AVPixelFormat::{AV_PIX_FMT_NV12, AV_PIX_FMT_P010LE};
+        let mut downloads = Downloads::default();
+        // SAFETY: only fills in the layout and starts a pool.
+        unsafe { downloads.reshape((AV_PIX_FMT_P010LE, 7680, 4320)) }.expect("a pool");
+        assert_eq!(downloads.linesizes, [15360, 15360, 0, 0]);
+        assert_eq!(downloads.offsets[1], 15360 * 4320);
+        // Rows round up to 64 bytes, and chroma takes the odd row.
+        // SAFETY: as above; the first pool goes.
+        unsafe { downloads.reshape((AV_PIX_FMT_NV12, 1919, 1081)) }.expect("a pool");
+        assert_eq!(downloads.linesizes, [1920, 1920, 0, 0]);
+        assert_eq!(downloads.offsets[1], 1920 * 1081);
     }
 }

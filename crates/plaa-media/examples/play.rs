@@ -1,16 +1,17 @@
 //! Plays a file without a window, drawing nothing but asking for pictures
 //! as the interface does, and prints what happened.
 //!
-//! cargo run --release -p plaa-media --example play -- <file> [seconds] [seek-to]
+//! cargo run --release -p plaa-media --example play -- [--software] <file> [seconds] [seek-to]
 
 use std::time::{Duration, Instant};
 
 use plaa_media::{Event, Options, Player, Source};
 
 fn main() {
-    let mut arguments = std::env::args().skip(1);
+    let mut arguments = std::env::args().skip(1).peekable();
+    let software = arguments.next_if_eq("--software").is_some();
     let Some(source) = arguments.next() else {
-        eprintln!("usage: play <file or address> [seconds] [seek-to]");
+        eprintln!("usage: play [--software] <file or address> [seconds] [seek-to]");
         std::process::exit(2);
     };
     let seconds: f64 = arguments
@@ -20,7 +21,11 @@ fn main() {
     let seek_to: Option<f64> = arguments.next().and_then(|text| text.parse().ok());
     let player = Player::open(
         Source::parse(&source),
-        Options::default(),
+        Options {
+            hardware: !software,
+            muted: true,
+            ..Options::default()
+        },
         |event| match event {
             Event::Opened { info, cover } => {
                 println!(

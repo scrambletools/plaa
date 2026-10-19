@@ -43,7 +43,8 @@ FFmpeg build.
 - The few calls `ffmpeg-next` lacks (hardware devices, copying pictures
   from graphics memory, display matrices, attached pictures, channel
   layout names) are in `plaa-media/src/ffi.rs`, the only unsafe code.
-- Pictures decoded on the graphics card are copied to memory and uploaded
-  again; importing them directly into wgpu is a later optimization.
+- Pictures decoded on the graphics card are copied to memory, reused
+  from a pool, and uploaded again; importing them directly into wgpu is
+  a later optimization.
 - ASS styling and picture subtitles need libass and a compositor of their
   own; text subtitles are drawn by iced until then.

@@ -29,7 +29,7 @@ look follows Material Design 3, as in prev.
 | Language | Rust, stable toolchain, edition 2024, minimum Rust 1.95 |
 | GUI | iced 0.14 with scramble-ui's Material 3 components; the picture through a wgpu shader widget of plaa's own |
 | Media engine | FFmpeg's libraries (libavformat, libavcodec, libavfilter, libswresample, libswscale) through `ffmpeg-next`, all inside `plaa-media` ([ADR 0001](decisions/0001-media-engine.md)) |
-| Hardware decoding | Through FFmpeg: VAAPI, then CUDA, then Vulkan on Linux; D3D11VA, CUDA, then DXVA2 on Windows; VideoToolbox on macOS. Pictures are copied to memory and converted on the graphics card; the processor takes over when no device opens |
+| Hardware decoding | Through FFmpeg: VAAPI, then CUDA, then Vulkan on Linux, where NVIDIA's VAAPI driver waits until last, as it copies pictures out several times slower than CUDA; D3D11VA, CUDA, then DXVA2 on Windows; VideoToolbox on macOS. Pictures are copied to reused memory and converted on the graphics card; the processor takes over when no device opens |
 | Sound out | cpal: ALSA (and PipeWire through it) on Linux, WASAPI on Windows, Core Audio on macOS. The device's clock drives playback |
 | Color | Y'CbCr to RGB in the shader, BT.601, BT.709 and BT.2020, limited and full range, 8 to 16 bits. PQ and HLG are tone mapped for standard screens, BT.2020 mapped to BT.709 |
 | Subtitles | Text subtitles (SubRip, ASS, WebVTT, MP4 text and the rest FFmpeg reads) drawn by plaa. Picture subtitles and ASS styling come next |
@@ -111,7 +111,8 @@ decoder:
   keeping a few seconds or a few megabytes ahead, and takes commands:
   seeks and track changes. Text subtitles are small enough to decode here.
 - **Video**: decodes, on the graphics card when it can, copies hardware
-  pictures to memory, converts the few formats the shader does not read
+  pictures into memory it reuses (at 8K, fresh memory for each picture
+  costs the system more than the copy), converts the few formats the shader does not read
   with swscale, and queues six pictures ahead of the clock.
 - **Audio**: decodes and runs a filter graph (`atempo` for speed with
   the pitch kept, then `aformat` for the device's rate, channels and
@@ -144,15 +145,17 @@ so playback runs without the window's interface being rebuilt for every
 frame. Each picture's planes are uploaded once, by its id: 8 bit planes
 as `R8` and `RG8` textures, 16 bit ones split into their two bytes
 (filtering each byte still blends the values correctly, as the value is
-linear in them). The shader turns Y'CbCr into RGB with the picture's
-matrix, range and bit depth, tone maps PQ and HLG, maps BT.2020 into
-BT.709, turns the picture by the stream's display matrix, and fits it
-into the widget. Where the picture is shrunk, each screen pixel weighs
-the texels within its size of its centre on a Hermite curve, as mpv's
-default downscaling does, two texels to a linear sample; single samples
-would skip texels and make text and fine lines shimmer. At its size or
-larger, one linear sample. Every window shares one pipeline, keyed by a
-surface id per window.
+linear in them). They go through two staging buffers each window keeps
+and reuses, as wgpu's own staging is fresh memory for every write, which
+at 8K takes three times as long. The shader turns Y'CbCr into RGB with
+the picture's matrix, range and bit depth, tone maps PQ and HLG, maps
+BT.2020 into BT.709, turns the picture by the stream's display matrix,
+and fits it into the widget. Where the picture is shrunk, each screen
+pixel weighs the texels within its size of its centre on a Hermite
+curve, as mpv's default downscaling does, two texels to a linear sample;
+single samples would skip texels and make text and fine lines shimmer.
+At its size or larger, one linear sample. Every window shares one
+pipeline, keyed by a surface id per window.
 
 ### Interface
 
@@ -218,7 +221,7 @@ Targets, to be measured as prev's are.
 | Risk | Mitigation |
 |---|---|
 | `ffmpeg-next` falls behind FFmpeg releases | The calls it lacks are in one small module (`ffi.rs`); a bindgen crate of plaa's own can replace it |
-| Copying hardware pictures to memory costs bandwidth at 4K and above | Measure; import DMA-BUF, D3D11 and IOSurface pictures into wgpu directly where it pays off |
+| Copying hardware pictures to memory costs bandwidth at 4K and above | Measured: with memory reused on the way out and on the way back in, an RTX 4080 SUPER copies 8K 10 bit pictures out at 137 a second through CUDA and uploads one in 8.5 ms, so 8K plays at 60 fps. Import DMA-BUF, D3D11 and IOSurface pictures into wgpu directly where it pays off |
 | `atempo` holds a little sound, so speed changes are a fraction of a second late | Acceptable; the clock follows what is heard |
 | Patented codecs in bundled FFmpeg builds | Linux uses the system's FFmpeg; the Windows and macOS builds are chosen with this in mind before release |
 | Screen recording differs by desktop | The ScreenCast portal on Wayland, the system APIs elsewhere |

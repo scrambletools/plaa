@@ -15,3 +15,7 @@ workspace = true
 # packages elsewhere.
 ffmpeg-next = { version = "9", default-features = false, features = ["codec", "format", "filter", "software-resampling", "software-scaling"] }
 cpal = "0.18"
+
+# Looks up the name of the VAAPI driver in libva, which FFmpeg loads.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"

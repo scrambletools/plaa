@@ -101,6 +101,7 @@ pub(crate) fn spawn_video(
         queue: queue.clone(),
         serial: 0,
         needs_flush: false,
+        downloads: ffi::Downloads::default(),
     };
     let thread = std::thread::Builder::new()
         .name("plaa-video".into())
@@ -122,6 +123,8 @@ struct VideoDecoder {
     /// The decoder was drained at the end of the file and must be reset
     /// before taking packets again.
     needs_flush: bool,
+    /// Memory for pictures copied out of graphics memory.
+    downloads: ffi::Downloads,
 }
 
 /// Converts pictures the shader cannot read: their format and size, and
@@ -208,7 +211,7 @@ impl VideoDecoder {
             return;
         }
         let frame = if ffi::is_hardware(&frame) {
-            match ffi::download(&frame) {
+            match self.downloads.download(&frame) {
                 Ok(frame) => frame,
                 Err(error) => {
                     eprintln!("plaa: copying a picture from the graphics card: {error}");

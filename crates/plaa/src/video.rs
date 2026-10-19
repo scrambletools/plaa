@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use iced::advanced::graphics::Viewport;
@@ -249,9 +250,42 @@ struct Surface {
     textures: Vec<(wgpu::Texture, (u32, u32), wgpu::TextureFormat)>,
     uniforms: wgpu::Buffer,
     bind_group: Option<wgpu::BindGroup>,
+    /// Where pictures are written on their way to the textures.
+    staging: Vec<Staging>,
     /// The picture uploaded, by its id.
     frame: u64,
     used: Instant,
+}
+
+/// A buffer pictures are written into and the card copies from, kept and
+/// reused: wgpu's own staging is fresh memory for every write, which at 8K
+/// costs several times what the copy does.
+struct Staging {
+    buffer: wgpu::Buffer,
+    /// Mapped, so it can be written; cleared while the card copies from it.
+    ready: Arc<AtomicBool>,
+}
+
+/// How many staging buffers a window keeps: one being copied from while
+/// the next picture is written into the other.
+const STAGING_BUFFERS: usize = 2;
+
+/// Where each plane goes in a staging buffer: its offset and row length,
+/// rows padded as copies to textures need. Returns them and the size.
+fn staging_layout(planes: &[((u32, u32), wgpu::TextureFormat)]) -> (Vec<(u64, u32)>, u64) {
+    let align = u64::from(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+    let mut total = 0;
+    let layout = planes
+        .iter()
+        .map(|((width, height), format)| {
+            let row = u64::from(*width) * u64::from(format.block_copy_size(None).unwrap_or(1));
+            let row = row.next_multiple_of(align);
+            let offset = total;
+            total += (row * u64::from(*height)).next_multiple_of(align);
+            (offset, row as u32)
+        })
+        .collect();
+    (layout, total.max(align))
 }
 
 impl Surface {
@@ -265,6 +299,7 @@ impl Surface {
                 mapped_at_creation: false,
             }),
             bind_group: None,
+            staging: Vec::new(),
             frame: 0,
             used: Instant::now(),
         }
@@ -345,34 +380,132 @@ impl Surface {
                 ],
             }));
         }
+        let planes: Vec<_> = self
+            .textures
+            .iter()
+            .map(|(_, size, format)| (*size, *format))
+            .collect();
+        let (offsets, size) = staging_layout(&planes);
+        self.staging.retain(|staging| staging.buffer.size() == size);
+        if !self
+            .staging
+            .iter()
+            .any(|staging| staging.ready.load(Ordering::Acquire))
+            && self.staging.len() < STAGING_BUFFERS
+        {
+            self.staging.push(Staging {
+                buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("plaa video staging"),
+                    size,
+                    usage: wgpu::BufferUsages::MAP_WRITE | wgpu::BufferUsages::COPY_SRC,
+                    mapped_at_creation: true,
+                }),
+                ready: Arc::new(AtomicBool::new(true)),
+            });
+        }
+        let Some(staging) = self
+            .staging
+            .iter()
+            .find(|staging| staging.ready.load(Ordering::Acquire))
+        else {
+            // Both still being copied from: wgpu stages this one itself.
+            for (index, (texture, (width, height), format)) in self.textures.iter().enumerate() {
+                let (data, stride) = frame.plane(index);
+                if !plane_fits(data, stride, *width, *height, *format) {
+                    continue;
+                }
+                queue.write_texture(
+                    texture.as_image_copy(),
+                    data,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(stride as u32),
+                        rows_per_image: Some(*height),
+                    },
+                    extent(*width, *height),
+                );
+            }
+            self.frame = frame.id;
+            return;
+        };
+        {
+            let mut mapped = staging.buffer.slice(..).get_mapped_range_mut();
+            for (index, ((width, height), format)) in planes.iter().enumerate() {
+                let (data, stride) = frame.plane(index);
+                if !plane_fits(data, stride, *width, *height, *format) {
+                    continue;
+                }
+                let (offset, padded) = offsets[index];
+                let row = *width as usize * format.block_copy_size(None).unwrap_or(1) as usize;
+                let rows = *height as usize;
+                let target = &mut mapped[offset as usize..][..padded as usize * rows];
+                if stride == padded as usize && data.len() >= target.len() {
+                    target.copy_from_slice(&data[..padded as usize * rows]);
+                } else {
+                    for (to, from) in target
+                        .chunks_exact_mut(padded as usize)
+                        .zip(data.chunks(stride))
+                    {
+                        to[..row].copy_from_slice(&from[..row]);
+                    }
+                }
+            }
+        }
+        staging.buffer.unmap();
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("plaa video upload"),
+        });
         for (index, (texture, (width, height), format)) in self.textures.iter().enumerate() {
             let (data, stride) = frame.plane(index);
-            let row = *width as usize * format.block_copy_size(None).unwrap_or(1) as usize;
-            let rows = *height as usize;
-            if rows == 0 || stride < row || data.len() < stride * (rows - 1) + row {
+            if !plane_fits(data, stride, *width, *height, *format) {
                 continue;
             }
-            queue.write_texture(
-                wgpu::TexelCopyTextureInfo {
-                    texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
+            let (offset, padded) = offsets[index];
+            encoder.copy_buffer_to_texture(
+                wgpu::TexelCopyBufferInfo {
+                    buffer: &staging.buffer,
+                    layout: wgpu::TexelCopyBufferLayout {
+                        offset,
+                        bytes_per_row: Some(padded),
+                        rows_per_image: Some(*height),
+                    },
                 },
-                data,
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(stride as u32),
-                    rows_per_image: Some(*height),
-                },
-                wgpu::Extent3d {
-                    width: *width,
-                    height: *height,
-                    depth_or_array_layers: 1,
-                },
+                texture.as_image_copy(),
+                extent(*width, *height),
             );
         }
+        queue.submit([encoder.finish()]);
+        // Writable again once the card has copied from it.
+        staging.ready.store(false, Ordering::Release);
+        let ready = staging.ready.clone();
+        staging
+            .buffer
+            .slice(..)
+            .map_async(wgpu::MapMode::Write, move |result| {
+                ready.store(result.is_ok(), Ordering::Release);
+            });
         self.frame = frame.id;
+    }
+}
+
+/// Whether a plane's data holds every row of a `width` by `height` plane.
+fn plane_fits(
+    data: &[u8],
+    stride: usize,
+    width: u32,
+    height: u32,
+    format: wgpu::TextureFormat,
+) -> bool {
+    let row = width as usize * format.block_copy_size(None).unwrap_or(1) as usize;
+    let rows = height as usize;
+    rows > 0 && stride >= row && data.len() >= stride * (rows - 1) + row
+}
+
+fn extent(width: u32, height: u32) -> wgpu::Extent3d {
+    wgpu::Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
     }
 }
 

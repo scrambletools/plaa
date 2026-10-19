@@ -5,7 +5,8 @@
 The first build.
 
 - Plays files and streams through FFmpeg, decoding video on the graphics
-  card where it can, with sound in step through the output device's clock.
+  card where it can, 8K at 60 fps included, with sound in step through
+  the output device's clock.
 - Draws pictures with a shader of its own: BT.601, BT.709 and BT.2020,
   8 to 16 bits, HDR10 and HLG tone mapped, phone videos turned upright,
   and shrunk pictures filtered as mpv does, so text and fine lines stay
