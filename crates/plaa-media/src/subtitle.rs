@@ -2,6 +2,8 @@
 //! and the subtitle files that go with a video.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A line of subtitle text and when it shows, in media seconds.
 #[derive(Debug, Clone, PartialEq)]
@@ -59,6 +61,90 @@ impl Cues {
     /// Every cue, in start order.
     pub fn into_vec(self) -> Vec<Cue> {
         self.cues
+    }
+}
+
+/// A subtitle drawn as a picture over the video: Blu-ray, DVD and DVB
+/// subtitles, and the lines libass draws for ASS ones.
+#[derive(Debug)]
+pub struct SubtitlePicture {
+    /// Another for each picture, so each is uploaded once.
+    pub id: u64,
+    /// The frame it is placed in, as the subtitles were made for it: as a
+    /// rule the video's.
+    pub canvas: (u32, u32),
+    /// Where on that frame it goes, and its size.
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    /// Its pixels, RGBA with straight alpha.
+    pub rgba: Vec<u8>,
+}
+
+impl SubtitlePicture {
+    pub fn new(canvas: (u32, u32), x: u32, y: u32, width: u32, height: u32, rgba: Vec<u8>) -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        Self {
+            id: NEXT.fetch_add(1, Ordering::Relaxed),
+            canvas,
+            x,
+            y,
+            width,
+            height,
+            rgba,
+        }
+    }
+}
+
+/// A picture subtitle and when it shows, in media seconds; one with no
+/// known end shows until the next, or until a clear says.
+#[derive(Debug, Clone)]
+pub struct PictureCue {
+    pub start: f64,
+    pub end: f64,
+    pub picture: Arc<SubtitlePicture>,
+}
+
+/// Picture cues decoded and not yet over, in start order.
+#[derive(Debug, Default)]
+pub struct PictureCues {
+    cues: Vec<PictureCue>,
+}
+
+impl PictureCues {
+    pub fn add(&mut self, cue: PictureCue) {
+        let at = self
+            .cues
+            .partition_point(|existing| existing.start <= cue.start);
+        if at > 0 {
+            let before = &mut self.cues[at - 1];
+            before.end = before.end.min(cue.start);
+        }
+        self.cues.insert(at, cue);
+    }
+
+    /// Ends whatever shows at `at`, as an empty picture subtitle says.
+    pub fn clear_from(&mut self, at: f64) {
+        for cue in &mut self.cues {
+            if cue.start <= at && cue.end > at {
+                cue.end = at;
+            }
+        }
+    }
+
+    /// The picture showing at `now`; forgets the cues already over.
+    pub fn at(&mut self, now: f64) -> Option<Arc<SubtitlePicture>> {
+        self.cues.retain(|cue| cue.end > now - 1.0);
+        self.cues
+            .iter()
+            .rev()
+            .find(|cue| cue.start <= now && now < cue.end)
+            .map(|cue| cue.picture.clone())
+    }
+
+    pub fn clear(&mut self) {
+        self.cues.clear();
     }
 }
 
@@ -289,6 +375,23 @@ mod tests {
             language("Film.pt-BR.srt"),
             (Some("pt-br".to_owned()), false)
         );
+    }
+
+    #[test]
+    fn pictures_show_until_the_next_or_a_clear() {
+        let cue = |start: f64, end: f64| PictureCue {
+            start,
+            end,
+            picture: Arc::new(SubtitlePicture::new((4, 4), 0, 0, 1, 1, vec![0; 4])),
+        };
+        let mut cues = PictureCues::default();
+        cues.add(cue(1.0, f64::INFINITY));
+        cues.add(cue(5.0, f64::INFINITY));
+        let first = cues.at(2.0).expect("the first").id;
+        assert_eq!(cues.at(4.9).map(|picture| picture.id), Some(first));
+        assert_ne!(cues.at(5.0).map(|picture| picture.id), Some(first));
+        cues.clear_from(7.0);
+        assert!(cues.at(7.5).is_none());
     }
 
     #[test]

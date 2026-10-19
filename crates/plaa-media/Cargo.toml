@@ -17,9 +17,13 @@ ffmpeg-next = { version = "9", default-features = false, features = ["codec", "f
 # Through the sound server on Linux, PulseAudio or PipeWire, whose devices
 # are the ones people know; ALSA when there is none.
 cpal = { version = "0.18", features = ["pulseaudio"] }
+# Loads libass, which draws ASS subtitles, when the system has it.
+libloading = "0.9"
 
 [dev-dependencies]
 tempfile = "3"
+# The subtitles example saves pictures.
+png = "0.18"
 
 # Looks up the name of the VAAPI driver in libva, which FFmpeg loads.
 [target.'cfg(target_os = "linux")'.dependencies]

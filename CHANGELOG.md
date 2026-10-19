@@ -26,3 +26,5 @@ The first build.
   is pointed at, and an A-B loop.
 - Subtitle files beside the video, picture in picture, the sound output
   in Settings, MPRIS on Linux, and the screen kept on while video plays.
+- Blu-ray, DVD and DVB picture subtitles, and ASS subtitles drawn as
+  styled by libass.

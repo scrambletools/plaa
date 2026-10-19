@@ -32,7 +32,7 @@ look follows Material Design 3, as in prev.
 | Hardware decoding | Through FFmpeg: VAAPI, then CUDA, then Vulkan on Linux, where NVIDIA's VAAPI driver waits until last, as it copies pictures out several times slower than CUDA; D3D11VA, CUDA, then DXVA2 on Windows; VideoToolbox on macOS. Pictures are copied to reused memory and converted on the graphics card; the processor takes over when no device opens |
 | Sound out | cpal: the sound server on Linux through the PulseAudio protocol, which PipeWire speaks too, asked for 50 ms of buffering, and ALSA without a server; WASAPI on Windows, Core Audio on macOS. The device's clock drives playback; Settings picks the device |
 | Color | Y'CbCr to RGB in the shader, BT.601, BT.709 and BT.2020, limited and full range, 8 to 16 bits. PQ and HLG are tone mapped for standard screens, BT.2020 mapped to BT.709 |
-| Subtitles | Text subtitles (SubRip, ASS, WebVTT, MP4 text and the rest FFmpeg reads) drawn by plaa. Picture subtitles and ASS styling come next |
+| Subtitles | Text subtitles (SubRip, WebVTT, MP4 text and the rest FFmpeg reads) drawn by plaa; ASS and SSA drawn as styled by libass, loaded as plaa runs, with the file's fonts; Blu-ray, DVD and DVB picture subtitles. Both kinds of picture are laid over the video in its shader, and fit and shrink with it |
 | Windows | One window per file, one running instance; a start window when nothing is open |
 | Overlay | For video, M3 floating toolbars over the picture by default, hiding once the pointer rests (2 s, adjustable) or leaves the window; Settings docks them. Sound always has them docked |
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
@@ -69,10 +69,10 @@ trimming and splitting, and Intel Macs.
    dropped together, M3U and PLS lists, the folder's other files),
    chapters on the timeline, subtitle files beside the video, thumbnails
    over the timeline, A-B loops, picture in picture, choosing the output
-   device, MPRIS, and keeping the screen awake. To come: picture
-   subtitles and ASS styling (libass), SMTC and Now Playing, drag and
-   drop on Wayland (prev's smithay-clipboard patch), the macOS menu bar,
-   title bar colors on Windows and macOS.
+   device, MPRIS, keeping the screen awake, picture subtitles and ASS
+   styling (libass). To come: SMTC and Now Playing, drag and drop on
+   Wayland (prev's smithay-clipboard patch), the macOS menu bar, title bar
+   colors on Windows and macOS.
 3. **Network**: yt-dlp, choosing a stream's quality, a buffering
    indicator, recent addresses.
 4. **Edit and export**: trim, split, rotate and flip, then export to
@@ -223,6 +223,7 @@ Targets, to be measured as prev's are.
 | Risk | Mitigation |
 |---|---|
 | `ffmpeg-next` falls behind FFmpeg releases | The calls it lacks are in one small module (`ffi.rs`); a bindgen crate of plaa's own can replace it |
+| libass missing where plaa runs | ASS shows as plain text then; packages for Windows and macOS bundle libass beside FFmpeg |
 | Copying hardware pictures to memory costs bandwidth at 4K and above | Measured: with memory reused on the way out and on the way back in, an RTX 4080 SUPER copies 8K 10 bit pictures out at 137 a second through CUDA and uploads one in 8.5 ms, so 8K plays at 60 fps. Import DMA-BUF, D3D11 and IOSurface pictures into wgpu directly where it pays off |
 | `atempo` holds a little sound, so speed changes are a fraction of a second late | Acceptable; the clock follows what is heard |
 | Patented codecs in bundled FFmpeg builds | Linux uses the system's FFmpeg; the Windows and macOS builds are chosen with this in mind before release |

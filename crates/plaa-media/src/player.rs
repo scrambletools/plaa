@@ -17,7 +17,7 @@ use crate::decode::{self, Picture};
 use crate::frame::{self, VideoFrame};
 use crate::info::MediaInfo;
 use crate::queue::{Item, PacketQueue};
-use crate::subtitle::{self, Cue, Cues};
+use crate::subtitle::{self, Cue, Cues, PictureCues, SubtitlePicture};
 
 /// What to open: a file, or an address FFmpeg reads, such as an HTTP or
 /// RTSP stream.
@@ -154,6 +154,10 @@ pub(crate) struct Shared {
     pub video_room: Condvar,
     pub audio: Mutex<Option<Arc<audio::Shared>>>,
     pub cues: Mutex<Cues>,
+    /// Picture subtitles decoded ahead of the clock.
+    pub picture_cues: Mutex<PictureCues>,
+    /// The ASS track libass draws, when it shows.
+    pub ass: Mutex<Option<crate::ass::AssTrack>>,
     /// The latest seek's serial: older packets, pictures and sound are
     /// dropped.
     pub serial: AtomicU64,
@@ -209,6 +213,16 @@ impl Shared {
         self.cues.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    pub fn ass(&self) -> MutexGuard<'_, Option<crate::ass::AssTrack>> {
+        self.ass.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub fn picture_cues(&self) -> MutexGuard<'_, PictureCues> {
+        self.picture_cues
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
     pub fn speed(&self) -> f64 {
         f64::from_bits(self.speed.load(Ordering::Relaxed))
     }
@@ -243,6 +257,8 @@ impl Player {
             video_room: Condvar::new(),
             audio: Mutex::new(None),
             cues: Mutex::new(Cues::default()),
+            picture_cues: Mutex::new(PictureCues::default()),
+            ass: Mutex::new(None),
             serial: AtomicU64::new(0),
             target: Mutex::new(None),
             decoded: Mutex::new((0, 0.0)),
@@ -493,6 +509,15 @@ impl Player {
         }
     }
 
+    /// The picture subtitle showing now.
+    pub fn subtitle_picture(&self) -> Option<Arc<SubtitlePicture>> {
+        let now = self.shared.clock.now();
+        if let Some(track) = self.shared.ass().as_mut() {
+            return track.render(now);
+        }
+        self.shared.picture_cues().at(now)
+    }
+
     /// The subtitle text showing now.
     pub fn subtitle(&self) -> Option<Cue> {
         let now = self.shared.clock.now();
@@ -533,7 +558,14 @@ impl Drop for Player {
 struct Decoders {
     video: Option<(usize, Arc<PacketQueue>, JoinHandle<()>)>,
     audio: Option<(usize, Arc<PacketQueue>, JoinHandle<()>)>,
-    subtitles: Option<(usize, decode::SubtitleDecoder)>,
+    subtitles: Option<(usize, SubtitleSink)>,
+}
+
+/// Where a subtitle track's packets go.
+enum SubtitleSink {
+    Decoder(decode::SubtitleDecoder),
+    /// To libass, through `Shared::ass`, by the stream's time base.
+    Ass(ffmpeg::Rational),
 }
 
 impl Decoders {
@@ -650,23 +682,21 @@ fn read(
         }
     }
     let subtitle_stream = decode::pick_subtitles(&info, &options.subtitle_languages);
-    let mut file_subtitles = None;
-    if let Some(index) = subtitle_stream {
-        match subtitle_file(&subtitle_files, index) {
-            Some(cues) => {
-                *shared
-                    .file_cues
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner) = Some(cues);
-                file_subtitles = Some(index);
-            }
-            None => {
-                decoders.subtitles = decode::SubtitleDecoder::new(&input, index, start)
-                    .ok()
-                    .map(|decoder| (index, decoder));
-            }
-        }
+    // The frame picture subtitles are placed in, unless they say: the
+    // video's.
+    let canvas = info
+        .video
+        .iter()
+        .find(|track| !track.cover)
+        .map_or((1920, 1080), |track| (track.width, track.height));
+    let showing = Subtitles {
+        input: &input,
+        info: &info,
+        start,
+        canvas,
+        files: &subtitle_files,
     }
+    .choose(subtitle_stream, &shared, &mut decoders);
     let cover = info
         .cover()
         .and_then(|track| decode::cover(&input, track.track.index))
@@ -677,7 +707,7 @@ fn read(
         state.has_video = decoders.video.is_some();
         state.has_audio = decoders.audio.is_some();
         state.audio = audio_index;
-        state.subtitles = file_subtitles.or(decoders.subtitles.as_ref().map(|(index, _)| *index));
+        state.subtitles = showing;
     }
     if decoders.video.is_none() && decoders.audio.is_none() {
         events(Event::Failed(
@@ -847,28 +877,19 @@ fn read(
                     }
                 }
                 Command::SelectSubtitles(index) => {
-                    shared.cues().clear();
-                    let file = index.and_then(|index| subtitle_file(&subtitle_files, index));
-                    let chosen_file = file.is_some();
-                    *shared
-                        .file_cues
-                        .lock()
-                        .unwrap_or_else(PoisonError::into_inner) = file;
-                    // A file's cues are all there already.
-                    if chosen_file {
-                        decoders.subtitles = None;
-                        shared.state().subtitles = index;
-                        continue;
+                    let showing = Subtitles {
+                        input: &input,
+                        info: &info,
+                        start,
+                        canvas,
+                        files: &subtitle_files,
                     }
-                    decoders.subtitles = index.and_then(|index| {
-                        decode::SubtitleDecoder::new(&input, index, start)
-                            .ok()
-                            .map(|decoder| (index, decoder))
-                    });
-                    shared.state().subtitles = decoders.subtitles.as_ref().map(|(index, _)| *index);
-                    // Text already passed shows again from where it is.
+                    .choose(index, &shared, &mut decoders);
+                    shared.state().subtitles = showing;
+                    // A track's lines already passed show again from where
+                    // it is; a file's are all there already.
                     let now = shared.clock.now().max(0.0);
-                    if info.seekable && index.is_some() {
+                    if info.seekable && decoders.subtitles.is_some() {
                         seek(&mut input, &shared, &mut decoders, now, true, start);
                         read_all = false;
                         shared.state().read_all = false;
@@ -897,11 +918,39 @@ fn read(
                 if let Some(queue) = queue {
                     let taken = std::mem::replace(&mut packet, ffmpeg::Packet::empty());
                     queue.put(Item::Packet(serial, taken));
-                } else if let Some((stream, decoder)) = &mut decoders.subtitles
+                } else if let Some((stream, sink)) = &mut decoders.subtitles
                     && *stream == index
                 {
-                    for cue in decoder.decode(&packet) {
-                        shared.cues().add(cue);
+                    match sink {
+                        SubtitleSink::Decoder(decoder) => {
+                            for decoded in decoder.decode(&packet) {
+                                match decoded {
+                                    decode::Decoded::Text(cue) => shared.cues().add(cue),
+                                    decode::Decoded::Picture(cue) => {
+                                        shared.picture_cues().add(cue);
+                                    }
+                                    decode::Decoded::Clear(at) => {
+                                        shared.picture_cues().clear_from(at);
+                                    }
+                                }
+                            }
+                        }
+                        SubtitleSink::Ass(time_base) => {
+                            let milliseconds = |value: i64| {
+                                crate::info::seconds(value, *time_base)
+                                    .map(|seconds| (seconds * 1000.0) as i64)
+                            };
+                            let begins = packet
+                                .pts()
+                                .and_then(milliseconds)
+                                .map(|begins| begins - (start * 1000.0) as i64);
+                            if let (Some(begins), Some(track), Some(data)) =
+                                (begins, shared.ass().as_mut(), packet.data())
+                            {
+                                let lasts = milliseconds(packet.duration()).unwrap_or(0);
+                                track.add(data, begins, lasts);
+                            }
+                        }
                     }
                 }
             }
@@ -1100,7 +1149,7 @@ pub const SUBTITLE_FILE_TRACKS: usize = 1 << 20;
 /// Reads the subtitle files beside the video at `path` and lists them
 /// among `info`'s subtitle tracks. Returns their cues, by their track
 /// number less `SUBTITLE_FILE_TRACKS`.
-fn read_subtitle_files(path: &Path, info: &mut MediaInfo) -> Vec<Arc<Vec<Cue>>> {
+fn read_subtitle_files(path: &Path, info: &mut MediaInfo) -> Vec<SubtitleFile> {
     let stem = path
         .file_stem()
         .map(|stem| stem.to_string_lossy().into_owned())
@@ -1117,19 +1166,134 @@ fn read_subtitle_files(path: &Path, info: &mut MediaInfo) -> Vec<Arc<Vec<Cue>>> 
         info.subtitles.push(crate::info::SubtitleTrack {
             track,
             text: true,
-            file: Some(file),
+            file: Some(file.clone()),
         });
-        all.push(Arc::new(cues));
+        all.push(SubtitleFile {
+            path: file,
+            cues: Arc::new(cues),
+        });
     }
     all
 }
 
-/// The cues of subtitle track `index`, when it is a file's.
-fn subtitle_file(files: &[Arc<Vec<Cue>>], index: usize) -> Option<Arc<Vec<Cue>>> {
+/// A subtitle file beside the video: where it is, and its lines as text.
+struct SubtitleFile {
+    path: PathBuf,
+    cues: Arc<Vec<Cue>>,
+}
+
+/// Subtitle track `index`, when it is a file's.
+fn subtitle_file(files: &[SubtitleFile], index: usize) -> Option<&SubtitleFile> {
     index
         .checked_sub(SUBTITLE_FILE_TRACKS)
         .and_then(|number| files.get(number))
-        .cloned()
+}
+
+/// What choosing a subtitle track needs to know of the file.
+struct Subtitles<'a> {
+    input: &'a ffmpeg::format::context::Input,
+    info: &'a MediaInfo,
+    start: f64,
+    /// The video's size, which picture subtitles are placed in.
+    canvas: (u32, u32),
+    files: &'a [SubtitleFile],
+}
+
+impl Subtitles<'_> {
+    /// Shows subtitle track `index`, or none: a file beside the video, as
+    /// text or drawn by libass, the video's own ASS drawn by libass, or
+    /// FFmpeg's decoder's text and pictures. Returns the track showing.
+    fn choose(
+        &self,
+        index: Option<usize>,
+        shared: &Shared,
+        decoders: &mut Decoders,
+    ) -> Option<usize> {
+        shared.cues().clear();
+        shared.picture_cues().clear();
+        *shared.ass() = None;
+        *shared
+            .file_cues
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = None;
+        decoders.subtitles = None;
+        let index = index?;
+        // libass draws over a picture; sound alone has none to draw on.
+        let drawn = self.info.has_video() && crate::ass::available();
+        let (canvas, video) = (ass_canvas(self.canvas), self.canvas);
+        if let Some(file) = subtitle_file(self.files, index) {
+            let styled = file.path.extension().is_some_and(|extension| {
+                matches!(
+                    extension.to_string_lossy().to_lowercase().as_str(),
+                    "ass" | "ssa"
+                )
+            });
+            let track = (drawn && styled)
+                .then(|| std::fs::read(&file.path).ok())
+                .flatten()
+                .and_then(|contents| crate::ass::AssTrack::read(&contents, canvas, video));
+            match track {
+                Some(track) => *shared.ass() = Some(track),
+                None => {
+                    *shared
+                        .file_cues
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner) = Some(file.cues.clone());
+                }
+            }
+            return Some(index);
+        }
+        let stream = self.input.stream(index)?;
+        let styled = self.info.subtitles.iter().any(|track| {
+            track.track.index == index && matches!(track.track.codec.as_str(), "ass" | "ssa")
+        });
+        if drawn && styled {
+            let header = crate::ffi::stream_extradata(&stream).unwrap_or_default();
+            if let Some(track) =
+                crate::ass::AssTrack::new(&header, &fonts(self.input), canvas, video)
+            {
+                *shared.ass() = Some(track);
+                decoders.subtitles = Some((index, SubtitleSink::Ass(stream.time_base())));
+                return Some(index);
+            }
+        }
+        let decoder =
+            decode::SubtitleDecoder::new(self.input, index, self.start, self.canvas).ok()?;
+        decoders.subtitles = Some((index, SubtitleSink::Decoder(decoder)));
+        Some(index)
+    }
+}
+
+/// The frame libass draws in: the video's, at least 1080 lines tall, so
+/// lines over a small video are drawn sharp rather than enlarged.
+fn ass_canvas((width, height): (u32, u32)) -> (u32, u32) {
+    let scale = (1080.0 / f64::from(height.max(1))).max(1.0);
+    (
+        (f64::from(width) * scale).round() as u32,
+        (f64::from(height) * scale).round() as u32,
+    )
+}
+
+/// The fonts a file carries for its ASS subtitles: names and data.
+fn fonts(input: &ffmpeg::format::context::Input) -> Vec<(String, Vec<u8>)> {
+    input
+        .streams()
+        .filter(|stream| stream.parameters().medium() == ffmpeg::media::Type::Attachment)
+        .filter_map(|stream| {
+            let metadata = stream.metadata();
+            let name = metadata.get("filename").unwrap_or_default().to_owned();
+            let mime = metadata.get("mimetype").unwrap_or_default().to_lowercase();
+            let lower = name.to_lowercase();
+            let font = mime.contains("font")
+                || mime.contains("opentype")
+                || mime.contains("truetype")
+                || [".ttf", ".otf", ".ttc"]
+                    .iter()
+                    .any(|ending| lower.ends_with(ending));
+            font.then(|| Some((name, crate::ffi::stream_extradata(&stream)?)))
+                .flatten()
+        })
+        .collect()
 }
 
 /// Notices the end of playback: everything read, decoded and played,
@@ -1183,7 +1347,8 @@ fn seek(
         output.flush(serial);
     }
     shared.cues().clear();
-    if let Some((_, decoder)) = &mut decoders.subtitles {
+    shared.picture_cues().clear();
+    if let Some((_, SubtitleSink::Decoder(decoder))) = &mut decoders.subtitles {
         decoder.flush();
     }
     shared.clock.jump(position);

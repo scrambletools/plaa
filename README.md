@@ -50,9 +50,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   file.
 - **Speed** from a quarter to three times, keeping the sound's pitch.
 - **Audio and subtitle tracks**, picked by preferred languages or from the
-  menu; text subtitles (SubRip, ASS, WebVTT, MP4 text and more), and
-  subtitle files beside the video, as `Film.en.srt` or in a `Subs`
-  folder.
+  menu: text subtitles (SubRip, WebVTT, MP4 text and more), ASS and SSA
+  drawn as styled by libass when the system has it, Blu-ray, DVD and DVB
+  picture subtitles, and subtitle files beside the video, as
+  `Film.en.srt` or in a `Subs` folder.
 - **Picture in picture** (Ctrl+Shift+P): a small window kept over others
   in a corner, where the system lets apps place windows.
 - **The desktop's media controls**: media keys, panels and `playerctl`
@@ -74,10 +75,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Picture subtitles and ASS styling, media keys on Windows and macOS,
-yt-dlp, trimming and export, recording, a visualizer, casting, the
-AVB/Milan entity, the assistant and MCP, packages and translations. The
-[plan](docs/PLAN.md) has the order.
+Media keys on Windows and macOS, yt-dlp, trimming and export, recording,
+a visualizer, casting, the AVB/Milan entity, the assistant and MCP,
+packages and translations. The [plan](docs/PLAN.md) has the order.
 
 ## Building
 
@@ -102,8 +102,14 @@ cargo build --release
 ./target/release/plaa video.mkv
 ```
 
+ASS subtitles are drawn by libass when the system has it, as most Linux
+systems do through FFmpeg (`brew install libass` on macOS); plaa loads
+it as it runs, so building needs nothing more.
+
 On macOS, install the Xcode Command Line Tools and `brew install ffmpeg
-pkgconf`. On Windows, install the Visual Studio C++ build tools and LLVM,
+pkgconf`, and set `LIBCLANG_PATH` to their `usr/lib` folder
+(`/Library/Developer/CommandLineTools/usr/lib`) when Xcode itself is not
+installed. On Windows, install the Visual Studio C++ build tools and LLVM,
 set `LIBCLANG_PATH` to LLVM's `bin` folder, unpack a shared FFmpeg build
 (such as [BtbN's](https://github.com/BtbN/FFmpeg-Builds/releases)) and
 set `FFMPEG_DIR` to it, with its `bin` folder on the `PATH`.

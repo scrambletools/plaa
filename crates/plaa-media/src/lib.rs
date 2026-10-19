@@ -2,6 +2,7 @@
 //! nearly any format, sound plays through the system's output device, and
 //! pictures are handed to the interface when the clock reaches them.
 
+mod ass;
 pub mod audio;
 pub mod clock;
 mod decode;
@@ -18,6 +19,7 @@ pub use decode::{Picture, same_language};
 pub use frame::VideoFrame;
 pub use info::MediaInfo;
 pub use player::{Event, Options, Player, Source, Status};
+pub use subtitle::SubtitlePicture;
 pub use thumbnails::{Thumbnail, Thumbnails};
 
 /// Sets FFmpeg up once: its network support, and only errors in its log.

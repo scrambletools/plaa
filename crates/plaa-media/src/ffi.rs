@@ -493,6 +493,69 @@ pub fn keyframe_before(
     Some(entry.timestamp as f64 * base - start)
 }
 
+/// A bitmap subtitle rectangle's pixels as RGBA with straight alpha, from
+/// its palette image.
+pub fn bitmap_rgba(rect: &ffmpeg::codec::subtitle::Bitmap) -> Option<Vec<u8>> {
+    let (width, height) = (rect.width() as usize, rect.height() as usize);
+    if width == 0 || height == 0 || rect.colors() == 0 {
+        return None;
+    }
+    // SAFETY: a bitmap rectangle's first plane holds `height` rows of
+    // `width` palette indices, `linesize[0]` apart, and its second the
+    // palette, `nb_colors` 32 bit ARGB entries; both live while `rect`
+    // does.
+    unsafe {
+        let raw = rect.as_ptr();
+        let indices = (*raw).data[0];
+        let palette = (*raw).data[1].cast::<u32>();
+        let stride = usize::try_from((*raw).linesize[0]).ok()?;
+        if indices.is_null() || palette.is_null() || stride < width {
+            return None;
+        }
+        let palette = std::slice::from_raw_parts(palette, rect.colors().min(256));
+        let mut rgba = Vec::with_capacity(width * height * 4);
+        for row in 0..height {
+            let line = std::slice::from_raw_parts(indices.add(row * stride), width);
+            for &index in line {
+                let color = palette.get(usize::from(index)).copied().unwrap_or(0);
+                rgba.extend_from_slice(&[
+                    (color >> 16) as u8,
+                    (color >> 8) as u8,
+                    color as u8,
+                    (color >> 24) as u8,
+                ]);
+            }
+        }
+        Some(rgba)
+    }
+}
+
+/// The size a subtitle decoder says its pictures are placed in, when it
+/// knows.
+pub fn subtitle_canvas(decoder: &ffmpeg::decoder::Subtitle) -> Option<(u32, u32)> {
+    // SAFETY: the decoder's context is valid while it is borrowed.
+    let (width, height) = unsafe {
+        let context = decoder.as_ptr();
+        ((*context).width, (*context).height)
+    };
+    (width > 0 && height > 0).then_some((width as u32, height as u32))
+}
+
+/// A stream's extra data: an ASS track's header, an attached font's
+/// bytes.
+pub fn stream_extradata(stream: &ffmpeg::format::stream::Stream) -> Option<Vec<u8>> {
+    // SAFETY: the stream's parameters live while it is borrowed, and their
+    // extra data is `extradata_size` bytes when not null.
+    unsafe {
+        let parameters = (*stream.as_ptr()).codecpar;
+        if parameters.is_null() || (*parameters).extradata.is_null() {
+            return None;
+        }
+        let size = usize::try_from((*parameters).extradata_size).ok()?;
+        Some(std::slice::from_raw_parts((*parameters).extradata, size).to_vec())
+    }
+}
+
 /// FFmpeg's release, such as "n9.0.1", as it was built.
 pub fn version() -> String {
     // SAFETY: FFmpeg returns a static string.

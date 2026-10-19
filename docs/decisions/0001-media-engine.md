@@ -42,9 +42,12 @@ FFmpeg build.
   and mpv do on top of FFmpeg; `plaa-media` keeps all of it in one place.
 - The few calls `ffmpeg-next` lacks (hardware devices, copying pictures
   from graphics memory, display matrices, attached pictures, channel
-  layout names) are in `plaa-media/src/ffi.rs`, the only unsafe code.
+  layout names, subtitle bitmaps) are in `plaa-media/src/ffi.rs`; with
+  `ass.rs`, which calls libass, it is the only unsafe code.
 - Pictures decoded on the graphics card are copied to memory, reused
   from a pool, and uploaded again; importing them directly into wgpu is
   a later optimization.
-- ASS styling and picture subtitles need libass and a compositor of their
-  own; text subtitles are drawn by iced until then.
+- Picture subtitles, and ASS ones as libass draws them, become one
+  picture over the video, laid over it in its shader. libass is loaded as
+  plaa runs, not linked, so plaa runs without it and shows ASS as text
+  then; other text subtitles are drawn by iced.

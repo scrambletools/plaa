@@ -603,7 +603,7 @@ fn chapters_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
 /// The audio and subtitle tracks to choose from, when there is a choice.
 fn tracks_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
     let info = window.info.as_ref()?;
-    let subtitles: Vec<_> = info.subtitles.iter().filter(|track| track.text).collect();
+    let subtitles: Vec<_> = info.subtitles.iter().collect();
     if info.audio.len() < 2 && subtitles.is_empty() {
         return None;
     }

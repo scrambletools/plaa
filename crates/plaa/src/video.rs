@@ -13,7 +13,7 @@ use iced::wgpu;
 use iced::widget::shader::{self, Action};
 use iced::{Element, Fill, Rectangle};
 use plaa_media::frame::{Layout, Matrix, Transfer};
-use plaa_media::{Player, VideoFrame};
+use plaa_media::{Player, SubtitlePicture, VideoFrame};
 
 use crate::window::Activity;
 
@@ -77,6 +77,7 @@ impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
         Primitive {
             surface: self.surface,
             frame: self.player.picture(),
+            subtitle: self.player.subtitle_picture(),
         }
     }
 
@@ -98,10 +99,20 @@ impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
 pub struct Primitive {
     surface: u64,
     frame: Option<Arc<VideoFrame>>,
+    /// The picture subtitle showing over it.
+    subtitle: Option<Arc<SubtitlePicture>>,
 }
 
-/// The values the shader reads, laid out as its `Uniforms`: 28 words.
-fn uniforms(frame: &VideoFrame, extent: (f32, f32), srgb_target: bool) -> [u8; 112] {
+/// The size of the shader's `Uniforms`: 32 words.
+const UNIFORMS: usize = 128;
+
+/// The values the shader reads, laid out as its `Uniforms`.
+fn uniforms(
+    frame: &VideoFrame,
+    extent: (f32, f32),
+    srgb_target: bool,
+    subtitle: Option<&SubtitlePicture>,
+) -> [u8; UNIFORMS] {
     let colors = frame.colors;
     let (kr, kb) = match colors.matrix {
         Matrix::Bt601 => (0.299, 0.114),
@@ -143,7 +154,7 @@ fn uniforms(frame: &VideoFrame, extent: (f32, f32), srgb_target: bool) -> [u8; 1
         Transfer::Pq => 1,
         Transfer::Hlg => 2,
     };
-    let mut words = [0u32; 28];
+    let mut words = [0u32; UNIFORMS / 4];
     for (row, values) in rows.iter().enumerate() {
         for (column, value) in values.iter().enumerate() {
             words[row * 4 + column] = (*value as f32).to_bits();
@@ -167,7 +178,17 @@ fn uniforms(frame: &VideoFrame, extent: (f32, f32), srgb_target: bool) -> [u8; 1
     words[22] = transfer;
     words[23] = u32::from(colors.wide_gamut);
     words[24] = u32::from(srgb_target);
-    let mut bytes = [0u8; 112];
+    if let Some(subtitle) = subtitle.filter(|subtitle| {
+        subtitle.canvas.0 > 0 && subtitle.canvas.1 > 0 && subtitle.width > 0 && subtitle.height > 0
+    }) {
+        let (width, height) = (subtitle.canvas.0 as f32, subtitle.canvas.1 as f32);
+        words[25] = 1;
+        words[28] = (subtitle.x as f32 / width).to_bits();
+        words[29] = (subtitle.y as f32 / height).to_bits();
+        words[30] = (subtitle.width as f32 / width).to_bits();
+        words[31] = (subtitle.height as f32 / height).to_bits();
+    }
+    let mut bytes = [0u8; UNIFORMS];
     for (chunk, word) in bytes.as_chunks_mut::<4>().0.iter_mut().zip(words) {
         *chunk = word.to_ne_bytes();
     }
@@ -228,7 +249,13 @@ impl shader::Primitive for Primitive {
                 &pipeline.blank,
             );
         }
-        queue.write_buffer(&surface.uniforms, 0, &uniforms(frame, extent, srgb));
+        let subtitle = self.subtitle.as_deref();
+        surface.show_subtitle(device, queue, subtitle, &pipeline.subtitle_layout);
+        queue.write_buffer(
+            &surface.uniforms,
+            0,
+            &uniforms(frame, extent, srgb, subtitle),
+        );
     }
 
     fn draw(&self, pipeline: &Pipeline, render_pass: &mut wgpu::RenderPass<'_>) -> bool {
@@ -240,6 +267,12 @@ impl shader::Primitive for Primitive {
         };
         render_pass.set_pipeline(&pipeline.pipeline);
         render_pass.set_bind_group(0, bind_group, &[]);
+        let subtitle = surface
+            .subtitle
+            .as_ref()
+            .filter(|_| self.subtitle.is_some())
+            .map_or(&pipeline.no_subtitle, |subtitle| &subtitle.group);
+        render_pass.set_bind_group(1, subtitle, &[]);
         render_pass.draw(0..4, 0..1);
         true
     }
@@ -252,9 +285,34 @@ struct Surface {
     bind_group: Option<wgpu::BindGroup>,
     /// Where pictures are written on their way to the textures.
     staging: Vec<Staging>,
+    /// The subtitle picture last shown over them.
+    subtitle: Option<SubtitleTexture>,
     /// The picture uploaded, by its id.
     frame: u64,
     used: Instant,
+}
+
+/// A subtitle picture on the graphics card, by its id.
+struct SubtitleTexture {
+    id: u64,
+    texture: wgpu::Texture,
+    group: wgpu::BindGroup,
+}
+
+/// The subtitle layout's group for `view`.
+fn subtitle_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    view: &wgpu::TextureView,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("plaa video subtitle"),
+        layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::TextureView(view),
+        }],
+    })
 }
 
 /// A buffer pictures are written into and the card copies from, kept and
@@ -294,15 +352,90 @@ impl Surface {
             textures: Vec::new(),
             uniforms: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("plaa video uniforms"),
-                size: 112,
+                size: UNIFORMS as u64,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
             bind_group: None,
             staging: Vec::new(),
+            subtitle: None,
             frame: 0,
             used: Instant::now(),
         }
+    }
+
+    /// Puts `subtitle` on the card, once: premultiplied, so filtering it
+    /// blends no dark edges in. Keeps the texture while the size stays.
+    fn show_subtitle(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        subtitle: Option<&SubtitlePicture>,
+        layout: &wgpu::BindGroupLayout,
+    ) {
+        let Some(subtitle) = subtitle.filter(|subtitle| subtitle.width > 0 && subtitle.height > 0)
+        else {
+            return;
+        };
+        if self
+            .subtitle
+            .as_ref()
+            .is_some_and(|shown| shown.id == subtitle.id)
+        {
+            return;
+        }
+        let size = wgpu::Extent3d {
+            width: subtitle.width,
+            height: subtitle.height,
+            depth_or_array_layers: 1,
+        };
+        let reusable = self
+            .subtitle
+            .take()
+            .filter(|shown| shown.texture.size() == size);
+        let (texture, group) = match reusable {
+            Some(shown) => (shown.texture, shown.group),
+            None => {
+                let texture = device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("plaa video subtitle"),
+                    size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+                let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let group = subtitle_group(device, layout, &view);
+                (texture, group)
+            }
+        };
+        let premultiplied: Vec<u8> = subtitle
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .flat_map(|[red, green, blue, alpha]| {
+                let times = |value: u8| ((u16::from(value) * u16::from(*alpha) + 127) / 255) as u8;
+                [times(*red), times(*green), times(*blue), *alpha]
+            })
+            .collect();
+        queue.write_texture(
+            texture.as_image_copy(),
+            &premultiplied,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(subtitle.width * 4),
+                rows_per_image: Some(subtitle.height),
+            },
+            size,
+        );
+        self.subtitle = Some(SubtitleTexture {
+            id: subtitle.id,
+            texture,
+            group,
+        });
     }
 
     fn upload(
@@ -527,9 +660,14 @@ fn plane_formats(layout: Layout) -> &'static [wgpu::TextureFormat] {
 pub struct Pipeline {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
+    /// The subtitle picture's own group, so changing it leaves the
+    /// planes' alone.
+    subtitle_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     /// Bound where a layout has fewer planes than the shader reads.
     blank: wgpu::TextureView,
+    /// Bound while no subtitle picture shows.
+    no_subtitle: wgpu::BindGroup,
     srgb: bool,
     surfaces: HashMap<u64, Surface>,
 }
@@ -578,9 +716,13 @@ impl shader::Pipeline for Pipeline {
                 },
             ],
         });
+        let subtitle_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("plaa video subtitle"),
+            entries: &[texture(0)],
+        });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("plaa video"),
-            bind_group_layouts: &[&layout],
+            bind_group_layouts: &[&layout, &subtitle_layout],
             push_constant_ranges: &[],
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -652,11 +794,15 @@ impl shader::Pipeline for Pipeline {
                 depth_or_array_layers: 1,
             },
         );
+        let blank = blank.create_view(&wgpu::TextureViewDescriptor::default());
+        let no_subtitle = subtitle_group(device, &subtitle_layout, &blank);
         Self {
             pipeline,
             layout,
+            subtitle_layout,
             sampler,
-            blank: blank.create_view(&wgpu::TextureViewDescriptor::default()),
+            blank,
+            no_subtitle,
             srgb: format.is_srgb(),
             surfaces: HashMap::new(),
         }
@@ -681,7 +827,7 @@ mod tests {
         )
         .validate(&module)
         .unwrap_or_else(|error| panic!("{error:?}"));
-        // The uniforms the shader reads are the 112 bytes `uniforms` writes.
+        // The uniforms the shader reads are the bytes `uniforms` writes.
         let uniforms = module
             .types
             .iter()
@@ -690,6 +836,6 @@ mod tests {
             .expect("a Uniforms struct");
         let mut layouter = naga::proc::Layouter::default();
         layouter.update(module.to_ctx()).expect("a layout");
-        assert_eq!(layouter[uniforms].size, 112);
+        assert_eq!(layouter[uniforms].size as usize, super::UNIFORMS);
     }
 }

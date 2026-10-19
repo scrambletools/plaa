@@ -1094,7 +1094,6 @@ impl Plaa {
                 let tracks: Vec<usize> = info
                     .subtitles
                     .iter()
-                    .filter(|track| track.text)
                     .map(|track| track.track.index)
                     .collect();
                 let next = match player.status.subtitles {

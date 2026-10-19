@@ -17,7 +17,7 @@ use crate::frame::{self, VideoFrame};
 use crate::info::{self, MediaInfo};
 use crate::player::Shared;
 use crate::queue::{Closed, Item, PacketQueue};
-use crate::subtitle::{self, Cue};
+use crate::subtitle::{self, Cue, PictureCue, SubtitlePicture};
 
 /// A still picture as RGBA, such as cover art.
 #[derive(Clone, PartialEq, Eq)]
@@ -565,10 +565,22 @@ fn tempo_filters(tempo: f64) -> String {
 }
 
 /// Decodes text subtitles as the reader comes across their packets.
+/// What a subtitle packet decodes to.
+pub(crate) enum Decoded {
+    Text(Cue),
+    Picture(PictureCue),
+    /// Whatever picture shows ends at this many seconds, as an empty
+    /// Blu-ray display set says.
+    Clear(f64),
+}
+
 pub(crate) struct SubtitleDecoder {
     decoder: ffmpeg::decoder::Subtitle,
     time_base: ffmpeg::Rational,
     start: f64,
+    /// The frame pictures are placed in when the decoder does not say:
+    /// the video's.
+    canvas: (u32, u32),
 }
 
 impl SubtitleDecoder {
@@ -576,16 +588,18 @@ impl SubtitleDecoder {
         input: &ffmpeg::format::context::Input,
         index: usize,
         start: f64,
+        canvas: (u32, u32),
     ) -> Result<Self, ffmpeg::Error> {
         let (decoder, time_base) = open_decoder(input, index)?;
         Ok(Self {
             decoder: decoder.subtitle()?,
             time_base,
             start,
+            canvas,
         })
     }
 
-    pub fn decode(&mut self, packet: &ffmpeg::Packet) -> Vec<Cue> {
+    pub fn decode(&mut self, packet: &ffmpeg::Packet) -> Vec<Decoded> {
         let mut subtitle = ffmpeg::Subtitle::new();
         if !matches!(self.decoder.decode(packet, &mut subtitle), Ok(true)) {
             return Vec::new();
@@ -602,17 +616,15 @@ impl SubtitleDecoder {
             return Vec::new();
         };
         let start = base - self.start + f64::from(subtitle.start()) / 1000.0;
-        let end = match subtitle.end() {
+        let known_end = match subtitle.end() {
             0 | u32::MAX => {
                 let duration = packet.duration();
-                if duration > 0 {
-                    start + info::seconds(duration, self.time_base).unwrap_or(0.0)
-                } else {
-                    start
-                }
+                (duration > 0)
+                    .then(|| start + info::seconds(duration, self.time_base).unwrap_or(0.0))
             }
-            end => base - self.start + f64::from(end) / 1000.0,
+            end => Some(base - self.start + f64::from(end) / 1000.0),
         };
+        let mut decoded = Vec::new();
         let text: Vec<String> = subtitle
             .rects()
             .filter_map(|rect| match rect {
@@ -622,14 +634,42 @@ impl SubtitleDecoder {
             })
             .filter(|line| !line.is_empty())
             .collect();
-        if text.is_empty() {
-            return Vec::new();
+        if !text.is_empty() {
+            decoded.push(Decoded::Text(Cue {
+                start,
+                end: known_end.unwrap_or(start),
+                text: text.join("\n"),
+            }));
         }
-        vec![Cue {
-            start,
-            end,
-            text: text.join("\n"),
-        }]
+        let bitmaps: Vec<_> = subtitle
+            .rects()
+            .filter_map(|rect| match rect {
+                ffmpeg::codec::subtitle::Rect::Bitmap(bitmap) => Some((
+                    bitmap.x() as u32,
+                    bitmap.y() as u32,
+                    bitmap.width(),
+                    bitmap.height(),
+                    ffi::bitmap_rgba(&bitmap)?,
+                )),
+                _ => None,
+            })
+            .collect();
+        if subtitle.rects().next().is_none() {
+            decoded.push(Decoded::Clear(start));
+        } else if let Some(picture) = composite(&bitmaps) {
+            let canvas = ffi::subtitle_canvas(&self.decoder).unwrap_or(self.canvas);
+            let (x, y, width, height, rgba) = picture;
+            decoded.push(Decoded::Picture(PictureCue {
+                start,
+                // Shown until the next, or until a clear, when no end is
+                // given.
+                end: known_end
+                    .filter(|end| *end > start)
+                    .unwrap_or(f64::INFINITY),
+                picture: Arc::new(SubtitlePicture::new(canvas, x, y, width, height, rgba)),
+            }));
+        }
+        decoded
     }
 
     pub fn flush(&mut self) {
@@ -649,11 +689,38 @@ pub(crate) fn pick_audio(info: &MediaInfo, languages: &[String]) -> Option<usize
 
 /// The subtitles to show: text ones in a preferred language, else ones
 /// the file marks forced or default. None when nothing asks for them.
+/// A subtitle's bitmaps, each at its place, as one picture over the box
+/// they share: its place, size and RGBA pixels.
+type Placed = (u32, u32, u32, u32, Vec<u8>);
+
+fn composite(bitmaps: &[Placed]) -> Option<Placed> {
+    let left = bitmaps.iter().map(|(x, ..)| *x).min()?;
+    let top = bitmaps.iter().map(|(_, y, ..)| *y).min()?;
+    let right = bitmaps.iter().map(|(x, _, width, ..)| x + width).max()?;
+    let bottom = bitmaps
+        .iter()
+        .map(|(_, y, _, height, _)| y + height)
+        .max()?;
+    let (width, height) = (right - left, bottom - top);
+    if let [only] = bitmaps {
+        return Some(only.clone());
+    }
+    let mut rgba = vec![0; width as usize * height as usize * 4];
+    for (x, y, bitmap_width, bitmap_height, pixels) in bitmaps {
+        let row = *bitmap_width as usize * 4;
+        for line in 0..*bitmap_height as usize {
+            let to = ((*y - top) as usize + line) * width as usize * 4 + (*x - left) as usize * 4;
+            rgba[to..to + row].copy_from_slice(&pixels[line * row..(line + 1) * row]);
+        }
+    }
+    Some((left, top, width, height, rgba))
+}
+
 /// The subtitles to show at first: in a preferred language, a file beside
 /// the video before the video's own; else a file beside the video, as it
 /// was put there to be shown; else the video's forced or default track.
 pub(crate) fn pick_subtitles(info: &MediaInfo, languages: &[String]) -> Option<usize> {
-    let text = || info.subtitles.iter().filter(|track| track.text);
+    let text = || info.subtitles.iter();
     let files: Vec<_> = text()
         .filter(|track| track.file.is_some())
         .map(|track| &track.track)
@@ -696,12 +763,14 @@ pub(crate) fn read_subtitle_file(path: &std::path::Path) -> Option<(info::Track,
     };
     // Its times count from the video's start, whatever the video's own
     // timestamps start at.
-    let mut decoder = SubtitleDecoder::new(&input, index, 0.0).ok()?;
+    let mut decoder = SubtitleDecoder::new(&input, index, 0.0, (0, 0)).ok()?;
     let mut cues = crate::subtitle::Cues::default();
     for (stream, packet) in input.packets() {
         if stream.index() == index {
-            for cue in decoder.decode(&packet) {
-                cues.add(cue);
+            for decoded in decoder.decode(&packet) {
+                if let Decoded::Text(cue) = decoded {
+                    cues.add(cue);
+                }
             }
         }
     }

@@ -1,7 +1,7 @@
 // Draws a decoded picture: reads its planes, weighing the texels each
-// screen pixel covers when shrunk, turns Y'CbCr into R'G'B', maps HDR and wide gamut
-// pictures into what a standard screen shows, and fits the picture
-// inside the widget, turned upright.
+// screen pixel covers when shrunk, turns Y'CbCr into R'G'B', maps HDR and
+// wide gamut pictures into what a standard screen shows, lays a subtitle
+// picture over it, and fits it inside the widget, turned upright.
 
 struct Uniforms {
     // Rows of the Y'CbCr to R'G'B' matrix; w is unused.
@@ -29,9 +29,13 @@ struct Uniforms {
     wide_gamut: u32,
     // The target stores linear light, so the result is decoded first.
     srgb_target: u32,
-    _padding0: u32,
+    // A subtitle picture shows over the picture.
+    has_subtitle: u32,
     _padding1: u32,
     _padding2: u32,
+    // Where it goes on the picture, in 0 to 1 units: left, top, width,
+    // height.
+    subtitle_rect: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -39,6 +43,7 @@ struct Uniforms {
 @group(0) @binding(2) var plane1: texture_2d<f32>;
 @group(0) @binding(3) var plane2: texture_2d<f32>;
 @group(0) @binding(4) var picture_sampler: sampler;
+@group(1) @binding(0) var subtitle: texture_2d<f32>;
 
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
@@ -245,6 +250,18 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     } else if uniforms.wide_gamut == 1u {
         let light = pow(encoded, vec3<f32>(2.4));
         shown = pow(clamp(bt2020_to_bt709(light), vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(1.0 / 2.4));
+    }
+
+    // A subtitle picture over it, premultiplied so filtering it blends no
+    // dark edges in, and laid over in the screen's encoding as the
+    // picture's own colors are.
+    if uniforms.has_subtitle == 1u {
+        let rect = uniforms.subtitle_rect;
+        let local = (in.uv - rect.xy) / rect.zw;
+        if all(local >= vec2<f32>(0.0)) && all(local <= vec2<f32>(1.0)) {
+            let over = sample_plane(subtitle, local, pixel / rect.zw);
+            shown = shown * (1.0 - over.a) + over.rgb;
+        }
     }
 
     if uniforms.srgb_target == 1u {
