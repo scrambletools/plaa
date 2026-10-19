@@ -331,6 +331,12 @@ record-no-input = No microphone
 record-microphone = Microphone
 record-default-microphone = The system’s default
 record-playing = What the computer plays
+record-mono = mono
+record-stereo = stereo
+record-channels = { $count } channels
+# The input's sample rate and channels, as "48 kHz · stereo".
+record-input-format = { $rate } kHz · { $channels }
+record-input-format-lowered = { $rate } kHz · { $channels }, saved at { $saved } kHz
 action-record-sound = Record sound
 open-record-sound = New sound recording
 start-record-sound = Record Sound

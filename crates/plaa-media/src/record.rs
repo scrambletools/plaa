@@ -152,6 +152,11 @@ impl Microphone {
         &self.name
     }
 
+    /// The device's sample rate and channels, which it records at.
+    pub fn format(&self) -> (u32, u16) {
+        (self.shared.rate, self.shared.channels)
+    }
+
     /// The loudest sample of each channel since last asked, 0 to 1.
     pub fn levels(&self) -> Vec<f32> {
         self.shared

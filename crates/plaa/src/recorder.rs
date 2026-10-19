@@ -159,6 +159,11 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
                     input_menu(microphone.name(), context, busy),
                     meters,
                     sound_menus(context, busy),
+                    scramble_ui::styled(
+                        recorded_format(microphone.format(), context),
+                        Type::BodySmall
+                    )
+                    .style(style::on_surface_variant),
                     record_button(recording, recorder.saving),
                 ]
                 .spacing(12)
@@ -176,6 +181,31 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
             .style(style::surface)
     ]
     .into()
+}
+
+/// The input's rate and channels, which it records at, and the rate the
+/// file is saved at when its format will not take the input's.
+fn recorded_format((rate, channels): (u32, u16), context: &Context<'_>) -> String {
+    let channels = match channels {
+        1 => crate::fl!("record-mono"),
+        2 => crate::fl!("record-stereo"),
+        count => crate::fl!("record-channels", count = count),
+    };
+    let saved = context.sound.rate_for(context.quality, rate);
+    if saved < rate {
+        crate::fl!(
+            "record-input-format-lowered",
+            rate = format::kilohertz(rate),
+            channels = channels,
+            saved = format::kilohertz(saved)
+        )
+    } else {
+        crate::fl!(
+            "record-input-format",
+            rate = format::kilohertz(rate),
+            channels = channels
+        )
+    }
 }
 
 /// The round button that starts recording, red as a recording light, and
