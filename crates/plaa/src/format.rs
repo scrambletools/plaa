@@ -27,6 +27,12 @@ pub fn precise_time(seconds: f64, long: bool) -> String {
     format!("{}.{}", time((tenths / 10) as f64, long), tenths % 10)
 }
 
+/// A sample rate in kHz, as "44.1" or "192".
+pub fn kilohertz(rate: u32) -> String {
+    let text = format!("{:.1}", f64::from(rate) / 1000.0);
+    text.strip_suffix(".0").unwrap_or(&text).to_owned()
+}
+
 /// A playback speed, such as "1.25×".
 pub fn speed(speed: f64) -> String {
     let text = format!("{speed:.2}");
@@ -78,6 +84,13 @@ pub fn track_name(track: &Track, number: usize, detail: Option<&str>) -> String 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sample_rates_in_kilohertz() {
+        assert_eq!(kilohertz(44100), "44.1");
+        assert_eq!(kilohertz(48000), "48");
+        assert_eq!(kilohertz(192000), "192");
+    }
 
     #[test]
     fn times_read_as_clocks() {

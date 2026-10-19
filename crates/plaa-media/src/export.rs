@@ -127,6 +127,20 @@ impl Sound {
             .iter()
             .any(|name| ffmpeg::encoder::find_by_name(name).is_some())
     }
+
+    /// The sample rate sound `rate` Hz is exported at, at `quality`: its
+    /// own where the format takes it, else 48 kHz, else the highest the
+    /// format takes.
+    pub fn rate_for(self, quality: u32, rate: u32) -> u32 {
+        let takes: Vec<i32> = self
+            .encoders(quality)
+            .iter()
+            .find_map(|name| ffmpeg::encoder::find_by_name(name))
+            .and_then(|codec| codec.audio().ok())
+            .and_then(|audio| audio.rates().map(Iterator::collect))
+            .unwrap_or_default();
+        sample_rate(rate.max(1), &takes)
+    }
 }
 
 /// An encoder an export can use: FFmpeg's name for it, and whether it
@@ -1073,13 +1087,12 @@ fn audio_side(
         .find_map(|name| ffmpeg::encoder::find_by_name(name))
         .ok_or_else(|| failed("no encoder for this sound format"))?;
     let audio = codec.audio().map_err(failed)?;
-    let rates: Vec<i32> = audio.rates().map(Iterator::collect).unwrap_or_default();
     let file_rate = info
         .audio
         .iter()
         .find(|track| track.track.index == index)
         .map_or(decoder.rate(), |track| track.sample_rate);
-    let rate = sample_rate(file_rate.max(1), &rates);
+    let rate = sound.rate_for(quality, file_rate);
     // MP3 holds two channels at most.
     let most = if sound == Sound::Mp3 { 2 } else { 8 };
     let channels = decoder.channels().clamp(1, most);

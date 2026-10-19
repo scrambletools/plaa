@@ -304,6 +304,7 @@ export-alac-note = Lossless: the sound exactly as it is, as Apple’s devices pl
 export-wav-note = Uncompressed: the sound exactly as it is, in the largest files
 export-kilobits = { $rate } kb/s
 export-bits = { $bits }-bit
+export-rate-lower = Saved at { $rate } kHz, below the file’s { $file } kHz
 export-choose = Export…
 export-name = { $name } export
 export-name-edited = { $name } edited

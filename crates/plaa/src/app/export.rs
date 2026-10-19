@@ -306,17 +306,20 @@ fn usual_quality(player: &PlayerWindow, sound: Sound) -> u32 {
     if !sound.lossless() {
         return sound.usual_quality();
     }
-    let bits = player
-        .info
-        .as_ref()
-        .and_then(|info| {
-            info.audio
-                .iter()
-                .find(|track| Some(track.track.index) == player.status.audio)
-        })
+    let bits = sound_track(player)
         .and_then(|track| track.bits)
         .unwrap_or(16);
     if bits > 16 { 24 } else { 16 }
+}
+
+/// The sound track playing, which is the one exported.
+fn sound_track(player: &PlayerWindow) -> Option<&plaa_media::info::AudioTrack> {
+    player
+        .info
+        .as_ref()?
+        .audio
+        .iter()
+        .find(|track| Some(track.track.index) == player.status.audio)
 }
 
 /// The format and picture size `choice` exports `player`'s file in; none
@@ -442,6 +445,17 @@ pub(super) fn dialog<'a>(
             .push(note(sound_note(choice.sound)))
             .push(component::section(crate::fl!("export-quality")))
             .push(component::connected(quality_buttons));
+        // Formats that cannot keep the file's rate say so.
+        if let Some(file) = sound_track(player).map(|track| track.sample_rate) {
+            let rate = choice.sound.rate_for(choice.quality, file);
+            if rate < file {
+                body = body.push(note(crate::fl!(
+                    "export-rate-lower",
+                    rate = crate::format::kilohertz(rate),
+                    file = crate::format::kilohertz(file)
+                )));
+            }
+        }
     }
     let actions = vec![
         scramble_ui::button(Kind::Text, crate::fl!("common-cancel"))
