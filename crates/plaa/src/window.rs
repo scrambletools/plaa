@@ -44,6 +44,7 @@ pub enum Sheet {
 /// The menus a window can have open, which keep its overlay shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Menu {
+    Open,
     Speed,
     Tracks,
     Chapters,
@@ -471,14 +472,23 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
 /// The toolbar: open, and the window's tools at the other end. The file's
 /// name is the window's title, as tools would cover it in a narrow window.
 fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
-    let mut tools = vec![
-        component::tool(
-            Icon::FolderOpen,
-            crate::fl!("action-open"),
-            Some(Control::Open),
-        ),
-        space().width(Fill).into(),
-    ];
+    let open = dropdown::icon_menu(
+        Icon::FolderOpen,
+        vec![
+            Entry::item(crate::fl!("open-file"), Control::Open).icon(Icon::FileOpen),
+            Entry::item(
+                crate::fl!("open-address"),
+                Control::Action(Action::OpenAddress),
+            )
+            .icon(Icon::Link),
+        ],
+    )
+    .size(button::Size::Small)
+    .tip(crate::fl!("action-open"))
+    .open(window.menu == Some(Menu::Open), |open| {
+        Control::Menu(Menu::Open, open)
+    });
+    let mut tools = vec![open.into(), space().width(Fill).into()];
     if let Some(menu) = edit_menu(window) {
         tools.push(menu);
     }

@@ -1692,6 +1692,12 @@ impl Plaa {
         if !matches!(control, Control::Hover(_) | Control::Activity) {
             self.media_window = Some(id);
         }
+        // What a menu chose closes it.
+        if matches!(control, Control::Open | Control::Action(_))
+            && let Some(player) = self.player_mut(id)
+        {
+            player.menu = None;
+        }
         let delay = self.settings.overlay_delay();
         match control {
             Control::Open => return self.perform(id, Action::Open),

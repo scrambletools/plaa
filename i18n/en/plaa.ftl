@@ -45,6 +45,8 @@ start-open-address = Open Address
 
 action-open = Open
 action-open-address = Open Address
+open-file = Open file…
+open-address = Open address…
 action-settings = Settings
 action-info = Inspector
 action-loop = Loop
