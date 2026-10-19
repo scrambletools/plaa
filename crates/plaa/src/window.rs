@@ -80,6 +80,7 @@ pub struct PlayerWindow {
     pub info: Option<Arc<MediaInfo>>,
     pub cover: Option<image::Handle>,
     /// The cover saved as a picture, for the desktop to show.
+    #[cfg(target_os = "linux")]
     pub art: Option<std::path::PathBuf>,
     pub status: Status,
     /// The graphics card API pictures decode on, or none for the
@@ -121,6 +122,7 @@ impl PlayerWindow {
             surface,
             info: None,
             cover: None,
+            #[cfg(target_os = "linux")]
             art: None,
             decoding: None,
             error: None,

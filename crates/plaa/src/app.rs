@@ -21,7 +21,8 @@ use crate::settings_view::{self, SettingsMessage, SettingsTab};
 use crate::shortcuts::{self, Action};
 use crate::window::{self as player_window, Control, Menu, PlayerWindow, SPEEDS, Sheet};
 
-#[cfg(target_os = "linux")]
+/// plaa's id, reversed domain style: its desktop entry on Linux, and how
+/// it names itself to the system's services everywhere.
 pub const APP_ID: &str = if plaa_store::paths::PRODUCTION {
     "io.github.scrambletools.plaa"
 } else {
@@ -73,6 +74,7 @@ pub struct Plaa {
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
     /// The window media keys and the desktop's controls act on: the one
     /// last played or used.
+    #[cfg(target_os = "linux")]
     media_window: Option<window::Id>,
     #[cfg(target_os = "linux")]
     mpris: Option<crate::mpris::Service>,
@@ -224,6 +226,7 @@ impl Plaa {
             language_drafts,
             audio_devices: Vec::new(),
             awake: None,
+            #[cfg(target_os = "linux")]
             media_window: None,
             #[cfg(target_os = "linux")]
             mpris: crate::mpris::Service::start("plaa", |command| {
@@ -492,7 +495,10 @@ impl Plaa {
     /// Plays `list`'s current item in window `id`, in place of what it
     /// showed. Moving on through a list keeps the window's size and modes.
     fn play_in(&mut self, id: window::Id, list: Playlist, moving_on: bool) {
-        self.media_window = Some(id);
+        #[cfg(target_os = "linux")]
+        {
+            self.media_window = Some(id);
+        }
         let source = list.source().clone();
         let start = match &source {
             Source::File(path) if self.settings.resume => {
@@ -552,6 +558,7 @@ impl Plaa {
 
     /// The window media keys act on: the one last played or used, or any
     /// that plays.
+    #[cfg(target_os = "linux")]
     fn media_window(&self) -> Option<window::Id> {
         self.media_window
             .filter(|id| {
@@ -858,9 +865,12 @@ impl Plaa {
         };
         match event {
             PlayerEvent::Opened { info, cover } => {
-                player.art = cover
-                    .as_deref()
-                    .and_then(|cover| save_cover(player.source(), cover));
+                #[cfg(target_os = "linux")]
+                {
+                    player.art = cover
+                        .as_deref()
+                        .and_then(|cover| save_cover(player.source(), cover));
+                }
                 player.cover = cover.map(|cover| {
                     image::Handle::from_rgba(cover.width, cover.height, cover.rgba.clone())
                 });
@@ -1180,6 +1190,7 @@ impl Plaa {
     }
 
     fn control(&mut self, id: window::Id, control: Control) -> Task<Message> {
+        #[cfg(target_os = "linux")]
         if !matches!(control, Control::Hover(_) | Control::Activity) {
             self.media_window = Some(id);
         }
@@ -1415,6 +1426,7 @@ impl Plaa {
 
 /// Remembers where `player` is, for its file to start there next time.
 /// `path` as a `file://` address, characters outside a path's own escaped.
+#[cfg(target_os = "linux")]
 fn file_uri(path: &std::path::Path) -> String {
     let mut uri = String::from("file://");
     for byte in path.to_string_lossy().bytes() {
@@ -1429,6 +1441,7 @@ fn file_uri(path: &std::path::Path) -> String {
 
 /// Saves a file's cover as a picture in the cache folder, for the desktop
 /// to show with what plays. Returns where.
+#[cfg(target_os = "linux")]
 fn save_cover(source: &Source, cover: &plaa_media::Picture) -> Option<PathBuf> {
     use std::hash::{Hash, Hasher};
     let folder = plaa_store::paths::cache_dir()?.join("covers");
