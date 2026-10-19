@@ -1,7 +1,8 @@
 // Draws a decoded picture: reads its planes, weighing the texels each
 // screen pixel covers when shrunk, turns Y'CbCr into R'G'B', maps HDR and
 // wide gamut pictures into what a standard screen shows, lays a subtitle
-// picture over it, and fits it inside the widget, turned upright.
+// picture over it, and fits it inside the widget, turned upright and as
+// an edit turns and flips it.
 
 struct Uniforms {
     // Rows of the Y'CbCr to R'G'B' matrix; w is unused.
@@ -18,7 +19,7 @@ struct Uniforms {
     chroma_scale: f32,
     // What a stored value is multiplied by to give 0 to 1.
     value_scale: f32,
-    // Clockwise quarter turns.
+    // Clockwise quarter turns, after mirroring.
     turns: u32,
     // 0: Y, U and V planes; 1: Y and interleaved UV; 2: RGBA.
     plane_layout: u32,
@@ -31,8 +32,12 @@ struct Uniforms {
     srgb_target: u32,
     // A subtitle picture shows over the picture.
     has_subtitle: u32,
-    _padding1: u32,
-    _padding2: u32,
+    // Mirrored left to right, before turning.
+    mirrored: u32,
+    // The turns subtitle pictures are placed by on the screen, so they
+    // read upright when the picture is flipped; 4 places them on the
+    // picture as it shows.
+    subtitle_turns: u32,
     // Where it goes on the picture, in 0 to 1 units: left, top, width,
     // height.
     subtitle_rect: vec4<f32>,
@@ -48,7 +53,19 @@ struct Uniforms {
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
+    // Where on the picture's place on screen, from its top left.
+    @location(1) screen: vec2<f32>,
 };
+
+// The picture's point shown at `screen` when it is turned clockwise.
+fn turned(screen: vec2<f32>, turns: u32) -> vec2<f32> {
+    switch turns {
+        case 1u: { return vec2<f32>(screen.y, 1.0 - screen.x); }
+        case 2u: { return vec2<f32>(1.0 - screen.x, 1.0 - screen.y); }
+        case 3u: { return vec2<f32>(1.0 - screen.y, screen.x); }
+        default: { return screen; }
+    }
+}
 
 @vertex
 fn vs_main(@builtin(vertex_index) index: u32) -> VertexOut {
@@ -57,14 +74,10 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOut {
     let corner = vec2<f32>(f32(index & 1u), f32(index >> 1u));
     var out: VertexOut;
     out.position = vec4<f32>((corner * 2.0 - 1.0) * uniforms.extent, 0.0, 1.0);
-    // Where on screen, from the top left.
-    let screen = vec2<f32>(corner.x, 1.0 - corner.y);
-    // The picture's point shown there, turned clockwise.
-    switch uniforms.turns {
-        case 1u: { out.uv = vec2<f32>(screen.y, 1.0 - screen.x); }
-        case 2u: { out.uv = vec2<f32>(1.0 - screen.x, 1.0 - screen.y); }
-        case 3u: { out.uv = vec2<f32>(1.0 - screen.y, screen.x); }
-        default: { out.uv = screen; }
+    out.screen = vec2<f32>(corner.x, 1.0 - corner.y);
+    out.uv = turned(out.screen, uniforms.turns);
+    if uniforms.mirrored == 1u {
+        out.uv.x = 1.0 - out.uv.x;
     }
     return out;
 }
@@ -257,7 +270,11 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     // picture's own colors are.
     if uniforms.has_subtitle == 1u {
         let rect = uniforms.subtitle_rect;
-        let local = (in.uv - rect.xy) / rect.zw;
+        var place = in.uv;
+        if uniforms.subtitle_turns < 4u {
+            place = turned(in.screen, uniforms.subtitle_turns);
+        }
+        let local = (place - rect.xy) / rect.zw;
         if all(local >= vec2<f32>(0.0)) && all(local <= vec2<f32>(1.0)) {
             let over = sample_plane(subtitle, local, pixel / rect.zw);
             shown = shown * (1.0 - over.a) + over.rgb;

@@ -1,5 +1,7 @@
 //! The macOS menu bar: the app menu, then File, Edit, View, Playback and
-//! Window. Each item runs the same action as its shortcut.
+//! Window. Each item runs the same action as its shortcut; Edit has
+//! plaa's own editing, as QuickTime Player's has, besides the system's
+//! items for text.
 //!
 //! A menu item's key equivalent takes the key before the window sees it.
 //! Items therefore show only the shortcuts with ⌘ on a character, and the
@@ -59,6 +61,16 @@ const ACTIONS: &[(&str, Action)] = &[
     ("subtitles", Action::Subtitles),
     ("audio-track", Action::AudioTrack),
     ("screenshot", Action::Screenshot),
+    ("export", Action::Export),
+    ("undo", Action::Undo),
+    ("redo", Action::Redo),
+    ("trim", Action::Trim),
+    ("split", Action::Split),
+    ("rotate-left", Action::RotateLeft),
+    ("rotate-right", Action::RotateRight),
+    ("flip-horizontal", Action::FlipHorizontal),
+    ("flip-vertical", Action::FlipVertical),
+    ("revert", Action::Revert),
 ];
 
 /// Calls `handler` with the action of each menu item chosen.
@@ -250,6 +262,8 @@ fn build() -> muda::Result<Menu> {
             &item("open", fl!("menu-open")),
             &item("open-address", fl!("menu-open-address")),
             &separator(),
+            &item("export", fl!("menu-export")),
+            &separator(),
             &item("close", fl!("menu-close")),
         ],
     )?;
@@ -257,10 +271,23 @@ fn build() -> muda::Result<Menu> {
         fl!("menu-edit"),
         true,
         &[
+            &item("undo", fl!("menu-undo")),
+            &item("redo", fl!("menu-redo")),
+            &separator(),
             &PredefinedMenuItem::cut(Some(&fl!("menu-cut"))),
             &PredefinedMenuItem::copy(Some(&fl!("menu-copy"))),
             &PredefinedMenuItem::paste(Some(&fl!("menu-paste"))),
             &PredefinedMenuItem::select_all(Some(&fl!("menu-select-all"))),
+            &separator(),
+            &item("trim", fl!("menu-trim")),
+            &item("split", fl!("menu-split")),
+            &separator(),
+            &item("rotate-left", fl!("menu-rotate-left")),
+            &item("rotate-right", fl!("menu-rotate-right")),
+            &item("flip-horizontal", fl!("menu-flip-horizontal")),
+            &item("flip-vertical", fl!("menu-flip-vertical")),
+            &separator(),
+            &item("revert", fl!("menu-revert")),
         ],
     )?;
     let view = Submenu::with_items(

@@ -1,7 +1,7 @@
 //! The iced application: a window per file, a start window when there is
 //! none, and Settings over whichever window asked.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -18,12 +18,16 @@ use scramble_ui::component::{self, Backdrop};
 use scramble_ui::{Icon, Type, button, column, icon, omarchy, row, style};
 
 use crate::External;
+use crate::editing::Mode;
 use crate::playlist::{self, Playlist};
 use crate::settings_view::{self, SettingsMessage, SettingsTab};
 use crate::shortcuts::{self, Action};
 use crate::window::{
     self as player_window, Control, Menu, PlayerWindow, QualityChoice, SPEEDS, Sheet,
 };
+
+mod edits;
+mod export;
 
 /// plaa's id, reversed domain style: its desktop entry on Linux, and how
 /// it names itself to the system's services everywhere.
@@ -78,6 +82,10 @@ pub struct Plaa {
     pub(crate) audio_devices: Vec<plaa_media::OutputDevice>,
     /// Whether yt-dlp was installed when Settings last opened.
     pub(crate) yt_dlp_found: bool,
+    /// The encoder each format and size of export would use, once found,
+    /// and those being looked for.
+    encoders: HashMap<export::Encoding, Option<plaa_media::export::Encoder>>,
+    probing: HashSet<export::Encoding>,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -144,6 +152,12 @@ pub(crate) struct Window {
     pip: Option<Size>,
     /// The height of the window's screen in its pixels, once known.
     screen_lines: Option<u32>,
+    /// The Export dialog's choices, while it shows.
+    export: Option<export::Choice>,
+    /// An export under way from the window.
+    exporting: Option<export::Exporting>,
+    /// Closing waits for an answer, as it would lose changes.
+    closing: Option<export::Closing>,
     /// The window's Wayland surface, which drops name it by, or its
     /// AppKit view.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -192,6 +206,17 @@ pub enum Message {
     /// A recent address is to be forgotten.
     AddressForgotten(String),
     DismissNotice(window::Id),
+    ExportFormat(window::Id, plaa_media::export::Format),
+    /// The Export dialog's size: the picture's shorter side, or its own.
+    ExportSize(window::Id, Option<u32>),
+    ExportDismissed(window::Id),
+    /// Export was chosen in the dialog: on to where to save it.
+    ExportChosen(window::Id),
+    /// Where to export to, or none when the save dialog was cancelled.
+    ExportTo(window::Id, Result<Option<PathBuf>, String>),
+    ExportStop(window::Id),
+    CloseConfirmed(window::Id),
+    CloseDismissed(window::Id),
     ScreenshotSaved(window::Id, Result<PathBuf, String>),
     SystemTheme(iced::theme::Mode),
     SystemAccent(Option<(u8, u8, u8)>),
@@ -263,6 +288,8 @@ impl Plaa {
             language_drafts,
             audio_devices: Vec::new(),
             yt_dlp_found: false,
+            encoders: HashMap::new(),
+            probing: HashSet::new(),
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -483,11 +510,11 @@ impl Plaa {
                 window::resize(id, size),
             ]);
         }
-        let Some(video) = window
-            .player()
-            .and_then(|player| player.picture())
-            .map(|track| (track.width, track.height, track.aspect, track.quarter_turns))
-        else {
+        let Some(video) = window.player().and_then(|player| {
+            let track = player.picture()?;
+            let turns = player.transform().after_turns(track.quarter_turns).turns;
+            Some((track.width, track.height, track.aspect, turns))
+        }) else {
             return Task::none();
         };
         window.pip = Some(window.size);
@@ -590,6 +617,9 @@ impl Plaa {
                 dropped: Vec::new(),
                 pip: None,
                 screen_lines: None,
+                export: None,
+                exporting: None,
+                closing: None,
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
                 surface: None,
                 #[cfg(target_os = "macos")]
@@ -869,7 +899,73 @@ impl Plaa {
                 }
                 Task::none()
             }
-            Message::CloseRequested(id) => window::close(id),
+            Message::CloseRequested(id) => {
+                if self.ask_before_closing(id, export::Closing::Window) {
+                    Task::none()
+                } else {
+                    window::close(id)
+                }
+            }
+            Message::External(External::Export(id, event)) => {
+                self.export_event(id, event);
+                Task::none()
+            }
+            Message::External(External::Encoder(format, size, found)) => {
+                self.probing.remove(&(format, size));
+                self.encoders.insert((format, size), found);
+                Task::none()
+            }
+            Message::ExportFormat(id, format) => {
+                if let Some(choice) = self
+                    .windows
+                    .get_mut(&id)
+                    .and_then(|window| window.export.as_mut())
+                {
+                    choice.format = format;
+                }
+                self.find_encoder(id);
+                Task::none()
+            }
+            Message::ExportSize(id, lines) => {
+                if let Some(choice) = self
+                    .windows
+                    .get_mut(&id)
+                    .and_then(|window| window.export.as_mut())
+                {
+                    choice.lines = lines;
+                }
+                self.find_encoder(id);
+                Task::none()
+            }
+            Message::ExportDismissed(id) => {
+                if let Some(window) = self.windows.get_mut(&id) {
+                    window.export = None;
+                }
+                Task::none()
+            }
+            Message::ExportChosen(id) => self.choose_export_file(id),
+            Message::ExportTo(id, result) => {
+                match result {
+                    Ok(Some(destination)) => self.start_export(id, destination),
+                    // Cancelled: back to the dialog.
+                    Ok(None) => {}
+                    Err(error) => {
+                        self.notify(id, crate::fl!("notice-dialog-failed", error = error));
+                    }
+                }
+                Task::none()
+            }
+            Message::ExportStop(id) => {
+                self.stop_export(id);
+                Task::none()
+            }
+            Message::CloseConfirmed(id) => self.confirm_close(id),
+            Message::CloseDismissed(id) => {
+                if let Some(window) = self.windows.get_mut(&id) {
+                    window.closing = None;
+                }
+                Task::none()
+            }
             Message::Resized(id, size) => {
                 // A window shows on its screen only once it has a size, so
                 // the screen may only now be known.
@@ -976,15 +1072,16 @@ impl Plaa {
             }
             Message::External(External::Thumbnail(id, thumbnail)) => {
                 if let Some(player) = self.player_mut(id) {
-                    let picture = &thumbnail.picture;
-                    player.thumbnail = Some((
-                        image::Handle::from_rgba(
-                            picture.width,
-                            picture.height,
-                            picture.rgba.clone(),
-                        ),
-                        picture.width as f32 / picture.height.max(1) as f32,
-                    ));
+                    if thumbnail.strip {
+                        player.add_still(thumbnail.asked, thumbnail.picture);
+                    } else {
+                        let picture = (*thumbnail.picture).clone().transformed(player.transform());
+                        let aspect = picture.width as f32 / picture.height.max(1) as f32;
+                        player.thumbnail = Some((
+                            image::Handle::from_rgba(picture.width, picture.height, picture.rgba),
+                            aspect,
+                        ));
+                    }
                 }
                 Task::none()
             }
@@ -1153,6 +1250,7 @@ impl Plaa {
                         }));
                 }
                 player.info = Some(info);
+                player.refresh_chapters();
                 player.refresh();
                 let size = match video {
                     Some((width, height, aspect, turns)) => {
@@ -1249,6 +1347,9 @@ impl Plaa {
                 window.address = None;
                 return Task::none();
             }
+            if window.closing.take().is_some() || window.export.take().is_some() {
+                return Task::none();
+            }
             if let Content::Player(player) = &mut window.content
                 && (player.menu.is_some() || player.sheet.is_some())
             {
@@ -1256,13 +1357,62 @@ impl Plaa {
                 player.sheet = None;
                 return Task::none();
             }
+            if let Some(mode) = window.player().and_then(|player| player.editor.mode) {
+                let control = match mode {
+                    Mode::Trim { .. } => Control::CancelTrim,
+                    Mode::Clips { .. } => Control::DoneEditing,
+                };
+                return self.control(id, control);
+            }
             if window.fullscreen {
                 return self.set_fullscreen(id, false);
             }
             return Task::none();
         }
-        if window.settings_open || window.address.is_some() {
+        if window.settings_open
+            || window.address.is_some()
+            || window.export.is_some()
+            || window.closing.is_some()
+        {
             return Task::none();
+        }
+        // Keys of their own while editing.
+        if let Some(player) = window.player()
+            && let Some(mode) = player.editor.mode
+            && !modifiers.command()
+        {
+            let position = player.player.position().as_secs_f64();
+            let control = match (mode, &key) {
+                (Mode::Trim { .. }, Key::Named(keyboard::key::Named::Enter)) => {
+                    Some(Control::ApplyTrim)
+                }
+                (Mode::Clips { .. }, Key::Named(keyboard::key::Named::Enter)) => {
+                    Some(Control::DoneEditing)
+                }
+                (
+                    Mode::Clips {
+                        selected: Some(clip),
+                    },
+                    Key::Named(keyboard::key::Named::Delete | keyboard::key::Named::Backspace),
+                ) => Some(Control::RemoveClip(clip)),
+                // The part kept starts or ends where the playhead is.
+                (Mode::Trim { to, .. }, Key::Character(character))
+                    if character.eq_ignore_ascii_case("i") && position < to =>
+                {
+                    Some(Control::TrimTo(position, to, position))
+                }
+                (Mode::Trim { from, .. }, Key::Character(character))
+                    if character.eq_ignore_ascii_case("o") && position > from =>
+                {
+                    Some(Control::TrimTo(from, position, position))
+                }
+                _ => None,
+            };
+            if let Some(control) = control {
+                return self
+                    .control(id, control)
+                    .chain(Task::done(Message::Control(id, Control::ScrubEnded)));
+            }
         }
         match shortcuts::action_for(&key, modifiers) {
             Some(action) => self.perform(id, action),
@@ -1283,10 +1433,25 @@ impl Plaa {
                 }
                 return iced::widget::operation::focus(ADDRESS_FIELD);
             }
-            Action::CloseWindow => return window::close(id),
+            Action::CloseWindow => {
+                if self.ask_before_closing(id, export::Closing::Window) {
+                    return Task::none();
+                }
+                return window::close(id);
+            }
             Action::Quit => {
-                self.save_positions();
-                return exit();
+                // Asked in the window that would lose something, if any.
+                let losing = self
+                    .windows
+                    .keys()
+                    .copied()
+                    .find(|window| self.would_lose(*window));
+                if let Some(losing) = losing
+                    && self.ask_before_closing(losing, export::Closing::Quit)
+                {
+                    return window::gain_focus(losing);
+                }
+                return self.quit();
             }
             Action::Settings => {
                 self.audio_devices = plaa_media::output_devices();
@@ -1305,6 +1470,20 @@ impl Plaa {
                     .get(&id)
                     .is_some_and(|window| window.fullscreen);
                 return self.set_fullscreen(id, !fullscreen);
+            }
+            Action::Trim
+            | Action::Split
+            | Action::RotateLeft
+            | Action::RotateRight
+            | Action::FlipHorizontal
+            | Action::FlipVertical
+            | Action::Undo
+            | Action::Redo
+            | Action::Revert
+            | Action::Export => {
+                let task = self.edit_action(id, action);
+                self.touch(id);
+                return task;
             }
             _ => {}
         }
@@ -1458,6 +1637,22 @@ impl Plaa {
         Task::none()
     }
 
+    /// Keeps where each file was left, and lets plaa go.
+    fn quit(&mut self) -> Task<Message> {
+        self.save_positions();
+        exit()
+    }
+
+    /// Takes window `id`'s status after a change, its overlay showing.
+    fn touch(&mut self, id: window::Id) {
+        let delay = self.settings.overlay_delay();
+        if let Some(player) = self.player_mut(id) {
+            player.refresh();
+            player.activity.touch();
+            player.refresh_overlay(delay);
+        }
+    }
+
     fn set_fullscreen(&mut self, id: window::Id, fullscreen: bool) -> Task<Message> {
         if let Some(window) = self.windows.get_mut(&id) {
             window.fullscreen = fullscreen;
@@ -1482,6 +1677,19 @@ impl Plaa {
             Control::Settings => return self.perform(id, Action::Settings),
             Control::Close => return window::close(id),
             Control::ToggleFullScreen => return self.perform(id, Action::FullScreen),
+            Control::Action(action) => return self.perform(id, action),
+            Control::TrimTo(..)
+            | Control::ApplyTrim
+            | Control::CancelTrim
+            | Control::SelectClip(_)
+            | Control::MoveClip(..)
+            | Control::RemoveClip(_)
+            | Control::TrimClip(_)
+            | Control::DoneEditing => {
+                let task = self.edit_control(id, control);
+                self.touch(id);
+                return task;
+            }
             Control::PlayItem(index) => return self.play_item(id, index),
             Control::TogglePip => return self.toggle_pip(id),
             Control::Previous => return self.previous(id),
@@ -1535,9 +1743,18 @@ impl Plaa {
                 let Some(player) = self.player_mut(id) else {
                     return Task::none();
                 };
-                let Some(picture) = player.player.snapshot() else {
+                let Some((width, height, rgba)) = player.player.snapshot() else {
                     return Task::none();
                 };
+                // As it shows: upright, and as edited.
+                let own = player.picture().map_or(0, |track| track.quarter_turns);
+                let shown = plaa_media::Picture {
+                    width,
+                    height,
+                    rgba,
+                }
+                .transformed(player.transform().after_turns(own));
+                let picture = (shown.width, shown.height, shown.rgba);
                 let name = screenshot_name(&player.source().name(), player.status.position);
                 return Task::perform(
                     crate::screenshot::save(picture, folder.join(name)),
@@ -1565,7 +1782,9 @@ impl Plaa {
             Control::SkipBy(seconds) => player.player.seek_by(seconds),
             Control::Hover(seconds) => {
                 match (seconds, &player.thumbnails) {
-                    (Some(seconds), Some(thumbnails)) => thumbnails.request(seconds),
+                    (Some(seconds), Some(thumbnails)) => {
+                        thumbnails.request(player.editor.source_of(seconds));
+                    }
                     // Gone, so pointing again shows no picture from before.
                     (None, _) => player.thumbnail = None,
                     _ => {}
@@ -1617,7 +1836,7 @@ impl Plaa {
 
     pub fn title(&self, id: window::Id) -> String {
         let base = match self.windows.get(&id).map(|window| &window.content) {
-            Some(Content::Player(player)) => player.title(),
+            Some(Content::Player(player)) => player.window_title(),
             _ => crate::fl!("app-name"),
         };
         if plaa_store::paths::PRODUCTION {
@@ -1739,6 +1958,25 @@ impl Plaa {
         } else {
             full()
         };
+        let exporting = match &window.exporting {
+            Some(exporting) => export::progress(id, exporting),
+            None => full(),
+        };
+        let export_dialog = match (window.export, window.player()) {
+            (Some(choice), Some(player)) => export::dialog(id, choice, player, &self.encoders),
+            _ => full(),
+        };
+        let closing = match window.closing {
+            Some(closing) => export::close_dialog(
+                id,
+                closing,
+                window.exporting.is_some(),
+                window
+                    .player()
+                    .map_or_else(String::new, PlayerWindow::title),
+            ),
+            None => full(),
+        };
         // Room for the transparent title bar on macOS, in the chrome
         // color, so the bar shows plaa's toolbar color behind its buttons.
         #[cfg(target_os = "macos")]
@@ -1757,7 +1995,15 @@ impl Plaa {
         } else {
             body
         };
-        scramble_ui::smooth::smooth(stack![body, notice, address, settings])
+        scramble_ui::smooth::smooth(stack![
+            body,
+            exporting,
+            notice,
+            address,
+            export_dialog,
+            settings,
+            closing
+        ])
     }
 }
 
@@ -1827,11 +2073,15 @@ impl Window {
 /// Remembers where `player` is, for its file or stream to start there
 /// next time. Live streams have nowhere to go back to.
 fn remember_position(positions: &mut Positions, player: &PlayerWindow) {
-    if player.info.as_ref().is_some_and(|info| info.seekable) {
+    if let Some(info) = player.info.as_ref().filter(|info| info.seekable) {
+        // In the file's own time, as edits are not kept.
+        let position = player
+            .editor
+            .source_of(player.player.position().as_secs_f64());
         positions.set(
             &position_key(player.source()),
-            player.player.position(),
-            player.status.duration,
+            Duration::from_secs_f64(position.max(0.0)),
+            info.duration,
         );
     }
 }

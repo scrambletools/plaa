@@ -1,5 +1,5 @@
-//! File dialogs: through the XDG desktop portal on Linux, and the
-//! system's own dialogs (through rfd) elsewhere.
+//! File dialogs, to open and to save: through the XDG desktop portal on
+//! Linux, and the system's own dialogs (through rfd) elsewhere.
 
 #[cfg(target_os = "linux")]
 use std::path::PathBuf;
@@ -72,6 +72,31 @@ mod portal {
         }
     }
 
+    /// Asks where to save a file, starting as `name` in `folder`.
+    /// Cancelling yields `None`.
+    pub async fn save_file(
+        title: String,
+        name: String,
+        folder: Option<PathBuf>,
+    ) -> Result<Option<PathBuf>, String> {
+        let request = SelectedFiles::save_file()
+            .title(title.as_str())
+            .current_name(name.as_str())
+            .current_folder::<&std::path::Path>(folder.as_deref())
+            .map_err(|error| error.to_string())?
+            .send()
+            .await
+            .map_err(|error| error.to_string())?;
+        match request.response() {
+            Ok(selected) => Ok(selected
+                .uris()
+                .first()
+                .and_then(|uri| file_uri_to_path(uri.as_str()))),
+            Err(ashpd::Error::Response(_)) => Ok(None),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+
     /// Asks for a folder, starting in `current`. Cancelling yields `None`.
     pub async fn choose_folder(
         title: String,
@@ -117,6 +142,23 @@ mod native {
             .into_iter()
             .map(|file| file.path().to_path_buf())
             .collect())
+    }
+
+    /// Asks where to save a file, starting as `name` in `folder`.
+    /// Cancelling yields `None`.
+    pub async fn save_file(
+        title: String,
+        name: String,
+        folder: Option<PathBuf>,
+    ) -> Result<Option<PathBuf>, String> {
+        let mut dialog = AsyncFileDialog::new().set_title(title).set_file_name(name);
+        if let Some(folder) = folder {
+            dialog = dialog.set_directory(folder);
+        }
+        Ok(dialog
+            .save_file()
+            .await
+            .map(|file| file.path().to_path_buf()))
     }
 
     /// Asks for a folder, starting in `current`. Cancelling yields `None`.

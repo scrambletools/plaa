@@ -3,6 +3,8 @@
 
 mod app;
 mod dialog;
+mod edit_bar;
+mod editing;
 mod format;
 mod i18n;
 #[cfg(unix)]
@@ -51,6 +53,15 @@ pub enum External {
     Thumbnail(iced::window::Id, plaa_media::Thumbnail),
     /// Media keys or the desktop asked something of what plays.
     Media(media::Command),
+    /// What a window's export says.
+    Export(iced::window::Id, plaa_media::export::ExportEvent),
+    /// The encoder an export of this format and size would use, once
+    /// found.
+    Encoder(
+        plaa_media::export::Format,
+        (u32, u32),
+        Option<plaa_media::export::Encoder>,
+    ),
     /// Something dragged over or dropped on a window, on Wayland.
     #[cfg(target_os = "linux")]
     Drag(smithay_clipboard::dnd::DragEvent),

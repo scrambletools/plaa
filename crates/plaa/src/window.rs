@@ -8,16 +8,20 @@ use std::time::{Duration, Instant};
 
 use iced::widget::{container, image, mouse_area, slider, space, stack, text};
 use iced::{Center, Element, Fill, Length, Theme};
+use plaa_media::info::Chapter;
 use plaa_media::subtitle::Cue;
 use plaa_media::web::Page;
-use plaa_media::{MediaInfo, Player, Quality, Source, Status, Thumbnails};
+use plaa_media::{MediaInfo, Picture, Player, Quality, Source, Status, Thumbnails, Transform};
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::dir::row;
 use scramble_ui::dropdown::{self, Entry};
 use scramble_ui::{Icon, Scheme, Type, button, column, icon, style};
 
+use crate::edit_bar::{ClipStrip, Still, TrimBar};
+use crate::editing::{Editor, Mode};
 use crate::format;
 use crate::playlist::Playlist;
+use crate::shortcuts::Action;
 use crate::timeline::{self, Timeline};
 
 /// The speeds the speed menu offers.
@@ -44,6 +48,7 @@ pub enum Menu {
     Tracks,
     Chapters,
     Quality,
+    Edit,
 }
 
 /// What the quality menu offers.
@@ -133,6 +138,14 @@ pub struct PlayerWindow {
     pub page: Option<Arc<Page>>,
     /// The quality asked for, where the source comes in several.
     pub quality: Quality,
+    /// The edit of the file, its history and what is being edited.
+    pub editor: Editor,
+    /// The file's chapters as they fall in the edit.
+    pub chapters: Vec<Chapter>,
+    /// Pictures along the file for the editing bars' filmstrips, by the
+    /// file's time, as they come and as they show.
+    pub strip: Vec<(f64, Arc<Picture>)>,
+    pub stills: Vec<Still>,
 }
 
 impl PlayerWindow {
@@ -165,6 +178,10 @@ impl PlayerWindow {
             opened: Instant::now(),
             page: None,
             quality: Quality::Best,
+            editor: Editor::default(),
+            chapters: Vec::new(),
+            strip: Vec::new(),
+            stills: Vec::new(),
         }
     }
 
@@ -180,6 +197,60 @@ impl PlayerWindow {
     /// The picture's track that shows.
     pub fn picture(&self) -> Option<&plaa_media::info::VideoTrack> {
         self.info.as_ref()?.picture(self.status.video)
+    }
+
+    /// How the edit turns and flips the picture.
+    pub fn transform(&self) -> Transform {
+        self.editor.transform()
+    }
+
+    /// How long the file lasts, if known.
+    pub fn file_duration(&self) -> Option<f64> {
+        self.info
+            .as_ref()
+            .and_then(|info| info.duration)
+            .map(|duration| duration.as_secs_f64())
+            .filter(|seconds| *seconds > 0.0)
+    }
+
+    /// Whether the file can be edited: a file, not a stream, of a known
+    /// length that plays.
+    pub fn can_edit(&self) -> bool {
+        matches!(self.source(), Source::File(_))
+            && self.error.is_none()
+            && self.info.as_ref().is_some_and(|info| info.seekable)
+            && self.file_duration().is_some()
+    }
+
+    /// Takes the chapters again after the edit changed.
+    pub fn refresh_chapters(&mut self) {
+        let chapters = self
+            .info
+            .as_ref()
+            .map_or(&[][..], |info| info.chapters.as_slice());
+        self.chapters = self.editor.chapters(chapters);
+    }
+
+    /// Notes a picture for the filmstrips, as it shows.
+    pub fn add_still(&mut self, seconds: f64, picture: Arc<Picture>) {
+        let at = self.strip.partition_point(|(time, _)| *time < seconds);
+        if self.strip.get(at).is_some_and(|(time, _)| *time == seconds) {
+            return;
+        }
+        self.stills
+            .insert(at, still(seconds, &picture, self.transform()));
+        self.strip.insert(at, (seconds, picture));
+    }
+
+    /// Turns the filmstrips' pictures again after the edit turned or
+    /// flipped the picture.
+    pub fn refresh_stills(&mut self) {
+        let transform = self.transform();
+        self.stills = self
+            .strip
+            .iter()
+            .map(|(seconds, picture)| still(*seconds, picture, transform))
+            .collect();
     }
 
     /// The name to show: for a stream, its title as the page, the stream
@@ -203,6 +274,16 @@ impl PlayerWindow {
         }
     }
 
+    /// The window's title: the name, marked while it has changes no
+    /// export has kept.
+    pub fn window_title(&self) -> String {
+        if self.editor.unexported() {
+            crate::fl!("title-edited", name = self.title())
+        } else {
+            self.title()
+        }
+    }
+
     /// Whether the floating overlay should show now: always for sound and
     /// while paused, else while the pointer moved lately inside the window,
     /// a menu is open or the timeline is dragged.
@@ -210,7 +291,11 @@ impl PlayerWindow {
         if !self.is_video() || self.status.paused || self.error.is_some() {
             return true;
         }
-        if self.menu.is_some() || self.dragging.is_some() || self.sheet.is_some() {
+        if self.menu.is_some()
+            || self.dragging.is_some()
+            || self.sheet.is_some()
+            || self.editor.mode.is_some()
+        {
             return true;
         }
         self.pointer_inside && self.activity.idle() < delay
@@ -291,6 +376,19 @@ pub enum Control {
     Activity,
     /// The wheel turned over the picture, by lines.
     Wheel(f32),
+    /// Does what a menu item or shortcut would.
+    Action(Action),
+    /// The trim bar keeps from and to these seconds, showing the third.
+    TrimTo(f64, f64, f64),
+    ApplyTrim,
+    CancelTrim,
+    SelectClip(Option<usize>),
+    /// Moves a clip to another place among them.
+    MoveClip(usize, usize),
+    RemoveClip(usize),
+    /// Trims one clip.
+    TrimClip(usize),
+    DoneEditing,
 }
 
 /// Everything the window's view needs besides its own state.
@@ -324,6 +422,7 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
     let picture = mouse_area(crate::video::view(
         &window.player,
         window.surface,
+        window.transform(),
         window.activity.clone(),
         !window.overlay_shown,
         Control::Activity,
@@ -377,6 +476,9 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
         ),
         space().width(Fill).into(),
     ];
+    if let Some(menu) = edit_menu(window) {
+        tools.push(menu);
+    }
     if window.is_video() {
         tools.push(component::tool(
             Icon::Photo,
@@ -432,27 +534,11 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
 /// items when there is a list, skip, the timeline, speed, volume, tracks
 /// and full screen.
 fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
+    if let Some(mode) = window.editor.mode {
+        return edit_bar(window, mode);
+    }
     let status = &window.status;
-    let playing = !status.paused;
-    let play_glyph = if status.ended {
-        Icon::Replay
-    } else if playing {
-        Icon::Pause
-    } else {
-        Icon::PlayArrow
-    };
-    let play_label = if playing {
-        crate::fl!("action-pause")
-    } else {
-        crate::fl!("action-play")
-    };
-    let play = component::tip(
-        button::icon_button(play_glyph)
-            .kind(button::Kind::Filled)
-            .always_filled()
-            .on_press(Control::TogglePlay),
-        play_label,
-    );
+    let play = play_button(window);
     let (previous, next) = if window.playlist.is_list() {
         (
             Some(component::tool(
@@ -492,12 +578,8 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
             Control::Scrub,
             Control::ScrubEnded,
         )
-        .chapters(
-            window
-                .info
-                .as_ref()
-                .map_or(&[][..], |info| info.chapters.as_slice()),
-        )
+        .chapters(&window.chapters)
+        .cuts(window.editor.cuts())
         .ab_loop(window.ab_loop)
         .buffered(window.source().is_url())
         .on_hover(Control::Hover)
@@ -584,6 +666,169 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
     row(controls).spacing(4).align_y(Center).width(Fill).into()
 }
 
+/// The play button, filled as the bars' main action.
+fn play_button<'a>(window: &PlayerWindow) -> Element<'a, Control> {
+    let status = &window.status;
+    let playing = !status.paused;
+    let glyph = if status.ended {
+        Icon::Replay
+    } else if playing {
+        Icon::Pause
+    } else {
+        Icon::PlayArrow
+    };
+    let label = if playing {
+        crate::fl!("action-pause")
+    } else {
+        crate::fl!("action-play")
+    };
+    component::tip(
+        button::icon_button(glyph)
+            .kind(button::Kind::Filled)
+            .always_filled()
+            .on_press(Control::TogglePlay),
+        label,
+    )
+}
+
+/// The bar in place of the playback controls while editing: the trim
+/// bar and its times, or the clips.
+fn edit_bar(window: &PlayerWindow, mode: Mode) -> Element<'_, Control> {
+    let duration = window
+        .status
+        .duration
+        .map_or(0.0, |duration| duration.as_secs_f64());
+    let long = duration >= 3600.0;
+    let time = |seconds: f64| -> Element<'_, Control> {
+        container(
+            text(format::precise_time(seconds, long))
+                .size(Type::LabelLarge.size())
+                .font(Type::LabelLarge.font(false))
+                .wrapping(text::Wrapping::None),
+        )
+        .padding([0, 4])
+        .into()
+    };
+    let height = style::SLIDER_HEIGHT;
+    let mut items: Vec<Element<'_, Control>> = vec![play_button(window)];
+    match mode {
+        Mode::Trim { clip, from, to } => {
+            let span = match clip.and_then(|clip| {
+                let edit = window.editor.edit()?;
+                let start = *edit.starts().get(clip)?;
+                Some((start, start + edit.clips()[clip].length()))
+            }) {
+                Some(span) => span,
+                None => (0.0, duration),
+            };
+            items.extend([
+                time(from),
+                TrimBar::new(
+                    &window.player,
+                    &window.editor,
+                    &window.stills,
+                    span,
+                    (from, to),
+                    Control::TrimTo,
+                    Control::Scrub,
+                    Control::ScrubEnded,
+                )
+                .height(height)
+                .into(),
+                time(to),
+                scramble_ui::button(button::Kind::Text, crate::fl!("common-cancel"))
+                    .on_press(Control::CancelTrim)
+                    .into(),
+                scramble_ui::button(button::Kind::Filled, crate::fl!("edit-trim-apply"))
+                    .on_press(Control::ApplyTrim)
+                    .into(),
+            ]);
+        }
+        Mode::Clips { selected } => {
+            let clips = window.editor.clips().map_or(1, <[_]>::len);
+            items.push(
+                ClipStrip::new(
+                    &window.player,
+                    &window.editor,
+                    &window.stills,
+                    selected,
+                    Control::SelectClip,
+                    Control::SeekTo,
+                    Control::MoveClip,
+                    Control::TrimClip,
+                )
+                .height(height)
+                .into(),
+            );
+            items.push(component::tool(
+                Icon::ContentCut,
+                crate::fl!("edit-split"),
+                Some(Control::Action(Action::Split)),
+            ));
+            items.push(component::tool(
+                Icon::Delete,
+                crate::fl!("edit-remove-clip"),
+                selected.filter(|_| clips > 1).map(Control::RemoveClip),
+            ));
+            items.push(
+                scramble_ui::button(button::Kind::Filled, crate::fl!("edit-done"))
+                    .on_press(Control::DoneEditing)
+                    .into(),
+            );
+        }
+    }
+    row(items).spacing(8).align_y(Center).width(Fill).into()
+}
+
+/// The edit menu: trimming and splitting, turning and flipping, undoing,
+/// and exporting.
+fn edit_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
+    if !window.can_edit() {
+        return None;
+    }
+    let item = |label: String, action: Action| Entry::item(label, Control::Action(action));
+    let mut entries = vec![
+        item(crate::fl!("edit-trim"), Action::Trim).icon(Icon::ContentCut),
+        item(crate::fl!("edit-split"), Action::Split).icon(Icon::ViewDay),
+    ];
+    if window.is_video() {
+        entries.extend([
+            Entry::divider(),
+            item(crate::fl!("edit-rotate-left"), Action::RotateLeft).icon(Icon::RotateLeft),
+            item(crate::fl!("edit-rotate-right"), Action::RotateRight).icon(Icon::RotateRight),
+            item(crate::fl!("edit-flip-horizontal"), Action::FlipHorizontal).icon(Icon::Flip),
+            item(crate::fl!("edit-flip-vertical"), Action::FlipVertical),
+        ]);
+    }
+    let editor = &window.editor;
+    if editor.can_undo() || editor.can_redo() || editor.is_edited() {
+        entries.push(Entry::divider());
+    }
+    if editor.can_undo() {
+        entries.push(item(crate::fl!("edit-undo"), Action::Undo).icon(Icon::Undo));
+    }
+    if editor.can_redo() {
+        entries.push(item(crate::fl!("edit-redo"), Action::Redo).icon(Icon::Redo));
+    }
+    if editor.is_edited() {
+        entries.push(item(crate::fl!("edit-revert"), Action::Revert).icon(Icon::ResetAll));
+    }
+    entries.extend([
+        Entry::divider(),
+        item(crate::fl!("edit-export"), Action::Export).icon(Icon::FileExport),
+    ]);
+    Some(
+        dropdown::icon_menu(Icon::MovieEdit, entries)
+            .size(button::Size::Small)
+            .tip(crate::fl!("action-edit"))
+            .selected(editor.is_edited())
+            .open(window.menu == Some(Menu::Edit), |open| {
+                Control::Menu(Menu::Edit, open)
+            })
+            .into(),
+    )
+}
+
 /// The color behind the sliders' handles: the bars' own.
 fn timeline_backdrop(theme: &Theme) -> iced::Color {
     Backdrop::ContainerLow.color(&Scheme::of(theme))
@@ -610,17 +855,17 @@ fn speed_menu(window: &PlayerWindow) -> Element<'_, Control> {
 
 /// The chapters to go to, when there are some.
 fn chapters_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
-    let info = window.info.as_ref()?;
-    if info.chapters.len() < 2 {
+    let chapters = &window.chapters;
+    if chapters.len() < 2 {
         return None;
     }
-    let long = info
+    let long = window
+        .status
         .duration
         .is_some_and(|duration| duration.as_secs() >= 3600);
     let current =
-        timeline::chapter_at(&info.chapters, window.shown_position()).map(|chapter| chapter.start);
-    let entries = info
-        .chapters
+        timeline::chapter_at(chapters, window.shown_position()).map(|chapter| chapter.start);
+    let entries = chapters
         .iter()
         .enumerate()
         .map(|(number, chapter)| {
@@ -1086,6 +1331,16 @@ fn inspector(window: &PlayerWindow) -> Element<'_, Control> {
         content,
         Length::Fixed(component::SIDE_SHEET_WIDTH),
     )
+}
+
+/// A filmstrip's picture, turned and flipped as `transform` says.
+fn still(seconds: f64, picture: &Picture, transform: Transform) -> Still {
+    let shown = picture.clone().transformed(transform);
+    Still {
+        seconds,
+        aspect: shown.width as f32 / shown.height.max(1) as f32,
+        handle: image::Handle::from_rgba(shown.width, shown.height, shown.rgba),
+    }
 }
 
 fn codec_label(track: &plaa_media::info::Track) -> String {

@@ -39,6 +39,16 @@ pub enum Action {
     NextChapter,
     AbLoop,
     PictureInPicture,
+    Trim,
+    Split,
+    RotateLeft,
+    RotateRight,
+    FlipHorizontal,
+    FlipVertical,
+    Undo,
+    Redo,
+    Revert,
+    Export,
 }
 
 /// Every action, its name in the settings file and its default
@@ -80,6 +90,16 @@ const ACTIONS: &[(Action, &str, &[&str])] = &[
         "picture-in-picture",
         &["Ctrl+Shift+P"],
     ),
+    (Action::Trim, "trim", &["Ctrl+T"]),
+    (Action::Split, "split", &["Ctrl+Y"]),
+    (Action::RotateLeft, "rotate-left", &["Ctrl+Shift+L"]),
+    (Action::RotateRight, "rotate-right", &["Ctrl+Shift+R"]),
+    (Action::FlipHorizontal, "flip-horizontal", &["Ctrl+Shift+H"]),
+    (Action::FlipVertical, "flip-vertical", &["Ctrl+Shift+V"]),
+    (Action::Undo, "undo", &["Ctrl+Z"]),
+    (Action::Redo, "redo", &["Ctrl+Shift+Z"]),
+    (Action::Revert, "revert", &[]),
+    (Action::Export, "export", &["Ctrl+E"]),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]

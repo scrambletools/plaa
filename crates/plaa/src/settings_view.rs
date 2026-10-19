@@ -627,7 +627,11 @@ impl Plaa {
                 self.settings.animations = on;
                 self.apply_looks();
             }
-            SettingsMessage::Hardware(on) => self.settings.hardware_decoding = on,
+            SettingsMessage::Hardware(on) => {
+                self.settings.hardware_decoding = on;
+                // Exports choose their encoders again.
+                self.forget_encoders();
+            }
             SettingsMessage::AudioDevice(device) => {
                 for window in self.windows.values() {
                     if let Some(player) = window.player() {

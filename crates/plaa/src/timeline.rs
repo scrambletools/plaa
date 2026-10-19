@@ -61,6 +61,8 @@ pub struct Timeline<'a, Message> {
     height: f32,
     style: StyleFn<'a>,
     chapters: &'a [Chapter],
+    /// Where an edit's clips meet.
+    cuts: Vec<f64>,
     ab_loop: Option<(f64, Option<f64>)>,
     on_hover: Option<HoverFn<'a, Message>>,
     /// The picture near where it is pointed at, and its shape.
@@ -89,6 +91,7 @@ impl<'a, Message> Timeline<'a, Message> {
             height: 16.0,
             style: Box::new(iced::widget::slider::default),
             chapters: &[],
+            cuts: Vec::new(),
             ab_loop: None,
             on_hover: None,
             thumbnail: None,
@@ -125,6 +128,12 @@ impl<'a, Message> Timeline<'a, Message> {
 
     pub fn chapters(mut self, chapters: &'a [Chapter]) -> Self {
         self.chapters = chapters;
+        self
+    }
+
+    /// Where an edit's clips meet, in seconds, marked as chapters are.
+    pub fn cuts(mut self, cuts: Vec<f64>) -> Self {
+        self.cuts = cuts;
         self
     }
 
@@ -427,9 +436,14 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
                 style.rail.backgrounds.0,
             );
         }
-        // Chapters part the rail, in the color of the gap by the handle.
-        for chapter in self.chapters {
-            let start = chapter.start.as_secs_f64();
+        // Chapters and cuts part the rail, in the color of the gap by the
+        // handle.
+        let starts = self
+            .chapters
+            .iter()
+            .map(|chapter| chapter.start.as_secs_f64())
+            .chain(self.cuts.iter().copied());
+        for start in starts {
             if start <= 0.0 || start >= self.duration {
                 continue;
             }

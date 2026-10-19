@@ -17,6 +17,16 @@ pub fn time(seconds: f64, long: bool) -> String {
     }
 }
 
+/// `seconds` as "1:02.3", to the tenth, or "1:01:02.3" when `long`.
+pub fn precise_time(seconds: f64, long: bool) -> String {
+    let tenths = if seconds.is_finite() {
+        (seconds.max(0.0) * 10.0).round() as u64
+    } else {
+        0
+    };
+    format!("{}.{}", time((tenths / 10) as f64, long), tenths % 10)
+}
+
 /// A playback speed, such as "1.25×".
 pub fn speed(speed: f64) -> String {
     let text = format!("{speed:.2}");

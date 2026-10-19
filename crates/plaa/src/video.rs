@@ -13,17 +13,19 @@ use iced::wgpu;
 use iced::widget::shader::{self, Action};
 use iced::{Element, Fill, Rectangle};
 use plaa_media::frame::{Layout, Matrix, Transfer};
-use plaa_media::{Player, SubtitlePicture, VideoFrame};
+use plaa_media::{Player, SubtitlePicture, Transform, VideoFrame};
 
 use crate::window::Activity;
 
-/// Draws `player`'s pictures, fitted inside the widget. `surface` tells
-/// windows apart, as every window's pictures share one pipeline. Pointer
-/// moves are noted in `activity`, and `on_activity` is sent when one
-/// should bring the hidden overlay back.
+/// Draws `player`'s pictures, fitted inside the widget, turned and
+/// flipped as `transform` says. `surface` tells windows apart, as every
+/// window's pictures share one pipeline. Pointer moves are noted in
+/// `activity`, and `on_activity` is sent when one should bring the hidden
+/// overlay back.
 pub fn view<'a, Message: Clone + 'a>(
     player: &'a Player,
     surface: u64,
+    transform: Transform,
     activity: Arc<Activity>,
     hide_cursor: bool,
     on_activity: Message,
@@ -31,6 +33,7 @@ pub fn view<'a, Message: Clone + 'a>(
     shader::Shader::new(Program {
         player,
         surface,
+        transform,
         activity,
         hide_cursor,
         on_activity,
@@ -43,6 +46,7 @@ pub fn view<'a, Message: Clone + 'a>(
 struct Program<'a, Message> {
     player: &'a Player,
     surface: u64,
+    transform: Transform,
     activity: Arc<Activity>,
     hide_cursor: bool,
     on_activity: Message,
@@ -78,6 +82,7 @@ impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
             surface: self.surface,
             frame: self.player.picture(),
             subtitle: self.player.subtitle_picture(),
+            transform: self.transform,
         }
     }
 
@@ -101,6 +106,8 @@ pub struct Primitive {
     frame: Option<Arc<VideoFrame>>,
     /// The picture subtitle showing over it.
     subtitle: Option<Arc<SubtitlePicture>>,
+    /// How an edit turns and flips the picture.
+    transform: Transform,
 }
 
 /// The size of the shader's `Uniforms`: 32 words.
@@ -109,6 +116,7 @@ const UNIFORMS: usize = 128;
 /// The values the shader reads, laid out as its `Uniforms`.
 fn uniforms(
     frame: &VideoFrame,
+    transform: Transform,
     extent: (f32, f32),
     srgb_target: bool,
     subtitle: Option<&SubtitlePicture>,
@@ -172,17 +180,26 @@ fn uniforms(
     } else {
         colors.scale.to_bits()
     };
-    words[19] = u32::from(frame.quarter_turns % 4);
+    let shown = transform.after_turns(frame.quarter_turns);
+    words[19] = u32::from(shown.turns);
     words[20] = layout;
     words[21] = wide;
     words[22] = transfer;
     words[23] = u32::from(colors.wide_gamut);
     words[24] = u32::from(srgb_target);
+    words[26] = u32::from(shown.mirrored);
     if let Some(subtitle) = subtitle.filter(|subtitle| {
         subtitle.canvas.0 > 0 && subtitle.canvas.1 > 0 && subtitle.width > 0 && subtitle.height > 0
     }) {
         let (width, height) = (subtitle.canvas.0 as f32, subtitle.canvas.1 as f32);
         words[25] = 1;
+        // Placed on the screen as without the edit, so they read upright,
+        // unless the edit turns the picture on its side.
+        words[27] = if transform.turns.is_multiple_of(2) {
+            u32::from(frame.quarter_turns % 4)
+        } else {
+            4
+        };
         words[28] = (subtitle.x as f32 / width).to_bits();
         words[29] = (subtitle.y as f32 / height).to_bits();
         words[30] = (subtitle.width as f32 / width).to_bits();
@@ -196,14 +213,14 @@ fn uniforms(
 }
 
 /// Half the fitted picture's size in clip space: the widget's whole width
-/// or height, keeping the picture's shape.
-fn fitted_extent(frame: &VideoFrame, bounds: &Rectangle) -> (f32, f32) {
+/// or height, keeping the picture's shape as it shows.
+fn fitted_extent(frame: &VideoFrame, transform: Transform, bounds: &Rectangle) -> (f32, f32) {
     let mut aspect = if frame.aspect.is_finite() && frame.aspect > 0.0 {
         frame.aspect as f32
     } else {
         frame.width as f32 / frame.height.max(1) as f32
     };
-    if frame.quarter_turns % 2 == 1 {
+    if transform.after_turns(frame.quarter_turns).turns % 2 == 1 {
         aspect = 1.0 / aspect;
     }
     if bounds.width <= 0.0 || bounds.height <= 0.0 {
@@ -232,7 +249,7 @@ impl shader::Primitive for Primitive {
             pipeline.surfaces.remove(&self.surface);
             return;
         };
-        let extent = fitted_extent(frame, bounds);
+        let extent = fitted_extent(frame, self.transform, bounds);
         let srgb = pipeline.srgb;
         let surface = pipeline
             .surfaces
@@ -254,7 +271,7 @@ impl shader::Primitive for Primitive {
         queue.write_buffer(
             &surface.uniforms,
             0,
-            &uniforms(frame, extent, srgb, subtitle),
+            &uniforms(frame, self.transform, extent, srgb, subtitle),
         );
     }
 
