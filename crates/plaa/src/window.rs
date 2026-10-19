@@ -358,14 +358,8 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
         }
         None => with_subtitles,
     };
-    // In full screen the toolbar stays away; the controls are enough.
-    let top: Element<'a, Control> = if context.fullscreen && component::floating_bars_enabled() {
-        space().into()
-    } else {
-        component::toolbar(toolbar(window, context))
-    };
     component::window_bars(
-        top,
+        component::toolbar(toolbar(window, context)),
         Some(component::toolbar(transport(window, context))),
         body,
         window.overlay_shown,
