@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.scrambletools.plaa</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>plaa</name>
+  <summary>Play video and audio files and streams</summary>
+
+  <developer id="io.github.scrambletools">
+    <name>Scramble Tools</name>
+  </developer>
+
+  <description>
+    <p>
+      plaa is a fast, lightweight media player, similar to QuickTime
+      Player and IINA. It plays nearly every video and audio format through
+      FFmpeg, decoding on the graphics card where it can.
+    </p>
+    <ul>
+      <li>One window per file, with controls that float over the picture and slide away while you watch</li>
+      <li>Audio and subtitle tracks, playback speed with the pitch kept, looping and frame stepping</li>
+      <li>Streams from the network, such as HLS, DASH and RTSP</li>
+      <li>HDR video shown on ordinary screens</li>
+      <li>Starts where you left off, and saves frames as pictures</li>
+      <li>Material 3 design, with colors from the system accent color</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.scrambletools.plaa.desktop</launchable>
+
+  <url type="homepage">https://github.com/scrambletools/plaa</url>
+  <url type="bugtracker">https://github.com/scrambletools/plaa/issues</url>
+  <url type="vcs-browser">https://github.com/scrambletools/plaa</url>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#b4a5f5</color>
+    <color type="primary" scheme_preference="dark">#3b2a8c</color>
+  </branding>
+
+  <content_rating type="oars-1.1"/>
+
+  <provides>
+    <binary>plaa</binary>
+  </provides>
+
+  <releases>
+    <release version="0.1.0" date="2026-10-18" type="development">
+      <description>
+        <p>The first build: playback with FFmpeg, the floating controls, tracks, subtitles and Settings.</p>
+      </description>
+    </release>
+  </releases>
+</component>

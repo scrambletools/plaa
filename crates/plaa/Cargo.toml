@@ -1,0 +1,41 @@
+[package]
+name = "plaa"
+description = "Fast, lightweight media player"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+iced = { version = "0.14", features = ["advanced", "image-without-codecs"] }
+png = "0.18"
+scramble-ui.workspace = true
+plaa-media.workspace = true
+plaa-store.workspace = true
+# The interface's text, from i18n/<language>/plaa.ftl (Project Fluent).
+i18n-embed = { version = "0.16", features = ["desktop-requester", "fluent-system"] }
+i18n-embed-fl = "0.10"
+rust-embed = { version = "8", features = ["debug-embed"] }
+toml = "1"
+
+# The file dialogs: the XDG desktop portal on Linux, the system's own
+# dialogs elsewhere, as prev has them.
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "file_chooser"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { version = "0.15", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+# The single instance's named pipe.
+interprocess = "2"
+windows-sys = { version = "0.61", features = ["Win32_System_Console", "Win32_UI_WindowsAndMessaging"] }
+
+[dev-dependencies]
+tempfile = "3"
+# Checks the video shader when tests run, as the graphics card would.
+naga = { version = "27", features = ["wgsl-in"] }

@@ -1,0 +1,36 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/scrambletools/plaa"
+
+[workspace.dependencies]
+plaa-media = { path = "crates/plaa-media", version = "0.1.0" }
+plaa-store = { path = "crates/plaa-store", version = "0.1.0" }
+# Material Design 3 for iced, shared by Scramble Tools apps. A git-ignored
+# .cargo/scramble-ui-local.toml can point it at a local checkout while
+# changing both (see the README).
+scramble-ui = { git = "https://github.com/scrambletools/scramble-ui", rev = "1b57adae70aab7efc4e57d1a777d295acc45b46b", version = "0.1.0" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# Right to left text in text inputs and the keyboard layout in use; the
+# copies live with scramble-ui, see its vendor/PATCHES.md.
+[patch.crates-io]
+iced_graphics = { git = "https://github.com/scrambletools/scramble-ui", rev = "1b57adae70aab7efc4e57d1a777d295acc45b46b" }
+iced_widget = { git = "https://github.com/scrambletools/scramble-ui", rev = "1b57adae70aab7efc4e57d1a777d295acc45b46b" }
+winit = { git = "https://github.com/scrambletools/scramble-ui", rev = "1b57adae70aab7efc4e57d1a777d295acc45b46b" }

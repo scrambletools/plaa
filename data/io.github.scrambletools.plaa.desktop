@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=plaa
+GenericName=Media Player
+Comment=Play video and audio files and streams
+Exec=plaa %U
+Icon=io.github.scrambletools.plaa
+Terminal=false
+Categories=AudioVideo;Audio;Video;Player;
+Keywords=video;audio;music;movie;player;stream;subtitles;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mpeg;video/mp2t;video/ogg;video/x-flv;video/x-ms-wmv;video/3gpp;video/3gpp2;video/x-m4v;video/dv;video/vnd.avi;video/x-ogm+ogg;video/x-theora+ogg;audio/mpeg;audio/mp4;audio/x-m4a;audio/aac;audio/flac;audio/x-flac;audio/ogg;audio/x-vorbis+ogg;audio/opus;audio/x-opus+ogg;audio/wav;audio/x-wav;audio/x-aiff;audio/x-ape;audio/x-wavpack;audio/x-ms-wma;audio/x-matroska;audio/webm;audio/ac3;audio/vnd.dts;audio/x-musepack;application/vnd.apple.mpegurl;application/x-mpegurl;
+StartupWMClass=io.github.scrambletools.plaa

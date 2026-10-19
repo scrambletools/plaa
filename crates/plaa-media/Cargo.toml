@@ -1,0 +1,17 @@
+[package]
+name = "plaa-media"
+description = "plaa's media engine: FFmpeg demuxing and decoding, audio output and the clock video follows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# FFmpeg through its C libraries: the system's on Linux, bundled with the
+# packages elsewhere.
+ffmpeg-next = { version = "9", default-features = false, features = ["codec", "format", "filter", "software-resampling", "software-scaling"] }
+cpal = "0.18"

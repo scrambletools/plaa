@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang libclang-dev pkg-config libfontconfig1-dev libfreetype-dev \
+            libxkbcommon-dev libwayland-dev libasound2-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev \
+            libswscale-dev libswresample-dev \
+            desktop-file-utils appstream
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: desktop-file-validate data/*.desktop
+      - run: appstreamcli validate --no-net data/*.metainfo.xml
+
+  macos:
+    # Apple Silicon, with Homebrew's FFmpeg; releases will bundle their own.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: FFmpeg
+        run: brew install ffmpeg pkgconf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: libclang for bindgen
+        run: echo "LIBCLANG_PATH=$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib" >>"$GITHUB_ENV"
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build --release -p plaa
+      - name: Check that it runs
+        run: target/release/plaa --version
+
+  windows:
+    runs-on: windows-2025
+    env:
+      # bindgen reads FFmpeg's headers through the runner's LLVM.
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      # A shared FFmpeg build, its headers, import libraries and DLLs.
+      FFMPEG_BUILD: ffmpeg-n8.0-latest-win64-gpl-shared-8.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: FFmpeg
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/$env:FFMPEG_BUILD.zip"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath $env:RUNNER_TEMP
+          $dir = Join-Path $env:RUNNER_TEMP $env:FFMPEG_BUILD
+          "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Join-Path $dir bin | Out-File -FilePath $env:GITHUB_PATH -Append
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build --release -p plaa
+      - name: Check that it runs
+        run: target\release\plaa.exe --version
+
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang libclang-dev pkg-config libfontconfig1-dev libfreetype-dev \
+            libxkbcommon-dev libwayland-dev libasound2-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev \
+            libswscale-dev libswresample-dev
+      - uses: dtolnay/rust-toolchain@1.95
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets
+
+  deny:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check all
