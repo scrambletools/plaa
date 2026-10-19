@@ -173,7 +173,9 @@ that flips, turns and sizes them for the encoder, and sound through one
 that resamples it and cuts it into the encoder's frames, filling gaps
 between parts. The encoder is the first of the system's that opens for
 the format and size, so a card that cannot take 8K H.264 leaves it to
-the processor; the dialog asks the same way, so it says which. What it
+the processor; the dialog asks the same way, so it says which. Ten bit
+pictures stay ten bits, but a card that encodes only eight, as AMD's
+with older drivers, takes them in eight unless they are HDR. What it
 writes goes to a hidden file beside the one chosen, renamed once done,
 and removed if it is stopped.
 

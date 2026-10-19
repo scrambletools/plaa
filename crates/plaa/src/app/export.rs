@@ -36,9 +36,9 @@ pub(crate) struct Exporting {
     edit: Option<Edit>,
 }
 
-/// An export's format and picture size, which the encoder it uses
-/// depends on.
-pub(crate) type Encoding = (Format, (u32, u32));
+/// An export's format, picture size and whether the picture is HDR,
+/// which the encoder it uses depends on.
+pub(crate) type Encoding = (Format, (u32, u32), bool);
 
 /// What closing waits to be told: a window, or plaa.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,9 +96,9 @@ impl Plaa {
         }
         let hardware = self.settings.hardware_decoding;
         std::thread::spawn(move || {
-            let (format, size) = encoding;
-            let found = plaa_media::export::encoder(format, size, hardware);
-            crate::post(External::Encoder(format, size, found));
+            let (format, size, hdr) = encoding;
+            let found = plaa_media::export::encoder(format, size, hdr, hardware);
+            crate::post(External::Encoder(encoding, found));
         });
     }
 
@@ -279,7 +279,7 @@ fn encoding(player: &PlayerWindow, choice: Choice) -> Option<Encoding> {
         shown,
         choice.lines,
     );
-    Some((choice.format, size))
+    Some((choice.format, size, track.hdr))
 }
 
 /// What an encoder runs on, as the dialog says: the graphics card's API,

@@ -55,11 +55,10 @@ pub enum External {
     Media(media::Command),
     /// What a window's export says.
     Export(iced::window::Id, plaa_media::export::ExportEvent),
-    /// The encoder an export of this format and size would use, once
-    /// found.
+    /// The encoder an export of this format, size and depth would use,
+    /// once found.
     Encoder(
-        plaa_media::export::Format,
-        (u32, u32),
+        (plaa_media::export::Format, (u32, u32), bool),
         Option<plaa_media::export::Encoder>,
     ),
     /// Something dragged over or dropped on a window, on Wayland.

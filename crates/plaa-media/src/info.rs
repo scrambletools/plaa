@@ -114,6 +114,8 @@ pub struct VideoTrack {
     /// A still picture, such as an album cover, not a video.
     pub cover: bool,
     pub pixel_format: String,
+    /// High dynamic range: PQ or HLG light.
+    pub hdr: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -266,6 +268,7 @@ impl MediaInfo {
                             .descriptor()
                             .map(|descriptor| descriptor.name().to_owned())
                             .unwrap_or_default(),
+                        hdr: ffi::is_hdr(&stream),
                     });
                 }
                 Type::Audio => {

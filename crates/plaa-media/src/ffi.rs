@@ -671,6 +671,20 @@ pub fn bit_depth(stream: &ffmpeg::format::stream::Stream) -> u32 {
     }
 }
 
+/// Whether a stream's pictures are HDR: their light PQ or HLG.
+pub fn is_hdr(stream: &ffmpeg::format::stream::Stream) -> bool {
+    use ffi::AVColorTransferCharacteristic::{AVCOL_TRC_ARIB_STD_B67, AVCOL_TRC_SMPTE2084};
+    // SAFETY: the stream's parameters live while it is borrowed.
+    unsafe {
+        let parameters = (*stream.as_ptr()).codecpar;
+        !parameters.is_null()
+            && matches!(
+                (*parameters).color_trc,
+                AVCOL_TRC_SMPTE2084 | AVCOL_TRC_ARIB_STD_B67
+            )
+    }
+}
+
 /// Gives an encoder about to open the colors of a stream's pictures:
 /// their range, primaries, transfer and matrix.
 pub fn copy_colors(stream: &ffmpeg::format::stream::Stream, encoder: &mut ffmpeg::codec::Context) {

@@ -910,9 +910,9 @@ impl Plaa {
                 self.export_event(id, event);
                 Task::none()
             }
-            Message::External(External::Encoder(format, size, found)) => {
-                self.probing.remove(&(format, size));
-                self.encoders.insert((format, size), found);
+            Message::External(External::Encoder(encoding, found)) => {
+                self.probing.remove(&encoding);
+                self.encoders.insert(encoding, found);
                 Task::none()
             }
             Message::ExportFormat(id, format) => {

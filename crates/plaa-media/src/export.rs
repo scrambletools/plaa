@@ -184,14 +184,14 @@ fn candidates(format: Format) -> Vec<Encoder> {
 
 /// The encoder an export to `format` of `size` pictures would use, on a
 /// graphics card only when `hardware` allows: the first that opens, as
-/// cards have sizes they cannot encode. Asking again gives the answer
-/// found the first time.
-pub fn encoder(format: Format, size: (u32, u32), hardware: bool) -> Option<Encoder> {
-    /// The encoder found for each format and size, with or without
-    /// graphics cards.
-    type Found = HashMap<(Format, (u32, u32), bool), Option<Encoder>>;
+/// cards have sizes they cannot encode, in ten bits for `hdr` pictures.
+/// Asking again gives the answer found the first time.
+pub fn encoder(format: Format, size: (u32, u32), hdr: bool, hardware: bool) -> Option<Encoder> {
+    /// The encoder found for each format, size and depth, with or
+    /// without graphics cards.
+    type Found = HashMap<(Format, (u32, u32), bool, bool), Option<Encoder>>;
     static FOUND: Mutex<Option<Found>> = Mutex::new(None);
-    let key = (format, size, hardware);
+    let key = (format, size, hdr, hardware);
     if let Some(found) = FOUND
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -206,7 +206,7 @@ pub fn encoder(format: Format, size: (u32, u32), hardware: bool) -> Option<Encod
         height: size.1.max(2),
         rate: ffmpeg::Rational::new(30, 1),
         time_base: ffmpeg::Rational::new(1, 30),
-        ten_bit: false,
+        ten_bit: hdr,
     };
     let chosen = candidates(format)
         .into_iter()
@@ -221,6 +221,7 @@ pub fn encoder(format: Format, size: (u32, u32), hardware: bool) -> Option<Encod
 }
 
 /// What a picture encoder is opened for.
+#[derive(Clone, Copy)]
 struct Picture {
     width: u32,
     height: u32,
@@ -713,6 +714,7 @@ fn video_side(
         .find(|track| track.track.index == index)
         .ok_or_else(|| failed("the picture's stream is gone"))?;
     let (width, height, aspect) = (track.width.max(1), track.height.max(1), track.aspect);
+    let hdr = track.hdr;
     let own = ffi::quarter_turns(&stream);
     let shown = transform.after_turns(own);
     let size = output_size((width, height), aspect, shown, job.lines);
@@ -726,18 +728,26 @@ fn video_side(
         time_base: stream.time_base(),
         ten_bit: ffi::bit_depth(&stream) > 8,
     };
+    // A card that will not take ten bits encodes eight, unless the
+    // picture is HDR, which needs them.
+    let eight_bit = Picture {
+        ten_bit: false,
+        ..picture
+    };
     let encoder = candidates(job.format)
         .into_iter()
         .filter(|candidate| job.hardware || !candidate.hardware)
         .find_map(|candidate| {
-            open_video(
-                candidate,
-                job.format,
-                &picture,
-                Some(&stream),
-                global_header,
-            )
-            .map(|opened| (candidate, opened))
+            let open = |picture: &Picture| {
+                open_video(candidate, job.format, picture, Some(&stream), global_header)
+            };
+            open(&picture)
+                .or_else(|| {
+                    (candidate.hardware && picture.ten_bit && !hdr)
+                        .then(|| open(&eight_bit))
+                        .flatten()
+                })
+                .map(|opened| (candidate, opened))
         });
     let Some((candidate, encoder)) = encoder else {
         return Err(failed("no encoder for this format opens"));
