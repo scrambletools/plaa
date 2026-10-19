@@ -28,3 +28,7 @@ The first build.
   in Settings, MPRIS on Linux, and the screen kept on while video plays.
 - Blu-ray, DVD and DVB picture subtitles, and ASS subtitles drawn as
   styled by libass.
+- Now Playing on macOS and the media flyout on Windows, besides MPRIS,
+  and files dropped on windows on Wayland.
+- The menu bar on macOS, and title bars in plaa's colors on macOS and
+  Windows.

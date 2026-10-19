@@ -56,8 +56,12 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   `Film.en.srt` or in a `Subs` folder.
 - **Picture in picture** (Ctrl+Shift+P): a small window kept over others
   in a corner, where the system lets apps place windows.
-- **The desktop's media controls**: media keys, panels and `playerctl`
-  through MPRIS on Linux.
+- **The system's media controls**: media keys, and what plays with its
+  cover in the system's panels, through MPRIS on Linux (and
+  `playerctl`), the media flyout on Windows and Now Playing on macOS.
+- **At home on each system**: the menu bar on macOS, title bars in
+  plaa's colors on macOS and Windows, and files dropped on windows on
+  Wayland as elsewhere.
 - **The screen stays on** while video plays, and the computer awake
   while sound does.
 - **Sound output** chosen in Settings, through the sound server on Linux
@@ -75,7 +79,7 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Media keys on Windows and macOS, yt-dlp, trimming and export, recording,
+yt-dlp, choosing a stream's quality, trimming and export, recording,
 a visualizer, casting, the AVB/Milan entity, the assistant and MCP,
 packages and translations. The [plan](docs/PLAN.md) has the order.
 

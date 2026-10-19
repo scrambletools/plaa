@@ -65,14 +65,14 @@ trimming and splitting, and Intel Macs.
    floating and docked controls, audio and subtitle tracks, text
    subtitles, the inspector, saved frames, resuming, Settings, one
    running instance, CI on the three systems.
-2. **Playback complete** (under way): done are playlists (files opened or
-   dropped together, M3U and PLS lists, the folder's other files),
-   chapters on the timeline, subtitle files beside the video, thumbnails
-   over the timeline, A-B loops, picture in picture, choosing the output
-   device, MPRIS, keeping the screen awake, picture subtitles and ASS
-   styling (libass). To come: SMTC and Now Playing, drag and drop on
-   Wayland (prev's smithay-clipboard patch), the macOS menu bar, title bar
-   colors on Windows and macOS.
+2. **Playback complete** (done): playlists (files opened or dropped
+   together, M3U and PLS lists, the folder's other files), chapters on
+   the timeline, subtitle files beside the video, thumbnails over the
+   timeline, A-B loops, picture in picture, choosing the output device,
+   the system's media controls (MPRIS, SMTC and Now Playing), keeping the
+   screen awake, picture subtitles and ASS styling (libass), drag and
+   drop on Wayland (prev's smithay-clipboard patch), the macOS menu bar,
+   and title bars in plaa's colors on Windows and macOS.
 3. **Network**: yt-dlp, choosing a stream's quality, a buffering
    indicator, recent addresses.
 4. **Edit and export**: trim, split, rotate and flip, then export to
@@ -178,7 +178,9 @@ next pixel, so it moves a pixel at a time at any width.
 | Single instance | Unix socket | named pipe | Unix socket |
 | File dialogs | XDG desktop portal (ashpd) | rfd | rfd |
 | Sound | cpal (PulseAudio protocol to PipeWire or PulseAudio, else ALSA) | cpal (WASAPI) | cpal (Core Audio) |
-| Media keys, now playing | MPRIS over D-Bus (zbus) | SMTC, to come | Now Playing, to come |
+| Media keys, now playing | MPRIS over D-Bus (zbus) | SMTC, on a window never shown (windows) | MPNowPlayingInfoCenter and MPRemoteCommandCenter (objc2) |
+| Menus and title bar | the window manager's | the system title bar, dark or light as plaa is | a menu bar (muda), the title bar transparent over plaa's chrome |
+| Drag and drop | winit on X11; prev's patched smithay-clipboard on Wayland | winit | winit |
 | Screen kept on | the screen saver's D-Bus service, else logind's idle lock (keepawake) | execution state (keepawake) | power assertions (keepawake) |
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
 | FFmpeg | the system's | bundled | bundled |
