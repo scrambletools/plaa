@@ -649,17 +649,64 @@ pub(crate) fn pick_audio(info: &MediaInfo, languages: &[String]) -> Option<usize
 
 /// The subtitles to show: text ones in a preferred language, else ones
 /// the file marks forced or default. None when nothing asks for them.
+/// The subtitles to show at first: in a preferred language, a file beside
+/// the video before the video's own; else a file beside the video, as it
+/// was put there to be shown; else the video's forced or default track.
 pub(crate) fn pick_subtitles(info: &MediaInfo, languages: &[String]) -> Option<usize> {
-    let tracks: Vec<_> = info
-        .subtitles
-        .iter()
-        .filter(|track| track.text)
+    let text = || info.subtitles.iter().filter(|track| track.text);
+    let files: Vec<_> = text()
+        .filter(|track| track.file.is_some())
         .map(|track| &track.track)
         .collect();
+    let own: Vec<_> = text()
+        .filter(|track| track.file.is_none())
+        .map(|track| &track.track)
+        .collect();
+    let tracks: Vec<_> = files.iter().chain(&own).copied().collect();
     by_language(&tracks, languages)
-        .or_else(|| tracks.iter().find(|track| track.forced).copied())
-        .or_else(|| tracks.iter().find(|track| track.default).copied())
+        .or_else(|| files.first().copied())
+        .or_else(|| own.iter().find(|track| track.forced).copied())
+        .or_else(|| own.iter().find(|track| track.default).copied())
         .map(|track| track.index)
+}
+
+/// Whether `code` is an ISO 639 code plaa knows, two or three letters,
+/// perhaps with a region as in `pt-BR`.
+pub fn is_language_code(code: &str) -> bool {
+    let code = code.to_ascii_lowercase();
+    let base = code.split(['-', '_']).next().unwrap_or("");
+    LANGUAGE_CODES
+        .iter()
+        .any(|(two, three)| *two == base || three.split('/').any(|three| three == base))
+}
+
+/// A subtitle file's codec and all its cues, read at once: such files are
+/// small. None when it holds no text subtitles.
+pub(crate) fn read_subtitle_file(path: &std::path::Path) -> Option<(info::Track, Vec<Cue>)> {
+    let mut input = ffmpeg::format::input(path).ok()?;
+    let stream = input.streams().best(ffmpeg::media::Type::Subtitle)?;
+    let index = stream.index();
+    let codec = stream.parameters().id();
+    let track = info::Track {
+        codec: codec.name().to_owned(),
+        codec_name: ffmpeg::codec::decoder::find(codec)
+            .map(|decoder| decoder.description().to_owned())
+            .unwrap_or_default(),
+        ..info::Track::default()
+    };
+    // Its times count from the video's start, whatever the video's own
+    // timestamps start at.
+    let mut decoder = SubtitleDecoder::new(&input, index, 0.0).ok()?;
+    let mut cues = crate::subtitle::Cues::default();
+    for (stream, packet) in input.packets() {
+        if stream.index() == index {
+            for cue in decoder.decode(&packet) {
+                cues.add(cue);
+            }
+        }
+    }
+    let cues = cues.into_vec();
+    (!cues.is_empty()).then_some((track, cues))
 }
 
 fn by_language<'a>(tracks: &[&'a info::Track], languages: &[String]) -> Option<&'a info::Track> {

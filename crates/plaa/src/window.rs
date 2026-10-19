@@ -497,9 +497,15 @@ fn tracks_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
                 .checked(window.status.subtitles.is_none()),
         );
         for (number, track) in subtitles.iter().enumerate() {
+            // A file beside the video is known by its name.
+            let file = track
+                .file
+                .as_ref()
+                .and_then(|file| file.file_name())
+                .map(|name| name.to_string_lossy().into_owned());
             entries.push(
                 Entry::item(
-                    format::track_name(&track.track, number + 1, None),
+                    format::track_name(&track.track, number + 1, file.as_deref()),
                     Control::Subtitles(Some(track.track.index)),
                 )
                 .checked(window.status.subtitles == Some(track.track.index)),

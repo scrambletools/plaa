@@ -17,7 +17,7 @@ use crate::decode::{self, Picture};
 use crate::frame::{self, VideoFrame};
 use crate::info::MediaInfo;
 use crate::queue::{Item, PacketQueue};
-use crate::subtitle::{Cue, Cues};
+use crate::subtitle::{self, Cue, Cues};
 
 /// What to open: a file, or an address FFmpeg reads, such as an HTTP or
 /// RTSP stream.
@@ -158,6 +158,9 @@ pub(crate) struct Shared {
     pub decoded: Mutex<(u64, f64)>,
     /// Where the timeline's handle is while it is dragged.
     pub scrub_to: Mutex<Option<f64>>,
+    /// The cues of the subtitle file beside the video that shows, all read
+    /// at once, in place of the video's own.
+    pub file_cues: Mutex<Option<Arc<Vec<Cue>>>>,
     /// Set to stop every thread, and to cut FFmpeg's reads short.
     pub stop: Arc<AtomicBool>,
     /// The playback speed, as f64 bits.
@@ -236,6 +239,7 @@ impl Player {
             target: Mutex::new(None),
             decoded: Mutex::new((0, 0.0)),
             scrub_to: Mutex::new(None),
+            file_cues: Mutex::new(None),
             stop: Arc::new(AtomicBool::new(false)),
             speed: AtomicU64::new(1.0f64.to_bits()),
             state: Mutex::new(State::default()),
@@ -465,6 +469,15 @@ impl Player {
     /// The subtitle text showing now.
     pub fn subtitle(&self) -> Option<Cue> {
         let now = self.shared.clock.now();
+        let file = self
+            .shared
+            .file_cues
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        if let Some(cues) = file {
+            return subtitle::showing(&cues, now).cloned();
+        }
         self.shared.cues().at(now).cloned()
     }
 
@@ -555,7 +568,12 @@ fn read(
             return;
         }
     };
-    let info = Arc::new(MediaInfo::read(&input));
+    let mut info = MediaInfo::read(&input);
+    let subtitle_files = match &source {
+        Source::File(path) => read_subtitle_files(path, &mut info),
+        Source::Url(_) => Vec::new(),
+    };
+    let info = Arc::new(info);
     let start = decode::start_seconds(&input);
 
     // The output opens before the decoders, which resample to its format.
@@ -600,10 +618,22 @@ fn read(
         }
     }
     let subtitle_stream = decode::pick_subtitles(&info, &options.subtitle_languages);
+    let mut file_subtitles = None;
     if let Some(index) = subtitle_stream {
-        decoders.subtitles = decode::SubtitleDecoder::new(&input, index, start)
-            .ok()
-            .map(|decoder| (index, decoder));
+        match subtitle_file(&subtitle_files, index) {
+            Some(cues) => {
+                *shared
+                    .file_cues
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner) = Some(cues);
+                file_subtitles = Some(index);
+            }
+            None => {
+                decoders.subtitles = decode::SubtitleDecoder::new(&input, index, start)
+                    .ok()
+                    .map(|decoder| (index, decoder));
+            }
+        }
     }
     let cover = info
         .cover()
@@ -615,7 +645,7 @@ fn read(
         state.has_video = decoders.video.is_some();
         state.has_audio = decoders.audio.is_some();
         state.audio = audio_index;
-        state.subtitles = decoders.subtitles.as_ref().map(|(index, _)| *index);
+        state.subtitles = file_subtitles.or(decoders.subtitles.as_ref().map(|(index, _)| *index));
     }
     if decoders.video.is_none() && decoders.audio.is_none() {
         events(Event::Failed(
@@ -740,6 +770,18 @@ fn read(
                 }
                 Command::SelectSubtitles(index) => {
                     shared.cues().clear();
+                    let file = index.and_then(|index| subtitle_file(&subtitle_files, index));
+                    let chosen_file = file.is_some();
+                    *shared
+                        .file_cues
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner) = file;
+                    // A file's cues are all there already.
+                    if chosen_file {
+                        decoders.subtitles = None;
+                        shared.state().subtitles = index;
+                        continue;
+                    }
                     decoders.subtitles = index.and_then(|index| {
                         decode::SubtitleDecoder::new(&input, index, start)
                             .ok()
@@ -948,6 +990,45 @@ fn arrived(shared: &Shared, serial: u64, target: f64) -> bool {
             .audio_output()
             .is_none_or(|output| output.reached(serial))
     }
+}
+
+/// Where subtitle files beside a video are numbered from among its tracks,
+/// past any stream a file has.
+pub const SUBTITLE_FILE_TRACKS: usize = 1 << 20;
+
+/// Reads the subtitle files beside the video at `path` and lists them
+/// among `info`'s subtitle tracks. Returns their cues, by their track
+/// number less `SUBTITLE_FILE_TRACKS`.
+fn read_subtitle_files(path: &Path, info: &mut MediaInfo) -> Vec<Arc<Vec<Cue>>> {
+    let stem = path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut all = Vec::new();
+    for file in subtitle::beside(path) {
+        let Some((mut track, cues)) = decode::read_subtitle_file(&file) else {
+            continue;
+        };
+        let (language, forced) = subtitle::file_language(&stem, &file, decode::is_language_code);
+        track.index = SUBTITLE_FILE_TRACKS + all.len();
+        track.language = language;
+        track.forced = forced;
+        info.subtitles.push(crate::info::SubtitleTrack {
+            track,
+            text: true,
+            file: Some(file),
+        });
+        all.push(Arc::new(cues));
+    }
+    all
+}
+
+/// The cues of subtitle track `index`, when it is a file's.
+fn subtitle_file(files: &[Arc<Vec<Cue>>], index: usize) -> Option<Arc<Vec<Cue>>> {
+    index
+        .checked_sub(SUBTITLE_FILE_TRACKS)
+        .and_then(|number| files.get(number))
+        .cloned()
 }
 
 /// Notices the end of playback: everything read, decoded and played,

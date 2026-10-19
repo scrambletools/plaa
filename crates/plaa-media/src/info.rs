@@ -94,6 +94,9 @@ pub struct SubtitleTrack {
     pub track: Track,
     /// Text subtitles, rather than pictures such as DVD and Blu-ray ones.
     pub text: bool,
+    /// The file beside the video the subtitles come from, rather than the
+    /// video's own.
+    pub file: Option<std::path::PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -231,7 +234,11 @@ impl MediaInfo {
                 }
                 Type::Subtitle => {
                     let text = codec.is_some_and(|codec| is_text_subtitle(codec.id()));
-                    info.subtitles.push(SubtitleTrack { track, text });
+                    info.subtitles.push(SubtitleTrack {
+                        track,
+                        text,
+                        file: None,
+                    });
                 }
                 _ => {}
             }
