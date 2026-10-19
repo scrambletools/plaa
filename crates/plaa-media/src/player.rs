@@ -16,8 +16,10 @@ use crate::clock::Clock;
 use crate::decode::{self, Picture};
 use crate::frame::{self, VideoFrame};
 use crate::info::MediaInfo;
+use crate::inputs::{self, Inputs, SOUND_TRACKS};
 use crate::queue::{Item, PacketQueue};
 use crate::subtitle::{self, Cue, Cues, PictureCues, SubtitlePicture};
+use crate::web::{Entry, Page};
 
 /// What to open: a file, or an address FFmpeg reads, such as an HTTP or
 /// RTSP stream.
@@ -56,7 +58,7 @@ impl Source {
         }
     }
 
-    fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Path {
         match self {
             Source::File(path) => path,
             Source::Url(url) => Path::new(url),
@@ -86,6 +88,11 @@ pub struct Options {
     pub audio_device: Option<String>,
     /// Which version to play, where the source offers several.
     pub quality: Quality,
+    /// Reads web pages with yt-dlp, when it is installed.
+    pub web: bool,
+    /// The web page yt-dlp read for the source already, so opening it
+    /// again, as in another quality, does not ask it again.
+    pub page: Option<Arc<Page>>,
 }
 
 /// Which of a source's versions to play, as an HLS stream's qualities.
@@ -113,6 +120,8 @@ impl Default for Options {
             subtitle_languages: Vec::new(),
             audio_device: None,
             quality: Quality::Best,
+            web: true,
+            page: None,
         }
     }
 }
@@ -131,6 +140,15 @@ pub enum Event {
     Decoding(Option<&'static str>),
     /// The audio output could not open, so the file plays silently.
     NoSound(String),
+    /// The source is a web page yt-dlp read: what it says of itself, and
+    /// the qualities it comes in.
+    Page(Arc<Page>),
+    /// The source is a list of web pages, such as a playlist, for the
+    /// interface to play one at a time.
+    List(Vec<Entry>),
+    /// The source looks like a web page, and plaa reads those with
+    /// yt-dlp, which is not installed.
+    NeedsYtDlp,
     /// Playback reached the end.
     Ended,
 }
@@ -205,6 +223,8 @@ pub(crate) struct Shared {
     pub stop: Arc<AtomicBool>,
     /// The playback speed, as f64 bits.
     pub speed: AtomicU64,
+    /// The quality to choose, which may change until the source is open.
+    pub quality: Mutex<Quality>,
     pub state: Mutex<State>,
 }
 
@@ -259,6 +279,10 @@ impl Shared {
         self.stop.load(Ordering::Relaxed)
     }
 
+    pub fn quality(&self) -> Quality {
+        *self.quality.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     /// Where exact seeking of `serial` lands, if it does.
     pub fn target(&self, serial: u64) -> Option<f64> {
         let target = *self.target.lock().unwrap_or_else(PoisonError::into_inner);
@@ -297,6 +321,7 @@ impl Player {
             file_cues: Mutex::new(None),
             stop: Arc::new(AtomicBool::new(false)),
             speed: AtomicU64::new(1.0f64.to_bits()),
+            quality: Mutex::new(options.quality),
             state: Mutex::new(State::default()),
         });
         let (commands, receiver) = mpsc::channel();
@@ -447,6 +472,17 @@ impl Player {
         let speed = speed.clamp(0.1, 16.0);
         self.shared.speed.store(speed.to_bits(), Ordering::Relaxed);
         self.shared.clock.set_rate(speed);
+    }
+
+    /// The quality to choose among the source's, if it has yet to choose:
+    /// for when the screen it shows on is known only after it starts
+    /// opening.
+    pub fn prefer(&self, quality: Quality) {
+        *self
+            .shared
+            .quality
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = quality;
     }
 
     /// Shows picture stream `stream`, as another of the source's variants,
@@ -676,13 +712,27 @@ impl Decoders {
         }
     }
 
-    /// The media time the source has been read up to: as its streams are
-    /// read in step, the latest packet's, as a stream with nothing for a
-    /// while would hold back the earliest.
+    /// The media time the source has been read up to. An input's streams
+    /// are read in step, so for one input, the latest packet's, as a stream
+    /// with nothing for a while would hold back the earliest. Inputs read
+    /// apart get as far as the one behind.
     fn read_to(&self) -> Option<f64> {
-        self.queues()
-            .filter_map(|queue| queue.end())
-            .reduce(f64::max)
+        if self.sound_apart() {
+            self.queues().try_fold(f64::INFINITY, |earliest, queue| {
+                Some(earliest.min(queue.end()?))
+            })
+        } else {
+            self.queues()
+                .filter_map(|queue| queue.end())
+                .reduce(f64::max)
+        }
+    }
+
+    /// Whether the sound plays from an input of its own.
+    fn sound_apart(&self) -> bool {
+        self.audio
+            .as_ref()
+            .is_some_and(|(index, ..)| *index >= SOUND_TRACKS)
     }
 
     fn stop_audio(&mut self) {
@@ -706,14 +756,17 @@ impl Decoders {
 
     /// Lets the reader skip every stream nothing plays, which over a
     /// network is not fetched at all: an HLS stream's other qualities.
-    fn skip_unused(&self, input: &mut ffmpeg::format::context::Input) {
+    fn skip_unused(&self, inputs: &mut Inputs) {
         let playing = [
             self.video.as_ref().map(|(index, ..)| *index),
             self.audio.as_ref().map(|(index, ..)| *index),
             self.subtitles.as_ref().map(|(index, _)| *index),
         ];
-        for index in 0..input.nb_streams() as usize {
-            crate::ffi::set_skipped(input, index, !playing.contains(&Some(index)));
+        for (input, first, _) in inputs.each_mut() {
+            for index in 0..input.nb_streams() as usize {
+                let skipped = !playing.contains(&Some(first + index));
+                crate::ffi::set_skipped(input, index, skipped);
+            }
         }
     }
 }
@@ -727,36 +780,24 @@ fn read(
     commands: Receiver<Command>,
     events: Box<dyn Fn(Event) + Send>,
 ) {
-    let stop = shared.stop.clone();
-    let mut dictionary = ffmpeg::Dictionary::new();
-    if source.is_url() {
-        dictionary.set("reconnect", "1");
-        dictionary.set("reconnect_streamed", "1");
-        dictionary.set("rw_timeout", "15000000");
-        dictionary.set("user_agent", concat!("plaa/", env!("CARGO_PKG_VERSION")));
-    }
-    let mut input = match ffmpeg::format::input_with_interrupt_and_dictionary(
-        source.path(),
-        move || stop.load(Ordering::Relaxed),
-        dictionary,
-    ) {
-        Ok(input) => input,
-        Err(error) => {
-            if !shared.stopping() {
-                events(Event::Failed(describe(&error)));
-            }
-            return;
-        }
+    let Some(opened) = inputs::open(&source, &options, &shared, &*events) else {
+        return;
     };
-    let mut info = MediaInfo::read(&input);
+    let mut inputs = opened.inputs;
+    let mut info = MediaInfo::read(&inputs.main);
+    let sound = inputs
+        .sound
+        .as_ref()
+        .map(|(sound, _)| MediaInfo::read(sound));
+    inputs::merge(&mut info, sound, opened.page.as_deref());
     let subtitle_files = match &source {
         Source::File(path) => read_subtitle_files(path, &mut info),
         Source::Url(_) => Vec::new(),
     };
     let info = Arc::new(info);
-    let start = decode::start_seconds(&input);
+    let start = inputs.start;
 
-    let video_stream = decode::pick_video(&info, options.quality);
+    let video_stream = decode::pick_video(&info, shared.quality());
     // The output opens before the decoders, which resample to its format.
     let audio_stream = decode::pick_audio(&info.audio_with(video_stream), &options.audio_languages);
     let mut output = None;
@@ -768,7 +809,14 @@ fn read(
             options.audio_device.as_deref(),
         ) {
             Ok(opened) => output = Some(opened),
-            Err(error) => events(Event::NoSound(error.to_string())),
+            Err(error) => {
+                events(Event::NoSound(error.to_string()));
+                output = Some(audio::Output::silent(
+                    shared.clock.clone(),
+                    options.volume,
+                    options.muted,
+                ));
+            }
         }
     }
     *shared.audio.lock().unwrap_or_else(PoisonError::into_inner) =
@@ -781,23 +829,20 @@ fn read(
     };
     start_video(
         video_stream,
-        &input,
+        &inputs.main,
         start,
         options.hardware,
         &shared,
         &mut decoders,
         &events,
     );
-    let mut audio_index = None;
-    if let (Some(index), Some(output)) = (audio_stream, &output) {
-        match decode::spawn_audio(&input, index, start, output.shared.clone(), shared.clone()) {
-            Ok((queue, thread)) => {
-                decoders.audio = Some((index, queue, thread));
-                audio_index = Some(index);
-            }
-            Err(error) => eprintln!("plaa: audio stream {index}: {error}"),
-        }
-    }
+    start_audio(
+        audio_stream,
+        &inputs,
+        output.as_ref(),
+        &shared,
+        &mut decoders,
+    );
     let subtitle_stream = decode::pick_subtitles(&info, &options.subtitle_languages);
     // The frame picture subtitles are placed in, unless they say: the
     // video's.
@@ -807,7 +852,7 @@ fn read(
         .find(|track| !track.cover)
         .map_or((1920, 1080), |track| (track.width, track.height));
     let showing = Subtitles {
-        input: &input,
+        input: &inputs.main,
         info: &info,
         start,
         canvas,
@@ -816,15 +861,13 @@ fn read(
     .choose(subtitle_stream, &shared, &mut decoders);
     let cover = info
         .cover()
-        .and_then(|track| decode::cover(&input, track.track.index))
+        .and_then(|track| decode::cover(&inputs.main, track.track.index))
+        .or(opened.thumbnail)
         .map(Arc::new);
-    decoders.skip_unused(&mut input);
+    decoders.skip_unused(&mut inputs);
     {
         let mut state = shared.state();
         state.info = Some(info.clone());
-        state.has_video = decoders.video.is_some();
-        state.has_audio = decoders.audio.is_some();
-        state.audio = audio_index;
         state.subtitles = showing;
     }
     if decoders.video.is_none() && decoders.audio.is_none() {
@@ -844,14 +887,7 @@ fn read(
     shared.clock.wait();
     shared.clock.set_paused(options.paused);
     if let Some(at) = options.start.filter(|_| info.seekable) {
-        seek(
-            &mut input,
-            &shared,
-            &mut decoders,
-            at.as_secs_f64(),
-            true,
-            start,
-        );
+        seek(&mut inputs, &shared, &mut decoders, at.as_secs_f64(), true);
     }
 
     let mut read_all = false;
@@ -887,7 +923,7 @@ fn read(
             && now >= to
             && now - played < 0.5
         {
-            seek(&mut input, &shared, &mut decoders, from, true, start);
+            seek(&mut inputs, &shared, &mut decoders, from, true);
             read_all = false;
             announced_end = false;
             shared.state().read_all = false;
@@ -895,7 +931,7 @@ fn read(
         played = shared.clock.now();
         if info.seekable
             && scrub.is_some()
-            && steer(&mut scrub, &mut input, &shared, &mut decoders, start)
+            && steer(&mut scrub, &mut inputs, &shared, &mut decoders)
         {
             read_all = false;
             announced_end = false;
@@ -918,7 +954,7 @@ fn read(
             match command {
                 Command::Seek { position, exact } => {
                     if info.seekable {
-                        seek(&mut input, &shared, &mut decoders, position, exact, start);
+                        seek(&mut inputs, &shared, &mut decoders, position, exact);
                         read_all = false;
                         announced_end = false;
                         shared.state().read_all = false;
@@ -932,7 +968,7 @@ fn read(
                             .lock()
                             .unwrap_or_else(PoisonError::into_inner) = None;
                         shared.clock.hold(false);
-                    } else if steer(&mut scrub, &mut input, &shared, &mut decoders, start) {
+                    } else if steer(&mut scrub, &mut inputs, &shared, &mut decoders) {
                         read_all = false;
                         announced_end = false;
                         shared.state().read_all = false;
@@ -946,7 +982,7 @@ fn read(
                     decoders.stop_video();
                     start_video(
                         Some(index),
-                        &input,
+                        &inputs.main,
                         start,
                         options.hardware,
                         &shared,
@@ -963,36 +999,28 @@ fn read(
                         decoders.stop_audio();
                         start_audio(
                             decode::pick_audio(&tracks, &options.audio_languages),
-                            &input,
-                            start,
+                            &inputs,
                             output.as_ref(),
                             &shared,
                             &mut decoders,
                         );
                     }
-                    decoders.skip_unused(&mut input);
+                    decoders.skip_unused(&mut inputs);
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
-                        seek(&mut input, &shared, &mut decoders, now, true, start);
+                        seek(&mut inputs, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
                 }
                 Command::SelectAudio(index) => {
                     decoders.stop_audio();
-                    start_audio(
-                        index,
-                        &input,
-                        start,
-                        output.as_ref(),
-                        &shared,
-                        &mut decoders,
-                    );
-                    decoders.skip_unused(&mut input);
+                    start_audio(index, &inputs, output.as_ref(), &shared, &mut decoders);
+                    decoders.skip_unused(&mut inputs);
                     // Back to where it was, so the new track starts in step.
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
-                        seek(&mut input, &shared, &mut decoders, now, true, start);
+                        seek(&mut inputs, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
@@ -1006,7 +1034,7 @@ fn read(
                         });
                     let playing = shared.state().audio.or(audio_stream);
                     // The old stream closes before the new one opens.
-                    output = None;
+                    drop(output.take());
                     match audio::Output::open(
                         shared.clock.clone(),
                         volume,
@@ -1014,29 +1042,26 @@ fn read(
                         device.as_deref(),
                     ) {
                         Ok(opened) => output = Some(opened),
-                        Err(error) => events(Event::NoSound(error.to_string())),
+                        Err(error) => {
+                            events(Event::NoSound(error.to_string()));
+                            output =
+                                Some(audio::Output::silent(shared.clock.clone(), volume, muted));
+                        }
                     }
                     *shared.audio.lock().unwrap_or_else(PoisonError::into_inner) =
                         output.as_ref().map(|output| output.shared.clone());
-                    start_audio(
-                        playing,
-                        &input,
-                        start,
-                        output.as_ref(),
-                        &shared,
-                        &mut decoders,
-                    );
-                    decoders.skip_unused(&mut input);
+                    start_audio(playing, &inputs, output.as_ref(), &shared, &mut decoders);
+                    decoders.skip_unused(&mut inputs);
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
-                        seek(&mut input, &shared, &mut decoders, now, true, start);
+                        seek(&mut inputs, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
                 }
                 Command::SelectSubtitles(index) => {
                     let showing = Subtitles {
-                        input: &input,
+                        input: &inputs.main,
                         info: &info,
                         start,
                         canvas,
@@ -1044,12 +1069,12 @@ fn read(
                     }
                     .choose(index, &shared, &mut decoders);
                     shared.state().subtitles = showing;
-                    decoders.skip_unused(&mut input);
+                    decoders.skip_unused(&mut inputs);
                     // A track's lines already passed show again from where
                     // it is; a file's are all there already.
                     let now = shared.clock.now().max(0.0);
                     if info.seekable && decoders.subtitles.is_some() {
-                        seek(&mut input, &shared, &mut decoders, now, true, start);
+                        seek(&mut inputs, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
@@ -1064,10 +1089,26 @@ fn read(
             }
             continue;
         }
-        match packet.read(&mut input) {
+        // Sound read apart from the picture keeps up with it.
+        let sound_apart = decoders.sound_apart();
+        let from_sound = sound_apart
+            && !inputs.sound_read
+            && (inputs.main_read || {
+                let end = |queue: Option<&(usize, Arc<PacketQueue>, JoinHandle<()>)>| {
+                    queue
+                        .and_then(|(_, queue, _)| queue.end())
+                        .unwrap_or(f64::MIN)
+                };
+                end(decoders.audio.as_ref()) <= end(decoders.video.as_ref())
+            });
+        let (input, first, input_start) = match (&mut inputs.sound, from_sound) {
+            (Some((sound, sound_start)), true) => (sound, SOUND_TRACKS, *sound_start),
+            _ => (&mut inputs.main, 0, start),
+        };
+        match packet.read(input) {
             Ok(()) => {
                 let serial = shared.serial.load(Ordering::Relaxed);
-                let index = packet.stream();
+                let index = first + packet.stream();
                 let queue = decoders
                     .video
                     .iter()
@@ -1075,7 +1116,7 @@ fn read(
                     .find(|(stream, _, _)| *stream == index)
                     .map(|(_, queue, _)| queue);
                 if let Some(queue) = queue {
-                    if let Some(end) = packet_end(&input, &packet, start) {
+                    if let Some(end) = packet_end(input, &packet, input_start) {
                         queue.reached(end);
                     }
                     let taken = std::mem::replace(&mut packet, ffmpeg::Packet::empty());
@@ -1116,27 +1157,31 @@ fn read(
                     }
                 }
             }
-            Err(ffmpeg::Error::Eof) => {
-                let serial = shared.serial.load(Ordering::Relaxed);
-                for queue in decoders.queues() {
-                    queue.put(Item::End(serial));
-                }
-                read_all = true;
-                shared.state().read_all = true;
-            }
             Err(ffmpeg::Error::Exit) => break,
             Err(ffmpeg::Error::InvalidData) => {}
             Err(error) => {
                 if shared.stopping() {
                     break;
                 }
-                eprintln!("plaa: reading {}: {error}", source.name());
-                let serial = shared.serial.load(Ordering::Relaxed);
-                for queue in decoders.queues() {
-                    queue.put(Item::End(serial));
+                if error != ffmpeg::Error::Eof {
+                    eprintln!("plaa: reading {}: {error}", source.name());
                 }
-                read_all = true;
-                shared.state().read_all = true;
+                // That input is done: its streams' decoders hear so.
+                let serial = shared.serial.load(Ordering::Relaxed);
+                let (from, to) = if from_sound {
+                    inputs.sound_read = true;
+                    (SOUND_TRACKS, usize::MAX)
+                } else {
+                    inputs.main_read = true;
+                    (0, SOUND_TRACKS)
+                };
+                for (index, queue, _) in decoders.video.iter().chain(&decoders.audio) {
+                    if (from..to).contains(index) {
+                        queue.put(Item::End(serial));
+                    }
+                }
+                read_all = inputs.main_read && (inputs.sound_read || !sound_apart);
+                shared.state().read_all = read_all;
             }
         }
     }
@@ -1175,19 +1220,21 @@ fn start_video(
 /// plays: none when there is no output or the track will not decode.
 fn start_audio(
     index: Option<usize>,
-    input: &ffmpeg::format::context::Input,
-    start: f64,
+    inputs: &Inputs,
     output: Option<&audio::Output>,
     shared: &Arc<Shared>,
     decoders: &mut Decoders,
 ) {
     let mut chosen = None;
-    if let (Some(index), Some(output)) = (index, output)
-        && let Ok((queue, thread)) =
-            decode::spawn_audio(input, index, start, output.shared.clone(), shared.clone())
-    {
-        decoders.audio = Some((index, queue, thread));
-        chosen = Some(index);
+    if let (Some(index), Some(output)) = (index, output) {
+        let (input, local, start) = inputs.locate(index);
+        match decode::spawn_audio(input, local, start, output.shared.clone(), shared.clone()) {
+            Ok((queue, thread)) => {
+                decoders.audio = Some((index, queue, thread));
+                chosen = Some(index);
+            }
+            Err(error) => eprintln!("plaa: audio stream {index}: {error}"),
+        }
     }
     let mut state = shared.state();
     state.audio = chosen;
@@ -1219,10 +1266,9 @@ const DECODE_ON: f64 = 1.0;
 /// move. Returns whether it sought.
 fn steer(
     scrub: &mut Option<Scrub>,
-    input: &mut ffmpeg::format::context::Input,
+    inputs: &mut Inputs,
     shared: &Shared,
     decoders: &mut Decoders,
-    start: f64,
 ) -> bool {
     let video_stream = decoders.video.as_ref().map(|(index, ..)| *index);
     let wanted = *shared
@@ -1234,7 +1280,7 @@ fn steer(
     };
     let serial = shared.serial.load(Ordering::Relaxed);
     let Some(current) = scrub else {
-        seek(input, shared, decoders, wanted, true, start);
+        seek(inputs, shared, decoders, wanted, true);
         *scrub = Some(Scrub {
             target: wanted,
             serial: shared.serial.load(Ordering::Relaxed),
@@ -1259,7 +1305,14 @@ fn steer(
     }
     if same
         && wanted > current.target
-        && decodes_on(input, shared, video_stream, start, current, wanted)
+        && decodes_on(
+            &inputs.main,
+            shared,
+            video_stream,
+            inputs.start,
+            current,
+            wanted,
+        )
     {
         *shared.target.lock().unwrap_or_else(PoisonError::into_inner) = Some((serial, wanted));
         shared.clock.jump(wanted);
@@ -1272,7 +1325,7 @@ fn steer(
     if same && !arrived(shared, serial, current.target) && current.since.elapsed() < PATIENCE {
         return false;
     }
-    seek(input, shared, decoders, wanted, true, start);
+    seek(inputs, shared, decoders, wanted, true);
     current.target = wanted;
     current.serial = shared.serial.load(Ordering::Relaxed);
     current.since = Instant::now();
@@ -1512,21 +1565,11 @@ fn check_ended(shared: &Shared) -> bool {
 
 /// Moves the reader and every decoder to `position`, seconds from the
 /// start of the file.
-fn seek(
-    input: &mut ffmpeg::format::context::Input,
-    shared: &Shared,
-    decoders: &mut Decoders,
-    position: f64,
-    exact: bool,
-    start: f64,
-) {
+fn seek(inputs: &mut Inputs, shared: &Shared, decoders: &mut Decoders, position: f64, exact: bool) {
     let serial = shared.serial.fetch_add(1, Ordering::Relaxed) + 1;
     *shared.target.lock().unwrap_or_else(PoisonError::into_inner) =
         exact.then_some((serial, position));
-    let timestamp = ((position + start) * f64::from(ffmpeg::ffi::AV_TIME_BASE)) as i64;
-    if let Err(error) = input.seek(timestamp, ..timestamp) {
-        eprintln!("plaa: seeking: {error}");
-    }
+    inputs.seek(position);
     for queue in decoders.queues() {
         queue.clear();
     }
@@ -1556,19 +1599,4 @@ fn packet_end(
     let begins = packet.pts().or(packet.dts())?;
     let seconds = crate::info::seconds(begins + packet.duration().max(0), time_base)?;
     Some(seconds - start)
-}
-
-fn describe(error: &ffmpeg::Error) -> String {
-    match error {
-        ffmpeg::Error::InvalidData => "this is not a file plaa can read".to_owned(),
-        ffmpeg::Error::Other { errno } if *errno == libc_enoent() => {
-            "the file does not exist".to_owned()
-        }
-        error => error.to_string(),
-    }
-}
-
-/// ENOENT, the same on every system plaa runs on.
-const fn libc_enoent() -> i32 {
-    2
 }

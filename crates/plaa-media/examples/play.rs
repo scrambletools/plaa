@@ -80,6 +80,20 @@ fn main() {
                     );
                 }
             }
+            Event::Page(page) => println!(
+                "page: {:?} by {:?}, {} formats, heights {:?}, live {}",
+                page.title,
+                page.artist,
+                page.formats.len(),
+                page.heights(),
+                page.live
+            ),
+            Event::List(entries) => {
+                println!("list of {}:", entries.len());
+                for entry in entries {
+                    println!("  {} {:?}", entry.url, entry.title);
+                }
+            }
             other => println!("event: {other:?}"),
         },
     );

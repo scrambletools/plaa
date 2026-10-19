@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use iced::widget::{container, mouse_area, opaque, space, toggler};
 use iced::window;
 use iced::{Center, Color, Element, Fill, Length, Task, Theme};
-use plaa_store::settings::{Appearance, Settings};
+use plaa_store::settings::{Appearance, Settings, StreamQuality};
 use scramble_ui::button::Kind;
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::dropdown;
@@ -46,6 +46,8 @@ pub enum SettingsMessage {
     AudioDevice(Option<String>),
     Resume(bool),
     FolderPlaylists(bool),
+    StreamQuality(StreamQuality),
+    WebPages(bool),
     Language(String),
     /// The audio (0) or subtitle (1) languages, as typed.
     Languages(usize, String),
@@ -444,6 +446,18 @@ impl Plaa {
                 self.settings.folder_playlists,
                 SettingsMessage::FolderPlaylists,
             ),
+            component::section(crate::fl!("settings-streams")),
+            self.stream_quality_row(),
+            switch_row(
+                crate::fl!("settings-web-pages"),
+                if self.yt_dlp_found {
+                    crate::fl!("settings-web-pages-found")
+                } else {
+                    crate::fl!("settings-web-pages-missing")
+                },
+                self.settings.web_pages,
+                SettingsMessage::WebPages,
+            ),
             component::section(crate::fl!("settings-folders")),
             folder_row(
                 crate::fl!("settings-recordings"),
@@ -457,6 +471,38 @@ impl Plaa {
             ),
         ]
         .spacing(12)
+    }
+
+    /// The quality streams play in: as tall as the screen, the best, or
+    /// at most a height.
+    fn stream_quality_row(&self) -> Element<'_, SettingsMessage> {
+        let label = |quality: StreamQuality| match quality {
+            StreamQuality::Auto => crate::fl!("settings-quality-auto"),
+            StreamQuality::Best => crate::fl!("settings-quality-best"),
+            StreamQuality::AtMost(lines) => crate::fl!("quality-lines", lines = lines.to_string()),
+        };
+        let choices: Vec<StreamQuality> = [StreamQuality::Auto, StreamQuality::Best]
+            .into_iter()
+            .chain(
+                [2160, 1440, 1080, 720, 480, 360]
+                    .into_iter()
+                    .map(StreamQuality::AtMost),
+            )
+            .collect();
+        let options: Vec<String> = choices.iter().copied().map(label).collect();
+        let selected = label(self.settings.stream_quality);
+        let pick = dropdown::pick(options.clone(), Some(selected), move |name| {
+            let at = options.iter().position(|option| *option == name);
+            SettingsMessage::StreamQuality(at.map_or(StreamQuality::Auto, |at| choices[at]))
+        })
+        .width(Fill);
+        column![
+            scramble_ui::styled(crate::fl!("settings-stream-quality"), Type::BodyLarge),
+            note(crate::fl!("settings-stream-quality-note")),
+            pick,
+        ]
+        .spacing(8)
+        .into()
     }
 
     /// The sound output device: the system's default, or one of those it
@@ -592,6 +638,8 @@ impl Plaa {
             }
             SettingsMessage::Resume(on) => self.settings.resume = on,
             SettingsMessage::FolderPlaylists(on) => self.settings.folder_playlists = on,
+            SettingsMessage::StreamQuality(quality) => self.settings.stream_quality = quality,
+            SettingsMessage::WebPages(on) => self.settings.web_pages = on,
             SettingsMessage::Language(tag) => {
                 self.settings.language = tag;
                 crate::i18n::set_language(self.settings.chosen_language());

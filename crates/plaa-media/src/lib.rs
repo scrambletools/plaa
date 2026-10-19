@@ -9,10 +9,12 @@ mod decode;
 mod ffi;
 pub mod frame;
 pub mod info;
+mod inputs;
 pub mod player;
 mod queue;
 pub mod subtitle;
 pub mod thumbnails;
+pub mod web;
 
 pub use audio::{OutputDevice, output_devices};
 pub use decode::{Picture, same_language};

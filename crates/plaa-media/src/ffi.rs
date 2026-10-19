@@ -38,7 +38,12 @@ pub fn attach_hardware(context: &mut ffmpeg::codec::Context) -> Option<&'static 
     // reference is either handed to the context or released.
     unsafe {
         let context = context.as_mut_ptr();
-        let codec = ffi::avcodec_find_decoder((*context).codec_id);
+        // The decoder the context was made for, else the codec's first.
+        let codec = if (*context).codec.is_null() {
+            ffi::avcodec_find_decoder((*context).codec_id)
+        } else {
+            (*context).codec
+        };
         if codec.is_null() {
             return None;
         }

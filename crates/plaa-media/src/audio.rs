@@ -281,9 +281,36 @@ pub fn output_devices() -> Vec<OutputDevice> {
 
 /// An open output stream. Dropping it stops the sound.
 pub struct Output {
-    _stream: cpal::Stream,
+    _sink: Sink,
     pub shared: Arc<Shared>,
 }
+
+/// Where the sound goes: a device, or nowhere.
+enum Sink {
+    Device {
+        _stream: cpal::Stream,
+    },
+    /// A thread that takes the sound as a device would, in time, without
+    /// playing it: for when no device opens, so playback goes on silently.
+    Silent {
+        stop: Arc<AtomicBool>,
+        thread: Option<std::thread::JoinHandle<()>>,
+    },
+}
+
+impl Drop for Sink {
+    fn drop(&mut self) {
+        if let Sink::Silent { stop, thread } = self {
+            stop.store(true, Ordering::Relaxed);
+            if let Some(thread) = thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
+}
+
+/// How much sound the silent output takes at a time.
+const SILENT_PERIOD: Duration = Duration::from_millis(10);
 
 impl Output {
     /// Opens the default output device at its own rate and channels.
@@ -341,9 +368,48 @@ impl Output {
             .play()
             .map_err(|error| OutputError::Device(error.to_string()))?;
         Ok(Self {
-            _stream: stream,
+            _sink: Sink::Device { _stream: stream },
             shared,
         })
+    }
+
+    /// An output that plays nothing but takes the sound in time, so the
+    /// clock and the end of playback go as with a device.
+    pub fn silent(clock: Arc<Clock>, volume: f32, muted: bool) -> Self {
+        let shared = Arc::new(Shared {
+            queue: Mutex::new(Queue::default()),
+            room: Condvar::new(),
+            clock,
+            volume: AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()),
+            muted: AtomicBool::new(muted),
+            rate: 48_000,
+            channels: 2,
+        });
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread = {
+            let (shared, stop) = (shared.clone(), stop.clone());
+            std::thread::Builder::new()
+                .name("plaa-silent".into())
+                .spawn(move || {
+                    let frames = (shared.rate as f64 * SILENT_PERIOD.as_secs_f64()) as usize;
+                    let mut out = vec![0.0f32; frames * usize::from(shared.channels)];
+                    let mut next = Instant::now();
+                    while !stop.load(Ordering::Relaxed) {
+                        shared.fill(&mut out, Duration::ZERO);
+                        next += SILENT_PERIOD;
+                        match next.checked_duration_since(Instant::now()) {
+                            Some(wait) => std::thread::sleep(wait),
+                            // Fallen behind: from now on.
+                            None => next = Instant::now(),
+                        }
+                    }
+                })
+                .ok()
+        };
+        Self {
+            _sink: Sink::Silent { stop, thread },
+            shared,
+        }
     }
 }
 

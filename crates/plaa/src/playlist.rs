@@ -25,20 +25,35 @@ const LISTS: &[&str] = &["m3u", "m3u8", "pls"];
 #[derive(Debug, Clone, PartialEq)]
 pub struct Playlist {
     items: Vec<Source>,
+    /// What items are called where the list says, as a web playlist does.
+    titles: Vec<Option<String>>,
     current: usize,
 }
 
 impl Playlist {
     /// A list of `items` at `current`, or none when it is empty.
     pub fn new(items: Vec<Source>, current: usize) -> Option<Self> {
+        let titles = vec![None; items.len()];
+        Self::titled(items.into_iter().zip(titles).collect(), current)
+    }
+
+    /// A list of items and what each is called, if known, at `current`.
+    pub fn titled(items: Vec<(Source, Option<String>)>, current: usize) -> Option<Self> {
+        let (items, titles): (Vec<_>, Vec<_>) = items.into_iter().unzip();
         (!items.is_empty()).then(|| Self {
             current: current.min(items.len() - 1),
             items,
+            titles,
         })
     }
 
     pub fn items(&self) -> &[Source] {
         &self.items
+    }
+
+    /// What item `index` is called, where the list says.
+    pub fn title(&self, index: usize) -> Option<&str> {
+        self.titles.get(index)?.as_deref()
     }
 
     pub fn current(&self) -> usize {

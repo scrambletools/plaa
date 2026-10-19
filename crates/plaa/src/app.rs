@@ -9,9 +9,10 @@ use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{container, image, space, stack};
 use iced::window::{self, settings::PlatformSpecific};
 use iced::{Center, Color, Element, Event, Fill, Size, Subscription, Task, Theme, event};
-use plaa_media::{Event as PlayerEvent, Options, Player, Source, Thumbnails};
+use plaa_media::web::Page;
+use plaa_media::{Event as PlayerEvent, Options, Player, Quality, Source, Thumbnails};
 use plaa_store::positions::{self, Positions};
-use plaa_store::settings::{self, Appearance, Settings};
+use plaa_store::settings::{self, Appearance, Settings, StreamQuality};
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::{Icon, Type, button, column, icon, omarchy, row, style};
 
@@ -19,7 +20,9 @@ use crate::External;
 use crate::playlist::{self, Playlist};
 use crate::settings_view::{self, SettingsMessage, SettingsTab};
 use crate::shortcuts::{self, Action};
-use crate::window::{self as player_window, Control, Menu, PlayerWindow, SPEEDS, Sheet};
+use crate::window::{
+    self as player_window, Control, Menu, PlayerWindow, QualityChoice, SPEEDS, Sheet,
+};
 
 /// plaa's id, reversed domain style: its desktop entry on Linux, and how
 /// it names itself to the system's services everywhere.
@@ -69,6 +72,8 @@ pub struct Plaa {
     pub(crate) language_drafts: [String; 2],
     /// The sound output devices, as they were when Settings last opened.
     pub(crate) audio_devices: Vec<plaa_media::OutputDevice>,
+    /// Whether yt-dlp was installed when Settings last opened.
+    pub(crate) yt_dlp_found: bool,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -133,6 +138,8 @@ pub(crate) struct Window {
     dropped: Vec<Source>,
     /// In picture in picture: the size to go back to.
     pip: Option<Size>,
+    /// The height of the window's screen in its pixels, once known.
+    screen_lines: Option<u32>,
     /// The window's Wayland surface, which drops name it by, or its
     /// AppKit view.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -156,6 +163,8 @@ pub enum Message {
     CloseRequested(window::Id),
     Resized(window::Id, Size),
     Rescaled(window::Id, f32),
+    /// The height of a window's screen in its pixels, if the system says.
+    Screen(window::Id, Option<u32>),
     /// A window's Wayland surface or AppKit view, once it shows.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     Surface(window::Id, Option<usize>),
@@ -241,6 +250,7 @@ impl Plaa {
             settings_tab: SettingsTab::default(),
             language_drafts,
             audio_devices: Vec::new(),
+            yt_dlp_found: false,
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -533,6 +543,7 @@ impl Plaa {
                 address: None,
                 dropped: Vec::new(),
                 pip: None,
+                screen_lines: None,
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
                 surface: None,
                 #[cfg(target_os = "macos")]
@@ -546,6 +557,7 @@ impl Plaa {
             Task::batch([
                 Task::done(Message::WindowOpened),
                 window::scale_factor(id).map(move |scale| Message::Rescaled(id, scale)),
+                screen_lines(id),
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
                 window::run(id, window_surface).map(move |surface| Message::Surface(id, surface)),
             ])
@@ -555,26 +567,71 @@ impl Plaa {
     /// Plays `list`'s current item in window `id`, in place of what it
     /// showed. Moving on through a list keeps the window's size and modes.
     fn play_in(&mut self, id: window::Id, list: Playlist, moving_on: bool) {
-        self.media_window = Some(id);
-        let source = list.source().clone();
-        let start = match &source {
-            Source::File(path) if self.settings.resume => {
-                self.positions.get(&path.to_string_lossy())
-            }
-            _ => None,
+        let start = self
+            .settings
+            .resume
+            .then(|| self.positions.get(&position_key(list.source())))
+            .flatten();
+        let lines = self.windows.get(&id).and_then(|window| window.screen_lines);
+        self.open_player(
+            id,
+            list,
+            Opening {
+                quality: self.quality(lines),
+                page: None,
+                start,
+                paused: false,
+                moving_on,
+            },
+        );
+    }
+
+    /// Opens window `id`'s web page again in `quality`, where it was, as
+    /// it was, playing or paused.
+    fn reopen(&mut self, id: window::Id, quality: Quality) {
+        let Some(player) = self.player_mut(id) else {
+            return;
         };
+        let Some(page) = player.page.clone() else {
+            return;
+        };
+        let opening = Opening {
+            quality,
+            page: Some(page),
+            start: Some(player.player.position()),
+            paused: player.status.paused,
+            moving_on: true,
+        };
+        let (list, ab_loop) = (player.playlist.clone(), player.ab_loop);
+        self.open_player(id, list, opening);
+        if let Some(player) = self.player_mut(id) {
+            player.ab_loop = ab_loop;
+            if let Some((from, Some(to))) = ab_loop {
+                player.player.set_ab_loop(Some((
+                    Duration::from_secs_f64(from),
+                    Duration::from_secs_f64(to),
+                )));
+            }
+        }
+    }
+
+    /// Starts a player for `list`'s current item in window `id`.
+    fn open_player(&mut self, id: window::Id, list: Playlist, opening: Opening) {
+        self.media_window = Some(id);
         let options = Options {
             hardware: self.settings.hardware_decoding,
             volume: self.settings.volume,
             muted: self.settings.muted,
-            start,
-            paused: false,
+            start: opening.start,
+            paused: opening.paused,
             audio_languages: self.settings.audio_languages.clone(),
             subtitle_languages: self.settings.subtitle_languages.clone(),
             audio_device: self.settings.audio_device.clone(),
-            quality: plaa_media::Quality::Best,
+            quality: opening.quality,
+            web: self.settings.web_pages,
+            page: opening.page.clone(),
         };
-        let player = Player::open(source, options, move |event| {
+        let player = Player::open(list.source().clone(), options, move |event| {
             crate::post(External::Player(id, event));
         });
         let surface = self.next_surface;
@@ -587,15 +644,27 @@ impl Plaa {
                 self.settings.volume,
                 self.settings.muted,
             );
-            playing.fit_window = !moving_on;
+            playing.fit_window = !opening.moving_on;
+            playing.quality = opening.quality;
+            playing.page = opening.page;
             if let Content::Player(previous) = &window.content {
                 remember_position(&mut self.positions, previous);
-                if moving_on {
+                if opening.moving_on {
                     playing.looping = previous.looping;
                     playing.sheet = previous.sheet;
                 }
             }
             window.content = Content::Player(Box::new(playing));
+        }
+    }
+
+    /// The quality to ask for: Settings' choice; the automatic one is the
+    /// height of the window's screen, `lines` tall when known.
+    fn quality(&self, lines: Option<u32>) -> Quality {
+        match self.settings.stream_quality {
+            StreamQuality::Best => Quality::Best,
+            StreamQuality::AtMost(lines) => Quality::AtMost(lines),
+            StreamQuality::Auto => Quality::AtMost(lines.unwrap_or(1080).max(360)),
         }
     }
 
@@ -756,6 +825,12 @@ impl Plaa {
             }
             Message::CloseRequested(id) => window::close(id),
             Message::Resized(id, size) => {
+                // A window shows on its screen only once it has a size, so
+                // the screen may only now be known.
+                let screen = match self.windows.get(&id) {
+                    Some(window) if window.screen_lines.is_none() => screen_lines(id),
+                    _ => Task::none(),
+                };
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.size = size;
                     // Entering or leaving full screen resizes the window,
@@ -766,7 +841,7 @@ impl Plaa {
                             crate::title_bar_macos::height(window.surface.unwrap_or(0));
                     }
                 }
-                Task::none()
+                screen
             }
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             Message::Surface(id, surface) => {
@@ -808,6 +883,22 @@ impl Plaa {
             Message::Rescaled(id, scale) => {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.scale = scale;
+                }
+                Task::none()
+            }
+            Message::Screen(id, lines) => {
+                let quality = self.quality(lines);
+                if let Some(window) = self.windows.get_mut(&id) {
+                    window.screen_lines = lines;
+                    // A player still opening chooses for this screen.
+                    if let Content::Player(player) = &mut window.content
+                        && player.info.is_none()
+                        && player.quality != quality
+                        && self.settings.stream_quality == StreamQuality::Auto
+                    {
+                        player.quality = quality;
+                        player.player.prefer(quality);
+                    }
                 }
                 Task::none()
             }
@@ -1015,6 +1106,25 @@ impl Plaa {
                 self.notify(id, crate::fl!("notice-no-sound", reason = reason));
                 Task::none()
             }
+            PlayerEvent::Page(page) => {
+                player.page = Some(page);
+                Task::none()
+            }
+            PlayerEvent::List(entries) => {
+                let items = entries
+                    .into_iter()
+                    .map(|entry| (Source::Url(entry.url), entry.title))
+                    .collect();
+                match Playlist::titled(items, 0) {
+                    Some(list) => self.play_in(id, list, false),
+                    None => player.error = Some(crate::fl!("error-empty-list")),
+                }
+                Task::none()
+            }
+            PlayerEvent::NeedsYtDlp => {
+                player.error = Some(crate::fl!("error-needs-yt-dlp"));
+                Task::none()
+            }
             PlayerEvent::Ended => {
                 if player.looping {
                     player.player.play();
@@ -1107,6 +1217,7 @@ impl Plaa {
             }
             Action::Settings => {
                 self.audio_devices = plaa_media::output_devices();
+                self.yt_dlp_found = plaa_media::web::program().is_some();
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.settings_open = true;
                 }
@@ -1399,6 +1510,15 @@ impl Plaa {
                 player.player.set_speed(speed);
                 player.menu = None;
             }
+            Control::Quality(choice) => {
+                player.menu = None;
+                match choice {
+                    QualityChoice::Variant(video) => player.player.select_video(video),
+                    QualityChoice::Lines(lines) => self.reopen(id, Quality::AtMost(lines)),
+                    QualityChoice::AudioOnly => self.reopen(id, Quality::AudioOnly),
+                }
+                return Task::none();
+            }
             Control::Audio(index) => {
                 player.player.select_audio(index);
                 player.menu = None;
@@ -1511,7 +1631,30 @@ impl Plaa {
         // shown, so opening one keeps the state underneath.
         let full = || Element::from(space().width(Fill).height(Fill));
         let notice = match &window.notice {
-            Some((notice, _)) => component::snackbar(full(), notice, Message::DismissNotice(id)),
+            Some((notice, _)) => {
+                // Above the playback controls: floating over a video, or
+                // docked along the bottom.
+                let player = window.player().filter(|player| player.error.is_none());
+                let floating = player.is_some_and(|player| player.is_video())
+                    && component::floating_bars_enabled();
+                let docked = player.is_some() && !floating;
+                let snackbar = component::snackbar_above_bar(
+                    full(),
+                    notice,
+                    Message::DismissNotice(id),
+                    floating,
+                );
+                container(snackbar)
+                    .padding(iced::Padding {
+                        bottom: if docked {
+                            component::TOOLBAR_HEIGHT
+                        } else {
+                            0.0
+                        },
+                        ..iced::Padding::ZERO
+                    })
+                    .into()
+            }
             None => full(),
         };
         let address = match &window.address {
@@ -1608,17 +1751,49 @@ impl Window {
     }
 }
 
-/// Remembers where `player` is, for its file to start there next time.
+/// Remembers where `player` is, for its file or stream to start there
+/// next time. Live streams have nowhere to go back to.
 fn remember_position(positions: &mut Positions, player: &PlayerWindow) {
-    if let Source::File(path) = player.source()
-        && player.info.as_ref().is_some_and(|info| info.seekable)
-    {
+    if player.info.as_ref().is_some_and(|info| info.seekable) {
         positions.set(
-            &path.to_string_lossy(),
+            &position_key(player.source()),
             player.player.position(),
             player.status.duration,
         );
     }
+}
+
+/// What a source's position is kept by: its path or its address.
+fn position_key(source: &Source) -> String {
+    match source {
+        Source::File(path) => path.to_string_lossy().into_owned(),
+        Source::Url(url) => url.clone(),
+    }
+}
+
+/// How a window's player opens.
+struct Opening {
+    quality: Quality,
+    /// The web page yt-dlp read already, when opening it again.
+    page: Option<std::sync::Arc<Page>>,
+    start: Option<Duration>,
+    paused: bool,
+    /// Moving on through a list, or to another quality: the window keeps
+    /// its size and modes.
+    moving_on: bool,
+}
+
+/// Asks for the height of window `id`'s screen in its own pixels.
+fn screen_lines(id: window::Id) -> Task<Message> {
+    window::monitor_size(id).then(move |size| {
+        window::scale_factor(id).map(move |scale| {
+            Message::Screen(
+                id,
+                size.map(|size| (size.height * scale).round() as u32)
+                    .filter(|lines| *lines > 0),
+            )
+        })
+    })
 }
 
 /// A window the video's size, made smaller to fit a typical screen, with

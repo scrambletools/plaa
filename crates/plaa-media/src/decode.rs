@@ -45,9 +45,26 @@ fn open_decoder(
     input: &ffmpeg::format::context::Input,
     index: usize,
 ) -> Result<(ffmpeg::codec::decoder::Decoder, ffmpeg::Rational), ffmpeg::Error> {
+    open_decoder_with(input, index, None)
+}
+
+/// The decoder for stream `index`, by the name of FFmpeg's decoder to use
+/// rather than its first for the codec.
+fn open_decoder_with(
+    input: &ffmpeg::format::context::Input,
+    index: usize,
+    name: Option<&str>,
+) -> Result<(ffmpeg::codec::decoder::Decoder, ffmpeg::Rational), ffmpeg::Error> {
     let stream = input.stream(index).ok_or(ffmpeg::Error::StreamNotFound)?;
     let time_base = stream.time_base();
-    let mut context = ffmpeg::codec::Context::from_parameters(stream.parameters())?;
+    let mut context = match name.and_then(ffmpeg::codec::decoder::find_by_name) {
+        Some(codec) => {
+            let mut context = ffmpeg::codec::Context::new_with_codec(codec);
+            context.set_parameters(stream.parameters())?;
+            context
+        }
+        None => ffmpeg::codec::Context::from_parameters(stream.parameters())?,
+    };
     // Every core the system has, which FFmpeg picks with a count of 0.
     context.set_threading(ffmpeg::codec::threading::Config::kind(
         ffmpeg::codec::threading::Type::Frame,
@@ -79,6 +96,16 @@ pub(crate) fn spawn_video(
     let mut device = None;
     if hardware {
         device = ffi::attach_hardware(&mut decoder.0);
+        // FFmpeg's first AV1 decoder, dav1d, decodes on the processor
+        // alone; its own decodes on graphics cards, and nothing else.
+        if device.is_none()
+            && stream.parameters().id() == ffmpeg::codec::Id::AV1
+            && let Ok((mut native, _)) = open_decoder_with(input, index, Some("av1"))
+            && let Some(found) = ffi::attach_hardware(&mut native.0)
+        {
+            decoder = native;
+            device = Some(found);
+        }
     }
     let decoder = match decoder.video() {
         Ok(decoder) => decoder,
@@ -872,9 +899,37 @@ const LANGUAGE_CODES: &[(&str, &str)] = &[
 pub(crate) fn cover(input: &ffmpeg::format::context::Input, index: usize) -> Option<Picture> {
     let stream = input.stream(index)?;
     let bytes = ffi::attached_picture(&stream)?;
-    let context = ffmpeg::codec::Context::from_parameters(stream.parameters()).ok()?;
+    still(stream.parameters(), &ffmpeg::Packet::copy(&bytes))
+}
+
+/// The picture at `address`, such as a web video's thumbnail, decoded as
+/// a cover is. Gives up once `stop` says so.
+pub(crate) fn picture_at(
+    address: &str,
+    stop: impl FnMut() -> bool + Send + 'static,
+) -> Option<Picture> {
+    let mut input = ffmpeg::format::input_with_interrupt_and_dictionary(
+        address,
+        stop,
+        ffmpeg::Dictionary::new(),
+    )
+    .ok()?;
+    let index = input.streams().best(ffmpeg::media::Type::Video)?.index();
+    let mut packet = ffmpeg::Packet::empty();
+    while packet.read(&mut input).is_ok() {
+        if packet.stream() == index {
+            return still(input.stream(index)?.parameters(), &packet);
+        }
+    }
+    None
+}
+
+/// The still picture in `packet`, decoded and made at most 1024 pixels on
+/// its long side.
+fn still(parameters: ffmpeg::codec::Parameters, packet: &ffmpeg::Packet) -> Option<Picture> {
+    let context = ffmpeg::codec::Context::from_parameters(parameters).ok()?;
     let mut decoder = context.decoder().video().ok()?;
-    decoder.send_packet(&ffmpeg::Packet::copy(&bytes)).ok()?;
+    decoder.send_packet(packet).ok()?;
     let _ = decoder.send_eof();
     let mut frame = ffmpeg::frame::Video::empty();
     decoder.receive_frame(&mut frame).ok()?;

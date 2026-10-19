@@ -37,7 +37,7 @@ usage-help =
 
 ## Start window
 
-start-hint = Open a video or audio file, or a stream's address.
+start-hint = Open a video or audio file, a stream or a web video.
 start-open = Open
 start-open-address = Open Address
 
@@ -65,6 +65,7 @@ action-picture-in-picture = Picture in Picture
 action-previous = Previous
 action-next = Next
 action-exit-full-screen = Exit Full Screen
+action-quality = Quality
 
 ## The floating controls
 
@@ -79,6 +80,12 @@ tracks-off = Off
 # A track the file gives no name or language, by its number.
 tracks-numbered = Track { $number }
 
+## The qualities a stream or a web video comes in
+
+# A picture's height in lines, as qualities are named: 1080p.
+quality-lines = { $lines }p
+quality-audio-only = Audio only
+
 ## Inspector
 
 info-title = Inspector
@@ -86,6 +93,7 @@ playlist-title = Playlist
 chapters-numbered = Chapter { $number }
 info-file = File
 info-name = Name
+info-address = Address
 info-folder = Folder
 info-size = Size
 info-format = Format
@@ -116,7 +124,7 @@ dialog-filter-media = Video and audio
 dialog-filter-all = All files
 
 address-title = Open Address
-address-note = A stream or file on the network, such as https://example.com/live.m3u8 or rtsp://camera.local/stream.
+address-note = A web page with a video, such as a YouTube video's, or a stream or file on the network, such as https://example.com/live.m3u8.
 address-label = Address
 address-open = Open
 
@@ -129,6 +137,11 @@ notice-no-sound = Playing without sound: { $reason }
 notice-loop-from = Loop from { $time }. Press again where it should end.
 notice-loop-between = Looping { $from } to { $to }.
 notice-loop-off = Loop off.
+
+## Errors, shown in place of what could not play
+
+error-needs-yt-dlp = This looks like a web page. plaa plays the videos on web pages with yt-dlp, which is not installed.
+error-empty-list = This list has nothing to play.
 
 ## Settings
 
@@ -173,6 +186,14 @@ settings-resume = Resume where you left off
 settings-resume-note = Files start where they were when last closed.
 settings-folder-playlists = Play the folder's other files
 settings-folder-playlists-note = Opening one file lists the others in its folder, which play after it.
+settings-streams = Streams and web videos
+settings-stream-quality = Quality
+settings-stream-quality-note = For streams and web videos that come in several qualities. Takes effect for what opens afterwards.
+settings-quality-auto = Automatic, as tall as the screen
+settings-quality-best = Best
+settings-web-pages = Play web videos with yt-dlp
+settings-web-pages-found = yt-dlp finds the video on pages such as YouTube's.
+settings-web-pages-missing = yt-dlp is not installed. Install it to play the videos on pages such as YouTube's.
 settings-folders = Folders
 settings-recordings = Recordings
 settings-screenshots = Saved frames

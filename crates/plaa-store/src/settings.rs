@@ -60,6 +60,13 @@ pub struct Settings {
     /// When one file opens, list the other files in its folder with it,
     /// to play on to.
     pub folder_playlists: bool,
+    /// Which quality streams that come in several play in: `auto` for the
+    /// tallest that fits the screen, `best`, or the tallest to play, such
+    /// as `1080p`.
+    pub stream_quality: StreamQuality,
+    /// Play web pages, such as YouTube's, through yt-dlp when it is
+    /// installed.
+    pub web_pages: bool,
     /// Audio and subtitle languages to pick first, as ISO 639 codes such
     /// as `en` or `jpn`, most wanted first. Empty follows the file's own
     /// defaults.
@@ -97,6 +104,8 @@ impl Default for Settings {
             muted: false,
             resume: true,
             folder_playlists: false,
+            stream_quality: StreamQuality::Auto,
+            web_pages: true,
             audio_languages: Vec::new(),
             subtitle_languages: Vec::new(),
             recordings: paths::default_recordings(),
@@ -159,6 +168,43 @@ pub enum Appearance {
     System,
     Light,
     Dark,
+}
+
+/// Which of a stream's qualities to play.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
+pub enum StreamQuality {
+    /// The tallest picture that fits the screen.
+    #[default]
+    Auto,
+    Best,
+    /// The tallest picture at most this many lines tall.
+    AtMost(u32),
+}
+
+impl From<String> for StreamQuality {
+    fn from(text: String) -> Self {
+        let text = text.trim().to_ascii_lowercase();
+        match text.as_str() {
+            "best" => Self::Best,
+            _ => text
+                .trim_end_matches('p')
+                .parse()
+                .ok()
+                .filter(|lines| *lines > 0)
+                .map_or(Self::Auto, Self::AtMost),
+        }
+    }
+}
+
+impl From<StreamQuality> for String {
+    fn from(quality: StreamQuality) -> Self {
+        match quality {
+            StreamQuality::Auto => "auto".to_owned(),
+            StreamQuality::Best => "best".to_owned(),
+            StreamQuality::AtMost(lines) => format!("{lines}p"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -257,6 +303,25 @@ mod tests {
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("hardware-decoding"));
         assert!(text.contains("overlay = false"));
+    }
+
+    #[test]
+    fn stream_quality_reads_as_written() {
+        for quality in [
+            StreamQuality::Auto,
+            StreamQuality::Best,
+            StreamQuality::AtMost(1080),
+        ] {
+            assert_eq!(StreamQuality::from(String::from(quality)), quality);
+        }
+        assert_eq!(
+            StreamQuality::from("720".to_owned()),
+            StreamQuality::AtMost(720)
+        );
+        assert_eq!(
+            StreamQuality::from("nonsense".to_owned()),
+            StreamQuality::Auto
+        );
     }
 
     #[test]

@@ -9,7 +9,8 @@ use std::time::{Duration, Instant};
 use iced::widget::{container, image, mouse_area, slider, space, stack, text};
 use iced::{Center, Element, Fill, Length, Theme};
 use plaa_media::subtitle::Cue;
-use plaa_media::{MediaInfo, Player, Source, Status, Thumbnails};
+use plaa_media::web::Page;
+use plaa_media::{MediaInfo, Player, Quality, Source, Status, Thumbnails};
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::dir::row;
 use scramble_ui::dropdown::{self, Entry};
@@ -42,6 +43,18 @@ pub enum Menu {
     Speed,
     Tracks,
     Chapters,
+    Quality,
+}
+
+/// What the quality menu offers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QualityChoice {
+    /// A web page's picture at most this many lines tall.
+    Lines(u32),
+    /// A web page's sound alone.
+    AudioOnly,
+    /// One of a stream's variants, by its picture's stream.
+    Variant(usize),
 }
 
 /// When the pointer last moved over the picture, kept where the picture
@@ -116,6 +129,10 @@ pub struct PlayerWindow {
     pub muted: bool,
     /// When the player started opening its source.
     pub opened: Instant,
+    /// The web page the source is, as yt-dlp read it.
+    pub page: Option<Arc<Page>>,
+    /// The quality asked for, where the source comes in several.
+    pub quality: Quality,
 }
 
 impl PlayerWindow {
@@ -146,6 +163,8 @@ impl PlayerWindow {
             volume,
             muted,
             opened: Instant::now(),
+            page: None,
+            quality: Quality::Best,
         }
     }
 
@@ -163,13 +182,24 @@ impl PlayerWindow {
         self.info.as_ref()?.picture(self.status.video)
     }
 
-    /// The name to show for the file: its title tag for sound, else its
-    /// file name.
+    /// The name to show: for a stream, its title as the page, the stream
+    /// or the list says; for a sound file, its title tag; else the file's
+    /// name.
     pub fn title(&self) -> String {
-        let name = self.source().name();
-        match &self.info {
-            Some(info) if !info.has_video() => info.title.clone().unwrap_or(name),
-            _ => name,
+        let tagged = self.info.as_ref().and_then(|info| info.title.clone());
+        match self.source() {
+            Source::Url(_) => tagged
+                .or_else(|| self.page.as_ref().and_then(|page| page.title.clone()))
+                .or_else(|| {
+                    self.playlist
+                        .title(self.playlist.current())
+                        .map(str::to_owned)
+                })
+                .unwrap_or_else(|| self.source().name()),
+            Source::File(_) if self.info.is_some() && !self.is_video() => {
+                tagged.unwrap_or_else(|| self.source().name())
+            }
+            Source::File(_) => self.source().name(),
         }
     }
 
@@ -238,6 +268,7 @@ pub enum Control {
     VolumeReleased,
     ToggleMute,
     Speed(f64),
+    Quality(QualityChoice),
     Audio(Option<usize>),
     Subtitles(Option<usize>),
     Menu(Menu, bool),
@@ -281,7 +312,7 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
     if let Some(error) = &window.error {
         let body = container(component::empty_state(
             Icon::Error,
-            window.source().name(),
+            window.title(),
             error.as_str(),
         ))
         .style(style::surface);
@@ -535,6 +566,9 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
     if let Some(menu) = chapters_menu(window) {
         controls.push(menu);
     }
+    if let Some(menu) = quality_menu(window) {
+        controls.push(menu);
+    }
     if let Some(menu) = tracks_menu(window) {
         controls.push(menu);
     }
@@ -614,6 +648,68 @@ fn chapters_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
             .tip(crate::fl!("action-chapters"))
             .open(window.menu == Some(Menu::Chapters), |open| {
                 Control::Menu(Menu::Chapters, open)
+            })
+            .into(),
+    )
+}
+
+/// The qualities a web page or a stream comes in, when there is a choice:
+/// a page's picture heights and its sound alone, or a stream's variants.
+fn quality_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
+    let showing = window.picture().map(|track| track.height);
+    let mut entries = Vec::new();
+    if let Some(page) = &window.page {
+        let sound_alone = window.quality == Quality::AudioOnly;
+        for lines in page.heights() {
+            entries.push(
+                Entry::item(
+                    crate::fl!("quality-lines", lines = lines.to_string()),
+                    Control::Quality(QualityChoice::Lines(lines)),
+                )
+                .checked(!sound_alone && showing == Some(lines)),
+            );
+        }
+        if page.has_audio() && !entries.is_empty() {
+            entries.push(
+                Entry::item(
+                    crate::fl!("quality-audio-only"),
+                    Control::Quality(QualityChoice::AudioOnly),
+                )
+                .checked(sound_alone),
+            );
+        }
+    } else if let Some(info) = &window.info {
+        for variant in &info.variants {
+            // Two of the same height are told apart by their bit rates.
+            let twin = info
+                .variants
+                .iter()
+                .filter(|other| other.height == variant.height)
+                .count()
+                > 1;
+            let lines = crate::fl!("quality-lines", lines = variant.height.to_string());
+            let label = match variant.bit_rate.filter(|_| twin) {
+                Some(rate) => format!("{lines} · {}", format::bit_rate(rate)),
+                None => lines,
+            };
+            entries.push(
+                Entry::item(
+                    label,
+                    Control::Quality(QualityChoice::Variant(variant.video)),
+                )
+                .checked(window.status.video == Some(variant.video)),
+            );
+        }
+    }
+    if entries.len() < 2 {
+        return None;
+    }
+    Some(
+        dropdown::icon_menu(Icon::Tune, entries)
+            .size(button::Size::Small)
+            .tip(crate::fl!("action-quality"))
+            .open(window.menu == Some(Menu::Quality), |open| {
+                Control::Menu(Menu::Quality, open)
             })
             .into(),
     )
@@ -814,14 +910,29 @@ fn playlist_sheet(window: &PlayerWindow) -> Element<'_, Control> {
         .enumerate()
         .map(|(index, source)| {
             let playing = index == current;
-            component::content_list_row(
-                playing.then_some(Icon::PlayArrow),
-                source.name(),
-                // Where the icon is in the playing row.
-                if playing { 0.0 } else { 20.0 },
-                playing,
-                Some(Control::PlayItem(index)),
+            let name = window
+                .playlist
+                .title(index)
+                .map_or_else(|| source.name(), str::to_owned);
+            // The playing row's icon, in the room the others keep for it.
+            let leading: Element<'_, Control> = if playing {
+                icon::icon(Icon::PlayArrow, 20).into()
+            } else {
+                space().width(20).into()
+            };
+            // Long titles wrap, as items of a list often start alike, so
+            // the row grows rather than keeping a list row's height.
+            let label = scramble_ui::aligned(scramble_ui::styled(name, Type::LabelLarge));
+            iced::widget::button(
+                row(vec![leading, label])
+                    .spacing(12)
+                    .align_y(Center)
+                    .width(Fill),
             )
+            .padding([10, 16])
+            .width(Fill)
+            .style(move |theme, status| playlist_row_style(theme, status, playing))
+            .on_press(Control::PlayItem(index))
             .into()
         });
     component::side_sheet_sized(
@@ -830,6 +941,44 @@ fn playlist_sheet(window: &PlayerWindow) -> Element<'_, Control> {
         iced::widget::Column::with_children(rows).spacing(2),
         Length::Fixed(component::SIDE_SHEET_WIDTH),
     )
+}
+
+/// A list row as scramble-ui draws one: the playing row in a tonal
+/// container, and a state layer while pointed at or pressed.
+fn playlist_row_style(
+    theme: &Theme,
+    status: iced::widget::button::Status,
+    playing: bool,
+) -> iced::widget::button::Style {
+    use iced::widget::button::Status;
+    let scheme = Scheme::of(theme);
+    let (background, content) = if playing {
+        (scheme.secondary_container, scheme.on_secondary_container)
+    } else {
+        (iced::Color::TRANSPARENT, scheme.on_surface_variant)
+    };
+    let layer = match status {
+        Status::Hovered => scramble_ui::state_layer::HOVERED,
+        Status::Pressed => scramble_ui::state_layer::PRESSED,
+        Status::Active | Status::Disabled => 0.0,
+    };
+    // The content's color laid over the background at the layer's share.
+    let over = |base: f32, top: f32| base * (1.0 - layer) + top * layer;
+    let shown = if background.a == 0.0 {
+        content.scale_alpha(layer)
+    } else {
+        iced::Color::from_rgb(
+            over(background.r, content.r),
+            over(background.g, content.g),
+            over(background.b, content.b),
+        )
+    };
+    iced::widget::button::Style {
+        background: Some(shown.into()),
+        text_color: content,
+        border: iced::border::rounded(20),
+        ..iced::widget::button::Style::default()
+    }
 }
 
 /// The inspector: what the file holds and how it plays.
@@ -844,7 +993,10 @@ fn inspector(window: &PlayerWindow) -> Element<'_, Control> {
         .into()
     };
     content = content.push(component::section(crate::fl!("info-file")));
-    content = content.push(field(crate::fl!("info-name"), window.source().name()));
+    content = content.push(match window.source() {
+        Source::Url(url) => field(crate::fl!("info-address"), url.clone()),
+        Source::File(_) => field(crate::fl!("info-name"), window.source().name()),
+    });
     if let Source::File(path) = window.source() {
         if let Some(folder) = path.parent() {
             content = content.push(field(
