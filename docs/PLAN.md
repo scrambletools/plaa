@@ -139,8 +139,12 @@ as `R8` and `RG8` textures, 16 bit ones split into their two bytes
 linear in them). The shader turns Y'CbCr into RGB with the picture's
 matrix, range and bit depth, tone maps PQ and HLG, maps BT.2020 into
 BT.709, turns the picture by the stream's display matrix, and fits it
-into the widget. Every window shares one pipeline, keyed by a surface
-id per window.
+into the widget. Where the picture is shrunk, each screen pixel weighs
+the texels within its size of its centre on a Hermite curve, as mpv's
+default downscaling does, two texels to a linear sample; single samples
+would skip texels and make text and fine lines shimmer. At its size or
+larger, one linear sample. Every window shares one pipeline, keyed by a
+surface id per window.
 
 ### Interface
 

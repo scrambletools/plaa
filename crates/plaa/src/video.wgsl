@@ -1,6 +1,7 @@
-// Draws a decoded picture: reads its planes, turns Y'CbCr into R'G'B',
-// maps HDR and wide gamut pictures into what a standard screen shows,
-// and fits the picture inside the widget, turned upright.
+// Draws a decoded picture: reads its planes, weighing the texels each
+// screen pixel covers when shrunk, turns Y'CbCr into R'G'B', maps HDR and wide gamut
+// pictures into what a standard screen shows, and fits the picture
+// inside the widget, turned upright.
 
 struct Uniforms {
     // Rows of the Y'CbCr to R'G'B' matrix; w is unused.
@@ -142,20 +143,78 @@ fn bt2020_to_bt709(light: vec3<f32>) -> vec3<f32> {
     );
 }
 
+// At most this many texels across or down are read for a pixel; pictures
+// shrunk further than that skip some.
+const MOST_TEXELS = 64;
+
+// The weight of a texel `distance` from a pixel's centre, in units of the
+// pixel's size on the picture: a Hermite curve, as mpv shrinks pictures.
+fn hermite(distance: f32) -> f32 {
+    let x = min(abs(distance), 1.0);
+    return (2.0 * x - 3.0) * x * x + 1.0;
+}
+
+// The weight of the texel from `start` to `start + 1` and of the next one,
+// together, and how far past the first's centre one linear sample weighs
+// the two that way.
+fn pair(start: f32, centre: f32, reach: f32) -> vec2<f32> {
+    let near = hermite((start + 0.5 - centre) / reach);
+    let far = hermite((start + 1.5 - centre) / reach);
+    let both = near + far;
+    return vec2<f32>(both, select(0.0, far / both, both > 0.0));
+}
+
+// The plane at `uv` for a screen pixel `pixel` in size, in 0 to 1 units.
+// Where the picture is shrunk, a pixel weighs every texel within its size
+// of its centre, so fine lines and text keep steady instead of showing
+// moiré where single samples would skip texels; at its size or larger it
+// is filtered linearly.
+fn sample_plane(plane: texture_2d<f32>, uv: vec2<f32>, pixel: vec2<f32>) -> vec4<f32> {
+    let size = vec2<f32>(textureDimensions(plane));
+    let texels = pixel * size;
+    if all(texels <= vec2<f32>(1.0)) {
+        return textureSampleLevel(plane, picture_sampler, uv, 0.0);
+    }
+    let reach = max(texels, vec2<f32>(1.0));
+    let centre = uv * size;
+    let first = floor(centre - reach - 0.5);
+    let count = min(
+        vec2<i32>(floor(centre + reach - 0.5) - first) + 1,
+        vec2<i32>(MOST_TEXELS),
+    );
+    var sum = vec4<f32>(0.0);
+    var weight = 0.0;
+    // Two texels at a time: one linear sample between them weighs both.
+    for (var row = 0; row < count.y; row += 2) {
+        let down = pair(first.y + f32(row), centre.y, reach.y);
+        for (var column = 0; column < count.x; column += 2) {
+            let across = pair(first.x + f32(column), centre.x, reach.x);
+            let texel = first + vec2<f32>(f32(column) + across.y, f32(row) + down.y) + 0.5;
+            let share = across.x * down.x;
+            sum += textureSampleLevel(plane, picture_sampler, texel / size, 0.0) * share;
+            weight += share;
+        }
+    }
+    return sum / max(weight, 1e-6);
+}
+
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
+    // The picture is only scaled and turned, so a screen pixel covers the
+    // same part of it everywhere.
+    let pixel = abs(dpdx(in.uv)) + abs(dpdy(in.uv));
     var encoded: vec3<f32>;
     if uniforms.plane_layout == 2u {
-        encoded = textureSample(plane0, picture_sampler, in.uv).rgb;
+        encoded = sample_plane(plane0, in.uv, pixel).rgb;
     } else {
-        let luma = one(textureSample(plane0, picture_sampler, in.uv));
+        let luma = one(sample_plane(plane0, in.uv, pixel));
         var chroma: vec2<f32>;
         if uniforms.plane_layout == 1u {
-            chroma = two(textureSample(plane1, picture_sampler, in.uv));
+            chroma = two(sample_plane(plane1, in.uv, pixel));
         } else {
             chroma = vec2<f32>(
-                one(textureSample(plane1, picture_sampler, in.uv)),
-                one(textureSample(plane2, picture_sampler, in.uv)),
+                one(sample_plane(plane1, in.uv, pixel)),
+                one(sample_plane(plane2, in.uv, pixel)),
             );
         }
         let yuv = vec3<f32>(
