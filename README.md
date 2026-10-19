@@ -9,8 +9,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 [triib](https://github.com/scrambletools/triib) through
 [scramble-ui](https://github.com/scrambletools/scramble-ui).
 
-> **Status:** early development, not yet released. Files and streams
-> play, with the controls floating over the picture; see the
+> **Status:** early development, not yet released. Files, streams and
+> web videos play, with the controls floating over the picture; see the
 > [development plan](docs/PLAN.md) for what comes next: editing and
 > export, recording, casting, an AVB/Milan talker and listener, and an
 > assistant.
@@ -23,7 +23,16 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   MPEG-TS and the rest, with H.264, HEVC, AV1, VP9, ProRes and other
   video, and AAC, Opus, FLAC, MP3, AC-3 and other sound.
 - **Streams** at addresses: HTTP, HLS, DASH, RTSP and SRT (Open Address,
-  Ctrl+U, or an address on the command line).
+  Ctrl+U, or an address on the command line), which buffer ahead and
+  wait to read on rather than stutter over a slow network, marking on
+  the timeline how far they have read. The addresses opened lately are
+  offered again.
+- **Web videos**, such as YouTube's and those of the many other sites
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, when it is
+  installed: with their titles, channels, chapters and thumbnails, and
+  playlists as plaa's own lists.
+- **Quality** chosen from a stream's or a web video's, or sound alone,
+  by default the best that fits the screen.
 - **Hardware decoding** on the graphics card (VAAPI, CUDA or Vulkan on
   Linux, Direct3D 11 on Windows, VideoToolbox on macOS), 8K at 60 fps
   included, falling back to the processor.
@@ -71,17 +80,17 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
   rate, how it decodes, and its tags.
 - **Settings** (Ctrl+,): light or dark, the system accent color, the
-  floating controls, hardware decoding, resuming, track languages and
-  folders, saved in `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml` on
+  floating controls, hardware decoding, resuming, streams' quality,
+  track languages and folders, saved in `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml` on
   Windows, `~/Library/Application Support/plaa/plaa.toml` on macOS).
 - **One window per file** and one running plaa: files opened again, from
   the file manager or the command line, go to the running one.
 
 ### Planned
 
-yt-dlp, choosing a stream's quality, trimming and export, recording,
-a visualizer, casting, the AVB/Milan entity, the assistant and MCP,
-packages and translations. The [plan](docs/PLAN.md) has the order.
+Trimming and export, recording, a visualizer, casting, the AVB/Milan
+entity, the assistant and MCP, packages and translations. The
+[plan](docs/PLAN.md) has the order.
 
 ## Building
 

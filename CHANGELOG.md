@@ -32,3 +32,7 @@ The first build.
   and files dropped on windows on Wayland.
 - The menu bar on macOS, and title bars in plaa's colors on macOS and
   Windows.
+- Streams buffer ahead, wait to read on rather than stutter, and fetch
+  only the quality that plays; a spinner shows while they wait.
+- Web videos and playlists through yt-dlp, a quality menu, recent
+  addresses, and AV1 decoded on the graphics card.

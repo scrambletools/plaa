@@ -29,12 +29,13 @@ look follows Material Design 3, as in prev.
 | Language | Rust, stable toolchain, edition 2024, minimum Rust 1.95 |
 | GUI | iced 0.14 with scramble-ui's Material 3 components; the picture through a wgpu shader widget of plaa's own |
 | Media engine | FFmpeg's libraries (libavformat, libavcodec, libavfilter, libswresample, libswscale) through `ffmpeg-next`, all inside `plaa-media` ([ADR 0001](decisions/0001-media-engine.md)) |
-| Hardware decoding | Through FFmpeg: VAAPI, then CUDA, then Vulkan on Linux, where NVIDIA's VAAPI driver waits until last, as it copies pictures out several times slower than CUDA; D3D11VA, CUDA, then DXVA2 on Windows; VideoToolbox on macOS. Pictures are copied to reused memory and converted on the graphics card; the processor takes over when no device opens |
+| Hardware decoding | Through FFmpeg: VAAPI, then CUDA, then Vulkan on Linux, where NVIDIA's VAAPI driver waits until last, as it copies pictures out several times slower than CUDA; D3D11VA, CUDA, then DXVA2 on Windows; VideoToolbox on macOS. AV1 through FFmpeg's own decoder on graphics cards, dav1d on the processor. Pictures are copied to reused memory and converted on the graphics card; the processor takes over when no device opens |
 | Sound out | cpal: the sound server on Linux through the PulseAudio protocol, which PipeWire speaks too, asked for 50 ms of buffering, and ALSA without a server; WASAPI on Windows, Core Audio on macOS. The device's clock drives playback; Settings picks the device |
 | Color | Y'CbCr to RGB in the shader, BT.601, BT.709 and BT.2020, limited and full range, 8 to 16 bits. PQ and HLG are tone mapped for standard screens, BT.2020 mapped to BT.709 |
 | Subtitles | Text subtitles (SubRip, WebVTT, MP4 text and the rest FFmpeg reads) drawn by plaa; ASS and SSA drawn as styled by libass, loaded as plaa runs, with the file's fonts; Blu-ray, DVD and DVB picture subtitles. Both kinds of picture are laid over the video in its shader, and fit and shrink with it |
 | Windows | One window per file, one running instance; a start window when nothing is open |
 | Overlay | For video, M3 floating toolbars over the picture by default, hiding once the pointer rests (2 s, adjustable) or leaves the window; Settings docks them. Sound always has them docked |
+| Web pages | yt-dlp, run as a program of its own when it is installed, not bundled: it follows the sites' changes faster than plaa could; its JSON names the streams, which FFmpeg plays |
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first; the 38 languages prev has once the interface settles |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
@@ -73,8 +74,10 @@ trimming and splitting, and Intel Macs.
    screen awake, picture subtitles and ASS styling (libass), drag and
    drop on Wayland (prev's smithay-clipboard patch), the macOS menu bar,
    and title bars in plaa's colors on Windows and macOS.
-3. **Network**: yt-dlp, choosing a stream's quality, a buffering
-   indicator, recent addresses.
+3. **Network** (done): web pages through yt-dlp, their picture and
+   sound read as two streams in step, and playlists; choosing a
+   stream's quality, by default as tall as the screen; buffering ahead,
+   waiting to read on, and a spinner while it waits; recent addresses.
 4. **Edit and export**: trim, split, rotate and flip, then export to
    H.264, HEVC, AV1 or audio only, on hardware encoders where there are.
 5. **Recording**: microphone, camera, screen (the ScreenCast portal and
@@ -105,11 +108,16 @@ Later crates: `plaa-avb` (the Milan entity), `plaa-cast`, `plaa-assist`.
 A `Player` plays one source. Opening it starts a reading thread, which
 opens the source with FFmpeg (an interrupt callback lets closing cut a
 stalled network read short), reads its streams and starts a thread per
-decoder:
+decoder. A web page is read by yt-dlp first, when it is installed: plaa
+picks the best format the chosen quality allows from what yt-dlp ranks,
+and when the site keeps sound apart, as YouTube does, opens it as a
+second input, read in step with the picture's. Streams no decoder takes
+are skipped, so an HLS stream fetches one of its qualities.
 
 - **Reading**: reads packets and hands each to its stream's queue,
-  keeping a few seconds or a few megabytes ahead, and takes commands:
-  seeks and track changes. Text subtitles are small enough to decode here.
+  keeping a second or so ahead of a file and up to 30 seconds ahead of a
+  stream, and takes commands: seeks and track changes. Text subtitles
+  are small enough to decode here.
 - **Video**: decodes, on the graphics card when it can, copies hardware
   pictures into memory it reuses (at 8K, fresh memory for each picture
   costs the system more than the copy), converts the few formats the shader does not read
@@ -122,11 +130,15 @@ decoder:
 
 The clock follows the sound while there is sound: it stalls while sound
 is missing, after a seek or while a stream buffers, so pictures wait
-rather than run ahead. Without sound, it starts from the first picture
-after a seek and runs on the system's clock. Every seek bumps a serial
-that packets, pictures and samples carry, so anything from before it is
-dropped wherever it is. Exact seeks also drop what decodes before the
-target.
+rather than run ahead. With no sound device, the sound goes to a silent
+output that takes it in time, so playback goes on as with one. Without
+sound, it starts from the first picture after a seek and runs on the
+system's clock. Once the source runs out, after a seek and when it
+opens, the clock also waits for the source to read 2 seconds ahead, so a
+slow network pauses playback once rather than every moment. Every seek
+bumps a serial that packets, pictures and samples carry, so anything
+from before it is dropped wherever it is. Exact seeks also drop what
+decodes before the target.
 
 Dragging the timeline holds the clock and seeks exactly, so the picture
 only moves the way the handle does; seeking to keyframes instead would
@@ -183,6 +195,7 @@ next pixel, so it moves a pixel at a time at any width.
 | Drag and drop | winit on X11; prev's patched smithay-clipboard on Wayland | winit | winit |
 | Screen kept on | the screen saver's D-Bus service, else logind's idle lock (keepawake) | execution state (keepawake) | power assertions (keepawake) |
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
+| yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |
 
