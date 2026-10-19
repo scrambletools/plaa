@@ -41,6 +41,14 @@ raw-window-handle = "0.6"
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rfd = { version = "0.15", default-features = false }
 
+# The menu bar, and the title bar plaa's chrome runs up behind.
+[target.'cfg(target_os = "macos")'.dependencies]
+muda = { version = "0.20", default-features = false }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSView", "NSWindow", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSDictionary", "NSGeometry", "NSString", "NSUserDefaults", "NSValue"] }
+raw-window-handle = "0.6"
+
 [target.'cfg(windows)'.dependencies]
 # The single instance's named pipe.
 interprocess = "2"

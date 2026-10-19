@@ -10,6 +10,8 @@ mod instance;
 #[cfg(windows)]
 #[path = "instance_windows.rs"]
 mod instance;
+#[cfg(target_os = "macos")]
+mod menu_macos;
 #[cfg(target_os = "linux")]
 mod mpris;
 mod playlist;
@@ -17,6 +19,8 @@ mod screenshot;
 mod settings_view;
 mod shortcuts;
 mod timeline;
+#[cfg(target_os = "macos")]
+mod title_bar_macos;
 mod video;
 mod window;
 
@@ -45,6 +49,9 @@ pub enum External {
     /// Something dragged over or dropped on a window, on Wayland.
     #[cfg(target_os = "linux")]
     Drag(smithay_clipboard::dnd::DragEvent),
+    /// An item of the macOS menu bar was chosen.
+    #[cfg(target_os = "macos")]
+    Menu(shortcuts::Action),
 }
 
 static EXTERNAL_EVENTS: Mutex<Option<UnboundedReceiver<External>>> = Mutex::new(None);
@@ -149,6 +156,12 @@ fn main() -> iced::Result {
         use smithay_clipboard::dnd;
         dnd::set_accepted_mimes(vec![dnd::URI_LIST_MIME.to_owned()]);
         dnd::set_drag_handler(|event| post(External::Drag(event)));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        menu_macos::leave_out_system_full_screen();
+        menu_macos::set_handler(|action| post(External::Menu(action)));
     }
 
     let omarchy_dir = omarchy::current_theme_dir();

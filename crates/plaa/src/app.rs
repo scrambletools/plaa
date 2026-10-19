@@ -78,6 +78,9 @@ pub struct Plaa {
     media_window: Option<window::Id>,
     #[cfg(target_os = "linux")]
     mpris: Option<crate::mpris::Service>,
+    /// The window last focused, which the menu bar's items act on.
+    #[cfg(target_os = "macos")]
+    focused: Option<window::Id>,
     next_surface: u64,
 }
 
@@ -132,9 +135,14 @@ pub(crate) struct Window {
     dropped: Vec<Source>,
     /// In picture in picture: the size to go back to.
     pip: Option<Size>,
-    /// The window's Wayland surface, which drops name it by.
-    #[cfg(target_os = "linux")]
+    /// The window's Wayland surface, which drops name it by, or its
+    /// AppKit view.
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     surface: Option<usize>,
+    /// The transparent title bar's height on macOS, which plaa's chrome
+    /// fills; zero in full screen.
+    #[cfg(target_os = "macos")]
+    title_bar: f32,
 }
 
 enum Content {
@@ -150,9 +158,13 @@ pub enum Message {
     CloseRequested(window::Id),
     Resized(window::Id, Size),
     Rescaled(window::Id, f32),
-    /// A window's Wayland surface, once it shows.
-    #[cfg(target_os = "linux")]
+    /// A window's Wayland surface or AppKit view, once it shows.
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     Surface(window::Id, Option<usize>),
+    #[cfg(target_os = "macos")]
+    Focused(window::Id),
+    #[cfg(target_os = "macos")]
+    TitleBarDoubleClicked(window::Id),
     Key(window::Id, Key, Modifiers),
     Pointer(window::Id, bool),
     FileDropped(window::Id, PathBuf),
@@ -238,10 +250,14 @@ impl Plaa {
             mpris: crate::mpris::Service::start("plaa", |command| {
                 crate::post(External::Media(command));
             }),
+            #[cfg(target_os = "macos")]
+            focused: None,
             next_surface: 1,
         };
         plaa.apply_looks();
         plaa.reload_omarchy();
+        #[cfg(target_os = "macos")]
+        crate::menu_macos::install();
         let task = plaa.open_sources(sources, None);
         let system = iced::system::theme().map(Message::SystemTheme);
         #[cfg(target_os = "linux")]
@@ -522,8 +538,10 @@ impl Plaa {
                 address: None,
                 dropped: Vec::new(),
                 pip: None,
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "macos"))]
                 surface: None,
+                #[cfg(target_os = "macos")]
+                title_bar: 0.0,
             },
         );
         if let Some(list) = list {
@@ -533,8 +551,8 @@ impl Plaa {
             Task::batch([
                 Task::done(Message::WindowOpened),
                 window::scale_factor(id).map(move |scale| Message::Rescaled(id, scale)),
-                #[cfg(target_os = "linux")]
-                window::run(id, wayland_surface).map(move |surface| Message::Surface(id, surface)),
+                #[cfg(any(target_os = "linux", target_os = "macos"))]
+                window::run(id, window_surface).map(move |surface| Message::Surface(id, surface)),
             ])
         })
     }
@@ -747,15 +765,50 @@ impl Plaa {
             Message::Resized(id, size) => {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.size = size;
+                    // Entering or leaving full screen resizes the window,
+                    // and the bar leaves or comes back.
+                    #[cfg(target_os = "macos")]
+                    {
+                        window.title_bar =
+                            crate::title_bar_macos::height(window.surface.unwrap_or(0));
+                    }
                 }
                 Task::none()
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
             Message::Surface(id, surface) => {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.surface = surface;
+                    #[cfg(target_os = "macos")]
+                    {
+                        window.title_bar = crate::title_bar_macos::height(surface.unwrap_or(0));
+                    }
                 }
                 Task::none()
+            }
+            #[cfg(target_os = "macos")]
+            Message::Focused(id) => {
+                self.focused = Some(id);
+                Task::none()
+            }
+            #[cfg(target_os = "macos")]
+            Message::TitleBarDoubleClicked(id) => {
+                if let Some(view) = self.windows.get(&id).and_then(|window| window.surface) {
+                    crate::title_bar_macos::double_clicked(view);
+                }
+                Task::none()
+            }
+            #[cfg(target_os = "macos")]
+            Message::External(External::Menu(action)) => {
+                let target = self
+                    .focused
+                    .filter(|id| self.windows.contains_key(id))
+                    .or_else(|| self.windows.keys().next().copied());
+                match (target, action) {
+                    (Some(id), action) => self.perform(id, action),
+                    (None, Action::Quit) => exit(),
+                    (None, _) => Task::none(),
+                }
             }
             #[cfg(target_os = "linux")]
             Message::External(External::Drag(event)) => self.dragged(event),
@@ -1438,6 +1491,8 @@ impl Plaa {
                 (Event::Window(window::Event::FileDropped(path)), _) => {
                     Some(Message::FileDropped(id, path))
                 }
+                #[cfg(target_os = "macos")]
+                (Event::Window(window::Event::Focused), _) => Some(Message::Focused(id)),
                 _ => None,
             }),
         ])
@@ -1478,11 +1533,28 @@ impl Plaa {
         } else {
             full()
         };
+        // Room for the transparent title bar on macOS, in the chrome
+        // color, so the bar shows plaa's toolbar color behind its buttons.
+        #[cfg(target_os = "macos")]
+        let body: Element<'_, Message> = if window.title_bar > 0.0 {
+            column![
+                iced::widget::mouse_area(
+                    container(space())
+                        .width(Fill)
+                        .height(window.title_bar)
+                        .style(style::chrome)
+                )
+                .on_double_click(Message::TitleBarDoubleClicked(id)),
+                body
+            ]
+            .into()
+        } else {
+            body
+        };
         scramble_ui::smooth::smooth(stack![body, notice, address, settings])
     }
 }
 
-/// Remembers where `player` is, for its file to start there next time.
 /// `path` as a `file://` address, characters outside a path's own escaped.
 #[cfg(target_os = "linux")]
 fn file_uri(path: &std::path::Path) -> String {
@@ -1523,12 +1595,13 @@ fn save_cover(source: &Source, cover: &plaa_media::Picture) -> Option<PathBuf> {
 }
 
 /// The window's `wl_surface` pointer on Wayland, which drag and drop
-/// events name the window by.
-#[cfg(target_os = "linux")]
-fn wayland_surface(window: &dyn window::Window) -> Option<usize> {
+/// events name the window by, or its `NSView` on macOS.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn window_surface(window: &dyn window::Window) -> Option<usize> {
     use raw_window_handle::RawWindowHandle;
     match window.window_handle().ok()?.as_raw() {
         RawWindowHandle::Wayland(handle) => Some(handle.surface.as_ptr() as usize),
+        RawWindowHandle::AppKit(handle) => Some(handle.ns_view.as_ptr() as usize),
         _ => None,
     }
 }
@@ -1560,6 +1633,7 @@ impl Window {
     }
 }
 
+/// Remembers where `player` is, for its file to start there next time.
 fn remember_position(positions: &mut Positions, player: &PlayerWindow) {
     if let Source::File(path) = player.source()
         && player.info.as_ref().is_some_and(|info| info.seekable)
@@ -1791,7 +1865,18 @@ fn platform_settings() -> PlatformSpecific {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+/// On macOS, the title bar is transparent over plaa's own chrome, which
+/// runs up behind it.
+#[cfg(target_os = "macos")]
+fn platform_settings() -> PlatformSpecific {
+    PlatformSpecific {
+        titlebar_transparent: true,
+        fullsize_content_view: true,
+        ..PlatformSpecific::default()
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn platform_settings() -> PlatformSpecific {
     PlatformSpecific::default()
 }

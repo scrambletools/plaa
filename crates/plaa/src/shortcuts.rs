@@ -220,6 +220,36 @@ impl Shortcut {
     }
 }
 
+/// What the macOS menu bar reads to show a shortcut on its items.
+#[cfg(target_os = "macos")]
+impl Shortcut {
+    pub fn command(&self) -> bool {
+        self.command
+    }
+
+    pub fn alt(&self) -> bool {
+        self.alt
+    }
+
+    pub fn shift(&self) -> bool {
+        self.shift
+    }
+
+    pub fn character(&self) -> Option<&str> {
+        match &self.key {
+            KeyName::Character(character) => Some(character),
+            KeyName::Named(_) => None,
+        }
+    }
+
+    pub fn named(&self) -> Option<Named> {
+        match &self.key {
+            KeyName::Named(named) => Some(*named),
+            KeyName::Character(_) => None,
+        }
+    }
+}
+
 fn is_letter(text: &str) -> bool {
     text.chars().all(char::is_alphabetic)
 }
@@ -321,6 +351,18 @@ pub fn label(action: Action) -> Option<String> {
         .iter()
         .find(|(_, bound)| *bound == action)
         .map(|(shortcut, _)| shortcut.label())
+}
+
+/// The shortcuts for `action` in effect, in the order they were given.
+#[cfg(target_os = "macos")]
+pub fn shortcuts(action: Action) -> Vec<Shortcut> {
+    BINDINGS
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .filter(|(_, bound)| *bound == action)
+        .map(|(shortcut, _)| shortcut.clone())
+        .collect()
 }
 
 /// Whether `key` is Escape, which always closes and cancels.

@@ -595,6 +595,8 @@ impl Plaa {
             SettingsMessage::Language(tag) => {
                 self.settings.language = tag;
                 crate::i18n::set_language(self.settings.chosen_language());
+                #[cfg(target_os = "macos")]
+                crate::menu_macos::install();
             }
             SettingsMessage::Languages(index, text) => {
                 let codes: Vec<String> = text
