@@ -42,6 +42,8 @@ pub enum SettingsMessage {
     CornerRadius(f32),
     Animations(bool),
     Hardware(bool),
+    /// An output device by id, or the system's default.
+    AudioDevice(Option<String>),
     Resume(bool),
     Language(String),
     /// The audio (0) or subtitle (1) languages, as typed.
@@ -428,6 +430,7 @@ impl Plaa {
                 self.settings.hardware_decoding,
                 SettingsMessage::Hardware,
             ),
+            self.audio_device_row(),
             switch_row(
                 crate::fl!("settings-resume"),
                 crate::fl!("settings-resume-note"),
@@ -447,6 +450,36 @@ impl Plaa {
             ),
         ]
         .spacing(12)
+    }
+
+    /// The sound output device: the system's default, or one of those it
+    /// had when Settings opened.
+    fn audio_device_row(&self) -> Element<'_, SettingsMessage> {
+        let system = crate::fl!("settings-audio-device-system");
+        let mut options = vec![system.clone()];
+        options.extend(self.audio_devices.iter().map(|device| device.name.clone()));
+        let selected = self
+            .settings
+            .audio_device
+            .as_ref()
+            .and_then(|id| self.audio_devices.iter().find(|device| &device.id == id))
+            .map_or(system, |device| device.name.clone());
+        let devices = self.audio_devices.clone();
+        let pick = dropdown::pick(options, Some(selected), move |name| {
+            SettingsMessage::AudioDevice(
+                devices
+                    .iter()
+                    .find(|device| device.name == name)
+                    .map(|device| device.id.clone()),
+            )
+        })
+        .width(Fill);
+        column![
+            scramble_ui::styled(crate::fl!("settings-audio-device"), Type::BodyLarge),
+            pick,
+        ]
+        .spacing(8)
+        .into()
     }
 
     /// The interface's language, and the languages of tracks to pick.
@@ -542,6 +575,14 @@ impl Plaa {
                 self.apply_looks();
             }
             SettingsMessage::Hardware(on) => self.settings.hardware_decoding = on,
+            SettingsMessage::AudioDevice(device) => {
+                for window in self.windows.values() {
+                    if let Some(player) = window.player() {
+                        player.player.set_audio_device(device.clone());
+                    }
+                }
+                self.settings.audio_device = device;
+            }
             SettingsMessage::Resume(on) => self.settings.resume = on,
             SettingsMessage::Language(tag) => {
                 self.settings.language = tag;

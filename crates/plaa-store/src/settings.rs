@@ -49,6 +49,9 @@ pub struct Settings {
     /// Decode video on the graphics card where it can, falling back to
     /// the processor.
     pub hardware_decoding: bool,
+    /// The sound output device, by the id the system gives it; the
+    /// system's default when none.
+    pub audio_device: Option<String>,
     /// Volume, 0 to 1, as last set.
     pub volume: f32,
     pub muted: bool,
@@ -86,6 +89,7 @@ impl Default for Settings {
             overlay_transparency: 15.0,
             animations: true,
             hardware_decoding: true,
+            audio_device: None,
             volume: 1.0,
             muted: false,
             resume: true,

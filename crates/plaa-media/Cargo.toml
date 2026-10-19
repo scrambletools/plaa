@@ -14,7 +14,9 @@ workspace = true
 # FFmpeg through its C libraries: the system's on Linux, bundled with the
 # packages elsewhere.
 ffmpeg-next = { version = "9", default-features = false, features = ["codec", "format", "filter", "software-resampling", "software-scaling"] }
-cpal = "0.18"
+# Through the sound server on Linux, PulseAudio or PipeWire, whose devices
+# are the ones people know; ALSA when there is none.
+cpal = { version = "0.18", features = ["pulseaudio"] }
 
 [dev-dependencies]
 tempfile = "3"

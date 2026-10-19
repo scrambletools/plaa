@@ -171,6 +171,14 @@ impl Shared {
         self.room.notify_all();
     }
 
+    /// The volume as the slider has it, and whether it is muted.
+    pub fn volume(&self) -> (f32, bool) {
+        (
+            f32::from_bits(self.volume.load(Ordering::Relaxed)),
+            self.muted.load(Ordering::Relaxed),
+        )
+    }
+
     pub fn set_volume(&self, volume: f32) {
         self.volume
             .store(volume.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
@@ -247,6 +255,30 @@ impl Shared {
     }
 }
 
+/// A sound output device: its id, which stays the same from one run to
+/// the next, and its name for people.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputDevice {
+    pub id: String,
+    pub name: String,
+}
+
+/// The system's sound output devices.
+pub fn output_devices() -> Vec<OutputDevice> {
+    let host = cpal::default_host();
+    let Ok(devices) = host.output_devices() else {
+        return Vec::new();
+    };
+    devices
+        .filter_map(|device| {
+            Some(OutputDevice {
+                id: device.id().ok()?.to_string(),
+                name: device.description().ok()?.name().to_owned(),
+            })
+        })
+        .collect()
+}
+
 /// An open output stream. Dropping it stops the sound.
 pub struct Output {
     _stream: cpal::Stream,
@@ -255,13 +287,35 @@ pub struct Output {
 
 impl Output {
     /// Opens the default output device at its own rate and channels.
-    pub fn open(clock: Arc<Clock>, volume: f32, muted: bool) -> Result<Self, OutputError> {
+    /// Opens output device `device`, by its id, or the system's default
+    /// when it is none or gone.
+    pub fn open(
+        clock: Arc<Clock>,
+        volume: f32,
+        muted: bool,
+        device: Option<&str>,
+    ) -> Result<Self, OutputError> {
         let host = cpal::default_host();
-        let device = host.default_output_device().ok_or(OutputError::NoDevice)?;
+        let chosen = device.and_then(|wanted| {
+            host.output_devices()
+                .ok()?
+                .find(|candidate| candidate.id().is_ok_and(|id| id.to_string() == wanted))
+        });
+        let device = chosen
+            .or_else(|| host.default_output_device())
+            .ok_or(OutputError::NoDevice)?;
         let supported = device
             .default_output_config()
             .map_err(|error| OutputError::Device(error.to_string()))?;
-        let config = supported.config();
+        #[cfg_attr(not(target_os = "linux"), expect(unused_mut))]
+        let mut config = supported.config();
+        // The sound server holds two seconds of sound unless asked for
+        // less, so each start and seek would be heard that late: periods
+        // of 25 ms, two of them buffered.
+        #[cfg(target_os = "linux")]
+        if host.id() == cpal::HostId::PulseAudio {
+            config.buffer_size = cpal::BufferSize::Fixed((config.sample_rate / 40).max(64));
+        }
         let shared = Arc::new(Shared {
             queue: Mutex::new(Queue::default()),
             room: Condvar::new(),

@@ -157,6 +157,8 @@ settings-animations-reduced = Off while the system asks for reduced motion.
 
 settings-hardware = Decode on the graphics card
 settings-hardware-note = Uses less power and plays large videos smoothly. Takes effect for files opened afterwards.
+settings-audio-device = Sound output
+settings-audio-device-system = System default
 settings-resume = Resume where you left off
 settings-resume-note = Files start where they were when last closed.
 settings-folders = Folders

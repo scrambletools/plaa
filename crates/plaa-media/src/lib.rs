@@ -12,6 +12,7 @@ pub mod player;
 mod queue;
 pub mod subtitle;
 
+pub use audio::{OutputDevice, output_devices};
 pub use decode::{Picture, same_language};
 pub use frame::VideoFrame;
 pub use info::MediaInfo;

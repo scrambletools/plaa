@@ -81,6 +81,9 @@ pub struct Options {
     /// Preferred languages, most wanted first.
     pub audio_languages: Vec<String>,
     pub subtitle_languages: Vec<String>,
+    /// The output device to play through, by id; the system's default
+    /// when none.
+    pub audio_device: Option<String>,
 }
 
 impl Default for Options {
@@ -93,6 +96,7 @@ impl Default for Options {
             paused: false,
             audio_languages: Vec::new(),
             subtitle_languages: Vec::new(),
+            audio_device: None,
         }
     }
 }
@@ -137,6 +141,8 @@ pub(crate) enum Command {
     Scrub,
     /// The drag ended.
     EndScrub,
+    /// Plays through this output device, by id, or the system's default.
+    SetAudioDevice(Option<String>),
     SelectAudio(Option<usize>),
     SelectSubtitles(Option<usize>),
 }
@@ -350,6 +356,12 @@ impl Player {
     /// playing.
     pub fn end_scrub(&self) {
         let _ = self.commands.send(Command::EndScrub);
+    }
+
+    /// Plays through output device `device`, by its id, or the system's
+    /// default when none.
+    pub fn set_audio_device(&self, device: Option<String>) {
+        let _ = self.commands.send(Command::SetAudioDevice(device));
     }
 
     pub fn set_volume(&self, volume: f32) {
@@ -580,7 +592,12 @@ fn read(
     let audio_stream = decode::pick_audio(&info, &options.audio_languages);
     let mut output = None;
     if audio_stream.is_some() {
-        match audio::Output::open(shared.clock.clone(), options.volume, options.muted) {
+        match audio::Output::open(
+            shared.clock.clone(),
+            options.volume,
+            options.muted,
+            options.audio_device.as_deref(),
+        ) {
             Ok(opened) => output = Some(opened),
             Err(error) => events(Event::NoSound(error.to_string())),
         }
@@ -742,25 +759,51 @@ fn read(
                 },
                 Command::SelectAudio(index) => {
                     decoders.stop_audio();
-                    let mut chosen = None;
-                    if let (Some(index), Some(output)) = (index, &output)
-                        && let Ok((queue, thread)) = decode::spawn_audio(
-                            &input,
-                            index,
-                            start,
-                            output.shared.clone(),
-                            shared.clone(),
-                        )
-                    {
-                        decoders.audio = Some((index, queue, thread));
-                        chosen = Some(index);
-                    }
-                    {
-                        let mut state = shared.state();
-                        state.audio = chosen;
-                        state.has_audio = chosen.is_some();
-                    }
+                    start_audio(
+                        index,
+                        &input,
+                        start,
+                        output.as_ref(),
+                        &shared,
+                        &mut decoders,
+                    );
                     // Back to where it was, so the new track starts in step.
+                    let now = shared.clock.now().max(0.0);
+                    if info.seekable {
+                        seek(&mut input, &shared, &mut decoders, now, true, start);
+                        read_all = false;
+                        shared.state().read_all = false;
+                    }
+                }
+                Command::SetAudioDevice(device) => {
+                    decoders.stop_audio();
+                    let (volume, muted) = output
+                        .as_ref()
+                        .map_or((options.volume, options.muted), |output| {
+                            output.shared.volume()
+                        });
+                    let playing = shared.state().audio.or(audio_stream);
+                    // The old stream closes before the new one opens.
+                    output = None;
+                    match audio::Output::open(
+                        shared.clock.clone(),
+                        volume,
+                        muted,
+                        device.as_deref(),
+                    ) {
+                        Ok(opened) => output = Some(opened),
+                        Err(error) => events(Event::NoSound(error.to_string())),
+                    }
+                    *shared.audio.lock().unwrap_or_else(PoisonError::into_inner) =
+                        output.as_ref().map(|output| output.shared.clone());
+                    start_audio(
+                        playing,
+                        &input,
+                        start,
+                        output.as_ref(),
+                        &shared,
+                        &mut decoders,
+                    );
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
                         seek(&mut input, &shared, &mut decoders, now, true, start);
@@ -853,6 +896,29 @@ fn read(
     }
     decoders.stop();
     drop(output);
+}
+
+/// Decodes audio track `index` into `output`, and notes the track that
+/// plays: none when there is no output or the track will not decode.
+fn start_audio(
+    index: Option<usize>,
+    input: &ffmpeg::format::context::Input,
+    start: f64,
+    output: Option<&audio::Output>,
+    shared: &Arc<Shared>,
+    decoders: &mut Decoders,
+) {
+    let mut chosen = None;
+    if let (Some(index), Some(output)) = (index, output)
+        && let Ok((queue, thread)) =
+            decode::spawn_audio(input, index, start, output.shared.clone(), shared.clone())
+    {
+        decoders.audio = Some((index, queue, thread));
+        chosen = Some(index);
+    }
+    let mut state = shared.state();
+    state.audio = chosen;
+    state.has_audio = chosen.is_some();
 }
 
 /// A drag along the timeline: where its pictures are headed.

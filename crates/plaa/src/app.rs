@@ -54,6 +54,8 @@ pub struct Plaa {
     pub(crate) settings_tab: SettingsTab,
     /// Language lists as typed in Settings, applied as they change.
     pub(crate) language_drafts: [String; 2],
+    /// The sound output devices, as they were when Settings last opened.
+    pub(crate) audio_devices: Vec<plaa_media::OutputDevice>,
     next_surface: u64,
 }
 
@@ -158,6 +160,7 @@ impl Plaa {
             system_animations: true,
             settings_tab: SettingsTab::default(),
             language_drafts,
+            audio_devices: Vec::new(),
             next_surface: 1,
         };
         plaa.apply_looks();
@@ -327,6 +330,7 @@ impl Plaa {
             paused: false,
             audio_languages: self.settings.audio_languages.clone(),
             subtitle_languages: self.settings.subtitle_languages.clone(),
+            audio_device: self.settings.audio_device.clone(),
         };
         let player = Player::open(source, options, move |event| {
             crate::post(External::Player(id, event));
@@ -642,6 +646,7 @@ impl Plaa {
                 return iced::exit();
             }
             Action::Settings => {
+                self.audio_devices = plaa_media::output_devices();
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.settings_open = true;
                 }
@@ -978,6 +983,16 @@ impl Plaa {
 }
 
 /// Remembers where `player` is, for its file to start there next time.
+impl Window {
+    /// What the window plays, if anything.
+    pub(crate) fn player(&self) -> Option<&PlayerWindow> {
+        match &self.content {
+            Content::Player(player) => Some(player),
+            Content::Start => None,
+        }
+    }
+}
+
 fn remember_position(positions: &mut Positions, player: &PlayerWindow) {
     if let Source::File(path) = player.source()
         && player.info.as_ref().is_some_and(|info| info.seekable)
