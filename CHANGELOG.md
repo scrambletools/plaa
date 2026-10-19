@@ -39,4 +39,5 @@ The first build.
 - Trimming, splitting and arranging clips, rotating and flipping, with
   undo, the edit playing clip after clip without a gap.
 - Exporting to H.264, HEVC, AV1 or sound alone, as edited and made
-  smaller, on the graphics card's encoder where one opens.
+  smaller, on the graphics card's encoder where one opens; sound alone
+  as AAC, MP3, Opus, FLAC, ALAC or WAV, at a quality chosen.

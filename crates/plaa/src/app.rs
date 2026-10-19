@@ -86,6 +86,8 @@ pub struct Plaa {
     /// and those being looked for.
     encoders: HashMap<export::Encoding, Option<plaa_media::export::Encoder>>,
     probing: HashSet<export::Encoding>,
+    /// What the Export dialog chose last, which it starts with next.
+    export_choice: Option<export::Choice>,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -209,6 +211,10 @@ pub enum Message {
     ExportFormat(window::Id, plaa_media::export::Format),
     /// The Export dialog's size: the picture's shorter side, or its own.
     ExportSize(window::Id, Option<u32>),
+    /// The Export dialog's format for the sound alone.
+    ExportSound(window::Id, plaa_media::export::Sound),
+    /// The sound's quality: kb/s, or bits for lossless sound.
+    ExportQuality(window::Id, u32),
     ExportDismissed(window::Id),
     /// Export was chosen in the dialog: on to where to save it.
     ExportChosen(window::Id),
@@ -290,6 +296,7 @@ impl Plaa {
             yt_dlp_found: false,
             encoders: HashMap::new(),
             probing: HashSet::new(),
+            export_choice: None,
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -935,6 +942,20 @@ impl Plaa {
                     choice.lines = lines;
                 }
                 self.find_encoder(id);
+                Task::none()
+            }
+            Message::ExportSound(id, sound) => {
+                self.choose_sound(id, sound);
+                Task::none()
+            }
+            Message::ExportQuality(id, quality) => {
+                if let Some(choice) = self
+                    .windows
+                    .get_mut(&id)
+                    .and_then(|window| window.export.as_mut())
+                {
+                    choice.quality = quality;
+                }
                 Task::none()
             }
             Message::ExportDismissed(id) => {

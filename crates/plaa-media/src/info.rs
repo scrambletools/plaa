@@ -125,6 +125,8 @@ pub struct AudioTrack {
     pub channels: u16,
     /// Such as "stereo" or "5.1(side)".
     pub layout: String,
+    /// Bits per sample, for lossless and uncompressed sound that says.
+    pub bits: Option<u32>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -283,6 +285,7 @@ impl MediaInfo {
                         sample_rate: audio.rate(),
                         channels: audio.channels(),
                         layout: layout_name(ffi::decoder_layout(&audio), audio.channels()),
+                        bits: ffi::sample_bits(&stream),
                     });
                 }
                 Type::Subtitle => {

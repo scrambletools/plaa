@@ -1,7 +1,8 @@
 //! Exporting a file, as edited, to a new one: its picture to H.264, HEVC
 //! or AV1, on a graphics card's encoder where one opens, else on the
-//! processor, its sound to AAC, or the sound alone. Pictures are turned
-//! and flipped as the edit says, and made smaller when asked.
+//! processor, with its sound as AAC; or the sound alone, compressed or
+//! lossless. Pictures are turned and flipped as the edit says, and made
+//! smaller when asked.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -23,17 +24,108 @@ pub enum Format {
     H264,
     Hevc,
     Av1,
-    /// The sound alone, as AAC.
-    AudioOnly,
+    /// The sound alone.
+    Sound(Sound),
 }
 
 impl Format {
     /// The file name ending its files usually have.
     pub fn extension(self) -> &'static str {
         match self {
-            Format::AudioOnly => "m4a",
+            Format::Sound(sound) => sound.extension(),
             _ => "mp4",
         }
+    }
+}
+
+/// What sound alone is exported as.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Sound {
+    Aac,
+    Mp3,
+    Opus,
+    Flac,
+    /// Apple Lossless.
+    Alac,
+    /// Uncompressed, in a WAV file.
+    Wav,
+}
+
+impl Sound {
+    pub const ALL: [Sound; 6] = [
+        Sound::Aac,
+        Sound::Mp3,
+        Sound::Opus,
+        Sound::Flac,
+        Sound::Alac,
+        Sound::Wav,
+    ];
+
+    /// Whether it keeps the sound exactly.
+    pub fn lossless(self) -> bool {
+        matches!(self, Sound::Flac | Sound::Alac | Sound::Wav)
+    }
+
+    /// The qualities offered: bit rates in kb/s for two channels, or for
+    /// lossless sound, bits per sample.
+    pub fn qualities(self) -> &'static [u32] {
+        match self {
+            Sound::Aac | Sound::Mp3 => &[128, 192, 256, 320],
+            Sound::Opus => &[64, 96, 128, 192],
+            Sound::Flac | Sound::Alac | Sound::Wav => &[16, 24],
+        }
+    }
+
+    /// The quality offered first: plenty for listening, or CD quality.
+    pub fn usual_quality(self) -> u32 {
+        match self {
+            Sound::Aac | Sound::Mp3 => 256,
+            Sound::Opus => 128,
+            Sound::Flac | Sound::Alac | Sound::Wav => 16,
+        }
+    }
+
+    pub fn extension(self) -> &'static str {
+        match self {
+            Sound::Aac | Sound::Alac => "m4a",
+            Sound::Mp3 => "mp3",
+            Sound::Opus => "opus",
+            Sound::Flac => "flac",
+            Sound::Wav => "wav",
+        }
+    }
+
+    /// FFmpeg's muxer for its files.
+    fn muxer(self) -> &'static str {
+        match self {
+            Sound::Aac | Sound::Alac => "ipod",
+            Sound::Mp3 => "mp3",
+            Sound::Opus => "opus",
+            Sound::Flac => "flac",
+            Sound::Wav => "wav",
+        }
+    }
+
+    /// FFmpeg's encoders for it at `quality`, best first: Apple's AAC
+    /// encoder where there is one, as it sounds better.
+    fn encoders(self, quality: u32) -> &'static [&'static str] {
+        match self {
+            Sound::Aac if cfg!(target_os = "macos") => &["aac_at", "aac"],
+            Sound::Aac => &["aac"],
+            Sound::Mp3 => &["libmp3lame"],
+            Sound::Opus => &["libopus"],
+            Sound::Flac => &["flac"],
+            Sound::Alac => &["alac"],
+            Sound::Wav if quality > 16 => &["pcm_s24le"],
+            Sound::Wav => &["pcm_s16le"],
+        }
+    }
+
+    /// Whether this system's FFmpeg can encode it.
+    pub fn available(self) -> bool {
+        self.encoders(self.usual_quality())
+            .iter()
+            .any(|name| ffmpeg::encoder::find_by_name(name).is_some())
     }
 }
 
@@ -58,6 +150,9 @@ pub struct Job {
     /// The picture's shorter side, in pixels, when smaller than the
     /// file's.
     pub lines: Option<u32>,
+    /// The sound's quality when it is exported alone, as its format
+    /// counts it.
+    pub quality: Option<u32>,
     /// Decode and encode on a graphics card where one does it.
     pub hardware: bool,
     pub destination: PathBuf,
@@ -161,13 +256,13 @@ fn candidates(format: Format) -> Vec<Encoder> {
         Format::Av1 if cfg!(target_os = "macos") => &[],
         Format::Av1 if cfg!(windows) => &["av1_nvenc", "av1_amf", "av1_qsv"],
         Format::Av1 => &["av1_nvenc", "av1_vaapi", "av1_qsv"],
-        Format::AudioOnly => &[],
+        Format::Sound(_) => &[],
     };
     let software: &[&str] = match format {
         Format::H264 => &["libx264"],
         Format::Hevc => &["libx265"],
         Format::Av1 => &["libsvtav1", "libaom-av1"],
-        Format::AudioOnly => &[],
+        Format::Sound(_) => &[],
     };
     hardware
         .iter()
@@ -432,11 +527,6 @@ fn picture_filters(transform: Transform, size: (u32, u32), format: Pixel) -> Str
     filters.join(",")
 }
 
-/// Rates AAC encodes at; others become 48 kHz.
-const AAC_RATES: [u32; 12] = [
-    96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000,
-];
-
 /// The output's streams, as each is fed.
 struct Output {
     context: ffmpeg::format::context::Output,
@@ -525,14 +615,15 @@ fn run(
         Some(edit) => (edit.spans(), edit.duration(), edit.transform()),
         None => (vec![Span::WHOLE], duration, Transform::default()),
     };
-    let video_stream = job
-        .video
-        .filter(|_| job.format != Format::AudioOnly)
-        .filter(|index| {
-            info.video
-                .iter()
-                .any(|track| track.track.index == *index && !track.cover)
-        });
+    let sound_alone = match job.format {
+        Format::Sound(sound) => Some(sound),
+        _ => None,
+    };
+    let video_stream = job.video.filter(|_| sound_alone.is_none()).filter(|index| {
+        info.video
+            .iter()
+            .any(|track| track.track.index == *index && !track.cover)
+    });
     let audio_stream = job
         .audio
         .filter(|index| info.audio.iter().any(|track| track.track.index == *index));
@@ -540,8 +631,8 @@ fn run(
         return Err(ExportError::Failed("nothing to export".to_owned()));
     }
 
-    let mut context =
-        ffmpeg::format::output_as(&temporary, muxer(&job.destination)).map_err(failed)?;
+    let muxer = sound_alone.map_or_else(|| muxer(&job.destination), Sound::muxer);
+    let mut context = ffmpeg::format::output_as(&temporary, muxer).map_err(failed)?;
     let global_header = context
         .format()
         .flags()
@@ -560,8 +651,24 @@ fn run(
         )?),
         None => None,
     };
+    // Sound with a picture is AAC.
+    let sound = sound_alone.unwrap_or(Sound::Aac);
+    let quality = job
+        .quality
+        .filter(|_| sound_alone.is_some())
+        .unwrap_or(match sound {
+            Sound::Aac => 192,
+            other => other.usual_quality(),
+        });
     let mut audio = match audio_stream {
-        Some(index) => Some(audio_side(&input, index, &mut context, global_header)?),
+        Some(index) => Some(audio_side(
+            &input,
+            &info,
+            index,
+            (sound, quality),
+            &mut context,
+            global_header,
+        )?),
         None => None,
     };
     let mut header = ffmpeg::Dictionary::new();
@@ -901,11 +1008,57 @@ impl VideoSide {
     }
 }
 
-/// Sets up the sound's side: its decoder, an AAC encoder, and its stream
-/// in the output.
+/// The sample format to encode `sound` at `quality` in, of those the
+/// encoder takes, if it says.
+fn sample_format(
+    sound: Sound,
+    quality: u32,
+    takes: &[ffmpeg::format::Sample],
+) -> Option<ffmpeg::format::Sample> {
+    use ffmpeg::format::Sample::{F32, I16, I32};
+    use ffmpeg::format::sample::Type::{Packed, Planar};
+    let wanted: &[ffmpeg::format::Sample] = if !sound.lossless() {
+        &[
+            F32(Planar),
+            F32(Packed),
+            I16(Packed),
+            I16(Planar),
+            I32(Planar),
+        ]
+    } else if quality > 16 {
+        &[I32(Packed), I32(Planar)]
+    } else {
+        &[I16(Packed), I16(Planar)]
+    };
+    wanted
+        .iter()
+        .copied()
+        .find(|sample| takes.is_empty() || takes.contains(sample))
+}
+
+/// The sample rate to encode at: the file's, where the encoder takes it,
+/// else 48 kHz, else the highest it takes.
+fn sample_rate(file: u32, takes: &[i32]) -> u32 {
+    let takes: Vec<u32> = takes
+        .iter()
+        .filter_map(|rate| u32::try_from(*rate).ok())
+        .collect();
+    if takes.is_empty() || takes.contains(&file) {
+        file
+    } else if takes.contains(&48000) {
+        48000
+    } else {
+        takes.iter().copied().max().unwrap_or(48000)
+    }
+}
+
+/// Sets up the sound's side: its decoder, an encoder for `sound` at
+/// `quality`, and its stream in the output.
 fn audio_side(
     input: &ffmpeg::format::context::Input,
+    info: &MediaInfo,
     index: usize,
+    (sound, quality): (Sound, u32),
     context: &mut ffmpeg::format::context::Output,
     global_header: bool,
 ) -> Result<AudioSide, ExportError> {
@@ -914,41 +1067,40 @@ fn audio_side(
         .ok_or_else(|| failed("the sound's stream is gone"))?;
     let (decoder, time_base) = crate::decode::open_decoder(input, index).map_err(failed)?;
     let decoder = decoder.audio().map_err(failed)?;
-    // Apple's AAC encoder where there is one, as it sounds better.
-    let codec = ["aac_at", "aac"]
-        .into_iter()
-        .filter(|name| *name != "aac_at" || cfg!(target_os = "macos"))
-        .find_map(ffmpeg::encoder::find_by_name)
-        .ok_or_else(|| failed("no AAC encoder"))?;
-    let rate = if AAC_RATES.contains(&decoder.rate()) {
-        decoder.rate()
-    } else {
-        48000
-    };
-    let channels = decoder.channels().clamp(1, 8);
-    let formats: Vec<ffmpeg::format::Sample> = codec
-        .audio()
-        .map_err(failed)?
-        .formats()
-        .map(Iterator::collect)
-        .unwrap_or_default();
-    let sample = [
-        ffmpeg::format::Sample::F32(ffmpeg::format::sample::Type::Planar),
-        ffmpeg::format::Sample::F32(ffmpeg::format::sample::Type::Packed),
-        ffmpeg::format::Sample::I16(ffmpeg::format::sample::Type::Packed),
-    ]
-    .into_iter()
-    .find(|sample| formats.is_empty() || formats.contains(sample))
-    .ok_or_else(|| failed("no sample format the AAC encoder takes"))?;
-    let mut encoder = ffmpeg::codec::Context::new_with_codec(codec)
-        .encoder()
-        .audio()
-        .map_err(failed)?;
+    let codec = sound
+        .encoders(quality)
+        .iter()
+        .find_map(|name| ffmpeg::encoder::find_by_name(name))
+        .ok_or_else(|| failed("no encoder for this sound format"))?;
+    let audio = codec.audio().map_err(failed)?;
+    let rates: Vec<i32> = audio.rates().map(Iterator::collect).unwrap_or_default();
+    let file_rate = info
+        .audio
+        .iter()
+        .find(|track| track.track.index == index)
+        .map_or(decoder.rate(), |track| track.sample_rate);
+    let rate = sample_rate(file_rate.max(1), &rates);
+    // MP3 holds two channels at most.
+    let most = if sound == Sound::Mp3 { 2 } else { 8 };
+    let channels = decoder.channels().clamp(1, most);
+    let formats: Vec<ffmpeg::format::Sample> =
+        audio.formats().map(Iterator::collect).unwrap_or_default();
+    let sample = sample_format(sound, quality, &formats)
+        .ok_or_else(|| failed("no sample format the sound encoder takes"))?;
+    let mut encoder = ffmpeg::codec::Context::new_with_codec(codec);
+    if sound.lossless() {
+        ffi::set_sample_bits(&mut encoder, quality);
+    }
+    let mut encoder = encoder.encoder().audio().map_err(failed)?;
     encoder.set_rate(rate as i32);
     encoder.set_channel_layout(ffmpeg::ChannelLayout::default(i32::from(channels)));
     encoder.set_format(sample);
     encoder.set_time_base(ffmpeg::Rational::new(1, rate as i32));
-    encoder.set_bit_rate((96_000 * usize::from(channels)).min(512_000));
+    if !sound.lossless() {
+        // The quality counts for two channels.
+        let per_channel = quality as usize * 1000 / 2;
+        encoder.set_bit_rate(per_channel * usize::from(channels.max(2)));
+    }
     if global_header {
         encoder.set_flags(ffmpeg::codec::Flags::GLOBAL_HEADER);
     }
@@ -1048,15 +1200,20 @@ impl AudioSide {
             ffmpeg::filter::find("abuffersink").ok_or_else(|| failed("no abuffersink filter"))?;
         graph.add(&abuffer, "in", &arguments).map_err(failed)?;
         graph.add(&sink, "out", "").map_err(failed)?;
-        let filters = format!(
+        let mut filters = format!(
             "aresample={rate}:async=1:first_pts=0,\
-             aformat=sample_fmts={format}:channel_layouts={layout},\
-             asetnsamples=n={size}",
+             aformat=sample_fmts={format}:channel_layouts={layout}",
             rate = self.encoder.rate(),
             format = self.encoder.format().name(),
             layout = ffi::default_layout(i32::from(self.encoder.channels())),
-            size = self.encoder.frame_size().max(1),
         );
+        // In the frames the encoder takes, unless it takes any; the last
+        // one short, which FFmpeg pads for encoders that need it, so
+        // lossless sound ends where it does.
+        let size = self.encoder.frame_size();
+        if size > 0 {
+            filters.push_str(&format!(",asetnsamples=n={size}:p=0"));
+        }
         graph
             .output("in", 0)
             .and_then(|parser| parser.input("out", 0))
@@ -1143,6 +1300,31 @@ mod tests {
             picture_filters(transform, (720, 1280), Pixel::NV12),
             "hflip,transpose=clock,scale=720:1280:flags=bicubic,format=nv12,setsar=1"
         );
+    }
+
+    #[test]
+    fn sound_is_encoded_as_its_encoder_takes_it() {
+        use ffmpeg::format::Sample::{F32, I16, I32};
+        use ffmpeg::format::sample::Type::{Packed, Planar};
+        assert_eq!(
+            sample_format(Sound::Flac, 24, &[I16(Packed), I32(Packed)]),
+            Some(I32(Packed))
+        );
+        assert_eq!(
+            sample_format(Sound::Alac, 16, &[I16(Planar), I32(Planar)]),
+            Some(I16(Planar))
+        );
+        assert_eq!(
+            sample_format(Sound::Opus, 128, &[I16(Packed), F32(Packed)]),
+            Some(F32(Packed))
+        );
+        // Opus takes 48 kHz, not 44.1.
+        assert_eq!(sample_rate(44100, &[48000, 24000, 16000]), 48000);
+        assert_eq!(sample_rate(44100, &[]), 44100);
+        assert_eq!(sample_rate(96000, &[44100, 32000]), 44100);
+        for sound in Sound::ALL {
+            assert!(sound.qualities().contains(&sound.usual_quality()));
+        }
     }
 
     #[test]

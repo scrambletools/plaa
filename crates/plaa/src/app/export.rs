@@ -1,13 +1,14 @@
 //! Exporting a window's file, as edited: the dialog choosing the format
-//! and size, the save dialog, the export's progress over the window, and
-//! the warning before closing a window with changes not exported.
+//! and size, or the sound's format and quality, the save dialog, the
+//! export's progress over the window, and the warning before closing a
+//! window with changes not exported.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use iced::widget::{container, progress_bar, space, text};
 use iced::{Center, Element, Fill, Task, Theme, window};
-use plaa_media::export::{Encoder, Export, ExportError, ExportEvent, Format, Job};
+use plaa_media::export::{Encoder, Export, ExportError, ExportEvent, Format, Job, Sound};
 use plaa_media::{Edit, Source};
 use scramble_ui::button::Kind;
 use scramble_ui::component;
@@ -23,6 +24,10 @@ pub(crate) struct Choice {
     pub format: Format,
     /// The picture's shorter side, when smaller than the file's.
     pub lines: Option<u32>,
+    /// The format and quality for the sound alone, kept while a picture's
+    /// format is chosen.
+    pub sound: Sound,
+    pub quality: u32,
 }
 
 /// An export under way from a window.
@@ -65,17 +70,45 @@ impl Plaa {
         if !player.can_edit() {
             return Task::none();
         }
-        let format = if player.is_video() {
-            Format::H264
-        } else {
-            Format::AudioOnly
-        };
-        window.export = Some(Choice {
-            format,
+        // As chosen last time, at the file's own size.
+        let mut choice = self.export_choice.unwrap_or(Choice {
+            format: Format::H264,
             lines: None,
+            sound: Sound::Aac,
+            quality: Sound::Aac.usual_quality(),
         });
+        choice.lines = None;
+        if !player.is_video() {
+            choice.format = Format::Sound(choice.sound);
+        }
+        if !choice.sound.available() {
+            choice.sound = Sound::Aac;
+            choice.quality = usual_quality(player, Sound::Aac);
+        }
+        window.export = Some(choice);
         self.find_encoder(id);
         Task::none()
+    }
+
+    /// Chooses `sound` in window `id`'s Export dialog, at the quality
+    /// chosen when the format offers it, else its usual one.
+    pub(super) fn choose_sound(&mut self, id: window::Id, sound: Sound) {
+        let Some(window) = self.windows.get_mut(&id) else {
+            return;
+        };
+        let Some(player) = window.player() else {
+            return;
+        };
+        let usual = usual_quality(player, sound);
+        if let Some(choice) = &mut window.export {
+            if !sound.qualities().contains(&choice.quality)
+                || choice.sound.lossless() != sound.lossless()
+            {
+                choice.quality = usual;
+            }
+            choice.sound = sound;
+            choice.format = Format::Sound(sound);
+        }
     }
 
     /// Looks for the encoder window `id`'s export dialog's choice would
@@ -146,6 +179,7 @@ impl Plaa {
         let Some(choice) = window.export.take() else {
             return;
         };
+        self.export_choice = Some(choice);
         let Content::Player(player) = &window.content else {
             return;
         };
@@ -160,6 +194,7 @@ impl Plaa {
             audio: player.status.audio,
             format: choice.format,
             lines: choice.lines,
+            quality: Some(choice.quality),
             hardware,
             destination: destination.clone(),
         };
@@ -265,10 +300,29 @@ impl Plaa {
     }
 }
 
+/// The quality `sound` is first offered at: for lossless sound, as many
+/// bits as the file has, at least CD quality's.
+fn usual_quality(player: &PlayerWindow, sound: Sound) -> u32 {
+    if !sound.lossless() {
+        return sound.usual_quality();
+    }
+    let bits = player
+        .info
+        .as_ref()
+        .and_then(|info| {
+            info.audio
+                .iter()
+                .find(|track| Some(track.track.index) == player.status.audio)
+        })
+        .and_then(|track| track.bits)
+        .unwrap_or(16);
+    if bits > 16 { 24 } else { 16 }
+}
+
 /// The format and picture size `choice` exports `player`'s file in; none
 /// for sound alone.
 fn encoding(player: &PlayerWindow, choice: Choice) -> Option<Encoding> {
-    if choice.format == Format::AudioOnly {
+    if matches!(choice.format, Format::Sound(_)) {
         return None;
     }
     let track = player.picture()?;
@@ -301,7 +355,8 @@ fn runs_on(encoder: Encoder) -> String {
     crate::fl!("export-on-graphics-card", api = api)
 }
 
-/// The Export dialog: the format, the size, and what encodes it.
+/// The Export dialog: the format, and the size and what encodes it, or
+/// for the sound alone, its format and quality.
 pub(super) fn dialog<'a>(
     id: window::Id,
     choice: Choice,
@@ -309,78 +364,84 @@ pub(super) fn dialog<'a>(
     encoders: &HashMap<Encoding, Option<Encoder>>,
 ) -> Element<'a, Message> {
     let has_audio = player.status.audio.is_some();
-    let mut formats = Vec::new();
+    let note = |text: String| {
+        scramble_ui::aligned(
+            scramble_ui::styled(text, Type::BodyMedium).style(style::on_surface_variant),
+        )
+    };
+    let mut body = column![scramble_ui::styled(
+        crate::fl!("export-title"),
+        Type::HeadlineSmall
+    )]
+    .spacing(8);
+    let mut ready = true;
+    // A file with a picture chooses between pictures' formats and the
+    // sound alone; one without has only sound.
     if player.is_video() {
-        formats.extend([
+        let mut formats = vec![
             (Format::H264, crate::fl!("export-h264")),
             (Format::Hevc, crate::fl!("export-hevc")),
             (Format::Av1, crate::fl!("export-av1")),
-        ]);
-    }
-    if has_audio {
-        formats.push((Format::AudioOnly, crate::fl!("export-audio-only")));
-    }
-    let format_buttons = formats
-        .into_iter()
-        .map(|(format, label)| {
-            scramble_ui::button(Kind::Tonal, label)
-                .selected(choice.format == format)
-                .on_press(Message::ExportFormat(id, format))
-        })
-        .collect();
-    let encoder = match encoding(player, choice) {
-        None => Some(None),
-        Some(encoding) => encoders.get(&encoding).copied().map(Some),
-    };
-    let (note, ready) = match encoder {
-        Some(Some(Some(encoder))) => (runs_on(encoder), true),
-        Some(Some(None)) => (crate::fl!("export-no-encoder"), false),
-        Some(None) => (crate::fl!("export-sound-note"), true),
-        None => (crate::fl!("export-checking"), false),
-    };
-    let mut body = column![
-        scramble_ui::styled(crate::fl!("export-title"), Type::HeadlineSmall),
-        component::section(crate::fl!("export-format")),
-        component::connected(format_buttons),
-        scramble_ui::aligned(
-            scramble_ui::styled(note, Type::BodyMedium).style(style::on_surface_variant)
-        ),
-    ]
-    .spacing(8);
-    // Sizes the picture can be made, its own first.
-    if choice.format != Format::AudioOnly
-        && let Some(track) = player.picture()
-    {
-        let turned = player.transform().after_turns(track.quarter_turns).turns % 2 == 1;
-        let shown_width = (f64::from(track.height) * track.aspect).round() as u32;
-        let shorter = if turned {
-            shown_width.min(track.height)
-        } else {
-            track.height.min(shown_width)
-        };
-        let mut sizes = vec![(None, crate::fl!("export-size-original", lines = shorter))];
-        sizes.extend(
-            LINES
-                .into_iter()
-                .filter(|lines| *lines < shorter)
-                .map(|lines| {
-                    (
-                        Some(lines),
-                        crate::fl!("quality-lines", lines = lines.to_string()),
-                    )
-                }),
-        );
-        let size_buttons = sizes
+        ];
+        if has_audio {
+            formats.push((Format::Sound(choice.sound), crate::fl!("export-audio-only")));
+        }
+        let format_buttons = formats
             .into_iter()
-            .map(|(lines, label)| {
+            .map(|(format, label)| {
                 scramble_ui::button(Kind::Tonal, label)
-                    .selected(choice.lines == lines)
-                    .on_press(Message::ExportSize(id, lines))
+                    .selected(choice.format == format)
+                    .on_press(Message::ExportFormat(id, format))
             })
             .collect();
         body = body
-            .push(component::section(crate::fl!("export-size")))
-            .push(component::connected(size_buttons));
+            .push(component::section(crate::fl!("export-format")))
+            .push(component::connected(format_buttons));
+    }
+    if let Some(encoding) = encoding(player, choice) {
+        let (text, found) = match encoders.get(&encoding) {
+            Some(Some(encoder)) => (runs_on(*encoder), true),
+            Some(None) => (crate::fl!("export-no-encoder"), false),
+            None => (crate::fl!("export-checking"), false),
+        };
+        ready = found;
+        body = body.push(note(text));
+        if let Some(sizes) = size_buttons(id, choice, player) {
+            body = body
+                .push(component::section(crate::fl!("export-size")))
+                .push(sizes);
+        }
+    } else {
+        let sound_buttons = Sound::ALL
+            .into_iter()
+            .filter(|sound| sound.available())
+            .map(|sound| {
+                scramble_ui::button(Kind::Tonal, sound_name(sound))
+                    .selected(choice.sound == sound)
+                    .on_press(Message::ExportSound(id, sound))
+            })
+            .collect();
+        let quality_buttons = choice
+            .sound
+            .qualities()
+            .iter()
+            .map(|&quality| {
+                let label = if choice.sound.lossless() {
+                    crate::fl!("export-bits", bits = quality)
+                } else {
+                    crate::fl!("export-kilobits", rate = quality)
+                };
+                scramble_ui::button(Kind::Tonal, label)
+                    .selected(choice.quality == quality)
+                    .on_press(Message::ExportQuality(id, quality))
+            })
+            .collect();
+        body = body
+            .push(component::section(crate::fl!("export-sound-format")))
+            .push(component::connected(sound_buttons))
+            .push(note(sound_note(choice.sound)))
+            .push(component::section(crate::fl!("export-quality")))
+            .push(component::connected(quality_buttons));
     }
     let actions = vec![
         scramble_ui::button(Kind::Text, crate::fl!("common-cancel"))
@@ -398,7 +459,7 @@ pub(super) fn dialog<'a>(
                 ..iced::Padding::ZERO
             }),
     );
-    let card = container(body).padding(24).width(520).style(style::dialog);
+    let card = container(body).padding(24).width(540).style(style::dialog);
     iced::widget::mouse_area(
         container(iced::widget::opaque(card))
             .center(Fill)
@@ -407,6 +468,67 @@ pub(super) fn dialog<'a>(
     )
     .on_press(Message::ExportDismissed(id))
     .into()
+}
+
+/// The sizes the picture can be exported at, its own first: none for a
+/// file without a picture.
+fn size_buttons<'a>(
+    id: window::Id,
+    choice: Choice,
+    player: &PlayerWindow,
+) -> Option<Element<'a, Message>> {
+    let track = player.picture()?;
+    let turned = player.transform().after_turns(track.quarter_turns).turns % 2 == 1;
+    let shown_width = (f64::from(track.height) * track.aspect).round() as u32;
+    let shorter = if turned {
+        shown_width.min(track.height)
+    } else {
+        track.height.min(shown_width)
+    };
+    let mut sizes = vec![(None, crate::fl!("export-size-original", lines = shorter))];
+    sizes.extend(
+        LINES
+            .into_iter()
+            .filter(|lines| *lines < shorter)
+            .map(|lines| {
+                (
+                    Some(lines),
+                    crate::fl!("quality-lines", lines = lines.to_string()),
+                )
+            }),
+    );
+    let buttons = sizes
+        .into_iter()
+        .map(|(lines, label)| {
+            scramble_ui::button(Kind::Tonal, label)
+                .selected(choice.lines == lines)
+                .on_press(Message::ExportSize(id, lines))
+        })
+        .collect();
+    Some(component::connected(buttons))
+}
+
+fn sound_name(sound: Sound) -> String {
+    match sound {
+        Sound::Aac => crate::fl!("export-aac"),
+        Sound::Mp3 => crate::fl!("export-mp3"),
+        Sound::Opus => crate::fl!("export-opus"),
+        Sound::Flac => crate::fl!("export-flac"),
+        Sound::Alac => crate::fl!("export-alac"),
+        Sound::Wav => crate::fl!("export-wav"),
+    }
+}
+
+/// What a sound format is good for, as the dialog says.
+fn sound_note(sound: Sound) -> String {
+    match sound {
+        Sound::Aac => crate::fl!("export-aac-note"),
+        Sound::Mp3 => crate::fl!("export-mp3-note"),
+        Sound::Opus => crate::fl!("export-opus-note"),
+        Sound::Flac => crate::fl!("export-flac-note"),
+        Sound::Alac => crate::fl!("export-alac-note"),
+        Sound::Wav => crate::fl!("export-wav-note"),
+    }
 }
 
 /// The export under way, over the top of the window, below the toolbar:

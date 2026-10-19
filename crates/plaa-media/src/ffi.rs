@@ -671,6 +671,40 @@ pub fn bit_depth(stream: &ffmpeg::format::stream::Stream) -> u32 {
     }
 }
 
+/// Bits per sample of a stream's sound, where it says: lossless sound
+/// does, and uncompressed sound by how it is stored.
+pub fn sample_bits(stream: &ffmpeg::format::stream::Stream) -> Option<u32> {
+    // SAFETY: the stream's parameters live while it is borrowed.
+    let (raw, coded) = unsafe {
+        let parameters = (*stream.as_ptr()).codecpar;
+        if parameters.is_null() {
+            return None;
+        }
+        (
+            (*parameters).bits_per_raw_sample,
+            (*parameters).bits_per_coded_sample,
+        )
+    };
+    let uncompressed = stream.parameters().id().name().starts_with("pcm_");
+    let bits = if raw > 0 {
+        raw
+    } else if uncompressed {
+        coded
+    } else {
+        0
+    };
+    u32::try_from(bits).ok().filter(|bits| *bits > 0)
+}
+
+/// Makes an encoder about to open keep `bits` of each sample, as FLAC and
+/// ALAC take 24 bit sound in 32 bit samples.
+pub fn set_sample_bits(encoder: &mut ffmpeg::codec::Context, bits: u32) {
+    // SAFETY: an unopened encoder's context, borrowed mutably.
+    unsafe {
+        (*encoder.as_mut_ptr()).bits_per_raw_sample = bits as i32;
+    }
+}
+
 /// Whether a stream's pictures are HDR: their light PQ or HLG.
 pub fn is_hdr(stream: &ffmpeg::format::stream::Stream) -> bool {
     use ffi::AVColorTransferCharacteristic::{AVCOL_TRC_ARIB_STD_B67, AVCOL_TRC_SMPTE2084};

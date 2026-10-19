@@ -36,7 +36,7 @@ look follows Material Design 3, as in prev.
 | Windows | One window per file, one running instance; a start window when nothing is open |
 | Overlay | For video, M3 floating toolbars over the picture by default, hiding once the pointer rests (2 s, adjustable) or leaves the window; Settings docks them. Sound always has them docked |
 | Editing | Not destructive: an edit is the file's clips in order and a turn and flip, played as it will be and kept until exported, as QuickTime Player keeps it until saved |
-| Export | Re-encoded through FFmpeg: NVENC, AMF or Quick Sync where they open, VAAPI on Linux, VideoToolbox on macOS, else x264, x265 and SVT-AV1; AAC sound (Apple's encoder on macOS); MP4, or M4A for sound |
+| Export | Re-encoded through FFmpeg: NVENC, AMF or Quick Sync where they open, VAAPI on Linux, VideoToolbox on macOS, else x264, x265 and SVT-AV1, in MP4 with AAC sound (Apple's encoder on macOS); sound alone as AAC, MP3 or Opus at a bit rate chosen, or FLAC, ALAC or WAV in 16 or 24 bits |
 | Web pages | yt-dlp, run as a program of its own when it is installed, not bundled: it follows the sites' changes faster than plaa could; its JSON names the streams, which FFmpeg plays |
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first; the 38 languages prev has once the interface settles |
@@ -82,8 +82,8 @@ trimming and splitting, and Intel Macs.
    waiting to read on, and a spinner while it waits; recent addresses.
 4. **Edit and export** (done): trim, split and arrange clips, rotate and
    flip, with undo, the edit playing without gaps; export to H.264,
-   HEVC, AV1 or sound alone, as edited and made smaller, on hardware
-   encoders where they open.
+   HEVC or AV1, as edited and made smaller, on hardware encoders where
+   they open, or the sound alone, compressed or lossless.
 5. **Recording**: microphone, camera, screen (the ScreenCast portal and
    PipeWire, ScreenCaptureKit, Windows.Graphics.Capture), AVB streams.
 6. **Visualizer**: waveform, spectrum and cover art for sound.

@@ -80,12 +80,13 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   can be moved, removed and trimmed one by one; **rotate** and **flip**
   (Ctrl+Shift+L, R, H and V); with undo and redo. The edit plays as it
   will be, clip after clip without a gap.
-- **Export** (Ctrl+E) to H.264, HEVC or AV1 with AAC sound, or the sound
-  alone, as edited, at the file's size or smaller: on the graphics
-  card's encoder where one opens (NVENC, AMF, Quick Sync, VAAPI or
-  VideoToolbox), else on the processor (x264, x265, SVT-AV1), keeping
-  HDR video's colors in HEVC and AV1. Closing with changes not exported
-  asks first.
+- **Export** (Ctrl+E) to H.264, HEVC or AV1 with AAC sound, as edited,
+  at the file's size or smaller: on the graphics card's encoder where
+  one opens (NVENC, AMF, Quick Sync, VAAPI or VideoToolbox), else on the
+  processor (x264, x265, SVT-AV1), keeping HDR video's colors in HEVC
+  and AV1. Or the sound alone, as AAC, MP3 or Opus at a bit rate chosen,
+  or lossless as FLAC, ALAC or WAV in 16 or 24 bits. Closing with
+  changes not exported asks first.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
