@@ -42,6 +42,9 @@ pub enum External {
     /// Media keys or the desktop asked something of what plays.
     #[cfg(target_os = "linux")]
     Media(mpris::Command),
+    /// Something dragged over or dropped on a window, on Wayland.
+    #[cfg(target_os = "linux")]
+    Drag(smithay_clipboard::dnd::DragEvent),
 }
 
 static EXTERNAL_EVENTS: Mutex<Option<UnboundedReceiver<External>>> = Mutex::new(None);
@@ -138,6 +141,14 @@ fn main() -> iced::Result {
             listener.spawn(|sources| post(External::OpenSources(sources)));
         }
         Err(error) => eprintln!("plaa: running without single instance: {error}"),
+    }
+
+    // Files dropped on windows on Wayland, where winit gives none.
+    #[cfg(target_os = "linux")]
+    {
+        use smithay_clipboard::dnd;
+        dnd::set_accepted_mimes(vec![dnd::URI_LIST_MIME.to_owned()]);
+        dnd::set_drag_handler(|event| post(External::Drag(event)));
     }
 
     let omarchy_dir = omarchy::current_theme_dir();

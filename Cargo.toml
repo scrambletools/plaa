@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+exclude = ["vendor"]
 
 [workspace.package]
 version = "0.1.0"
@@ -34,3 +35,6 @@ strip = true
 iced_graphics = { git = "https://github.com/scrambletools/scramble-ui", rev = "741d03adfd69edad5194fb07c9991ead3bcd9079" }
 iced_widget = { git = "https://github.com/scrambletools/scramble-ui", rev = "741d03adfd69edad5194fb07c9991ead3bcd9079" }
 winit = { git = "https://github.com/scrambletools/scramble-ui", rev = "741d03adfd69edad5194fb07c9991ead3bcd9079" }
+# Drag and drop on Wayland, on the data device iced's clipboard makes; see
+# vendor/PATCHES.md.
+smithay-clipboard = { path = "vendor/smithay-clipboard" }

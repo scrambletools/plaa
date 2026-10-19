@@ -132,6 +132,9 @@ pub(crate) struct Window {
     dropped: Vec<Source>,
     /// In picture in picture: the size to go back to.
     pip: Option<Size>,
+    /// The window's Wayland surface, which drops name it by.
+    #[cfg(target_os = "linux")]
+    surface: Option<usize>,
 }
 
 enum Content {
@@ -147,6 +150,9 @@ pub enum Message {
     CloseRequested(window::Id),
     Resized(window::Id, Size),
     Rescaled(window::Id, f32),
+    /// A window's Wayland surface, once it shows.
+    #[cfg(target_os = "linux")]
+    Surface(window::Id, Option<usize>),
     Key(window::Id, Key, Modifiers),
     Pointer(window::Id, bool),
     FileDropped(window::Id, PathBuf),
@@ -341,6 +347,43 @@ impl Plaa {
         }
     }
 
+    /// Plays what was dropped on a window on Wayland: its files, or the
+    /// addresses of streams, as one list.
+    #[cfg(target_os = "linux")]
+    fn dragged(&mut self, event: smithay_clipboard::dnd::DragEvent) -> Task<Message> {
+        use smithay_clipboard::dnd::{DragEvent, URI_LIST_MIME, parse_uri_list};
+        let DragEvent::Dropped {
+            surface,
+            mime,
+            data,
+            ..
+        } = event
+        else {
+            return Task::none();
+        };
+        let Some(id) = self
+            .windows
+            .iter()
+            .find_map(|(id, window)| (window.surface == Some(surface)).then_some(*id))
+        else {
+            return Task::none();
+        };
+        if mime != URI_LIST_MIME {
+            return Task::none();
+        }
+        let sources: Vec<Source> = parse_uri_list(&String::from_utf8_lossy(&data))
+            .iter()
+            .map(|uri| match crate::dialog::file_uri_to_path(uri) {
+                Some(path) => canonical(Source::File(path)),
+                None => Source::parse(uri),
+            })
+            .collect();
+        if let Some(list) = self.playlist_for(sources) {
+            self.play_in(id, list, false);
+        }
+        window::gain_focus(id)
+    }
+
     /// The list `sources` make together: list files' entries in their
     /// place, or for one file alone, the files in its folder when Settings
     /// asks for them.
@@ -479,6 +522,8 @@ impl Plaa {
                 address: None,
                 dropped: Vec::new(),
                 pip: None,
+                #[cfg(target_os = "linux")]
+                surface: None,
             },
         );
         if let Some(list) = list {
@@ -488,6 +533,8 @@ impl Plaa {
             Task::batch([
                 Task::done(Message::WindowOpened),
                 window::scale_factor(id).map(move |scale| Message::Rescaled(id, scale)),
+                #[cfg(target_os = "linux")]
+                window::run(id, wayland_surface).map(move |surface| Message::Surface(id, surface)),
             ])
         })
     }
@@ -692,7 +739,7 @@ impl Plaa {
                     }
                 }
                 if self.windows.is_empty() {
-                    return iced::exit();
+                    return exit();
                 }
                 Task::none()
             }
@@ -703,6 +750,15 @@ impl Plaa {
                 }
                 Task::none()
             }
+            #[cfg(target_os = "linux")]
+            Message::Surface(id, surface) => {
+                if let Some(window) = self.windows.get_mut(&id) {
+                    window.surface = surface;
+                }
+                Task::none()
+            }
+            #[cfg(target_os = "linux")]
+            Message::External(External::Drag(event)) => self.dragged(event),
             Message::Rescaled(id, scale) => {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.scale = scale;
@@ -1005,7 +1061,7 @@ impl Plaa {
             Action::CloseWindow => return window::close(id),
             Action::Quit => {
                 self.save_positions();
-                return iced::exit();
+                return exit();
             }
             Action::Settings => {
                 self.audio_devices = plaa_media::output_devices();
@@ -1461,6 +1517,25 @@ fn save_cover(source: &Source, cover: &plaa_media::Picture) -> Option<PathBuf> {
     }
     plaa_store::atomic::write(&path, &bytes).ok()?;
     Some(path)
+}
+
+/// The window's `wl_surface` pointer on Wayland, which drag and drop
+/// events name the window by.
+#[cfg(target_os = "linux")]
+fn wayland_surface(window: &dyn window::Window) -> Option<usize> {
+    use raw_window_handle::RawWindowHandle;
+    match window.window_handle().ok()?.as_raw() {
+        RawWindowHandle::Wayland(handle) => Some(handle.surface.as_ptr() as usize),
+        _ => None,
+    }
+}
+
+/// Lets plaa go, the clipboard's worker first, while the Wayland
+/// connection it uses is still open.
+fn exit() -> Task<Message> {
+    #[cfg(target_os = "linux")]
+    smithay_clipboard::shutdown();
+    iced::exit()
 }
 
 /// A file by its canonical path, so the same file is known however it was

@@ -2980,9 +2980,11 @@ dependencies = [
  "plaa-media",
  "plaa-store",
  "png",
+ "raw-window-handle",
  "rfd",
  "rust-embed",
  "scramble-ui",
+ "smithay-clipboard",
  "tempfile",
  "toml 1.1.8+spec-1.1.0",
  "windows-sys 0.61.2",
@@ -3641,8 +3643,6 @@ dependencies = [
 [[package]]
 name = "smithay-clipboard"
 version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71704c03f739f7745053bde45fa203a46c58d25bc5c4efba1d9a60e9dba81226"
 dependencies = [
  "libc",
  "smithay-client-toolkit 0.20.0",

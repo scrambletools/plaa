@@ -33,6 +33,10 @@ ashpd = { version = "0.13", default-features = false, features = ["async-io", "f
 # MPRIS, which media keys and panels play and pause through: the same
 # D-Bus library as the portal's.
 zbus = "5"
+# Files dropped on windows on Wayland, from the patched copy in vendor/,
+# and the window's surface they name it by.
+smithay-clipboard = "0.7"
+raw-window-handle = "0.6"
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rfd = { version = "0.15", default-features = false }
