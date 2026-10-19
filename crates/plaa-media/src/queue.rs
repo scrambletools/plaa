@@ -26,6 +26,9 @@ struct Inner {
     items: VecDeque<Item>,
     bytes: usize,
     closed: bool,
+    /// The media time read up to, in seconds: the end of the latest
+    /// packet.
+    end: Option<f64>,
 }
 
 #[derive(Default)]
@@ -51,6 +54,19 @@ impl PacketQueue {
         self.ready.notify_one();
     }
 
+    /// Notes that packets up to `seconds` of media time have been read.
+    pub fn reached(&self, seconds: f64) {
+        let mut inner = self.inner();
+        if inner.end.is_none_or(|end| seconds > end) {
+            inner.end = Some(seconds);
+        }
+    }
+
+    /// The media time read up to since the last seek, if anything was.
+    pub fn end(&self) -> Option<f64> {
+        self.inner().end
+    }
+
     /// Whether the decoder has enough waiting for now.
     pub fn has_enough(&self) -> bool {
         let inner = self.inner();
@@ -66,6 +82,7 @@ impl PacketQueue {
         let mut inner = self.inner();
         inner.items.clear();
         inner.bytes = 0;
+        inner.end = None;
     }
 
     /// The next item, waiting up to `timeout`. `None` when there was none,
@@ -121,5 +138,17 @@ mod tests {
         assert!(matches!(queue.get(Duration::from_millis(1)), Ok(None)));
         queue.close();
         assert!(queue.get(Duration::ZERO).is_err());
+    }
+
+    #[test]
+    fn knows_how_far_it_has_read() {
+        let queue = PacketQueue::default();
+        assert_eq!(queue.end(), None);
+        queue.reached(2.0);
+        // A packet out of order does not move it back.
+        queue.reached(1.5);
+        assert_eq!(queue.end(), Some(2.0));
+        queue.clear();
+        assert_eq!(queue.end(), None);
     }
 }

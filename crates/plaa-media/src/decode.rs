@@ -15,7 +15,7 @@ use crate::audio;
 use crate::ffi;
 use crate::frame::{self, VideoFrame};
 use crate::info::{self, MediaInfo};
-use crate::player::Shared;
+use crate::player::{Quality, Shared};
 use crate::queue::{Closed, Item, PacketQueue};
 use crate::subtitle::{self, Cue, PictureCue, SubtitlePicture};
 
@@ -677,10 +677,29 @@ impl SubtitleDecoder {
     }
 }
 
-/// The audio stream to play: the first in a preferred language, else the
-/// one the file marks as default, else the first.
-pub(crate) fn pick_audio(info: &MediaInfo, languages: &[String]) -> Option<usize> {
-    let tracks: Vec<_> = info.audio.iter().map(|track| &track.track).collect();
+/// The picture stream to show: of the variants, the best `quality`
+/// allows, else the first picture that is not a cover.
+pub(crate) fn pick_video(info: &MediaInfo, quality: Quality) -> Option<usize> {
+    if quality == Quality::AudioOnly {
+        return None;
+    }
+    let variant = match quality {
+        Quality::AtMost(lines) => info
+            .variants
+            .iter()
+            .find(|variant| variant.height <= lines)
+            .or(info.variants.last()),
+        _ => info.variants.first(),
+    };
+    variant
+        .map(|variant| variant.video)
+        .or_else(|| info.picture(None).map(|track| track.track.index))
+}
+
+/// The audio stream to play of `tracks`: the first in a preferred
+/// language, else the one the file marks as default, else the first.
+pub(crate) fn pick_audio(tracks: &[&info::AudioTrack], languages: &[String]) -> Option<usize> {
+    let tracks: Vec<_> = tracks.iter().map(|track| &track.track).collect();
     by_language(&tracks, languages)
         .or_else(|| tracks.iter().find(|track| track.default).copied())
         .or_else(|| tracks.first().copied())

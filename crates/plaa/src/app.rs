@@ -429,8 +429,7 @@ impl Plaa {
         }
         let Some(video) = window
             .player()
-            .and_then(|player| player.info.as_ref())
-            .and_then(|info| info.video.iter().find(|track| !track.cover))
+            .and_then(|player| player.picture())
             .map(|track| (track.width, track.height, track.aspect, track.quarter_turns))
         else {
             return Task::none();
@@ -573,6 +572,7 @@ impl Plaa {
             audio_languages: self.settings.audio_languages.clone(),
             subtitle_languages: self.settings.subtitle_languages.clone(),
             audio_device: self.settings.audio_device.clone(),
+            quality: plaa_media::Quality::Best,
         };
         let player = Player::open(source, options, move |event| {
             crate::post(External::Player(id, event));
@@ -972,10 +972,10 @@ impl Plaa {
                 player.cover = cover.map(|cover| {
                     image::Handle::from_rgba(cover.width, cover.height, cover.rgba.clone())
                 });
-                let video =
-                    info.video.iter().find(|track| !track.cover).map(|track| {
-                        (track.width, track.height, track.aspect, track.quarter_turns)
-                    });
+                player.refresh();
+                let video = info
+                    .picture(player.status.video)
+                    .map(|track| (track.width, track.height, track.aspect, track.quarter_turns));
                 // Pictures over the timeline, for files: a stream would be
                 // read a second time over the network.
                 if let Source::File(path) = player.source()
@@ -1130,9 +1130,7 @@ impl Plaa {
             return Task::none();
         };
         let frame = player
-            .info
-            .as_ref()
-            .and_then(|info| info.video.iter().find(|track| !track.cover))
+            .picture()
             .and_then(|track| track.frame_rate)
             .map_or(1.0 / 25.0, |rate| 1.0 / rate);
         match action {
@@ -1207,7 +1205,11 @@ impl Plaa {
                 let Some(info) = &player.info else {
                     return Task::none();
                 };
-                let tracks: Vec<usize> = info.audio.iter().map(|track| track.track.index).collect();
+                let tracks: Vec<usize> = info
+                    .audio_with(player.status.video)
+                    .iter()
+                    .map(|track| track.track.index)
+                    .collect();
                 if tracks.len() > 1 {
                     let at = player
                         .status

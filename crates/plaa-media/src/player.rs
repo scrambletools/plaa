@@ -84,6 +84,21 @@ pub struct Options {
     /// The output device to play through, by id; the system's default
     /// when none.
     pub audio_device: Option<String>,
+    /// Which version to play, where the source offers several.
+    pub quality: Quality,
+}
+
+/// Which of a source's versions to play, as an HLS stream's qualities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Quality {
+    /// The best there is.
+    #[default]
+    Best,
+    /// The best whose picture is at most this many lines tall, else the
+    /// smallest.
+    AtMost(u32),
+    /// Sound alone.
+    AudioOnly,
 }
 
 impl Default for Options {
@@ -97,6 +112,7 @@ impl Default for Options {
             audio_languages: Vec::new(),
             subtitle_languages: Vec::new(),
             audio_device: None,
+            quality: Quality::Best,
         }
     }
 }
@@ -127,7 +143,11 @@ pub struct Status {
     pub ended: bool,
     /// Waiting for data, as a stream does over a slow network.
     pub buffering: bool,
+    /// How far ahead the source has been read.
+    pub buffered: Option<Duration>,
     pub speed: f64,
+    /// The streams playing: picture, sound and subtitles.
+    pub video: Option<usize>,
     pub audio: Option<usize>,
     pub subtitles: Option<usize>,
     /// A seek was asked for and has yet to be made, so the position is
@@ -146,6 +166,7 @@ pub(crate) enum Command {
     EndScrub,
     /// Plays through this output device, by id, or the system's default.
     SetAudioDevice(Option<String>),
+    SelectVideo(usize),
     SelectAudio(Option<usize>),
     SelectSubtitles(Option<usize>),
 }
@@ -166,6 +187,8 @@ pub(crate) struct Shared {
     pub serial: AtomicU64,
     /// Seeks asked for that the reader has yet to make.
     pub seeks: AtomicU64,
+    /// The media time read up to, as f64 bits: NaN when unknown.
+    pub buffered: AtomicU64,
     /// Where an exact seek lands, for its serial: decoders drop what comes
     /// before it.
     pub target: Mutex<Option<(u64, f64)>>,
@@ -193,9 +216,9 @@ pub(crate) struct State {
     /// The reader reached the end of the file.
     pub read_all: bool,
     pub ended: bool,
+    pub video: Option<usize>,
     pub audio: Option<usize>,
     pub subtitles: Option<usize>,
-    pub buffering: bool,
 }
 
 impl Shared {
@@ -266,6 +289,7 @@ impl Player {
             ass: Mutex::new(None),
             serial: AtomicU64::new(0),
             seeks: AtomicU64::new(0),
+            buffered: AtomicU64::new(f64::NAN.to_bits()),
             target: Mutex::new(None),
             decoded: Mutex::new((0, 0.0)),
             scrub_to: Mutex::new(None),
@@ -425,6 +449,12 @@ impl Player {
         self.shared.clock.set_rate(speed);
     }
 
+    /// Shows picture stream `stream`, as another of the source's variants,
+    /// with its own sound if it has some.
+    pub fn select_video(&self, stream: usize) {
+        let _ = self.commands.send(Command::SelectVideo(stream));
+    }
+
     pub fn select_audio(&self, stream: Option<usize>) {
         let _ = self.commands.send(Command::SelectAudio(stream));
     }
@@ -455,16 +485,33 @@ impl Player {
         self.shared.clock.pace()
     }
 
+    /// How far ahead the source has been read, if known.
+    pub fn buffered(&self) -> Option<Duration> {
+        let seconds = f64::from_bits(self.shared.buffered.load(Ordering::Relaxed));
+        (seconds.is_finite() && seconds >= 0.0).then(|| Duration::from_secs_f64(seconds))
+    }
+
     pub fn status(&self) -> Status {
         check_ended(&self.shared);
         let state = self.shared.state().clone();
+        let position = self.position();
+        let buffered = self.buffered();
+        let paused = self.shared.clock.paused();
+        let buffering = !paused
+            && self
+                .shared
+                .clock
+                .waited()
+                .is_some_and(|waited| waited >= BUFFERING_SHOWN);
         Status {
-            position: self.position(),
+            position,
             duration: state.info.as_ref().and_then(|info| info.duration),
-            paused: self.shared.clock.paused(),
+            paused,
             ended: state.ended,
-            buffering: state.buffering,
+            buffering,
+            buffered,
             speed: self.shared.speed(),
+            video: state.video,
             audio: state.audio,
             subtitles: state.subtitles,
             seeking: self.shared.seeks.load(Ordering::Relaxed) > 0,
@@ -474,19 +521,33 @@ impl Player {
     /// The picture to draw now. Called on every frame the interface draws.
     pub fn picture(&self) -> Option<Arc<VideoFrame>> {
         let now = self.shared.clock.now();
-        let (shown, first_of_seek) = {
+        let (shown, first_of_seek, ran_dry) = {
             let mut video = self.shared.video();
             let first = video.has_new();
-            (video.take_due(now), first)
+            let shown = video.take_due(now);
+            (shown, first, video.is_empty() && !video.finished)
         };
         self.shared.video_room.notify_all();
+        let (has_audio, read_all) = {
+            let state = self.shared.state();
+            (state.has_audio, state.read_all)
+        };
         // Without sound, the clock starts from the first picture after a
         // seek, so it does not run ahead while that is decoded.
         if first_of_seek
-            && !self.shared.state().has_audio
+            && !has_audio
             && let Some(shown) = &shown
         {
             self.shared.clock.anchor(shown.position, Instant::now());
+        }
+        // Nor does it run on once the source has run out of pictures, as a
+        // stream does: it waits for the source to read ahead, as for sound.
+        // Pictures decoding slower than they play still have packets read.
+        let starved = self
+            .buffered()
+            .is_none_or(|read| read.as_secs_f64() < now + STARVED);
+        if !has_audio && ran_dry && !read_all && starved && self.shared.clock.running() {
+            self.shared.clock.wait();
         }
         shown
     }
@@ -566,6 +627,21 @@ impl Drop for Player {
     }
 }
 
+/// How far ahead a source reads before playing on after a wait, in
+/// seconds of media time.
+const READY: f64 = 2.0;
+
+/// How far ahead a stream over a network reads at most: in media time,
+/// and in memory.
+const STREAM_AHEAD: f64 = 30.0;
+const STREAM_BYTES: usize = 128 * 1024 * 1024;
+
+/// A source read less than this far past the clock has run out.
+const STARVED: f64 = 0.1;
+
+/// Waits shorter than this, as after most seeks, are not worth showing.
+const BUFFERING_SHOWN: Duration = Duration::from_millis(300);
+
 /// The streams being decoded, each with its packet queue and thread.
 struct Decoders {
     video: Option<(usize, Arc<PacketQueue>, JoinHandle<()>)>,
@@ -588,9 +664,25 @@ impl Decoders {
             .chain(self.audio.iter().map(|(_, queue, _)| queue))
     }
 
-    fn has_enough(&self) -> bool {
+    /// Whether enough is read ahead of `now` for now. Streams over a
+    /// network read much further ahead than files, to ride out the
+    /// network slowing down.
+    fn has_enough(&self, network: bool, now: f64) -> bool {
         let total: usize = self.queues().map(|queue| queue.bytes()).sum();
-        total > 24 * 1024 * 1024 || self.queues().all(|queue| queue.has_enough())
+        if network {
+            total > STREAM_BYTES || self.read_to().is_some_and(|end| end - now >= STREAM_AHEAD)
+        } else {
+            total > 24 * 1024 * 1024 || self.queues().all(|queue| queue.has_enough())
+        }
+    }
+
+    /// The media time the source has been read up to: as its streams are
+    /// read in step, the latest packet's, as a stream with nothing for a
+    /// while would hold back the earliest.
+    fn read_to(&self) -> Option<f64> {
+        self.queues()
+            .filter_map(|queue| queue.end())
+            .reduce(f64::max)
     }
 
     fn stop_audio(&mut self) {
@@ -600,11 +692,28 @@ impl Decoders {
         }
     }
 
-    fn stop(&mut self) {
-        self.stop_audio();
+    fn stop_video(&mut self) {
         if let Some((_, queue, thread)) = self.video.take() {
             queue.close();
             let _ = thread.join();
+        }
+    }
+
+    fn stop(&mut self) {
+        self.stop_audio();
+        self.stop_video();
+    }
+
+    /// Lets the reader skip every stream nothing plays, which over a
+    /// network is not fetched at all: an HLS stream's other qualities.
+    fn skip_unused(&self, input: &mut ffmpeg::format::context::Input) {
+        let playing = [
+            self.video.as_ref().map(|(index, ..)| *index),
+            self.audio.as_ref().map(|(index, ..)| *index),
+            self.subtitles.as_ref().map(|(index, _)| *index),
+        ];
+        for index in 0..input.nb_streams() as usize {
+            crate::ffi::set_skipped(input, index, !playing.contains(&Some(index)));
         }
     }
 }
@@ -647,8 +756,9 @@ fn read(
     let info = Arc::new(info);
     let start = decode::start_seconds(&input);
 
+    let video_stream = decode::pick_video(&info, options.quality);
     // The output opens before the decoders, which resample to its format.
-    let audio_stream = decode::pick_audio(&info, &options.audio_languages);
+    let audio_stream = decode::pick_audio(&info.audio_with(video_stream), &options.audio_languages);
     let mut output = None;
     if audio_stream.is_some() {
         match audio::Output::open(
@@ -664,25 +774,20 @@ fn read(
     *shared.audio.lock().unwrap_or_else(PoisonError::into_inner) =
         output.as_ref().map(|output| output.shared.clone());
 
-    let video_stream = info
-        .video
-        .iter()
-        .find(|track| !track.cover)
-        .map(|track| track.track.index);
     let mut decoders = Decoders {
         video: None,
         audio: None,
         subtitles: None,
     };
-    if let Some(index) = video_stream {
-        match decode::spawn_video(&input, index, start, options.hardware, shared.clone()) {
-            Ok(((queue, thread), hardware)) => {
-                decoders.video = Some((index, queue, thread));
-                events(Event::Decoding(hardware));
-            }
-            Err(error) => eprintln!("plaa: video stream {index}: {error}"),
-        }
-    }
+    start_video(
+        video_stream,
+        &input,
+        start,
+        options.hardware,
+        &shared,
+        &mut decoders,
+        &events,
+    );
     let mut audio_index = None;
     if let (Some(index), Some(output)) = (audio_stream, &output) {
         match decode::spawn_audio(&input, index, start, output.shared.clone(), shared.clone()) {
@@ -713,6 +818,7 @@ fn read(
         .cover()
         .and_then(|track| decode::cover(&input, track.track.index))
         .map(Arc::new);
+    decoders.skip_unused(&mut input);
     {
         let mut state = shared.state();
         state.info = Some(info.clone());
@@ -733,8 +839,9 @@ fn read(
     });
 
     // Starts like a seek, so the clock waits for the first sound or
-    // picture.
+    // picture, and for the source to read ahead.
     shared.clock.stall();
+    shared.clock.wait();
     shared.clock.set_paused(options.paused);
     if let Some(at) = options.start.filter(|_| info.seekable) {
         seek(
@@ -753,8 +860,22 @@ fn read(
     // Where playback was last time round, to see it reach a loop's end.
     let mut played = shared.clock.now();
     let mut packet = ffmpeg::Packet::empty();
+    let network = source.is_url();
     while !shared.stopping() {
         let now = shared.clock.now();
+        let read_to = decoders.read_to();
+        shared
+            .buffered
+            .store(read_to.unwrap_or(f64::NAN).to_bits(), Ordering::Relaxed);
+        // Waiting for the source: on once it has read far enough ahead,
+        // or as far as it will.
+        if shared.clock.waited().is_some()
+            && (read_all
+                || decoders.has_enough(network, now)
+                || read_to.is_some_and(|end| end - now >= READY))
+        {
+            shared.clock.end_wait();
+        }
         let between = *shared
             .ab_loop
             .lock()
@@ -774,14 +895,7 @@ fn read(
         played = shared.clock.now();
         if info.seekable
             && scrub.is_some()
-            && steer(
-                &mut scrub,
-                &mut input,
-                &shared,
-                &mut decoders,
-                video_stream,
-                start,
-            )
+            && steer(&mut scrub, &mut input, &shared, &mut decoders, start)
         {
             read_all = false;
             announced_end = false;
@@ -789,7 +903,7 @@ fn read(
         }
         // Commands first, waiting for one only while there is nothing to
         // read for now, and not long while the timeline is dragged.
-        let idle = read_all || decoders.has_enough();
+        let idle = read_all || decoders.has_enough(network, now);
         let wait = if scrub.is_some() { 4 } else { 20 };
         let command = if idle {
             match commands.recv_timeout(Duration::from_millis(wait)) {
@@ -818,14 +932,7 @@ fn read(
                             .lock()
                             .unwrap_or_else(PoisonError::into_inner) = None;
                         shared.clock.hold(false);
-                    } else if steer(
-                        &mut scrub,
-                        &mut input,
-                        &shared,
-                        &mut decoders,
-                        video_stream,
-                        start,
-                    ) {
+                    } else if steer(&mut scrub, &mut input, &shared, &mut decoders, start) {
                         read_all = false;
                         announced_end = false;
                         shared.state().read_all = false;
@@ -835,6 +942,42 @@ fn read(
                     Some(scrub) => scrub.ending = true,
                     None => shared.clock.hold(false),
                 },
+                Command::SelectVideo(index) => {
+                    decoders.stop_video();
+                    start_video(
+                        Some(index),
+                        &input,
+                        start,
+                        options.hardware,
+                        &shared,
+                        &mut decoders,
+                        &events,
+                    );
+                    // A variant with sound of its own plays it.
+                    let tracks = info.audio_with(Some(index));
+                    let playing = decoders.audio.as_ref().map(|(index, ..)| *index);
+                    if !tracks
+                        .iter()
+                        .any(|track| Some(track.track.index) == playing)
+                    {
+                        decoders.stop_audio();
+                        start_audio(
+                            decode::pick_audio(&tracks, &options.audio_languages),
+                            &input,
+                            start,
+                            output.as_ref(),
+                            &shared,
+                            &mut decoders,
+                        );
+                    }
+                    decoders.skip_unused(&mut input);
+                    let now = shared.clock.now().max(0.0);
+                    if info.seekable {
+                        seek(&mut input, &shared, &mut decoders, now, true, start);
+                        read_all = false;
+                        shared.state().read_all = false;
+                    }
+                }
                 Command::SelectAudio(index) => {
                     decoders.stop_audio();
                     start_audio(
@@ -845,6 +988,7 @@ fn read(
                         &shared,
                         &mut decoders,
                     );
+                    decoders.skip_unused(&mut input);
                     // Back to where it was, so the new track starts in step.
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
@@ -882,6 +1026,7 @@ fn read(
                         &shared,
                         &mut decoders,
                     );
+                    decoders.skip_unused(&mut input);
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
                         seek(&mut input, &shared, &mut decoders, now, true, start);
@@ -899,6 +1044,7 @@ fn read(
                     }
                     .choose(index, &shared, &mut decoders);
                     shared.state().subtitles = showing;
+                    decoders.skip_unused(&mut input);
                     // A track's lines already passed show again from where
                     // it is; a file's are all there already.
                     let now = shared.clock.now().max(0.0);
@@ -929,6 +1075,9 @@ fn read(
                     .find(|(stream, _, _)| *stream == index)
                     .map(|(_, queue, _)| queue);
                 if let Some(queue) = queue {
+                    if let Some(end) = packet_end(&input, &packet, start) {
+                        queue.reached(end);
+                    }
                     let taken = std::mem::replace(&mut packet, ffmpeg::Packet::empty());
                     queue.put(Item::Packet(serial, taken));
                 } else if let Some((stream, sink)) = &mut decoders.subtitles
@@ -995,6 +1144,33 @@ fn read(
     drop(output);
 }
 
+/// Decodes the picture of stream `index`, and notes the stream that
+/// shows: none when it will not decode.
+fn start_video(
+    index: Option<usize>,
+    input: &ffmpeg::format::context::Input,
+    start: f64,
+    hardware: bool,
+    shared: &Arc<Shared>,
+    decoders: &mut Decoders,
+    events: &dyn Fn(Event),
+) {
+    let mut chosen = None;
+    if let Some(index) = index {
+        match decode::spawn_video(input, index, start, hardware, shared.clone()) {
+            Ok(((queue, thread), device)) => {
+                decoders.video = Some((index, queue, thread));
+                chosen = Some(index);
+                events(Event::Decoding(device));
+            }
+            Err(error) => eprintln!("plaa: video stream {index}: {error}"),
+        }
+    }
+    let mut state = shared.state();
+    state.video = chosen;
+    state.has_video = chosen.is_some();
+}
+
 /// Decodes audio track `index` into `output`, and notes the track that
 /// plays: none when there is no output or the track will not decode.
 fn start_audio(
@@ -1046,9 +1222,9 @@ fn steer(
     input: &mut ffmpeg::format::context::Input,
     shared: &Shared,
     decoders: &mut Decoders,
-    video_stream: Option<usize>,
     start: f64,
 ) -> bool {
+    let video_stream = decoders.video.as_ref().map(|(index, ..)| *index);
     let wanted = *shared
         .scrub_to
         .lock()
@@ -1366,7 +1542,20 @@ fn seek(
     }
     shared.clock.jump(position);
     shared.clock.stall();
+    shared.clock.wait();
     shared.state().ended = false;
+}
+
+/// The media time `packet` lasts until, in seconds from the start.
+fn packet_end(
+    input: &ffmpeg::format::context::Input,
+    packet: &ffmpeg::Packet,
+    start: f64,
+) -> Option<f64> {
+    let time_base = input.stream(packet.stream())?.time_base();
+    let begins = packet.pts().or(packet.dts())?;
+    let seconds = crate::info::seconds(begins + packet.duration().max(0), time_base)?;
+    Some(seconds - start)
 }
 
 fn describe(error: &ffmpeg::Error) -> String {

@@ -22,6 +22,9 @@ use crate::timeline::{self, Timeline};
 /// The speeds the speed menu offers.
 pub const SPEEDS: [f64; 8] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
 
+/// How long opening may take before a spinner says it is under way.
+const OPENING_SHOWN: Duration = Duration::from_millis(300);
+
 /// How far the skip buttons and arrow keys move, in seconds.
 pub const SKIP: f64 = 10.0;
 pub const SKIP_SHORT: f64 = 5.0;
@@ -111,6 +114,8 @@ pub struct PlayerWindow {
     pub subtitle: Option<Cue>,
     pub volume: f32,
     pub muted: bool,
+    /// When the player started opening its source.
+    pub opened: Instant,
 }
 
 impl PlayerWindow {
@@ -140,6 +145,7 @@ impl PlayerWindow {
             subtitle: None,
             volume,
             muted,
+            opened: Instant::now(),
         }
     }
 
@@ -150,6 +156,11 @@ impl PlayerWindow {
     /// Whether the file shows a moving picture, rather than only sound.
     pub fn is_video(&self) -> bool {
         self.info.as_ref().is_some_and(|info| info.has_video())
+    }
+
+    /// The picture's track that shows.
+    pub fn picture(&self) -> Option<&plaa_media::info::VideoTrack> {
+        self.info.as_ref()?.picture(self.status.video)
     }
 
     /// The name to show for the file: its title tag for sound, else its
@@ -194,6 +205,14 @@ impl PlayerWindow {
     pub fn refresh(&mut self) {
         self.status = self.player.status();
         self.subtitle = self.player.subtitle();
+    }
+
+    /// Whether the player is waiting for its source: opening it, or for a
+    /// stream to read ahead.
+    pub fn waiting(&self) -> bool {
+        self.error.is_none()
+            && (self.status.buffering
+                || (self.info.is_none() && self.opened.elapsed() >= OPENING_SHOWN))
     }
 
     /// The position the timeline shows: the dragged one while dragging.
@@ -296,6 +315,7 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
         Some(cue) => stack![picture, subtitle_view(cue, window, context)].into(),
         None => picture.into(),
     };
+    let with_subtitles = with_spinner(with_subtitles, window);
     let body: Element<'a, Control> = match sheet(window) {
         Some(sheet) => {
             let sheet = component::between_bars(
@@ -454,6 +474,7 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
                 .map_or(&[][..], |info| info.chapters.as_slice()),
         )
         .ab_loop(window.ab_loop)
+        .buffered(window.source().is_url())
         .on_hover(Control::Hover)
         .thumbnail(window.thumbnail.clone())
         .height(style::SLIDER_HEIGHT)
@@ -602,13 +623,14 @@ fn chapters_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
 fn tracks_menu(window: &PlayerWindow) -> Option<Element<'_, Control>> {
     let info = window.info.as_ref()?;
     let subtitles: Vec<_> = info.subtitles.iter().collect();
-    if info.audio.len() < 2 && subtitles.is_empty() {
+    let audio = info.audio_with(window.status.video);
+    if audio.len() < 2 && subtitles.is_empty() {
         return None;
     }
     let mut entries = Vec::new();
-    if info.audio.len() > 1 {
+    if audio.len() > 1 {
         entries.push(Entry::heading(crate::fl!("tracks-audio")));
-        for (number, track) in info.audio.iter().enumerate() {
+        for (number, track) in audio.iter().enumerate() {
             entries.push(
                 Entry::item(
                     format::track_name(&track.track, number + 1, Some(&track.layout)),
@@ -731,9 +753,10 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
     let body = container(column![art, lines].spacing(24).align_x(Center).padding(24))
         .center(Fill)
         .style(style::surface);
+    let body = with_spinner(body.into(), window);
     let body: Element<'a, Control> = match sheet(window) {
         Some(sheet) => iced::widget::row![body, sheet].into(),
-        None => body.into(),
+        None => body,
     };
     column![
         docked(toolbar(window, context)),
@@ -741,6 +764,25 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
         docked(transport(window, context))
     ]
     .into()
+}
+
+/// `content` with a spinner over its middle while the player waits for
+/// its source.
+fn with_spinner<'a>(content: Element<'a, Control>, window: &PlayerWindow) -> Element<'a, Control> {
+    if !window.waiting() {
+        return content;
+    }
+    let spinner = container(crate::spinner::spinner(40.0))
+        .padding(12)
+        .style(|theme: &Theme| {
+            let scheme = Scheme::of(theme);
+            container::Style {
+                background: Some(scheme.surface_container_high.scale_alpha(0.85).into()),
+                border: iced::border::rounded(32),
+                ..container::Style::default()
+            }
+        });
+    stack![content, container(spinner).center(Fill)].into()
 }
 
 /// A bar docked along an edge, whether or not bars float over pictures.
@@ -827,7 +869,7 @@ fn inspector(window: &PlayerWindow) -> Element<'_, Control> {
         if let Some(rate) = info.bit_rate {
             content = content.push(field(crate::fl!("info-bit-rate"), format::bit_rate(rate)));
         }
-        for track in info.video.iter().filter(|track| !track.cover) {
+        if let Some(track) = info.picture(window.status.video) {
             content = content.push(component::section(crate::fl!("info-video")));
             content = content.push(field(crate::fl!("info-codec"), codec_label(&track.track)));
             content = content.push(field(
@@ -859,7 +901,7 @@ fn inspector(window: &PlayerWindow) -> Element<'_, Control> {
                 content = content.push(field(crate::fl!("info-decoding"), decoding));
             }
         }
-        for track in &info.audio {
+        for track in info.audio_with(window.status.video) {
             content = content.push(component::section(crate::fl!("info-audio")));
             content = content.push(field(crate::fl!("info-codec"), codec_label(&track.track)));
             content = content.push(field(

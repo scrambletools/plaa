@@ -23,6 +23,7 @@ mod settings_view;
 mod shortcuts;
 #[cfg(windows)]
 mod smtc_windows;
+mod spinner;
 mod timeline;
 #[cfg(target_os = "macos")]
 mod title_bar_macos;

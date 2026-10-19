@@ -556,6 +556,58 @@ pub fn stream_extradata(stream: &ffmpeg::format::stream::Stream) -> Option<Vec<u
     }
 }
 
+/// The source's programs, as an HLS stream's qualities: each one's
+/// streams, and the bit rate it says it needs.
+pub fn programs(input: &ffmpeg::format::context::Input) -> Vec<(Vec<usize>, Option<u64>)> {
+    // SAFETY: a valid format context, whose `programs` holds
+    // `nb_programs` programs, each with `nb_stream_indexes` indices.
+    unsafe {
+        let context = input.as_ptr();
+        let count = (*context).nb_programs as usize;
+        if count == 0 || (*context).programs.is_null() {
+            return Vec::new();
+        }
+        std::slice::from_raw_parts((*context).programs, count)
+            .iter()
+            .filter(|program| !program.is_null())
+            .map(|&program| {
+                let streams = if (*program).stream_index.is_null() {
+                    Vec::new()
+                } else {
+                    std::slice::from_raw_parts(
+                        (*program).stream_index,
+                        (*program).nb_stream_indexes as usize,
+                    )
+                    .iter()
+                    .map(|&index| index as usize)
+                    .collect()
+                };
+                let bit_rate = ffmpeg::DictionaryRef::wrap((*program).metadata)
+                    .get("variant_bitrate")
+                    .and_then(|rate| rate.parse().ok())
+                    .filter(|rate: &u64| *rate > 0);
+                (streams, bit_rate)
+            })
+            .collect()
+    }
+}
+
+/// Lets FFmpeg skip stream `index` of `input`, or read it again: for
+/// streams over a network, a skipped stream is not even fetched.
+pub fn set_skipped(input: &mut ffmpeg::format::context::Input, index: usize, skipped: bool) {
+    if let Some(stream) = input.stream(index) {
+        // SAFETY: the stream belongs to `input`, borrowed mutably, and
+        // FFmpeg reads the flag on its next read.
+        unsafe {
+            (*stream.as_ptr().cast_mut()).discard = if skipped {
+                ffi::AVDiscard::AVDISCARD_ALL
+            } else {
+                ffi::AVDiscard::AVDISCARD_DEFAULT
+            };
+        }
+    }
+}
+
 /// FFmpeg's release, such as "n9.0.1", as it was built.
 pub fn version() -> String {
     // SAFETY: FFmpeg returns a static string.

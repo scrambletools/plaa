@@ -250,7 +250,7 @@ impl Shared {
         match first {
             Some(position) => self.clock.anchor(position, heard_at),
             None if finished => {}
-            None => self.clock.stall(),
+            None => self.clock.ran_out(),
         }
     }
 }

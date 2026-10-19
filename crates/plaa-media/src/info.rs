@@ -23,6 +23,9 @@ pub struct MediaInfo {
     pub video: Vec<VideoTrack>,
     pub audio: Vec<AudioTrack>,
     pub subtitles: Vec<SubtitleTrack>,
+    /// The versions to choose between, when the source offers several, as
+    /// an HLS stream's qualities: the tallest picture first.
+    pub variants: Vec<Variant>,
     /// Whether the source can seek, which live streams cannot.
     pub seekable: bool,
 }
@@ -36,6 +39,39 @@ impl MediaInfo {
     /// The cover art's stream, if the file has one.
     pub fn cover(&self) -> Option<&VideoTrack> {
         self.video.iter().find(|track| track.cover)
+    }
+
+    /// The picture's track: stream `index`, or the first that is not a
+    /// cover.
+    pub fn picture(&self, index: Option<usize>) -> Option<&VideoTrack> {
+        let pictures = || self.video.iter().filter(|track| !track.cover);
+        index
+            .and_then(|index| pictures().find(|track| track.track.index == index))
+            .or_else(|| pictures().next())
+    }
+
+    /// The variant picture stream `video` belongs to, if the source has
+    /// variants.
+    pub fn variant_of(&self, video: usize) -> Option<&Variant> {
+        self.variants.iter().find(|variant| variant.video == video)
+    }
+
+    /// The sound tracks that go with picture stream `video`: its variant's
+    /// own, else every one.
+    pub fn audio_with(&self, video: Option<usize>) -> Vec<&AudioTrack> {
+        let variant = video.and_then(|video| self.variant_of(video));
+        let own: Vec<_> = self
+            .audio
+            .iter()
+            .filter(|track| {
+                variant.is_some_and(|variant| variant.streams.contains(&track.track.index))
+            })
+            .collect();
+        if own.is_empty() {
+            self.audio.iter().collect()
+        } else {
+            own
+        }
     }
 
     /// The tag `key`, in any case.
@@ -97,6 +133,20 @@ pub struct SubtitleTrack {
     /// The file beside the video the subtitles come from, rather than the
     /// video's own.
     pub file: Option<std::path::PathBuf>,
+}
+
+/// One version of the source to choose, as one of an HLS stream's
+/// qualities.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Variant {
+    /// Its picture's stream.
+    pub video: usize,
+    pub width: u32,
+    pub height: u32,
+    /// The bits per second it needs, when the source says.
+    pub bit_rate: Option<u64>,
+    /// Every stream it plays, its sound among them.
+    pub streams: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -243,8 +293,38 @@ impl MediaInfo {
                 _ => {}
             }
         }
+        info.variants = variants(&info, ffi::programs(input));
         info
     }
+}
+
+/// The programs that each have a picture of their own, as the variants to
+/// choose between, the tallest first; none when there is no choice.
+fn variants(info: &MediaInfo, programs: Vec<(Vec<usize>, Option<u64>)>) -> Vec<Variant> {
+    let mut variants: Vec<Variant> = programs
+        .into_iter()
+        .filter_map(|(streams, bit_rate)| {
+            let picture = info
+                .video
+                .iter()
+                .find(|track| !track.cover && streams.contains(&track.track.index))?;
+            Some(Variant {
+                video: picture.track.index,
+                width: picture.width,
+                height: picture.height,
+                bit_rate: bit_rate.or(picture.track.bit_rate),
+                streams,
+            })
+        })
+        .collect();
+    variants.sort_by(|first, second| {
+        (second.height, second.bit_rate).cmp(&(first.height, first.bit_rate))
+    });
+    variants.dedup_by_key(|variant| variant.video);
+    if variants.len() < 2 {
+        variants.clear();
+    }
+    variants
 }
 
 /// Container handler names that say nothing about the track, such as
@@ -339,6 +419,32 @@ fn is_text_subtitle(id: ffmpeg::codec::Id) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn programs_with_their_own_pictures_are_variants() {
+        let video = |index, height| VideoTrack {
+            track: Track {
+                index,
+                ..Track::default()
+            },
+            width: height * 16 / 9,
+            height,
+            ..VideoTrack::default()
+        };
+        let info = MediaInfo {
+            video: vec![video(1, 720), video(3, 1080)],
+            ..MediaInfo::default()
+        };
+        let found = variants(
+            &info,
+            vec![(vec![0, 1], Some(2_000_000)), (vec![2, 3], Some(6_000_000))],
+        );
+        assert_eq!(found.len(), 2);
+        assert_eq!((found[0].video, found[0].height), (3, 1080));
+        assert_eq!(found[1].streams, vec![0, 1]);
+        // One program is no choice.
+        assert!(variants(&info, vec![(vec![0, 1, 2, 3], None)]).is_empty());
+    }
 
     #[test]
     fn generic_handler_names_are_not_titles() {

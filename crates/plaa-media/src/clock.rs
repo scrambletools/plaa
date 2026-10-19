@@ -1,6 +1,6 @@
 //! The playback clock pictures follow: set from the audio device while a
 //! file has audio, so pictures keep to the sound, and from the system's
-//! clock otherwise.
+//! clock otherwise. It waits while a stream reads ahead.
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
@@ -23,11 +23,21 @@ struct State {
     stalled: bool,
     /// Held while the timeline is dragged, without pausing.
     held: bool,
+    /// Since when it has waited for the source to read far enough ahead
+    /// to play on without stopping again.
+    waiting: Option<Instant>,
 }
 
 impl State {
     fn running(&self) -> bool {
-        !self.paused && !self.stalled && !self.held
+        !self.paused && !self.stalled && !self.held && self.waiting.is_none()
+    }
+
+    /// Notes where the clock is now, before something changes how it runs.
+    fn settle(&mut self) {
+        let now = Instant::now();
+        self.position = self.position_at(now);
+        self.at = now;
     }
 
     fn position_at(&self, instant: Instant) -> f64 {
@@ -58,6 +68,7 @@ impl Clock {
                 paused: true,
                 stalled: false,
                 held: false,
+                waiting: None,
             }),
         }
     }
@@ -111,11 +122,46 @@ impl Clock {
     pub fn stall(&self) {
         let mut state = self.state();
         if !state.stalled {
-            let now = Instant::now();
-            state.position = state.position_at(now);
-            state.at = now;
+            state.settle();
             state.stalled = true;
         }
+    }
+
+    /// The sound ran out while playing: stops until it comes again, and
+    /// waits for the source to read ahead, so it does not run out again at
+    /// once.
+    pub fn ran_out(&self) {
+        let mut state = self.state();
+        if state.running() {
+            state.waiting = Some(Instant::now());
+        }
+        if !state.stalled {
+            state.settle();
+            state.stalled = true;
+        }
+    }
+
+    /// Waits for the source to read ahead, as after a seek.
+    pub fn wait(&self) {
+        let mut state = self.state();
+        if state.waiting.is_none() {
+            state.settle();
+            state.waiting = Some(Instant::now());
+        }
+    }
+
+    /// The source has read far enough ahead: plays on.
+    pub fn end_wait(&self) {
+        let mut state = self.state();
+        if state.waiting.is_some() {
+            state.settle();
+            state.waiting = None;
+        }
+    }
+
+    /// How long the clock has waited for the source, if it is waiting.
+    pub fn waited(&self) -> Option<Duration> {
+        self.state().waiting.map(|since| since.elapsed())
     }
 
     pub fn set_paused(&self, paused: bool) {
@@ -150,11 +196,11 @@ impl Clock {
         self.state().held
     }
 
-    /// Whether the clock is kept still, paused or held, so the sound
-    /// waits where it is.
+    /// Whether the clock is kept still, paused, held or waiting for the
+    /// source, so the sound waits where it is.
     pub fn still(&self) -> bool {
         let state = self.state();
-        state.paused || state.held
+        state.paused || state.held || state.waiting.is_some()
     }
 
     pub fn running(&self) -> bool {
@@ -222,6 +268,24 @@ mod tests {
         clock.hold(false);
         assert!(clock.running());
         assert!(clock.now() >= 8.0);
+    }
+
+    #[test]
+    fn running_out_waits_until_the_source_reads_ahead() {
+        let clock = Clock::new();
+        clock.set_paused(false);
+        clock.anchor(4.0, Instant::now());
+        clock.ran_out();
+        assert!(clock.waited().is_some() && clock.still());
+        // Sound coming back does not end the wait by itself.
+        clock.anchor(4.0, Instant::now());
+        assert!(!clock.running());
+        clock.end_wait();
+        assert!(clock.running() && clock.waited().is_none());
+        // Running out again while stalled after a seek is no new wait.
+        clock.stall();
+        clock.ran_out();
+        assert!(clock.waited().is_none());
     }
 
     #[test]

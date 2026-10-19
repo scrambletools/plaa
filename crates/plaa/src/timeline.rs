@@ -30,6 +30,9 @@ use crate::format;
 /// player seeks there.
 const HOLD: Duration = Duration::from_secs(1);
 
+/// How often the mark of what is read ahead moves on.
+const BUFFERED_REDRAW: Duration = Duration::from_millis(250);
+
 /// The gap in the rail where a chapter starts.
 const CHAPTER_GAP: f32 = 2.0;
 
@@ -62,6 +65,8 @@ pub struct Timeline<'a, Message> {
     on_hover: Option<HoverFn<'a, Message>>,
     /// The picture near where it is pointed at, and its shape.
     thumbnail: Option<(image::Handle, f32)>,
+    /// Marks how far ahead the source has been read, as for streams.
+    buffered: bool,
 }
 
 impl<'a, Message> Timeline<'a, Message> {
@@ -87,6 +92,7 @@ impl<'a, Message> Timeline<'a, Message> {
             ab_loop: None,
             on_hover: None,
             thumbnail: None,
+            buffered: false,
         }
     }
 
@@ -107,6 +113,13 @@ impl<'a, Message> Timeline<'a, Message> {
     /// A loop's start, and its end once set, marked under the rail.
     pub fn ab_loop(mut self, ab_loop: Option<(f64, Option<f64>)>) -> Self {
         self.ab_loop = ab_loop;
+        self
+    }
+
+    /// Marks how far ahead the player has read along the rail after the
+    /// handle, as is worth knowing for streams.
+    pub fn buffered(mut self, buffered: bool) -> Self {
+        self.buffered = buffered;
         self
     }
 
@@ -165,6 +178,17 @@ impl<'a, Message> Timeline<'a, Message> {
         let edge = f64::from(bounds.x) * scale + travel * position / self.duration;
         let wait = until_next_pixel(edge, speed);
         Some(Instant::now() + Duration::from_secs_f64(wait.clamp(0.0, 3600.0)))
+    }
+}
+
+/// `from` moved `share` of the way to `to`.
+fn mix(from: iced::Color, to: iced::Color, share: f32) -> iced::Color {
+    let toward = |from: f32, to: f32| from + (to - from) * share;
+    iced::Color {
+        r: toward(from.r, to.r),
+        g: toward(from.g, to.g),
+        b: toward(from.b, to.b),
+        a: toward(from.a, to.a),
     }
 }
 
@@ -296,6 +320,15 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
                 {
                     shell.request_redraw_at(at);
                 }
+                // Reading ahead goes on while paused.
+                if self.buffered
+                    && self
+                        .player
+                        .buffered()
+                        .is_some_and(|read| read.as_secs_f64() < self.duration)
+                {
+                    shell.request_redraw_at(Instant::now() + BUFFERED_REDRAW);
+                }
             }
             _ => {}
         }
@@ -360,6 +393,22 @@ impl<Message: Clone> Widget<Message, Theme, iced::Renderer> for Timeline<'_, Mes
             rail(bounds.x + middle, bounds.width - middle),
             style.rail.backgrounds.1,
         );
+        // What is read ahead, between the rail's two colors.
+        if self.buffered
+            && let Some(read) = self.player.buffered()
+        {
+            let end = self.x_of(bounds, handle_width, read.as_secs_f64()) - bounds.x;
+            if end > middle {
+                let (played, ahead) = (style.rail.backgrounds.0, style.rail.backgrounds.1);
+                let between = match (played, ahead) {
+                    (iced::Background::Color(played), iced::Background::Color(ahead)) => {
+                        iced::Background::Color(mix(ahead, played, 0.4))
+                    }
+                    (_, ahead) => ahead,
+                };
+                renderer.fill_quad(rail(bounds.x + middle, end - middle), between);
+            }
+        }
         if let Some((from, to)) = self.ab_loop {
             let start = self.x_of(bounds, handle_width, from);
             let end = to.map_or(start + LOOP_START, |to| self.x_of(bounds, handle_width, to));
