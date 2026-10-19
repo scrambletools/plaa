@@ -36,3 +36,7 @@ The first build.
   only the quality that plays; a spinner shows while they wait.
 - Web videos and playlists through yt-dlp, a quality menu, recent
   addresses, and AV1 decoded on the graphics card.
+- Trimming, splitting and arranging clips, rotating and flipping, with
+  undo, the edit playing clip after clip without a gap.
+- Exporting to H.264, HEVC, AV1 or sound alone, as edited and made
+  smaller, on the graphics card's encoder where one opens.

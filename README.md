@@ -10,10 +10,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 [scramble-ui](https://github.com/scrambletools/scramble-ui).
 
 > **Status:** early development, not yet released. Files, streams and
-> web videos play, with the controls floating over the picture; see the
-> [development plan](docs/PLAN.md) for what comes next: editing and
-> export, recording, casting, an AVB/Milan talker and listener, and an
-> assistant.
+> web videos play, with the controls floating over the picture, and
+> files can be trimmed, split, turned and exported; see the
+> [development plan](docs/PLAN.md) for what comes next: recording,
+> casting, an AVB/Milan talker and listener, and an assistant.
 
 ## Features
 
@@ -75,12 +75,23 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   while sound does.
 - **Sound output** chosen in Settings, through the sound server on Linux
   (PipeWire or PulseAudio).
+- **Trim** (Ctrl+T) between two handles over a filmstrip, the part kept
+  playing over and over meanwhile; **split** (Ctrl+Y) into clips, which
+  can be moved, removed and trimmed one by one; **rotate** and **flip**
+  (Ctrl+Shift+L, R, H and V); with undo and redo. The edit plays as it
+  will be, clip after clip without a gap.
+- **Export** (Ctrl+E) to H.264, HEVC or AV1 with AAC sound, or the sound
+  alone, as edited, at the file's size or smaller: on the graphics
+  card's encoder where one opens (NVENC, AMF, Quick Sync, VAAPI or
+  VideoToolbox), else on the processor (x264, x265, SVT-AV1), keeping
+  HDR video's colors in HEVC and AV1. Closing with changes not exported
+  asks first.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
   rate, how it decodes, and its tags.
 - **Settings** (Ctrl+,): light or dark, the system accent color, the
-  floating controls, hardware decoding, resuming, streams' quality,
+  floating controls, the graphics card, resuming, streams' quality,
   track languages and folders, saved in `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml` on
   Windows, `~/Library/Application Support/plaa/plaa.toml` on macOS).
 - **One window per file** and one running plaa: files opened again, from
@@ -88,9 +99,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Trimming and export, recording, a visualizer, casting, the AVB/Milan
-entity, the assistant and MCP, packages and translations. The
-[plan](docs/PLAN.md) has the order.
+Recording, a visualizer, casting, the AVB/Milan entity, the assistant
+and MCP, packages and translations. The [plan](docs/PLAN.md) has the
+order.
 
 ## Building
 
@@ -132,9 +143,10 @@ their own settings (`~/.config/plaa-dev.toml`) and data under
 `plaa-dev`, show "(dev)" in window titles, and run alongside an installed
 copy. Packages are built with `PLAA_PRODUCTION=1`.
 
-`PLAA_FFMPEG_LOG=1` shows FFmpeg's own messages, and
+`PLAA_FFMPEG_LOG=1` shows FFmpeg's own messages,
 `cargo run --release -p plaa-media --example play -- <file>` plays a file
-without a window and says what it showed.
+without a window and says what it showed, and the `export` example
+exports one as the Export dialog does.
 
 ### Changing scramble-ui alongside
 
@@ -168,6 +180,13 @@ On macOS, use ⌘ in place of Ctrl.
 | Playlist | Ctrl+P |
 | Picture in picture | Ctrl+Shift+P |
 | Save frame as picture | S |
+| Trim, split clip | Ctrl+T, Ctrl+Y |
+| Trim from, to the playhead | I, O (while trimming) |
+| Remove the chosen clip | Delete (while arranging clips) |
+| Rotate left, right | Ctrl+Shift+L, Ctrl+Shift+R |
+| Flip horizontally, vertically | Ctrl+Shift+H, Ctrl+Shift+V |
+| Undo, redo | Ctrl+Z, Ctrl+Shift+Z |
+| Export | Ctrl+E |
 | Open, open address | Ctrl+O, Ctrl+U |
 | Inspector | Ctrl+I |
 | Settings | Ctrl+, |
@@ -188,8 +207,9 @@ The actions are open, open-address, close-window, quit, settings, info,
 play-pause, back, forward, back-more, forward-more, previous-frame,
 next-frame, volume-up, volume-down, mute, full-screen, faster, slower,
 normal-speed, loop, screenshot, subtitles, audio-track, to-start,
-previous, next, playlist, previous-chapter, next-chapter, ab-loop and
-picture-in-picture. A shortcut the settings give one action is taken
+previous, next, playlist, previous-chapter, next-chapter, ab-loop,
+picture-in-picture, trim, split, rotate-left, rotate-right,
+flip-horizontal, flip-vertical, undo, redo, revert and export. A shortcut the settings give one action is taken
 from any other that had it by default.
 
 ## License

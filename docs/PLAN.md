@@ -35,6 +35,8 @@ look follows Material Design 3, as in prev.
 | Subtitles | Text subtitles (SubRip, WebVTT, MP4 text and the rest FFmpeg reads) drawn by plaa; ASS and SSA drawn as styled by libass, loaded as plaa runs, with the file's fonts; Blu-ray, DVD and DVB picture subtitles. Both kinds of picture are laid over the video in its shader, and fit and shrink with it |
 | Windows | One window per file, one running instance; a start window when nothing is open |
 | Overlay | For video, M3 floating toolbars over the picture by default, hiding once the pointer rests (2 s, adjustable) or leaves the window; Settings docks them. Sound always has them docked |
+| Editing | Not destructive: an edit is the file's clips in order and a turn and flip, played as it will be and kept until exported, as QuickTime Player keeps it until saved |
+| Export | Re-encoded through FFmpeg: NVENC, AMF or Quick Sync where they open, VAAPI on Linux, VideoToolbox on macOS, else x264, x265 and SVT-AV1; AAC sound (Apple's encoder on macOS); MP4, or M4A for sound |
 | Web pages | yt-dlp, run as a program of its own when it is installed, not bundled: it follows the sites' changes faster than plaa could; its JSON names the streams, which FFmpeg plays |
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first; the 38 languages prev has once the interface settles |
@@ -78,8 +80,10 @@ trimming and splitting, and Intel Macs.
    sound read as two streams in step, and playlists; choosing a
    stream's quality, by default as tall as the screen; buffering ahead,
    waiting to read on, and a spinner while it waits; recent addresses.
-4. **Edit and export**: trim, split, rotate and flip, then export to
-   H.264, HEVC, AV1 or audio only, on hardware encoders where there are.
+4. **Edit and export** (done): trim, split and arrange clips, rotate and
+   flip, with undo, the edit playing without gaps; export to H.264,
+   HEVC, AV1 or sound alone, as edited and made smaller, on hardware
+   encoders where they open.
 5. **Recording**: microphone, camera, screen (the ScreenCast portal and
    PipeWire, ScreenCaptureKit, Windows.Graphics.Capture), AVB streams.
 6. **Visualizer**: waveform, spectrum and cover art for sound.
@@ -140,6 +144,16 @@ bumps a serial that packets, pictures and samples carry, so anything
 from before it is dropped wherever it is. Exact seeks also drop what
 decodes before the target.
 
+An edit plays as it will be. Its clips, joined where one carries on
+the next in the file, are parts the reader reads one after another,
+seeking to the next once every stream playing has read past the end of
+this one, by decoding time where packets have it. Packets carry their
+part, so the decoders know where each picture and sound goes in the
+edited time: a decoder drains itself at the end of a part, pictures
+keep within it by their middle and sound to the sample, and the clock,
+seeks and the position all count in the edited time, so the parts play
+one after another without a gap.
+
 Dragging the timeline holds the clock and seeks exactly, so the picture
 only moves the way the handle does; seeking to keyframes instead would
 show each keyframe before the frames after it, rocking back and forth.
@@ -148,6 +162,20 @@ target moves on and decoding carries on to it, which keeps up with the
 handle; otherwise one seek at a time, the next once the last one's
 picture shows, to the handle's latest position. Letting go lands on the
 handle and lets the clock go on.
+
+### Export
+
+An export runs on a thread of its own, from its own reading of the file:
+each part of the edit is read in turn, as in playback, its pictures and
+sound kept within it and stamped with the edited time. Pictures, copied
+out of graphics memory when decoded there, go through a filter graph
+that flips, turns and sizes them for the encoder, and sound through one
+that resamples it and cuts it into the encoder's frames, filling gaps
+between parts. The encoder is the first of the system's that opens for
+the format and size, so a card that cannot take 8K H.264 leaves it to
+the processor; the dialog asks the same way, so it says which. What it
+writes goes to a hidden file beside the one chosen, renamed once done,
+and removed if it is stopped.
 
 ### Pictures
 
@@ -195,6 +223,7 @@ next pixel, so it moves a pixel at a time at any width.
 | Drag and drop | winit on X11; prev's patched smithay-clipboard on Wayland | winit | winit |
 | Screen kept on | the screen saver's D-Bus service, else logind's idle lock (keepawake) | execution state (keepawake) | power assertions (keepawake) |
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
+| Hardware encoding | NVENC, VAAPI, Quick Sync | NVENC, AMF, Quick Sync | VideoToolbox |
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |
