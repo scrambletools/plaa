@@ -40,20 +40,52 @@ impl Default for Zoom {
     }
 }
 
-/// A turn of the wheel zooming the picture: `steps`, out where negative,
-/// at `pointer`, in fractions of the widget from its middle, the picture
-/// fitted to `extent` of it.
+/// A change to the zoom, for a picture fitted to `extent` of the widget.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ZoomStep {
-    steps: f32,
-    pointer: (f32, f32),
-    extent: (f32, f32),
+pub enum ZoomChange {
+    /// The wheel turned `steps`, out where negative, at `pointer`, in
+    /// fractions of the widget from its middle.
+    Wheel {
+        steps: f32,
+        pointer: (f32, f32),
+        extent: (f32, f32),
+    },
+    /// The zoomed picture was dragged `moved`, in fractions of the widget.
+    Drag {
+        moved: (f32, f32),
+        extent: (f32, f32),
+    },
 }
 
 impl Zoom {
-    /// Zoomed by `step`.
-    pub fn step(self, step: ZoomStep) -> Self {
-        self.at(step.steps, step.pointer, step.extent)
+    /// Changed by `change`.
+    pub fn changed(self, change: ZoomChange) -> Self {
+        match change {
+            ZoomChange::Wheel {
+                steps,
+                pointer,
+                extent,
+            } => self.at(steps, pointer, extent),
+            ZoomChange::Drag { moved, extent } => self.dragged(moved, extent),
+        }
+    }
+
+    pub fn is_zoomed(self) -> bool {
+        self.scale > 1.0
+    }
+
+    /// Dragged `moved`, in fractions of the widget: the picture follows
+    /// the pointer, as far as it still covers the widget.
+    fn dragged(self, moved: (f32, f32), extent: (f32, f32)) -> Self {
+        let follow = |center: f32, moved: f32, extent: f32| center - moved / (extent * self.scale);
+        Self {
+            scale: self.scale,
+            center: (
+                follow(self.center.0, moved.0, extent.0),
+                follow(self.center.1, moved.1, extent.1),
+            ),
+        }
+        .clamped(extent)
     }
 
     /// Zoomed in `steps` steps of the wheel, out where negative, keeping
@@ -114,8 +146,9 @@ impl Zoom {
 
 /// Draws `player`'s pictures, fitted inside the widget, turned and
 /// flipped as `transform` says, and zoomed in as `zoom` says; the command
-/// key and the wheel zoom it at the pointer, each turn sent as `on_zoom`
-/// for the window to apply in turn. `surface`
+/// key and the wheel zoom it at the pointer, and dragging moves it while
+/// zoomed, each change sent as `on_zoom` for the window to apply in turn.
+/// `surface`
 /// tells windows apart, as every window's pictures share one pipeline.
 /// Pointer moves are noted in `activity`, and `on_activity` is sent when
 /// one should bring the hidden overlay back.
@@ -126,7 +159,7 @@ pub fn view<'a, Message: Clone + 'a>(
     activity: Arc<Activity>,
     hide_cursor: bool,
     on_activity: Message,
-    on_zoom: fn(ZoomStep) -> Message,
+    on_zoom: fn(ZoomChange) -> Message,
 ) -> Element<'a, Message> {
     shader::Shader::new(Program {
         player,
@@ -151,17 +184,25 @@ struct Program<'a, Message> {
     activity: Arc<Activity>,
     hide_cursor: bool,
     on_activity: Message,
-    on_zoom: fn(ZoomStep) -> Message,
+    on_zoom: fn(ZoomChange) -> Message,
+}
+
+/// What the picture keeps between events.
+#[derive(Default)]
+pub struct Held {
+    /// The keys held, as the wheel zooms with the command key.
+    modifiers: keyboard::Modifiers,
+    /// Where the pointer was as it last dragged the zoomed picture.
+    dragging: Option<iced::Point>,
 }
 
 impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
-    /// The keys held, as the wheel zooms with the command key.
-    type State = keyboard::Modifiers;
+    type State = Held;
     type Primitive = Primitive;
 
     fn update(
         &self,
-        modifiers: &mut Self::State,
+        held: &mut Self::State,
         event: &iced::Event,
         bounds: Rectangle,
         cursor: mouse::Cursor,
@@ -172,15 +213,43 @@ impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
             iced::Event::Window(iced::window::Event::RedrawRequested(_)) => {
                 self.player.next_redraw().map(Action::request_redraw_at)
             }
-            iced::Event::Mouse(mouse::Event::CursorMoved { .. }) => self
-                .activity
-                .touch()
-                .then(|| Action::publish(self.on_activity.clone())),
-            iced::Event::Keyboard(keyboard::Event::ModifiersChanged(held)) => {
-                *modifiers = *held;
+            iced::Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                let shown = self.activity.touch();
+                let Some(from) = held.dragging else {
+                    return shown.then(|| Action::publish(self.on_activity.clone()));
+                };
+                // Dragging keeps the overlay away, and moves the picture.
+                held.dragging = Some(*position);
+                let frame = self.player.picture()?;
+                let moved = (
+                    (position.x - from.x) / bounds.width.max(1.0),
+                    (position.y - from.y) / bounds.height.max(1.0),
+                );
+                Some(Action::publish((self.on_zoom)(ZoomChange::Drag {
+                    moved,
+                    extent: fitted_extent(&frame, self.transform, &bounds),
+                })))
+            }
+            // Not taken, so a double click still fills the screen.
+            iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+                if self.zoom.is_zoomed() =>
+            {
+                held.dragging = cursor.position_over(bounds);
                 None
             }
-            iced::Event::Mouse(mouse::Event::WheelScrolled { delta }) if modifiers.command() => {
+            iced::Event::Mouse(
+                mouse::Event::ButtonReleased(mouse::Button::Left) | mouse::Event::CursorLeft,
+            ) => {
+                held.dragging = None;
+                None
+            }
+            iced::Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) => {
+                held.modifiers = *modifiers;
+                None
+            }
+            iced::Event::Mouse(mouse::Event::WheelScrolled { delta })
+                if held.modifiers.command() =>
+            {
                 let pointer = cursor.position_in(bounds)?;
                 let frame = self.player.picture()?;
                 let steps = match delta {
@@ -191,24 +260,19 @@ impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
                     pointer.x / bounds.width.max(1.0) - 0.5,
                     pointer.y / bounds.height.max(1.0) - 0.5,
                 );
-                let step = ZoomStep {
+                let change = ZoomChange::Wheel {
                     steps,
                     pointer,
                     extent: fitted_extent(&frame, self.transform, &bounds),
                 };
                 // Taken here, so the wheel does not change the volume too.
-                Some(Action::publish((self.on_zoom)(step)).and_capture())
+                Some(Action::publish((self.on_zoom)(change)).and_capture())
             }
             _ => None,
         }
     }
 
-    fn draw(
-        &self,
-        _modifiers: &Self::State,
-        _cursor: mouse::Cursor,
-        _bounds: Rectangle,
-    ) -> Primitive {
+    fn draw(&self, _held: &Self::State, _cursor: mouse::Cursor, _bounds: Rectangle) -> Primitive {
         Primitive {
             surface: self.surface,
             frame: self.player.picture(),
@@ -220,12 +284,19 @@ impl<Message: Clone> shader::Program<Message> for Program<'_, Message> {
 
     fn mouse_interaction(
         &self,
-        _modifiers: &Self::State,
+        held: &Self::State,
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> mouse::Interaction {
-        if self.hide_cursor && cursor.is_over(bounds) {
+        if held.dragging.is_some() {
+            mouse::Interaction::Grabbing
+        } else if !cursor.is_over(bounds) {
+            mouse::Interaction::default()
+        } else if self.hide_cursor {
             mouse::Interaction::Hidden
+        } else if self.zoom.is_zoomed() {
+            // A zoomed picture can be dragged.
+            mouse::Interaction::Grab
         } else {
             mouse::Interaction::default()
         }
@@ -1009,6 +1080,25 @@ mod tests {
         // above it: the top of the picture stays at the widget's top.
         let top = fitted.at(3.0, (0.0, -0.25), extent);
         assert!(close(shown_at(top, (0.0, -0.5), extent), (0.0, -0.5)));
+    }
+
+    #[test]
+    fn dragging_moves_the_picture_with_the_pointer() {
+        let extent = (1.0, 0.8);
+        let zoomed = Zoom::default().at(4.0, (0.0, 0.0), extent);
+        let point = (0.05, -0.02);
+        let before = shown_at(zoomed, point, extent);
+        let dragged = zoomed.dragged((0.1, -0.05), extent);
+        assert!(close(
+            shown_at(dragged, point, extent),
+            (before.0 + 0.1, before.1 - 0.05)
+        ));
+        // Not past where the picture's edge meets the widget's.
+        let far = dragged.dragged((5.0, 5.0), extent);
+        assert!(close(shown_at(far, (-0.5, -0.5), extent), (-0.5, -0.5)));
+        // Fitted, there is nothing to move.
+        let fitted = Zoom::default();
+        assert_eq!(fitted.dragged((0.3, 0.3), extent), fitted);
     }
 
     #[test]

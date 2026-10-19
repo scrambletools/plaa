@@ -383,8 +383,9 @@ pub enum Control {
     Activity,
     /// The wheel turned over the picture, by lines.
     Wheel(f32),
-    /// The command key and the wheel zoomed the picture.
-    Zoom(crate::video::ZoomStep),
+    /// The command key and the wheel zoomed the picture, or a drag moved
+    /// it while zoomed.
+    Zoom(crate::video::ZoomChange),
     /// Does what a menu item or shortcut would.
     Action(Action),
     /// The trim bar keeps from and to these seconds, showing the third.

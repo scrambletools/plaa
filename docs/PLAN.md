@@ -249,7 +249,10 @@ the shader moves and scales the picture's corners, and the widget's
 edges cut it. Where the zoomed picture is larger than the widget it is
 kept covering it, its edge stopping at the widget's, and where it is
 smaller, in the middle; so near an edge the point under the pointer can
-move toward it. A new file starts fitted.
+move toward it. Dragging a zoomed picture moves it with the pointer, as
+far as it still covers the widget; the press is left to the window, so
+a double click still fills the screen, and the overlay stays away while
+dragging. A new file starts fitted.
 
 ### Interface
 

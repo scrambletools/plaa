@@ -1825,9 +1825,9 @@ impl Plaa {
                 self.save_settings();
                 return Task::none();
             }
-            Control::Zoom(step) => {
+            Control::Zoom(change) => {
                 if let Some(player) = self.player_mut(id) {
-                    player.zoom = player.zoom.step(step);
+                    player.zoom = player.zoom.changed(change);
                 }
                 return Task::none();
             }
