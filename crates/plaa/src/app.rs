@@ -93,6 +93,8 @@ pub struct Plaa {
     export_choice: Option<export::Choice>,
     /// The sound input devices, as they were when last looked at.
     input_devices: Vec<plaa_media::record::InputDevice>,
+    /// A screen recording whose window closed so as not to be in it.
+    hidden: Option<recording::Hidden>,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -314,6 +316,7 @@ impl Plaa {
             probing: HashSet::new(),
             export_choice: None,
             input_devices: Vec::new(),
+            hidden: None,
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -890,9 +893,10 @@ impl Plaa {
                 })
             })
         };
-        let recording = self.windows.values().any(|window| {
-            matches!(&window.content, Content::Recorder(recorder) if recorder.is_recording())
-        });
+        let recording = self.hidden.is_some()
+            || self.windows.values().any(|window| {
+                matches!(&window.content, Content::Recorder(recorder) if recorder.is_recording())
+            });
         let wanted = if playing(true) {
             Some(Awake::Screen)
         } else if playing(false) || recording {
@@ -910,7 +914,18 @@ impl Plaa {
 
     fn handle(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::External(External::OpenSources(sources)) => self.open_sources(sources, None),
+            Message::External(External::OpenSources(sources)) => {
+                // Opening plaa again stops a recording that hides: its
+                // window shows once it is saved.
+                if self.stop_hidden() && sources.is_empty() {
+                    return Task::none();
+                }
+                self.open_sources(sources, None)
+            }
+            Message::External(External::StopHidden) => {
+                self.stop_hidden();
+                Task::none()
+            }
             Message::External(External::OmarchyThemeChanged) => {
                 self.reload_omarchy();
                 Task::none()
@@ -918,17 +933,19 @@ impl Plaa {
             Message::External(External::Player(id, event)) => self.player_event(id, event),
             Message::WindowOpened => Task::none(),
             Message::WindowClosed(id) => {
-                if let Some(Window {
-                    content: Content::Player(player),
-                    ..
-                }) = self.windows.remove(&id)
-                {
-                    remember_position(&mut self.positions, &player);
-                    if let Some(path) = &self.positions_path {
-                        let _ = self.positions.save(path);
+                match self.windows.remove(&id).map(|window| window.content) {
+                    Some(Content::Player(player)) => {
+                        remember_position(&mut self.positions, &player);
+                        if let Some(path) = &self.positions_path {
+                            let _ = self.positions.save(path);
+                        }
                     }
+                    Some(Content::Recorder(recorder)) if recorder.hiding => {
+                        self.hide_recording(id, recorder);
+                    }
+                    _ => {}
                 }
-                if self.windows.is_empty() {
+                if self.windows.is_empty() && self.hidden.is_none() {
                     return exit();
                 }
                 Task::none()
@@ -1207,6 +1224,9 @@ impl Plaa {
                     if let Content::Recorder(recorder) = &mut window.content {
                         recorder.tick();
                     }
+                }
+                if let Some(recorder) = self.hidden_recorder() {
+                    recorder.tick();
                 }
                 Task::none()
             }
@@ -1942,10 +1962,11 @@ impl Plaa {
         } else {
             Subscription::none()
         };
-        let metering = self
-            .windows
-            .values()
-            .any(|window| matches!(window.content, Content::Recorder(_)));
+        let metering = self.hidden.is_some()
+            || self
+                .windows
+                .values()
+                .any(|window| matches!(window.content, Content::Recorder(_)));
         let meter_ticks = if metering {
             Subscription::run(meter_ticks).map(|_| Message::MeterTick)
         } else {

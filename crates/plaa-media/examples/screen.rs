@@ -94,6 +94,7 @@ mod linux {
             microphone.as_ref(),
             (format, hardware),
             PathBuf::from(destination),
+            Duration::ZERO,
             move |event| {
                 let _ = sender.send(event);
             },

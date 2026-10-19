@@ -32,6 +32,10 @@ pub enum RecorderControl {
     Video(Format),
     /// Asks the system again what to record.
     Reshare,
+    /// Records the screen with plaa hidden, as the warning said.
+    Hide,
+    /// Closes the warning, recording nothing.
+    Cancel,
     Settings,
     Close,
 }
@@ -51,6 +55,17 @@ pub struct Recorder {
     pub saving: bool,
     /// What a screen recording records.
     pub screen: Option<Screen>,
+    /// The warning before recording a screen, which hides plaa.
+    pub warning: Option<Warning>,
+    /// The window closes while it records the screen, so as not to be in
+    /// the recording.
+    pub hiding: bool,
+}
+
+/// How a recording that hides plaa is stopped, as its warning says.
+pub struct Warning {
+    /// A dot in the tray stops it.
+    pub tray: bool,
 }
 
 /// The screen or window a screen recording records.
@@ -72,6 +87,8 @@ impl Recorder {
             levels: Vec::new(),
             saving: false,
             screen: None,
+            warning: None,
+            hiding: false,
         }
     }
 
@@ -84,6 +101,8 @@ impl Recorder {
             levels: Vec::new(),
             saving: false,
             screen: Some(screen),
+            warning: None,
+            hiding: false,
         }
     }
 
@@ -179,9 +198,10 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
         .width(Fill)
         .align_y(Center)
         .style(style::chrome);
-    let body = match &recorder.screen {
-        Some(screen) => screen_body(recorder, screen, context),
-        None => sound_body(recorder, context),
+    let body = match (&recorder.screen, &recorder.warning) {
+        (Some(_), Some(warning)) => warning_body(warning),
+        (Some(screen), None) => screen_body(recorder, screen, context),
+        (None, _) => sound_body(recorder, context),
     };
     column![
         toolbar,
@@ -336,6 +356,39 @@ fn screen_body<'a>(
         .push(video_menu(context.video, busy))
         .push(record_button(recording, !recorder.saving && !ended));
     container(controls).center(Fill).into()
+}
+
+/// What happens once a screen's recording starts: plaa hides, and how
+/// it is stopped then.
+fn warning_body<'a>(warning: &Warning) -> Element<'a, RecorderControl> {
+    let stopping = if warning.tray {
+        crate::fl!("record-hide-tray")
+    } else {
+        crate::fl!("record-hide-reopen")
+    };
+    container(
+        column![
+            icon::icon(Icon::Info, 40).style(style::primary_text),
+            scramble_ui::styled(crate::fl!("record-hide-title"), Type::TitleLarge),
+            scramble_ui::styled(stopping, Type::BodyMedium)
+                .style(style::on_surface_variant)
+                .align_x(Center)
+                .width(320),
+            scramble_ui::dir::row(vec![
+                scramble_ui::button(button::Kind::Text, crate::fl!("common-cancel"))
+                    .on_press(RecorderControl::Cancel)
+                    .into(),
+                scramble_ui::button(button::Kind::Filled, crate::fl!("record-hide-start"))
+                    .on_press(RecorderControl::Hide)
+                    .into(),
+            ])
+            .spacing(8),
+        ]
+        .spacing(16)
+        .align_x(Center),
+    )
+    .center(Fill)
+    .into()
 }
 
 /// How long the recording lasts and how large it is, shown while it goes

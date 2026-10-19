@@ -190,13 +190,16 @@ impl ScreenCapture {
     }
 
     /// Starts recording to `destination` in `format`, on a graphics card
-    /// when `hardware` allows, with the sound of `microphone` when given;
-    /// `events` hears when it ends, from its thread.
+    /// when `hardware` allows, with the sound of `microphone` when given.
+    /// It begins `after` from now, as a window gets out of the way first:
+    /// of what shows until then, only the last picture is kept, which
+    /// begins it. `events` hears when it ends, from its thread.
     pub fn record(
         &mut self,
         microphone: Option<&crate::record::Microphone>,
         (format, hardware): (Format, bool),
         destination: PathBuf,
+        after: Duration,
         events: impl Fn(RecordEvent) + Send + 'static,
     ) -> Result<(), String> {
         if self.recording.is_some() {
@@ -208,6 +211,7 @@ impl ScreenCapture {
         self.progress.recorded.store(0, Ordering::Relaxed);
         self.progress.written.store(0, Ordering::Relaxed);
         let sound = microphone.map(crate::record::Microphone::tap);
+        let begin = Instant::now() + after;
         let finish = Arc::new(AtomicBool::new(false));
         let thread = {
             let (frames, shared, progress, finish) = (
@@ -224,7 +228,7 @@ impl ScreenCapture {
                         (&frames, &shared, sound.as_ref()),
                         (format, hardware),
                         &temporary,
-                        (&finish, &progress),
+                        (begin, &finish, &progress),
                     );
                     frames.end();
                     if let Some(sound) = &sound {
@@ -462,12 +466,12 @@ impl SoundSide {
 
 /// Writes the recording into `temporary` until `finish` is set. Pictures
 /// and sound are taken once the encoders are open, which takes a moment
-/// on a graphics card, from when the recording starts.
+/// on a graphics card, and from `begin` if that is later.
 fn write(
     (frames, shared, sound): (&Frames, &CaptureShared, Option<&SoundTap>),
     (format, hardware): (Format, bool),
     temporary: &std::path::Path,
-    (finish, progress): (&AtomicBool, &Progress),
+    (begin, finish, progress): (Instant, &AtomicBool, &Progress),
 ) -> Result<(), ExportError> {
     let waited = Instant::now();
     let (width, height) = loop {
@@ -552,14 +556,29 @@ fn write(
         size,
         graph: None,
     };
-    let start = Instant::now();
     frames.start();
+    // Until it begins, each picture replaces the one before, the last
+    // beginning the recording.
+    let mut pending: Vec<Taken> = Vec::new();
+    loop {
+        let now = Instant::now();
+        if now >= begin || finish.load(Ordering::Relaxed) {
+            break;
+        }
+        let wait = (begin - now).min(Duration::from_millis(20));
+        if let Some(newest) = frames.take(wait).pop() {
+            pending = vec![newest];
+        }
+    }
+    if let Some(newest) = frames.take(Duration::ZERO).pop() {
+        pending = vec![newest];
+    }
+    let start = Instant::now();
     if let Some(sound) = sound {
         sound.start();
     }
     let micros = |at: Instant| at.saturating_duration_since(start).as_micros() as i64;
     let mut last: Option<(i64, ffmpeg::frame::Video)> = None;
-    let mut pending: Vec<Taken> = Vec::new();
     loop {
         let finishing = finish.load(Ordering::Relaxed);
         for (at, frame) in pending.drain(..) {
@@ -905,18 +924,28 @@ mod tests {
         let finish = AtomicBool::new(false);
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join("screen.mp4");
-        // A still screen sends nothing: the picture kept starts it.
+        // A still screen sends nothing: the picture kept would start it.
         frames.push(Instant::now(), picture(size.0, size.1, 40));
+        // It begins a second from now, as a window gets out of the way.
+        let begin = Instant::now() + Duration::from_secs(1);
         std::thread::scope(|scope| {
             let writer = scope.spawn(|| {
                 write(
                     (&frames, &shared, None),
                     (Format::H264, true),
                     &path,
-                    (&finish, &progress),
+                    (begin, &finish, &progress),
                 )
             });
             while frames.waiting().queue.is_none() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            // Of what shows before it begins, the last picture begins it.
+            for level in 1..=3u8 {
+                let before = Duration::from_millis(100 * u64::from(4 - level));
+                frames.push(begin - before, picture(size.0, size.1, level * 10));
+            }
+            while Instant::now() < begin + Duration::from_millis(50) {
                 std::thread::sleep(Duration::from_millis(5));
             }
             for level in 0..10u8 {
@@ -938,6 +967,9 @@ mod tests {
             .video()
             .unwrap();
         assert_eq!((decoder.width(), decoder.height()), (320, 240));
+        // Gray 30 is 42 in limited range.
+        let first = first_luma(&path);
+        assert!((40..=44).contains(&first), "{first}");
         let mut input = input;
         let mut times: Vec<i64> = input
             .packets()
@@ -945,7 +977,8 @@ mod tests {
             .filter_map(|(_, packet)| packet.pts())
             .collect();
         times.sort_unstable();
-        // The one kept, ten more, and the last again where it ends.
+        // The last before it began, ten more, and the last again where
+        // it ends.
         assert_eq!(times.len(), 12, "{times:?}");
         let base = f64::from(stream_base(&path));
         let seconds: Vec<f64> = times.iter().map(|&time| time as f64 / base).collect();
@@ -953,6 +986,34 @@ mod tests {
         // About 50 ms apart, then the 200 ms before it ended.
         assert!((0.6..1.2).contains(&seconds[11]), "{seconds:?}");
         assert!(progress.written.load(Ordering::Relaxed) > 0);
+    }
+
+    /// The middle of the first picture's luma.
+    fn first_luma(path: &std::path::Path) -> u8 {
+        let mut input = ffmpeg::format::input(&path).unwrap();
+        let stream = input.streams().best(ffmpeg::media::Type::Video).unwrap();
+        let index = stream.index();
+        let mut decoder = ffmpeg::codec::Context::from_parameters(stream.parameters())
+            .unwrap()
+            .decoder()
+            .video()
+            .unwrap();
+        let mut frame = ffmpeg::frame::Video::empty();
+        for (stream, packet) in input.packets() {
+            if stream.index() != index {
+                continue;
+            }
+            decoder.send_packet(&packet).unwrap();
+            if decoder.receive_frame(&mut frame).is_ok() {
+                break;
+            }
+        }
+        if frame.width() == 0 {
+            decoder.send_eof().unwrap();
+            decoder.receive_frame(&mut frame).unwrap();
+        }
+        let (width, height) = (frame.width() as usize, frame.height() as usize);
+        frame.data(0)[height / 2 * frame.stride(0) + width / 2]
     }
 
     /// The video stream's time base's units a second.

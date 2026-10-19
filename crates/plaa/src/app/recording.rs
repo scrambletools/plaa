@@ -1,6 +1,8 @@
 //! Recording sound or the screen in a window of its own: opening it, its
 //! controls, and playing the recording once it is saved.
 
+use std::time::Duration;
+
 use iced::{Element, Size, Task, window};
 use plaa_media::export::{Format, Sound};
 use plaa_media::record::{Microphone, RecordEvent};
@@ -15,20 +17,78 @@ use crate::shortcuts::Action;
 /// The recording window's size.
 const RECORDER_SIZE: Size = Size::new(440.0, 380.0);
 /// The screen recording window's size, with room for what is shared.
-#[cfg(target_os = "linux")]
 const SCREEN_RECORDER_SIZE: Size = Size::new(440.0, 440.0);
+/// How long a window takes to close out of the way of a screen recording
+/// before it begins.
+const HIDING: Duration = Duration::from_millis(800);
+
+/// A screen recording whose window closed so as not to be in it.
+pub(super) struct Hidden {
+    /// The window it was in, which its events name.
+    window: window::Id,
+    recorder: Box<Recorder>,
+    /// The dot in the tray that stops it.
+    #[cfg(target_os = "linux")]
+    _tray: Option<crate::tray::Tray>,
+}
+
+/// Whether a dot in the tray can stop a hidden recording.
+fn tray_shows() -> bool {
+    #[cfg(target_os = "linux")]
+    return crate::tray::available();
+    #[cfg(not(target_os = "linux"))]
+    false
+}
+
+/// Starts recording `recorder`'s screen, `after` from now, saving it in
+/// `folder`; window `id` hears when it is saved.
+fn record_screen(
+    recorder: &mut Recorder,
+    id: window::Id,
+    (video, hardware): (Format, bool),
+    folder: &std::path::Path,
+    after: Duration,
+) -> Result<(), String> {
+    let microphone = recorder
+        .microphone
+        .as_ref()
+        .and_then(|microphone| microphone.as_ref().ok());
+    let Some(capture) = recorder
+        .screen
+        .as_mut()
+        .and_then(|screen| screen.capture.as_mut().ok())
+    else {
+        return Ok(());
+    };
+    std::fs::create_dir_all(folder).map_err(|error| error.to_string())?;
+    let name = format!("{}.mp4", crate::fl!("record-screen-file-name"));
+    let destination = crate::screenshot::unused(&folder.join(name));
+    capture.record(
+        microphone,
+        (video, hardware),
+        destination,
+        after,
+        move |event| crate::post(External::Recorded(id, event)),
+    )
+}
 
 impl Plaa {
     /// Opens a recording window: in place of window `id`'s start view, else
     /// a new one.
     pub(super) fn open_recorder(&mut self, id: window::Id) -> Task<Message> {
         let recorder = Recorder::open(self.settings.microphone.as_deref());
-        self.show_recorder(id, recorder, RECORDER_SIZE)
+        self.show_recorder(id, recorder, RECORDER_SIZE).1
     }
 
     /// Shows `recorder` in window `id` if it shows the start view or a
-    /// recorder that is not recording, else in a new window.
-    fn show_recorder(&mut self, id: window::Id, recorder: Recorder, size: Size) -> Task<Message> {
+    /// recorder that is not recording, else in a new window: the window,
+    /// and the task opening or resizing it.
+    fn show_recorder(
+        &mut self,
+        id: window::Id,
+        recorder: Recorder,
+        size: Size,
+    ) -> (window::Id, Task<Message>) {
         let recorder = Box::new(recorder);
         self.input_devices = plaa_media::record::input_devices();
         if let Some(window) = self.windows.get_mut(&id)
@@ -39,13 +99,13 @@ impl Plaa {
             }
         {
             window.content = Content::Recorder(recorder);
-            return window::resize(id, size);
+            return (id, window::resize(id, size));
         }
         let (opened, task) = self.new_window(size);
         if let Some(window) = self.windows.get_mut(&opened) {
             window.content = Content::Recorder(recorder);
         }
-        task
+        (opened, task)
     }
 
     /// Asks the system what screen or window to record, for window `id`.
@@ -94,7 +154,7 @@ impl Plaa {
             .screen_sound
             .then_some(self.settings.microphone.as_deref());
         let recorder = Recorder::screen(screen, sound);
-        self.show_recorder(id, recorder, SCREEN_RECORDER_SIZE)
+        self.show_recorder(id, recorder, SCREEN_RECORDER_SIZE).1
     }
 
     /// The format and quality recordings are made in, as Settings say,
@@ -152,6 +212,8 @@ impl Plaa {
         let video = self.recording_video();
         let hardware = self.settings.hardware_decoding;
         let folder = self.settings.recordings.clone();
+        // One recording hides at a time.
+        let can_hide = self.hidden.is_none();
         let Some(window) = self.windows.get_mut(&id) else {
             return Task::none();
         };
@@ -159,60 +221,66 @@ impl Plaa {
             return Task::none();
         };
         match control {
+            RecorderControl::Toggle | RecorderControl::Hide if recorder.screen.is_some() => {
+                if recorder.saving {
+                    return Task::none();
+                }
+                if let Some(capture) = recorder.capture_mut()
+                    && capture.is_recording()
+                {
+                    capture.stop();
+                    recorder.saving = true;
+                    return Task::none();
+                }
+                // A whole screen would show this window: it closes while
+                // recording, once a warning has said how to stop then.
+                // Space agrees, as the button does.
+                let whole_screen = recorder
+                    .screen
+                    .as_ref()
+                    .is_some_and(|screen| !screen.window);
+                let hides = whole_screen && can_hide;
+                let agreed =
+                    recorder.warning.take().is_some() || matches!(control, RecorderControl::Hide);
+                if hides && !agreed {
+                    recorder.warning = Some(recorder::Warning { tray: tray_shows() });
+                    return Task::none();
+                }
+                let after = if hides { HIDING } else { Duration::ZERO };
+                match record_screen(recorder, id, (video, hardware), &folder, after) {
+                    Ok(()) if hides => {
+                        recorder.hiding = true;
+                        return window::close(id);
+                    }
+                    Ok(()) => {}
+                    Err(error) => {
+                        self.notify(id, crate::fl!("notice-record-failed", error = error));
+                    }
+                }
+            }
             RecorderControl::Toggle => {
-                let started = if recorder.screen.is_some() {
-                    let name = format!("{}.mp4", crate::fl!("record-screen-file-name"));
-                    let microphone = recorder
-                        .microphone
-                        .as_ref()
-                        .and_then(|microphone| microphone.as_ref().ok());
-                    let Some(capture) = recorder
-                        .screen
-                        .as_mut()
-                        .and_then(|screen| screen.capture.as_mut().ok())
-                    else {
-                        return Task::none();
-                    };
-                    if capture.is_recording() {
-                        capture.stop();
-                        recorder.saving = true;
-                        return Task::none();
-                    }
-                    std::fs::create_dir_all(&folder)
-                        .map_err(|error| error.to_string())
-                        .and_then(|()| {
-                            let destination = crate::screenshot::unused(&folder.join(name));
-                            capture.record(
-                                microphone,
-                                (video, hardware),
-                                destination,
-                                move |event| crate::post(External::Recorded(id, event)),
-                            )
-                        })
-                } else {
-                    let Some(Ok(microphone)) = &mut recorder.microphone else {
-                        return Task::none();
-                    };
-                    if microphone.is_recording() {
-                        microphone.stop();
-                        recorder.saving = true;
-                        return Task::none();
-                    }
-                    let name =
-                        format!("{}.{}", crate::fl!("record-file-name"), sound.0.extension());
-                    std::fs::create_dir_all(&folder)
-                        .map_err(|error| error.to_string())
-                        .and_then(|()| {
-                            let destination = crate::screenshot::unused(&folder.join(name));
-                            microphone.record(destination, sound, move |event| {
-                                crate::post(External::Recorded(id, event));
-                            })
-                        })
+                let Some(Ok(microphone)) = &mut recorder.microphone else {
+                    return Task::none();
                 };
+                if microphone.is_recording() {
+                    microphone.stop();
+                    recorder.saving = true;
+                    return Task::none();
+                }
+                let name = format!("{}.{}", crate::fl!("record-file-name"), sound.0.extension());
+                let started = std::fs::create_dir_all(&folder)
+                    .map_err(|error| error.to_string())
+                    .and_then(|()| {
+                        let destination = crate::screenshot::unused(&folder.join(name));
+                        microphone.record(destination, sound, move |event| {
+                            crate::post(External::Recorded(id, event));
+                        })
+                    });
                 if let Err(error) = started {
                     self.notify(id, crate::fl!("notice-record-failed", error = error));
                 }
             }
+            RecorderControl::Cancel => recorder.warning = None,
             RecorderControl::Microphone(device) => {
                 if recorder.is_recording() || recorder.saving {
                     return Task::none();
@@ -254,14 +322,66 @@ impl Plaa {
                 self.settings.screen_format = format.key().to_owned();
                 self.save_settings();
             }
-            RecorderControl::Settings | RecorderControl::Close | RecorderControl::Reshare => {}
+            RecorderControl::Settings
+            | RecorderControl::Close
+            | RecorderControl::Reshare
+            | RecorderControl::Hide => {}
         }
         Task::none()
+    }
+
+    /// Keeps recording window `id`'s recording once the window has
+    /// closed, with a dot in the tray to stop it.
+    pub(super) fn hide_recording(&mut self, id: window::Id, recorder: Box<Recorder>) {
+        self.hidden = Some(Hidden {
+            window: id,
+            recorder,
+            #[cfg(target_os = "linux")]
+            _tray: crate::tray::Tray::show(
+                crate::fl!("record-tray-title"),
+                crate::fl!("record-tray-tip"),
+                || crate::post(External::StopHidden),
+            ),
+        });
+    }
+
+    /// Stops the recording that hides, if there is one: its window shows
+    /// again once it is saved.
+    pub(super) fn stop_hidden(&mut self) -> bool {
+        let Some(hidden) = &mut self.hidden else {
+            return false;
+        };
+        if let Some(capture) = hidden.recorder.capture_mut()
+            && capture.is_recording()
+        {
+            capture.stop();
+            hidden.recorder.saving = true;
+        }
+        true
+    }
+
+    /// The recording that hides, if there is one.
+    pub(super) fn hidden_recorder(&mut self) -> Option<&mut Recorder> {
+        self.hidden.as_mut().map(|hidden| &mut *hidden.recorder)
     }
 
     /// What window `id`'s recording says: once saved, the window plays it.
     pub(super) fn recorded(&mut self, id: window::Id, event: RecordEvent) -> Task<Message> {
         let RecordEvent::Finished(result) = event;
+        // A recording that hid comes back in a window of its own, which
+        // then plays it.
+        let mut id = id;
+        let mut task = Task::none();
+        if self
+            .hidden
+            .as_ref()
+            .is_some_and(|hidden| hidden.window == id)
+            && let Some(hidden) = self.hidden.take()
+        {
+            let mut recorder = hidden.recorder;
+            recorder.hiding = false;
+            (id, task) = self.show_recorder(id, *recorder, SCREEN_RECORDER_SIZE);
+        }
         match result {
             Ok(path) => {
                 let name = path
@@ -313,6 +433,6 @@ impl Plaa {
                 self.notify(id, crate::fl!("notice-record-failed", error = error));
             }
         }
-        Task::none()
+        task
     }
 }

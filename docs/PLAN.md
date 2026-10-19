@@ -209,6 +209,18 @@ ends. Stopping sharing from the desktop ends the recording, saved as
 it is; closing the window ends the portal's session, or the compositor
 would keep copying the screen.
 
+Recording a screen or a region would show the recording window, so it
+closes first, after a warning saying how to stop: no system lets a
+Wayland window hide itself (Hyprland ignores minimizing), so the window
+goes and the recorder lives on without one. The recording begins 0.8
+seconds later, once the window has gone; of the pictures until then,
+only the last is kept, to begin it. A red dot in the tray, a
+StatusNotifierItem of plaa's own, stops it when clicked, and so does
+opening plaa again, which tells the running plaa; the warning names
+only the second where no tray is shown. Once saved, a new window plays
+the recording. Other plaa windows stay, so a video plaa plays can be
+recorded.
+
 ### Pictures
 
 The picture is a shader widget that asks the player for the picture due
@@ -258,6 +270,7 @@ next pixel, so it moves a pixel at a time at any width.
 | Hardware encoding | NVENC, VAAPI, Quick Sync | NVENC, AMF, Quick Sync | VideoToolbox |
 | Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI) | cpal (Core Audio) |
 | Screen in | the ScreenCast portal (ashpd), its picture through PipeWire | FFmpeg's ddagrab (planned) | ScreenCaptureKit (planned) |
+| Tray, while recording hidden | StatusNotifierItem over D-Bus (zbus) | the notification area (planned) | a menu bar item (planned) |
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |

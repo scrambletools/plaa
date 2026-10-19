@@ -45,4 +45,6 @@ The first build.
   level meter, played back once saved.
 - Recording the screen, a window or a region on Linux, through the
   ScreenCast portal and PipeWire, with a microphone's sound or what the
-  computer plays, encoded on the graphics card where it can.
+  computer plays, encoded on the graphics card where it can. Recording
+  a screen, plaa's recording window hides, and a red dot in the tray,
+  or opening plaa again, stops it.

@@ -32,6 +32,8 @@ mod spinner;
 mod timeline;
 #[cfg(target_os = "macos")]
 mod title_bar_macos;
+#[cfg(target_os = "linux")]
+mod tray;
 mod video;
 mod window;
 
@@ -58,6 +60,8 @@ pub enum External {
     Media(media::Command),
     /// What a window's recording says.
     Recorded(iced::window::Id, plaa_media::record::RecordEvent),
+    /// The dot in the tray was clicked: the recording that hides stops.
+    StopHidden,
     /// What a window's export says.
     Export(iced::window::Id, plaa_media::export::ExportEvent),
     /// The encoder an export of this format, size and depth would use,

@@ -96,9 +96,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 - **Record the screen** (Ctrl+Alt+N) on Linux: a screen, a window or a
   region, as the system's picker offers, with the pointer, and the sound
   of a microphone or of what the computer plays if chosen, as H.264,
-  HEVC or AV1 on the graphics card's encoder where one opens. A
-  recording ends when Stop is pressed or the screen is no longer
-  shared.
+  HEVC or AV1 on the graphics card's encoder where one opens. Recording
+  a screen, the recording window gets out of the way, after saying how
+  to stop: click the red dot plaa puts in the tray, or open plaa again.
+  A recording also ends when the screen is no longer shared.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
