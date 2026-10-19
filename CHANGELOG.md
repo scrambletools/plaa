@@ -20,3 +20,9 @@ The first build.
   frame, resuming where a file was left.
 - Settings, keyboard shortcuts that the settings file can change, one
   window per file and one running plaa.
+- Playlists of files opened or dropped together, M3U and PLS lists, and
+  optionally the opened file's folder.
+- Chapters on the timeline, pictures and chapter names over it where it
+  is pointed at, and an A-B loop.
+- Subtitle files beside the video, picture in picture, the sound output
+  in Settings, MPRIS on Linux, and the screen kept on while video plays.

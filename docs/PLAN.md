@@ -30,7 +30,7 @@ look follows Material Design 3, as in prev.
 | GUI | iced 0.14 with scramble-ui's Material 3 components; the picture through a wgpu shader widget of plaa's own |
 | Media engine | FFmpeg's libraries (libavformat, libavcodec, libavfilter, libswresample, libswscale) through `ffmpeg-next`, all inside `plaa-media` ([ADR 0001](decisions/0001-media-engine.md)) |
 | Hardware decoding | Through FFmpeg: VAAPI, then CUDA, then Vulkan on Linux, where NVIDIA's VAAPI driver waits until last, as it copies pictures out several times slower than CUDA; D3D11VA, CUDA, then DXVA2 on Windows; VideoToolbox on macOS. Pictures are copied to reused memory and converted on the graphics card; the processor takes over when no device opens |
-| Sound out | cpal: ALSA (and PipeWire through it) on Linux, WASAPI on Windows, Core Audio on macOS. The device's clock drives playback |
+| Sound out | cpal: the sound server on Linux through the PulseAudio protocol, which PipeWire speaks too, asked for 50 ms of buffering, and ALSA without a server; WASAPI on Windows, Core Audio on macOS. The device's clock drives playback; Settings picks the device |
 | Color | Y'CbCr to RGB in the shader, BT.601, BT.709 and BT.2020, limited and full range, 8 to 16 bits. PQ and HLG are tone mapped for standard screens, BT.2020 mapped to BT.709 |
 | Subtitles | Text subtitles (SubRip, ASS, WebVTT, MP4 text and the rest FFmpeg reads) drawn by plaa. Picture subtitles and ASS styling come next |
 | Windows | One window per file, one running instance; a start window when nothing is open |
@@ -65,14 +65,14 @@ trimming and splitting, and Intel Macs.
    floating and docked controls, audio and subtitle tracks, text
    subtitles, the inspector, saved frames, resuming, Settings, one
    running instance, CI on the three systems.
-2. **Playback complete**: playlists (the folder's other files, and lists
-   dropped in), chapters on the timeline, picture subtitles and ASS
-   styling (libass), subtitle files beside the video, thumbnails over the
-   timeline, A-B loops, picture in picture, choosing the output device,
-   media keys and the system's now playing (MPRIS, SMTC, Now Playing),
-   keeping the screen awake, drag and drop on Wayland (prev's
-   smithay-clipboard patch), the macOS menu bar, title bar colors on
-   Windows and macOS.
+2. **Playback complete** (under way): done are playlists (files opened or
+   dropped together, M3U and PLS lists, the folder's other files),
+   chapters on the timeline, subtitle files beside the video, thumbnails
+   over the timeline, A-B loops, picture in picture, choosing the output
+   device, MPRIS, and keeping the screen awake. To come: picture
+   subtitles and ASS styling (libass), SMTC and Now Playing, drag and
+   drop on Wayland (prev's smithay-clipboard patch), the macOS menu bar,
+   title bar colors on Windows and macOS.
 3. **Network**: yt-dlp, choosing a stream's quality, a buffering
    indicator, recent addresses.
 4. **Edit and export**: trim, split, rotate and flip, then export to
@@ -177,7 +177,9 @@ next pixel, so it moves a pixel at a time at any width.
 | Settings and data | XDG folders | `%APPDATA%\plaa`, `%LOCALAPPDATA%\plaa` | `~/Library/Application Support/plaa` |
 | Single instance | Unix socket | named pipe | Unix socket |
 | File dialogs | XDG desktop portal (ashpd) | rfd | rfd |
-| Sound | cpal (ALSA, PipeWire) | cpal (WASAPI) | cpal (Core Audio) |
+| Sound | cpal (PulseAudio protocol to PipeWire or PulseAudio, else ALSA) | cpal (WASAPI) | cpal (Core Audio) |
+| Media keys, now playing | MPRIS over D-Bus (zbus) | SMTC, to come | Now Playing, to come |
+| Screen kept on | the screen saver's D-Bus service, else logind's idle lock (keepawake) | execution state (keepawake) | power assertions (keepawake) |
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |

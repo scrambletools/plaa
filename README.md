@@ -25,8 +25,11 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 - **Streams** at addresses: HTTP, HLS, DASH, RTSP and SRT (Open Address,
   Ctrl+U, or an address on the command line).
 - **Hardware decoding** on the graphics card (VAAPI, CUDA or Vulkan on
-  Linux, Direct3D 11 on Windows, VideoToolbox on macOS), falling back to
-  the processor.
+  Linux, Direct3D 11 on Windows, VideoToolbox on macOS), 8K at 60 fps
+  included, falling back to the processor.
+- **Playlists**: files opened or dropped together, M3U and PLS lists,
+  and in Settings, the other files in the opened file's folder; the next
+  plays when one ends (Playlist, Ctrl+P; previous and next, P and N).
 - **Pictures drawn on the graphics card**, with BT.601, BT.709 and
   BT.2020 colors, 8 to 16 bits, HDR10 and HLG tone mapped for ordinary
   screens, and phone videos turned upright.
@@ -39,10 +42,25 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   docked.
 - **Seeking** by dragging the timeline, the picture following the
   handle exactly and only the way it goes; back and forward 5 and 10
-  seconds, and frame by frame.
+  seconds, and frame by frame. Pointing at the timeline shows a picture
+  from there, the time and the chapter.
+- **Chapters** marked on the timeline, in a menu, and a key away
+  (Page Up, Page Down).
+- **A-B loop** (B, then B again where it should end) besides looping the
+  file.
 - **Speed** from a quarter to three times, keeping the sound's pitch.
 - **Audio and subtitle tracks**, picked by preferred languages or from the
-  menu; text subtitles (SubRip, ASS, WebVTT, MP4 text and more).
+  menu; text subtitles (SubRip, ASS, WebVTT, MP4 text and more), and
+  subtitle files beside the video, as `Film.en.srt` or in a `Subs`
+  folder.
+- **Picture in picture** (Ctrl+Shift+P): a small window kept over others
+  in a corner, where the system lets apps place windows.
+- **The desktop's media controls**: media keys, panels and `playerctl`
+  through MPRIS on Linux.
+- **The screen stays on** while video plays, and the computer awake
+  while sound does.
+- **Sound output** chosen in Settings, through the sound server on Linux
+  (PipeWire or PulseAudio).
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
@@ -56,10 +74,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Playlists, chapters, picture subtitles and ASS styling, timeline
-thumbnails, picture in picture, media keys, yt-dlp, trimming and export,
-recording, a visualizer, casting, the AVB/Milan entity, the assistant and
-MCP, packages and translations. The [plan](docs/PLAN.md) has the order.
+Picture subtitles and ASS styling, media keys on Windows and macOS,
+yt-dlp, trimming and export, recording, a visualizer, casting, the
+AVB/Milan entity, the assistant and MCP, packages and translations. The
+[plan](docs/PLAN.md) has the order.
 
 ## Building
 
@@ -125,7 +143,11 @@ On macOS, use ⌘ in place of Ctrl.
 | Slower, faster, normal speed | `[`, `]`, Backspace |
 | Next subtitles, next audio track | C, A |
 | Full screen | F, F11 (Escape leaves it) |
-| Loop | Ctrl+L |
+| Loop, A-B loop | Ctrl+L, B |
+| Previous, next in the playlist | P, N, Ctrl+Left, Ctrl+Right |
+| Previous, next chapter | Page Up, Page Down |
+| Playlist | Ctrl+P |
+| Picture in picture | Ctrl+Shift+P |
 | Save frame as picture | S |
 | Open, open address | Ctrl+O, Ctrl+U |
 | Inspector | Ctrl+I |
@@ -146,7 +168,10 @@ screenshot = "Ctrl+Shift+S"
 The actions are open, open-address, close-window, quit, settings, info,
 play-pause, back, forward, back-more, forward-more, previous-frame,
 next-frame, volume-up, volume-down, mute, full-screen, faster, slower,
-normal-speed, loop, screenshot, subtitles, audio-track and to-start.
+normal-speed, loop, screenshot, subtitles, audio-track, to-start,
+previous, next, playlist, previous-chapter, next-chapter, ab-loop and
+picture-in-picture. A shortcut the settings give one action is taken
+from any other that had it by default.
 
 ## License
 
