@@ -1396,12 +1396,15 @@ impl Plaa {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        // Status and overlays need looking at while something plays or an
-        // overlay or notice waits to go.
+        // Status and overlays need looking at while something plays, an
+        // overlay or notice waits to go, or a seek is about to land.
         let ticking = self.windows.values().any(|window| {
             window.notice.is_some()
                 || matches!(&window.content, Content::Player(player)
-                    if !player.status.paused || player.overlay_shown != !player.is_video() || player.info.is_none())
+                    if !player.status.paused
+                        || player.status.seeking
+                        || player.overlay_shown != !player.is_video()
+                        || player.info.is_none())
         });
         let ticks = if ticking {
             Subscription::run(ticks).map(|_| Message::Tick)

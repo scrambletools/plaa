@@ -130,6 +130,9 @@ pub struct Status {
     pub speed: f64,
     pub audio: Option<usize>,
     pub subtitles: Option<usize>,
+    /// A seek was asked for and has yet to be made, so the position is
+    /// about to jump.
+    pub seeking: bool,
 }
 
 pub(crate) enum Command {
@@ -161,6 +164,8 @@ pub(crate) struct Shared {
     /// The latest seek's serial: older packets, pictures and sound are
     /// dropped.
     pub serial: AtomicU64,
+    /// Seeks asked for that the reader has yet to make.
+    pub seeks: AtomicU64,
     /// Where an exact seek lands, for its serial: decoders drop what comes
     /// before it.
     pub target: Mutex<Option<(u64, f64)>>,
@@ -260,6 +265,7 @@ impl Player {
             picture_cues: Mutex::new(PictureCues::default()),
             ass: Mutex::new(None),
             serial: AtomicU64::new(0),
+            seeks: AtomicU64::new(0),
             target: Mutex::new(None),
             decoded: Mutex::new((0, 0.0)),
             scrub_to: Mutex::new(None),
@@ -275,7 +281,11 @@ impl Player {
             let source = source.clone();
             std::thread::Builder::new()
                 .name("plaa-read".into())
-                .spawn(move || read(source, options, shared, receiver, Box::new(events)))
+                .spawn(move || {
+                    read(source, options, shared.clone(), receiver, Box::new(events));
+                    // Seeks still asked for will never be made.
+                    shared.seeks.store(0, Ordering::Relaxed);
+                })
                 .ok()
         };
         Self {
@@ -335,6 +345,7 @@ impl Player {
             let mut state = self.shared.state();
             state.ended = false;
         }
+        self.shared.seeks.fetch_add(1, Ordering::Relaxed);
         let _ = self.commands.send(Command::Seek {
             position: position.as_secs_f64(),
             exact,
@@ -456,6 +467,7 @@ impl Player {
             speed: self.shared.speed(),
             audio: state.audio,
             subtitles: state.subtitles,
+            seeking: self.shared.seeks.load(Ordering::Relaxed) > 0,
         }
     }
 
@@ -797,6 +809,7 @@ fn read(
                         announced_end = false;
                         shared.state().read_all = false;
                     }
+                    shared.seeks.fetch_sub(1, Ordering::Relaxed);
                 }
                 Command::Scrub => {
                     if !info.seekable {
