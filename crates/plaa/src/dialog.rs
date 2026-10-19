@@ -1,6 +1,7 @@
 //! File dialogs: through the XDG desktop portal on Linux, and the
 //! system's own dialogs (through rfd) elsewhere.
 
+#[cfg(target_os = "linux")]
 use std::path::PathBuf;
 
 #[cfg(target_os = "linux")]
@@ -134,8 +135,12 @@ mod native {
     }
 }
 
-/// Converts a local `file://` URI to a path, decoding percent escapes.
+/// Converts a local `file://` URI, as the portal gives, to a path,
+/// decoding percent escapes.
+#[cfg(target_os = "linux")]
 pub fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
+    use std::os::unix::ffi::OsStringExt;
+
     let rest = uri.strip_prefix("file://")?;
     let path = rest.strip_prefix("localhost").unwrap_or(rest);
     if !path.starts_with('/') {
@@ -156,27 +161,10 @@ pub fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
             bytes.push(byte);
         }
     }
-    path_from_bytes(bytes)
-}
-
-#[cfg(unix)]
-fn path_from_bytes(bytes: Vec<u8>) -> Option<PathBuf> {
-    use std::os::unix::ffi::OsStringExt;
     Some(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
 }
 
-/// `/C:/Users/...` from a `file:///C:/Users/...` URI becomes `C:/Users/...`.
-#[cfg(not(unix))]
-fn path_from_bytes(bytes: Vec<u8>) -> Option<PathBuf> {
-    let path = String::from_utf8(bytes).ok()?;
-    let path = match path.as_bytes() {
-        [b'/', drive, b':', ..] if drive.is_ascii_alphabetic() => &path[1..],
-        _ => &path,
-    };
-    Some(PathBuf::from(path))
-}
-
-#[cfg(all(test, unix))]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
 

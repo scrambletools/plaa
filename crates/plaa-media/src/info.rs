@@ -226,7 +226,7 @@ impl MediaInfo {
                         track,
                         sample_rate: audio.rate(),
                         channels: audio.channels(),
-                        layout: layout_name(&audio.channel_layout(), audio.channels()),
+                        layout: layout_name(ffi::decoder_layout(&audio), audio.channels()),
                     });
                 }
                 Type::Subtitle => {
@@ -279,9 +279,8 @@ fn stream_sample_aspect(stream: &ffmpeg::format::stream::Stream, codec: ffmpeg::
     }
 }
 
-pub(crate) fn layout_name(layout: &ffmpeg::ChannelLayout, channels: u16) -> String {
-    let described = ffi::describe_layout(layout);
-    if layout.is_empty() || described.is_empty() || described.contains("channels") {
+pub(crate) fn layout_name(described: String, channels: u16) -> String {
+    if described.is_empty() || described.contains("channels") {
         match channels {
             1 => "mono".to_owned(),
             2 => "stereo".to_owned(),

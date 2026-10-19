@@ -190,13 +190,52 @@ pub fn attached_picture(stream: &ffmpeg::format::stream::Stream) -> Option<Vec<u
     }
 }
 
-/// A channel layout's name, such as "stereo" or "5.1(side)".
-pub fn describe_layout(layout: &ffmpeg::ChannelLayout) -> String {
+// Channel layouts are read from FFmpeg's own `ch_layout` fields, which
+// every FFmpeg since 5.1 has, as the wrapper's layout type differs between
+// FFmpeg versions.
+
+/// The name of a decoder's channel layout, such as "stereo" or
+/// "5.1(side)", or "" when it has none.
+pub fn decoder_layout(decoder: &ffmpeg::decoder::Audio) -> String {
+    // SAFETY: the decoder's context is valid while it is borrowed.
+    unsafe { describe(&(*decoder.as_ptr()).ch_layout) }
+}
+
+/// The name of a frame's channel layout, as FFmpeg's filters take it: the
+/// usual layout for its number of channels when the file gives none.
+pub fn frame_layout(frame: &ffmpeg::frame::Audio) -> String {
+    // SAFETY: the frame is valid while it is borrowed.
+    let layout = unsafe { &(*frame.as_ptr()).ch_layout };
+    if layout.order == ffi::AVChannelOrder::AV_CHANNEL_ORDER_UNSPEC {
+        default_layout(layout.nb_channels)
+    } else {
+        // SAFETY: as above.
+        unsafe { describe(layout) }
+    }
+}
+
+/// The name of the usual layout for `channels` channels.
+pub fn default_layout(channels: i32) -> String {
+    // SAFETY: FFmpeg fills the zeroed layout, which is released after.
+    unsafe {
+        let mut layout: ffi::AVChannelLayout = std::mem::zeroed();
+        ffi::av_channel_layout_default(&mut layout, channels);
+        let name = describe(&layout);
+        ffi::av_channel_layout_uninit(&mut layout);
+        name
+    }
+}
+
+/// `layout`'s name.
+///
+/// # Safety
+/// `layout` must be a valid channel layout.
+unsafe fn describe(layout: *const ffi::AVChannelLayout) -> String {
     let mut buffer = [0u8; 64];
     // SAFETY: FFmpeg writes at most `buffer.len()` bytes, ending in a
     // zero, and returns how many it needed.
     let written = unsafe {
-        ffi::av_channel_layout_describe(&layout.0, buffer.as_mut_ptr().cast(), buffer.len())
+        ffi::av_channel_layout_describe(layout, buffer.as_mut_ptr().cast(), buffer.len())
     };
     if written <= 0 {
         return String::new();

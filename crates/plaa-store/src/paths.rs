@@ -207,6 +207,17 @@ fn simplify(path: PathBuf) -> PathBuf {
 mod tests {
     use super::*;
 
+    #[test]
+    fn home_is_written_as_a_tilde_and_read_back() {
+        let Some(home) = home() else {
+            return;
+        };
+        let inside = home.join("Videos").join("a.mkv");
+        let short = abbreviate_home(&inside);
+        assert!(short.starts_with("~"));
+        assert_eq!(expand_home(&short), inside);
+    }
+
     #[cfg(not(any(windows, target_os = "macos")))]
     #[test]
     fn user_dirs_are_read_relative_to_home() {

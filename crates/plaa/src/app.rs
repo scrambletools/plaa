@@ -99,6 +99,8 @@ pub enum Message {
     SystemAccent(Option<(u8, u8, u8)>),
     AnimationsEnabled(Option<bool>),
     Settings(SettingsMessage),
+    /// The portal had no answer.
+    #[cfg(target_os = "linux")]
     Nothing,
 }
 
@@ -487,6 +489,7 @@ impl Plaa {
                 Task::none()
             }
             Message::Settings(message) => self.settings_update(message),
+            #[cfg(target_os = "linux")]
             Message::Nothing => Task::none(),
         }
     }

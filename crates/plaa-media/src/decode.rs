@@ -515,25 +515,19 @@ fn build_graph(
     channels: u16,
 ) -> Result<ffmpeg::filter::Graph, ffmpeg::Error> {
     let mut graph = ffmpeg::filter::Graph::new();
-    let layout = frame.channel_layout();
-    let layout = if layout.is_empty() {
-        ffmpeg::ChannelLayout::default(i32::from(frame.channels()))
-    } else {
-        layout
-    };
     let arguments = format!(
         "time_base={}/{}:sample_rate={}:sample_fmt={}:channel_layout={}",
         time_base.numerator(),
         time_base.denominator().max(1),
         frame.rate(),
         frame.format().name(),
-        ffi::describe_layout(&layout),
+        ffi::frame_layout(frame),
     );
     let abuffer = ffmpeg::filter::find("abuffer").ok_or(ffmpeg::Error::FilterNotFound)?;
     let abuffersink = ffmpeg::filter::find("abuffersink").ok_or(ffmpeg::Error::FilterNotFound)?;
     graph.add(&abuffer, "in", &arguments)?;
     graph.add(&abuffersink, "out", "")?;
-    let out_layout = ffi::describe_layout(&ffmpeg::ChannelLayout::default(i32::from(channels)));
+    let out_layout = ffi::default_layout(i32::from(channels));
     let specification = format!(
         "{}aformat=sample_fmts=flt:sample_rates={rate}:channel_layouts={out_layout}",
         tempo_filters(tempo)

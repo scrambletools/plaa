@@ -58,7 +58,7 @@ jobs:
       # bindgen reads FFmpeg's headers through the runner's LLVM.
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
       # A shared FFmpeg build, its headers, import libraries and DLLs.
-      FFMPEG_BUILD: ffmpeg-n8.0-latest-win64-gpl-shared-8.0
+      FFMPEG_BUILD: ffmpeg-n9.0-latest-win64-gpl-shared-9.0
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
