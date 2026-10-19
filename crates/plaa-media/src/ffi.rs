@@ -1,6 +1,6 @@
-//! The few FFmpeg calls the safe wrapper lacks: hardware decoding, moving
-//! a decoded picture out of graphics memory, a stream's rotation and its
-//! index of keyframes.
+//! The few FFmpeg calls the safe wrapper lacks: hardware decoding and
+//! encoding, moving a decoded picture out of graphics memory, a stream's
+//! rotation, colors and index of keyframes, and cutting sound frames.
 #![allow(unsafe_code)]
 
 use ffmpeg::ffi;
@@ -609,6 +609,181 @@ pub fn set_skipped(input: &mut ffmpeg::format::context::Input, index: usize, ski
             } else {
                 ffi::AVDiscard::AVDISCARD_DEFAULT
             };
+        }
+    }
+}
+
+/// `keep` samples of `frame` from sample `skip` on, as a frame of their
+/// own with its format, rate and channels.
+pub fn audio_slice(
+    frame: &ffmpeg::frame::Audio,
+    skip: usize,
+    keep: usize,
+) -> Option<ffmpeg::frame::Audio> {
+    if skip + keep > frame.samples() || keep == 0 {
+        return None;
+    }
+    let mut out = ffmpeg::frame::Audio::empty();
+    // SAFETY: both frames are valid; the new one gets buffers of its own
+    // for `keep` samples before they are copied in, from within the old
+    // one's, as checked above.
+    unsafe {
+        let (source, target) = (frame.as_ptr(), out.as_mut_ptr());
+        (*target).format = (*source).format;
+        (*target).sample_rate = (*source).sample_rate;
+        if ffi::av_channel_layout_copy(&mut (*target).ch_layout, &(*source).ch_layout) < 0 {
+            return None;
+        }
+        (*target).nb_samples = i32::try_from(keep).ok()?;
+        if ffi::av_frame_get_buffer(target, 0) < 0 {
+            return None;
+        }
+        ffi::av_samples_copy(
+            (*target).extended_data,
+            (*source).extended_data,
+            0,
+            i32::try_from(skip).ok()?,
+            (*target).nb_samples,
+            (*source).ch_layout.nb_channels,
+            std::mem::transmute::<i32, ffi::AVSampleFormat>((*source).format),
+        );
+        ffi::av_frame_copy_props(target, source);
+    }
+    Some(out)
+}
+
+/// Bits per sample of a stream's pictures, from its pixel format.
+pub fn bit_depth(stream: &ffmpeg::format::stream::Stream) -> u32 {
+    // SAFETY: the stream's parameters live while it is borrowed; FFmpeg's
+    // pixel format descriptors are static.
+    unsafe {
+        let parameters = (*stream.as_ptr()).codecpar;
+        if parameters.is_null() || (*parameters).format < 0 {
+            return 8;
+        }
+        let format = std::mem::transmute::<i32, ffi::AVPixelFormat>((*parameters).format);
+        let descriptor = ffi::av_pix_fmt_desc_get(format);
+        if descriptor.is_null() {
+            8
+        } else {
+            (*descriptor).comp[0].depth as u32
+        }
+    }
+}
+
+/// Gives an encoder about to open the colors of a stream's pictures:
+/// their range, primaries, transfer and matrix.
+pub fn copy_colors(stream: &ffmpeg::format::stream::Stream, encoder: &mut ffmpeg::codec::Context) {
+    // SAFETY: the stream's parameters and the unopened encoder's context
+    // are valid while borrowed.
+    unsafe {
+        let parameters = (*stream.as_ptr()).codecpar;
+        if parameters.is_null() {
+            return;
+        }
+        let context = encoder.as_mut_ptr();
+        (*context).color_range = (*parameters).color_range;
+        (*context).color_primaries = (*parameters).color_primaries;
+        (*context).color_trc = (*parameters).color_trc;
+        (*context).colorspace = (*parameters).color_space;
+        (*context).chroma_sample_location = (*parameters).chroma_location;
+    }
+}
+
+/// Names an output stream's codec by `tag`, as Apple's players want HEVC
+/// called "hvc1".
+pub fn set_codec_tag(stream: &mut ffmpeg::format::stream::StreamMut, tag: &[u8; 4]) {
+    // SAFETY: the stream belongs to an output being set up.
+    unsafe {
+        let parameters = (*stream.as_mut_ptr()).codecpar;
+        if !parameters.is_null() {
+            (*parameters).codec_tag = u32::from_le_bytes(*tag);
+        }
+    }
+}
+
+/// Graphics memory an encoder takes pictures in, as VAAPI's do, and the
+/// device it is on.
+pub struct HardwareFrames {
+    device: *mut ffi::AVBufferRef,
+    frames: *mut ffi::AVBufferRef,
+}
+
+// SAFETY: FFmpeg's buffer references may be used from any thread, one at
+// a time, which owning them makes so.
+unsafe impl Send for HardwareFrames {}
+
+impl HardwareFrames {
+    /// Opens a VAAPI device and graphics memory for `width` by `height`
+    /// pictures of `format`, and hands it to `encoder`, which is yet to
+    /// open, to take its pictures in.
+    pub fn vaapi(
+        encoder: &mut ffmpeg::codec::Context,
+        width: u32,
+        height: u32,
+        format: ffmpeg::format::Pixel,
+    ) -> Option<Self> {
+        // SAFETY: each reference made is kept or released; the frames
+        // context's data is an AVHWFramesContext, as FFmpeg documents.
+        unsafe {
+            let mut device = std::ptr::null_mut();
+            if ffi::av_hwdevice_ctx_create(
+                &mut device,
+                ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_VAAPI,
+                std::ptr::null(),
+                std::ptr::null_mut(),
+                0,
+            ) < 0
+                || device.is_null()
+            {
+                return None;
+            }
+            let mut frames = ffi::av_hwframe_ctx_alloc(device);
+            if frames.is_null() {
+                ffi::av_buffer_unref(&mut device);
+                return None;
+            }
+            let context = (*frames).data.cast::<ffi::AVHWFramesContext>();
+            (*context).format = ffi::AVPixelFormat::AV_PIX_FMT_VAAPI;
+            (*context).sw_format = format.into();
+            (*context).width = width as i32;
+            (*context).height = height as i32;
+            (*context).initial_pool_size = 20;
+            if ffi::av_hwframe_ctx_init(frames) < 0 {
+                ffi::av_buffer_unref(&mut frames);
+                ffi::av_buffer_unref(&mut device);
+                return None;
+            }
+            let codec = encoder.as_mut_ptr();
+            (*codec).hw_frames_ctx = ffi::av_buffer_ref(frames);
+            (*codec).pix_fmt = ffi::AVPixelFormat::AV_PIX_FMT_VAAPI;
+            Some(Self { device, frames })
+        }
+    }
+
+    /// `frame` copied into graphics memory, with its timestamps.
+    pub fn upload(&self, frame: &ffmpeg::frame::Video) -> Option<ffmpeg::frame::Video> {
+        let mut out = ffmpeg::frame::Video::empty();
+        // SAFETY: the frames context is valid while `self` lives; the new
+        // frame gets a buffer from it before the copy.
+        unsafe {
+            if ffi::av_hwframe_get_buffer(self.frames, out.as_mut_ptr(), 0) < 0
+                || ffi::av_hwframe_transfer_data(out.as_mut_ptr(), frame.as_ptr(), 0) < 0
+            {
+                return None;
+            }
+            ffi::av_frame_copy_props(out.as_mut_ptr(), frame.as_ptr());
+        }
+        Some(out)
+    }
+}
+
+impl Drop for HardwareFrames {
+    fn drop(&mut self) {
+        // SAFETY: both references are this one's own.
+        unsafe {
+            ffi::av_buffer_unref(&mut self.frames);
+            ffi::av_buffer_unref(&mut self.device);
         }
     }
 }

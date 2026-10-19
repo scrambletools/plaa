@@ -1,6 +1,7 @@
-//! Small pictures of a file at the times the timeline is pointed at: read
-//! on a thread of their own from the file's keyframes, only the latest
-//! time asked for, and kept for when it is asked again.
+//! Small pictures of a file at the times the timeline is pointed at, and
+//! along it for a filmstrip: read on a thread of their own from the
+//! file's keyframes, the latest time pointed at first, and kept for when
+//! they are asked for again.
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -26,6 +27,10 @@ pub struct Thumbnail {
     /// The media time of the picture: the keyframe at or before the time
     /// asked for.
     pub seconds: f64,
+    /// The time asked for.
+    pub asked: f64,
+    /// Asked for a filmstrip, rather than where the timeline is pointed.
+    pub strip: bool,
     pub picture: Arc<Picture>,
 }
 
@@ -36,10 +41,18 @@ pub struct Thumbnails {
 }
 
 struct Shared {
-    /// The latest time asked for, until the thread takes it.
-    wanted: Mutex<Option<f64>>,
+    wanted: Mutex<Wanted>,
     wake: Condvar,
     stop: AtomicBool,
+}
+
+/// The times asked for that the thread has yet to take.
+#[derive(Default)]
+struct Wanted {
+    /// The latest time pointed at, made first.
+    pointed: Option<f64>,
+    /// A filmstrip's times, in order.
+    strip: VecDeque<f64>,
 }
 
 impl Thumbnails {
@@ -48,7 +61,7 @@ impl Thumbnails {
     pub fn open(path: PathBuf, width: u32, ready: impl Fn(Thumbnail) + Send + 'static) -> Self {
         crate::init();
         let shared = Arc::new(Shared {
-            wanted: Mutex::new(None),
+            wanted: Mutex::new(Wanted::default()),
             wake: Condvar::new(),
             stop: AtomicBool::new(false),
         });
@@ -62,13 +75,25 @@ impl Thumbnails {
         Self { shared, thread }
     }
 
-    /// Asks for the picture at `seconds`, in place of any not yet made.
+    /// Asks for the picture at `seconds`, in place of any pointed at not
+    /// yet made.
     pub fn request(&self, seconds: f64) {
-        *self
-            .shared
+        self.shared
             .wanted
             .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Some(seconds.max(0.0));
+            .unwrap_or_else(PoisonError::into_inner)
+            .pointed = Some(seconds.max(0.0));
+        self.shared.wake.notify_one();
+    }
+
+    /// Asks for pictures at each of `times`, for a filmstrip, in place of
+    /// one asked for before.
+    pub fn request_strip(&self, times: impl IntoIterator<Item = f64>) {
+        self.shared
+            .wanted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .strip = times.into_iter().map(|seconds| seconds.max(0.0)).collect();
         self.shared.wake.notify_one();
     }
 }
@@ -117,16 +142,19 @@ fn run(path: &std::path::Path, width: u32, shared: &Shared, ready: &dyn Fn(Thumb
     while !stop() {
         let wanted = {
             let mut wanted = shared.wanted.lock().unwrap_or_else(PoisonError::into_inner);
-            while wanted.is_none() && !stop() {
+            while wanted.pointed.is_none() && wanted.strip.is_empty() && !stop() {
                 wanted = shared
                     .wake
                     .wait_timeout(wanted, Duration::from_millis(200))
                     .unwrap_or_else(PoisonError::into_inner)
                     .0;
             }
-            wanted.take()
+            match wanted.pointed.take() {
+                Some(seconds) => Some((seconds, false)),
+                None => wanted.strip.pop_front().map(|seconds| (seconds, true)),
+            }
         };
-        let Some(seconds) = wanted else {
+        let Some((seconds, strip)) = wanted else {
             continue;
         };
         // By the keyframe a seek lands on, from the index when the file
@@ -134,12 +162,18 @@ fn run(path: &std::path::Path, width: u32, shared: &Shared, ready: &dyn Fn(Thumb
         let keyframe = ffi::keyframe_before(&input, video.index, seconds, start);
         let key = (keyframe.unwrap_or(seconds.floor()) * 1000.0) as u64;
         if let Some(thumbnail) = kept.get(&key) {
-            ready(thumbnail.clone());
+            ready(Thumbnail {
+                asked: seconds,
+                strip,
+                ..thumbnail.clone()
+            });
             continue;
         }
-        let Some(thumbnail) = make(&mut input, &mut decoder, &video, seconds, start, width) else {
+        let Some(mut thumbnail) = make(&mut input, &mut decoder, &video, seconds, start, width)
+        else {
             continue;
         };
+        thumbnail.strip = strip;
         if kept.len() >= KEPT
             && let Some(oldest) = order.pop_front()
         {
@@ -197,6 +231,8 @@ fn make(
             let picture = scale(&frame, video, width)?;
             return Some(Thumbnail {
                 seconds: at,
+                asked: seconds,
+                strip: false,
                 picture: Arc::new(picture),
             });
         }
@@ -242,64 +278,51 @@ fn scale(frame: &ffmpeg::frame::Video, video: &Video, width: u32) -> Option<Pict
     for line in out.data(0).chunks(stride).take(out_height as usize) {
         rgba.extend_from_slice(&line[..row.min(line.len())]);
     }
-    Some(turn(
+    Some(
         Picture {
             width: out_width,
             height: out_height,
             rgba,
-        },
-        video.quarter_turns,
-    ))
-}
-
-/// `picture` turned clockwise by `quarter_turns`.
-fn turn(picture: Picture, quarter_turns: u8) -> Picture {
-    let turns = quarter_turns % 4;
-    if turns == 0 {
-        return picture;
-    }
-    let (width, height) = (picture.width as usize, picture.height as usize);
-    let (out_width, out_height) = if turns % 2 == 1 {
-        (height, width)
-    } else {
-        (width, height)
-    };
-    let mut rgba = vec![0; picture.rgba.len()];
-    for y in 0..height {
-        for x in 0..width {
-            let (to_x, to_y) = match turns {
-                1 => (height - 1 - y, x),
-                2 => (width - 1 - x, height - 1 - y),
-                _ => (y, width - 1 - x),
-            };
-            let from = (y * width + x) * 4;
-            let to = (to_y * out_width + to_x) * 4;
-            rgba[to..to + 4].copy_from_slice(&picture.rgba[from..from + 4]);
         }
-    }
-    Picture {
-        width: out_width as u32,
-        height: out_height as u32,
-        rgba,
-    }
+        .transformed(crate::edit::Transform {
+            turns: video.quarter_turns,
+            mirrored: false,
+        }),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::edit::Transform;
+
     #[test]
-    fn pictures_turn_clockwise() {
+    fn pictures_turn_clockwise_and_mirror() {
         // Two pixels side by side, red then blue.
-        let picture = Picture {
+        let picture = || Picture {
             width: 2,
             height: 1,
             rgba: vec![255, 0, 0, 255, 0, 0, 255, 255],
         };
-        let turned = turn(picture, 1);
+        let turned = picture().transformed(Transform {
+            turns: 1,
+            mirrored: false,
+        });
         assert_eq!((turned.width, turned.height), (1, 2));
         // A clockwise turn puts the left pixel on top.
         assert_eq!(&turned.rgba[..4], &[255, 0, 0, 255]);
         assert_eq!(&turned.rgba[4..], &[0, 0, 255, 255]);
+        let mirrored = picture().transformed(Transform {
+            turns: 0,
+            mirrored: true,
+        });
+        assert_eq!(&mirrored.rgba[..4], &[0, 0, 255, 255]);
+        // Mirrored, then turned: the right pixel ends on top.
+        let both = picture().transformed(Transform {
+            turns: 1,
+            mirrored: true,
+        });
+        assert_eq!(&both.rgba[..4], &[0, 0, 255, 255]);
     }
 }

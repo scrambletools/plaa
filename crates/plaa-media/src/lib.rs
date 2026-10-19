@@ -6,6 +6,8 @@ mod ass;
 pub mod audio;
 pub mod clock;
 mod decode;
+pub mod edit;
+pub mod export;
 mod ffi;
 pub mod frame;
 pub mod info;
@@ -18,6 +20,7 @@ pub mod web;
 
 pub use audio::{OutputDevice, output_devices};
 pub use decode::{Picture, same_language};
+pub use edit::{Clip, Edit, Transform};
 pub use frame::VideoFrame;
 pub use info::MediaInfo;
 pub use player::{Event, Options, Player, Quality, Source, Status};

@@ -14,6 +14,7 @@ use ffmpeg_next as ffmpeg;
 use crate::audio;
 use crate::clock::Clock;
 use crate::decode::{self, Picture};
+use crate::edit::{Edit, Span};
 use crate::frame::{self, VideoFrame};
 use crate::info::MediaInfo;
 use crate::inputs::{self, Inputs, SOUND_TRACKS};
@@ -187,6 +188,9 @@ pub(crate) enum Command {
     SelectVideo(usize),
     SelectAudio(Option<usize>),
     SelectSubtitles(Option<usize>),
+    /// Plays these parts of the file, or all of it when none, from this
+    /// many seconds of the edited time.
+    SetEdit(Vec<Span>, f64),
 }
 
 /// What the player's threads and its handle share.
@@ -225,6 +229,9 @@ pub(crate) struct Shared {
     pub speed: AtomicU64,
     /// The quality to choose, which may change until the source is open.
     pub quality: Mutex<Quality>,
+    /// The edit playing, if the file is edited: its time is what the
+    /// clock, pictures and sound count in.
+    pub edit: Mutex<Option<Arc<Edit>>>,
     pub state: Mutex<State>,
 }
 
@@ -239,6 +246,8 @@ pub(crate) struct State {
     pub video: Option<usize>,
     pub audio: Option<usize>,
     pub subtitles: Option<usize>,
+    /// How long the edit playing lasts, if the file is edited.
+    pub edited: Option<Duration>,
 }
 
 impl Shared {
@@ -283,6 +292,22 @@ impl Shared {
         *self.quality.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// How long playback lasts: the edit's length, else the file's.
+    pub fn duration(&self) -> Option<Duration> {
+        let state = self.state();
+        state
+            .edited
+            .or_else(|| state.info.as_ref().and_then(|info| info.duration))
+    }
+
+    /// The file's time at `seconds` of what plays.
+    pub fn source_time(&self, seconds: f64) -> f64 {
+        match &*self.edit.lock().unwrap_or_else(PoisonError::into_inner) {
+            Some(edit) => edit.source_of(seconds),
+            None => seconds,
+        }
+    }
+
     /// Where exact seeking of `serial` lands, if it does.
     pub fn target(&self, serial: u64) -> Option<f64> {
         let target = *self.target.lock().unwrap_or_else(PoisonError::into_inner);
@@ -322,6 +347,7 @@ impl Player {
             stop: Arc::new(AtomicBool::new(false)),
             speed: AtomicU64::new(1.0f64.to_bits()),
             quality: Mutex::new(options.quality),
+            edit: Mutex::new(None),
             state: Mutex::new(State::default()),
         });
         let (commands, receiver) = mpsc::channel();
@@ -380,12 +406,7 @@ impl Player {
     /// Moves to `position`: to the keyframe before it when not `exact`,
     /// quicker while dragging along the timeline.
     pub fn seek(&self, position: Duration, exact: bool) {
-        let duration = self
-            .shared
-            .state()
-            .info
-            .as_ref()
-            .and_then(|info| info.duration);
+        let duration = self.shared.duration();
         let position = match duration {
             Some(duration) => position.min(duration),
             None => position,
@@ -411,12 +432,7 @@ impl Player {
     /// pictures land exactly there and only move the way it goes, the
     /// clock held meanwhile. `end_scrub` lets go.
     pub fn scrub(&self, position: Duration) {
-        let duration = self
-            .shared
-            .state()
-            .info
-            .as_ref()
-            .and_then(|info| info.duration);
+        let duration = self.shared.duration();
         let position = match duration {
             Some(duration) => position.min(duration),
             None => position,
@@ -499,15 +515,33 @@ impl Player {
         let _ = self.commands.send(Command::SelectSubtitles(stream));
     }
 
-    /// The media time now.
+    /// Plays `edit` of the file, or all of it when none, from `position`
+    /// of the edited time. Positions and the duration count in the
+    /// edit's time from then on.
+    pub fn set_edit(&self, edit: Option<Arc<Edit>>, position: Duration) {
+        let spans = edit.as_deref().map(Edit::spans).unwrap_or_default();
+        {
+            let mut state = self.shared.state();
+            state.edited = edit
+                .as_ref()
+                .map(|edit| Duration::from_secs_f64(edit.duration()));
+            state.ended = false;
+        }
+        *self
+            .shared
+            .edit
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = edit;
+        self.shared.seeks.fetch_add(1, Ordering::Relaxed);
+        let _ = self
+            .commands
+            .send(Command::SetEdit(spans, position.as_secs_f64()));
+    }
+
+    /// The media time now: of the edit, if the file is edited.
     pub fn position(&self) -> Duration {
         let seconds = self.shared.clock.now().max(0.0);
-        let duration = self
-            .shared
-            .state()
-            .info
-            .as_ref()
-            .and_then(|info| info.duration);
+        let duration = self.shared.duration();
         let position = Duration::from_secs_f64(seconds);
         match duration {
             Some(duration) => position.min(duration),
@@ -541,7 +575,7 @@ impl Player {
                 .is_some_and(|waited| waited >= BUFFERING_SHOWN);
         Status {
             position,
-            duration: state.info.as_ref().and_then(|info| info.duration),
+            duration: self.shared.duration(),
             paused,
             ended: state.ended,
             buffering,
@@ -620,7 +654,7 @@ impl Player {
 
     /// The picture subtitle showing now.
     pub fn subtitle_picture(&self) -> Option<Arc<SubtitlePicture>> {
-        let now = self.shared.clock.now();
+        let now = self.shared.source_time(self.shared.clock.now());
         if let Some(track) = self.shared.ass().as_mut() {
             return track.render(now);
         }
@@ -629,7 +663,7 @@ impl Player {
 
     /// The subtitle text showing now.
     pub fn subtitle(&self) -> Option<Cue> {
-        let now = self.shared.clock.now();
+        let now = self.shared.source_time(self.shared.clock.now());
         let file = self
             .shared
             .file_cues
@@ -728,6 +762,15 @@ impl Decoders {
         }
     }
 
+    /// The streams decoding, which a part's end waits for.
+    fn playing(&self) -> Vec<usize> {
+        self.video
+            .iter()
+            .chain(&self.audio)
+            .map(|(index, ..)| *index)
+            .collect()
+    }
+
     /// Whether the sound plays from an input of its own.
     fn sound_apart(&self) -> bool {
         self.audio
@@ -768,6 +811,87 @@ impl Decoders {
                 crate::ffi::set_skipped(input, index, skipped);
             }
         }
+    }
+}
+
+/// Packets read without a decoding timestamp, in an order that may run
+/// ahead of their pictures', count as past a part's end only this far
+/// past it.
+const REORDERED: f64 = 1.0;
+
+/// A stream this far past a part's end while another has yet to reach it
+/// takes the other as done too, as when the other's sound ends early.
+const LAGGING: f64 = 3.0;
+
+/// Where the reader is among the parts of the file it plays: the part its
+/// packets are for, and the streams playing that have read past its end.
+struct Reading {
+    spans: Vec<Span>,
+    current: usize,
+    passed: Vec<usize>,
+}
+
+impl Reading {
+    /// Reads `spans`, or all of the file when none.
+    fn new(spans: Vec<Span>) -> Self {
+        Self {
+            spans: if spans.is_empty() {
+                vec![Span::WHOLE]
+            } else {
+                spans
+            },
+            current: 0,
+            passed: Vec::new(),
+        }
+    }
+
+    fn span(&self) -> Span {
+        self.spans[self.current]
+    }
+
+    fn has_next(&self) -> bool {
+        self.current + 1 < self.spans.len()
+    }
+
+    /// The part `seconds` of the edited time is in, and the file's time
+    /// there.
+    fn locate(&self, seconds: f64) -> (usize, f64) {
+        let index = self
+            .spans
+            .iter()
+            .position(|span| seconds < span.to + span.shift)
+            .unwrap_or(self.spans.len() - 1);
+        let span = self.spans[index];
+        (index, (seconds - span.shift).clamp(span.from, span.to))
+    }
+
+    /// Starts reading part `index` from the file's time `seconds`.
+    fn go_to(&mut self, index: usize, inputs: &mut Inputs, seconds: f64) {
+        self.current = index;
+        self.passed.clear();
+        inputs.seek(seconds);
+    }
+
+    /// Notes that `stream` read a packet at `seconds` of the file, by its
+    /// decoding time when `decoding`. Returns whether that is past the
+    /// part's end, so the packet belongs to no clip here.
+    fn passes(&mut self, stream: usize, seconds: f64, decoding: bool, playing: &[usize]) -> bool {
+        let end = self.span().to;
+        let margin = if decoding { 0.0 } else { REORDERED };
+        if seconds < end + margin {
+            return false;
+        }
+        if seconds >= end + LAGGING {
+            self.passed = playing.to_vec();
+        } else if !self.passed.contains(&stream) {
+            self.passed.push(stream);
+        }
+        true
+    }
+
+    /// Whether every stream playing has read past the part's end.
+    fn finished(&self, playing: &[usize]) -> bool {
+        playing.iter().all(|stream| self.passed.contains(stream))
     }
 }
 
@@ -886,8 +1010,16 @@ fn read(
     shared.clock.stall();
     shared.clock.wait();
     shared.clock.set_paused(options.paused);
+    let mut reading = Reading::new(Vec::new());
     if let Some(at) = options.start.filter(|_| info.seekable) {
-        seek(&mut inputs, &shared, &mut decoders, at.as_secs_f64(), true);
+        seek(
+            &mut inputs,
+            &mut reading,
+            &shared,
+            &mut decoders,
+            at.as_secs_f64(),
+            true,
+        );
     }
 
     let mut read_all = false;
@@ -923,7 +1055,14 @@ fn read(
             && now >= to
             && now - played < 0.5
         {
-            seek(&mut inputs, &shared, &mut decoders, from, true);
+            seek(
+                &mut inputs,
+                &mut reading,
+                &shared,
+                &mut decoders,
+                from,
+                true,
+            );
             read_all = false;
             announced_end = false;
             shared.state().read_all = false;
@@ -931,7 +1070,13 @@ fn read(
         played = shared.clock.now();
         if info.seekable
             && scrub.is_some()
-            && steer(&mut scrub, &mut inputs, &shared, &mut decoders)
+            && steer(
+                &mut scrub,
+                &mut inputs,
+                &mut reading,
+                &shared,
+                &mut decoders,
+            )
         {
             read_all = false;
             announced_end = false;
@@ -954,7 +1099,14 @@ fn read(
             match command {
                 Command::Seek { position, exact } => {
                     if info.seekable {
-                        seek(&mut inputs, &shared, &mut decoders, position, exact);
+                        seek(
+                            &mut inputs,
+                            &mut reading,
+                            &shared,
+                            &mut decoders,
+                            position,
+                            exact,
+                        );
                         read_all = false;
                         announced_end = false;
                         shared.state().read_all = false;
@@ -968,7 +1120,13 @@ fn read(
                             .lock()
                             .unwrap_or_else(PoisonError::into_inner) = None;
                         shared.clock.hold(false);
-                    } else if steer(&mut scrub, &mut inputs, &shared, &mut decoders) {
+                    } else if steer(
+                        &mut scrub,
+                        &mut inputs,
+                        &mut reading,
+                        &shared,
+                        &mut decoders,
+                    ) {
                         read_all = false;
                         announced_end = false;
                         shared.state().read_all = false;
@@ -1008,7 +1166,7 @@ fn read(
                     decoders.skip_unused(&mut inputs);
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
-                        seek(&mut inputs, &shared, &mut decoders, now, true);
+                        seek(&mut inputs, &mut reading, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
@@ -1020,7 +1178,7 @@ fn read(
                     // Back to where it was, so the new track starts in step.
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
-                        seek(&mut inputs, &shared, &mut decoders, now, true);
+                        seek(&mut inputs, &mut reading, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
@@ -1054,10 +1212,31 @@ fn read(
                     decoders.skip_unused(&mut inputs);
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
-                        seek(&mut inputs, &shared, &mut decoders, now, true);
+                        seek(&mut inputs, &mut reading, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
+                }
+                Command::SetEdit(spans, position) => {
+                    // A web page's picture and sound read apart are not
+                    // edited.
+                    if inputs.sound.is_none() {
+                        reading = Reading::new(spans);
+                    }
+                    if info.seekable {
+                        seek(
+                            &mut inputs,
+                            &mut reading,
+                            &shared,
+                            &mut decoders,
+                            position,
+                            true,
+                        );
+                        read_all = false;
+                        announced_end = false;
+                        shared.state().read_all = false;
+                    }
+                    shared.seeks.fetch_sub(1, Ordering::Relaxed);
                 }
                 Command::SelectSubtitles(index) => {
                     let showing = Subtitles {
@@ -1074,7 +1253,7 @@ fn read(
                     // it is; a file's are all there already.
                     let now = shared.clock.now().max(0.0);
                     if info.seekable && decoders.subtitles.is_some() {
-                        seek(&mut inputs, &shared, &mut decoders, now, true);
+                        seek(&mut inputs, &mut reading, &shared, &mut decoders, now, true);
                         read_all = false;
                         shared.state().read_all = false;
                     }
@@ -1116,11 +1295,34 @@ fn read(
                     .find(|(stream, _, _)| *stream == index)
                     .map(|(_, queue, _)| queue);
                 if let Some(queue) = queue {
-                    if let Some(end) = packet_end(input, &packet, input_start) {
-                        queue.reached(end);
+                    let span = reading.span();
+                    let playing = decoders.playing();
+                    let past = span.to.is_finite()
+                        && packet_order(input, &packet, input_start).is_some_and(
+                            |(seconds, decoding)| {
+                                reading.passes(index, seconds, decoding, &playing)
+                            },
+                        );
+                    if !past {
+                        if let Some(end) = packet_end(input, &packet, input_start) {
+                            queue.reached(end.min(span.to) + span.shift);
+                        }
+                        let taken = std::mem::replace(&mut packet, ffmpeg::Packet::empty());
+                        queue.put(Item::Packet(serial, span, taken));
+                    } else if reading.finished(&playing) {
+                        // On to the next part, or that was the last.
+                        if reading.has_next() {
+                            let next = reading.current + 1;
+                            let from = reading.spans[next].from;
+                            reading.go_to(next, &mut inputs, from);
+                        } else {
+                            for queue in decoders.queues() {
+                                queue.put(Item::End(serial));
+                            }
+                            read_all = true;
+                            shared.state().read_all = true;
+                        }
                     }
-                    let taken = std::mem::replace(&mut packet, ffmpeg::Packet::empty());
-                    queue.put(Item::Packet(serial, taken));
                 } else if let Some((stream, sink)) = &mut decoders.subtitles
                     && *stream == index
                 {
@@ -1165,6 +1367,13 @@ fn read(
                 }
                 if error != ffmpeg::Error::Eof {
                     eprintln!("plaa: reading {}: {error}", source.name());
+                }
+                // The file ended before a part did: on to the next.
+                if !from_sound && reading.has_next() {
+                    let next = reading.current + 1;
+                    let from = reading.spans[next].from;
+                    reading.go_to(next, &mut inputs, from);
+                    continue;
                 }
                 // That input is done: its streams' decoders hear so.
                 let serial = shared.serial.load(Ordering::Relaxed);
@@ -1267,6 +1476,7 @@ const DECODE_ON: f64 = 1.0;
 fn steer(
     scrub: &mut Option<Scrub>,
     inputs: &mut Inputs,
+    reading: &mut Reading,
     shared: &Shared,
     decoders: &mut Decoders,
 ) -> bool {
@@ -1280,7 +1490,7 @@ fn steer(
     };
     let serial = shared.serial.load(Ordering::Relaxed);
     let Some(current) = scrub else {
-        seek(inputs, shared, decoders, wanted, true);
+        seek(inputs, reading, shared, decoders, wanted, true);
         *scrub = Some(Scrub {
             target: wanted,
             serial: shared.serial.load(Ordering::Relaxed),
@@ -1307,6 +1517,7 @@ fn steer(
         && wanted > current.target
         && decodes_on(
             &inputs.main,
+            reading,
             shared,
             video_stream,
             inputs.start,
@@ -1325,7 +1536,7 @@ fn steer(
     if same && !arrived(shared, serial, current.target) && current.since.elapsed() < PATIENCE {
         return false;
     }
-    seek(inputs, shared, decoders, wanted, true);
+    seek(inputs, reading, shared, decoders, wanted, true);
     current.target = wanted;
     current.serial = shared.serial.load(Ordering::Relaxed);
     current.since = Instant::now();
@@ -1333,9 +1544,11 @@ fn steer(
 }
 
 /// Whether decoding on reaches `wanted` sooner than a seek would: no
-/// keyframe lies between it and where the decoder is.
+/// keyframe lies between it and where the decoder is, within the part of
+/// the file being read.
 fn decodes_on(
     input: &ffmpeg::format::context::Input,
+    reading: &Reading,
     shared: &Shared,
     video_stream: Option<usize>,
     start: f64,
@@ -1346,6 +1559,12 @@ fn decodes_on(
     let Some(stream) = video_stream else {
         return false;
     };
+    let (part, wanted) = reading.locate(wanted);
+    let (target_part, target) = reading.locate(scrub.target);
+    if part != target_part || part != reading.current {
+        return false;
+    }
+    let span = reading.spans[part];
     let keyframe = |seconds| crate::ffi::keyframe_before(input, stream, seconds, start);
     let (of, decoded) = *shared
         .decoded
@@ -1354,9 +1573,12 @@ fn decodes_on(
     // Before its first picture, the decoder starts from the target's
     // keyframe.
     let reached = if of == scrub.serial {
-        decoded
+        if !span.holds(decoded) {
+            return false;
+        }
+        decoded - span.shift
     } else {
-        keyframe(scrub.target).unwrap_or(scrub.target)
+        keyframe(target).unwrap_or(target)
     };
     match keyframe(wanted) {
         Some(keyframe) => keyframe <= reached + 1e-3,
@@ -1564,12 +1786,20 @@ fn check_ended(shared: &Shared) -> bool {
 }
 
 /// Moves the reader and every decoder to `position`, seconds from the
-/// start of the file.
-fn seek(inputs: &mut Inputs, shared: &Shared, decoders: &mut Decoders, position: f64, exact: bool) {
+/// start of the file, or of the edit playing.
+fn seek(
+    inputs: &mut Inputs,
+    reading: &mut Reading,
+    shared: &Shared,
+    decoders: &mut Decoders,
+    position: f64,
+    exact: bool,
+) {
     let serial = shared.serial.fetch_add(1, Ordering::Relaxed) + 1;
     *shared.target.lock().unwrap_or_else(PoisonError::into_inner) =
         exact.then_some((serial, position));
-    inputs.seek(position);
+    let (part, source) = reading.locate(position);
+    reading.go_to(part, inputs, source);
     for queue in decoders.queues() {
         queue.clear();
     }
@@ -1587,6 +1817,22 @@ fn seek(inputs: &mut Inputs, shared: &Shared, decoders: &mut Decoders, position:
     shared.clock.stall();
     shared.clock.wait();
     shared.state().ended = false;
+}
+
+/// Where `packet` comes in the file's time, in seconds from the start:
+/// by its decoding time where it has one, which is in order, else by its
+/// presentation time. Says which.
+fn packet_order(
+    input: &ffmpeg::format::context::Input,
+    packet: &ffmpeg::Packet,
+    start: f64,
+) -> Option<(f64, bool)> {
+    let time_base = input.stream(packet.stream())?.time_base();
+    let (time, decoding) = match packet.dts() {
+        Some(dts) => (dts, true),
+        None => (packet.pts()?, false),
+    };
+    Some((crate::info::seconds(time, time_base)? - start, decoding))
 }
 
 /// The media time `packet` lasts until, in seconds from the start.

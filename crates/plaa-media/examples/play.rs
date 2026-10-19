@@ -2,13 +2,16 @@
 //! as the interface does, and prints what happened.
 //!
 //! cargo run --release -p plaa-media --example play -- [--software]
-//! [--at-most <lines>] <file> [seconds] [seek-to]
+//! [--at-most <lines>] [--clips <from>-<to>,...] <file> [seconds] [seek-to]
 //!
-//! With PLAY_TRACE set, it prints its status four times a second.
+//! With PLAY_TRACE set, it prints its status four times a second, and
+//! each picture shown with the brightness of its first pixel, which a
+//! test video can count frames in.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use plaa_media::{Event, Options, Player, Quality, Source};
+use plaa_media::{Clip, Edit, Event, Options, Player, Quality, Source};
 
 fn main() {
     let mut arguments = std::env::args().skip(1).peekable();
@@ -20,9 +23,24 @@ fn main() {
         },
         None => Quality::Best,
     };
+    let edit = arguments.next_if_eq("--clips").and_then(|_| {
+        let clips: Vec<Clip> = arguments
+            .next()?
+            .split(',')
+            .filter_map(|clip| {
+                let (from, to) = clip.split_once('-')?;
+                Some(Clip {
+                    from: from.parse().ok()?,
+                    to: to.parse().ok()?,
+                })
+            })
+            .collect();
+        Some(Arc::new(Edit::new(clips)))
+    });
     let Some(source) = arguments.next() else {
         eprintln!(
-            "usage: play [--software] [--at-most <lines>] <file or address> [seconds] [seek-to]"
+            "usage: play [--software] [--at-most <lines>] [--clips <from>-<to>,...] \
+             <file or address> [seconds] [seek-to]"
         );
         std::process::exit(2);
     };
@@ -97,6 +115,11 @@ fn main() {
             other => println!("event: {other:?}"),
         },
     );
+    if let Some(edit) = &edit {
+        println!("clips {:?}, {:.3} s", edit.clips(), edit.duration());
+        player.set_edit(Some(edit.clone()), Duration::ZERO);
+    }
+    let trace = std::env::var_os("PLAY_TRACE").is_some();
     let start = Instant::now();
     let mut shown = 0;
     let mut last_id = 0;
@@ -110,6 +133,14 @@ fn main() {
         {
             shown += 1;
             last_id = frame.id;
+            if trace {
+                let (plane, _) = frame.plane(0);
+                eprintln!(
+                    "picture {:.3} value {}",
+                    frame.position,
+                    plane.first().copied().unwrap_or(0)
+                );
+            }
             first_position.get_or_insert((frame.position, frame.layout, frame.colors));
         }
         if let Some(target) = seek_to
@@ -122,7 +153,7 @@ fn main() {
         }
         let status = player.status();
         let step = (start.elapsed().as_secs_f64() * 4.0) as u64;
-        if std::env::var_os("PLAY_TRACE").is_some() && step != traced {
+        if trace && step != traced {
             traced = step;
             eprintln!(
                 "{:.2} {:?} {:?} {:?}",

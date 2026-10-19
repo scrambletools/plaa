@@ -6,8 +6,11 @@ use std::time::Duration;
 
 use ffmpeg_next as ffmpeg;
 
+use crate::edit::Span;
+
 pub enum Item {
-    Packet(u64, ffmpeg::Packet),
+    /// A packet of this serial, from this part of the file.
+    Packet(u64, Span, ffmpeg::Packet),
     /// The end of the file, for packets of this serial.
     End(u64),
 }
@@ -15,7 +18,7 @@ pub enum Item {
 impl Item {
     fn bytes(&self) -> usize {
         match self {
-            Item::Packet(_, packet) => packet.size(),
+            Item::Packet(_, _, packet) => packet.size(),
             Item::End(_) => 0,
         }
     }
@@ -127,12 +130,16 @@ mod tests {
     #[test]
     fn hands_out_in_order_until_closed() {
         let queue = PacketQueue::default();
-        queue.put(Item::Packet(0, ffmpeg::Packet::copy(&[1, 2, 3])));
+        queue.put(Item::Packet(
+            0,
+            Span::WHOLE,
+            ffmpeg::Packet::copy(&[1, 2, 3]),
+        ));
         queue.put(Item::End(0));
         assert_eq!(queue.bytes(), 3);
         assert!(matches!(
             queue.get(Duration::ZERO),
-            Ok(Some(Item::Packet(0, _)))
+            Ok(Some(Item::Packet(0, _, _)))
         ));
         assert!(matches!(queue.get(Duration::ZERO), Ok(Some(Item::End(0)))));
         assert!(matches!(queue.get(Duration::from_millis(1)), Ok(None)));

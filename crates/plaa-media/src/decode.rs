@@ -12,6 +12,7 @@ use ffmpeg::software::scaling;
 use ffmpeg_next as ffmpeg;
 
 use crate::audio;
+use crate::edit::Span;
 use crate::ffi;
 use crate::frame::{self, VideoFrame};
 use crate::info::{self, MediaInfo};
@@ -25,6 +26,42 @@ pub struct Picture {
     pub width: u32,
     pub height: u32,
     pub rgba: Vec<u8>,
+}
+
+impl Picture {
+    /// The picture mirrored and turned as `transform` says.
+    pub fn transformed(self, transform: crate::edit::Transform) -> Picture {
+        let turns = transform.turns % 4;
+        if turns == 0 && !transform.mirrored {
+            return self;
+        }
+        let (width, height) = (self.width as usize, self.height as usize);
+        let (out_width, out_height) = if turns % 2 == 1 {
+            (height, width)
+        } else {
+            (width, height)
+        };
+        let mut rgba = vec![0; self.rgba.len()];
+        for y in 0..height {
+            for x in 0..width {
+                let mirrored = if transform.mirrored { width - 1 - x } else { x };
+                let (to_x, to_y) = match turns {
+                    1 => (height - 1 - y, mirrored),
+                    2 => (width - 1 - mirrored, height - 1 - y),
+                    3 => (y, width - 1 - mirrored),
+                    _ => (mirrored, y),
+                };
+                let from = (y * width + x) * 4;
+                let to = (to_y * out_width + to_x) * 4;
+                rgba[to..to + 4].copy_from_slice(&self.rgba[from..from + 4]);
+            }
+        }
+        Picture {
+            width: out_width as u32,
+            height: out_height as u32,
+            rgba,
+        }
+    }
 }
 
 impl std::fmt::Debug for Picture {
@@ -41,7 +78,7 @@ pub(crate) fn start_seconds(input: &ffmpeg::format::context::Input) -> f64 {
 }
 
 /// The decoder for stream `index`, its packets read in `time_base`.
-fn open_decoder(
+pub(crate) fn open_decoder(
     input: &ffmpeg::format::context::Input,
     index: usize,
 ) -> Result<(ffmpeg::codec::decoder::Decoder, ffmpeg::Rational), ffmpeg::Error> {
@@ -92,6 +129,45 @@ pub(crate) fn spawn_video(
         .filter(|rate| rate.numerator() > 0 && rate.denominator() > 0)
         .map(f64::from)
         .unwrap_or(25.0);
+    let (decoder, time_base, device) = video_decoder(input, index, hardware)?;
+    let queue = Arc::new(PacketQueue::default());
+    let mut worker = VideoDecoder {
+        decoder,
+        time_base,
+        start,
+        frame_duration: 1.0 / frame_rate,
+        quarter_turns,
+        last_position: None,
+        shared,
+        queue: queue.clone(),
+        serial: 0,
+        span: Span::WHOLE,
+        needs_flush: false,
+        downloads: ffi::Downloads::default(),
+    };
+    let thread = std::thread::Builder::new()
+        .name("plaa-video".into())
+        .spawn(move || worker.run())
+        .map_err(|_| ffmpeg::Error::External)?;
+    Ok(((queue, thread), device))
+}
+
+/// The picture decoder for stream `index`, on a graphics card when
+/// `hardware` and one opens: the decoder, the time base of its packets,
+/// and the card's API.
+pub(crate) fn video_decoder(
+    input: &ffmpeg::format::context::Input,
+    index: usize,
+    hardware: bool,
+) -> Result<
+    (
+        ffmpeg::decoder::Video,
+        ffmpeg::Rational,
+        Option<&'static str>,
+    ),
+    ffmpeg::Error,
+> {
+    let stream = input.stream(index).ok_or(ffmpeg::Error::StreamNotFound)?;
     let (mut decoder, time_base) = open_decoder(input, index)?;
     let mut device = None;
     if hardware {
@@ -116,25 +192,7 @@ pub(crate) fn spawn_video(
         }
         Err(error) => return Err(error),
     };
-    let queue = Arc::new(PacketQueue::default());
-    let mut worker = VideoDecoder {
-        decoder,
-        time_base,
-        start,
-        frame_duration: 1.0 / frame_rate,
-        quarter_turns,
-        last_position: None,
-        shared,
-        queue: queue.clone(),
-        serial: 0,
-        needs_flush: false,
-        downloads: ffi::Downloads::default(),
-    };
-    let thread = std::thread::Builder::new()
-        .name("plaa-video".into())
-        .spawn(move || worker.run())
-        .map_err(|_| ffmpeg::Error::External)?;
-    Ok(((queue, thread), device))
+    Ok((decoder, time_base, device))
 }
 
 struct VideoDecoder {
@@ -147,6 +205,8 @@ struct VideoDecoder {
     shared: Arc<Shared>,
     queue: Arc<PacketQueue>,
     serial: u64,
+    /// The part of the file the packets decoding are from.
+    span: Span,
     /// The decoder was drained at the end of the file and must be reset
     /// before taking packets again.
     needs_flush: bool,
@@ -169,10 +229,19 @@ impl VideoDecoder {
                 Ok(Some(item)) => item,
             };
             match item {
-                Item::Packet(serial, packet) => {
-                    self.renew(serial);
+                Item::Packet(serial, span, packet) => {
+                    self.renew(serial, span);
                     if serial != self.shared.serial.load(Ordering::Relaxed) {
                         continue;
+                    }
+                    if span.index != self.span.index {
+                        // The last part's pictures still in the decoder
+                        // come out before the next part's go in.
+                        let _ = self.decoder.send_eof();
+                        self.drain(&mut scaler);
+                        self.decoder.flush();
+                        self.last_position = None;
+                        self.span = span;
                     }
                     if self.decoder.send_packet(&packet).is_err() {
                         continue;
@@ -180,7 +249,7 @@ impl VideoDecoder {
                     self.drain(&mut scaler);
                 }
                 Item::End(serial) => {
-                    self.renew(serial);
+                    self.renew(serial, self.span);
                     let _ = self.decoder.send_eof();
                     self.drain(&mut scaler);
                     self.needs_flush = true;
@@ -193,11 +262,13 @@ impl VideoDecoder {
         }
     }
 
-    /// Resets the decoder for packets of a new serial, after a seek.
-    fn renew(&mut self, serial: u64) {
+    /// Resets the decoder for packets of a new serial, after a seek, from
+    /// `span`.
+    fn renew(&mut self, serial: u64, span: Span) {
         if serial != self.serial || self.needs_flush {
             self.decoder.flush();
             self.serial = serial;
+            self.span = span;
             self.needs_flush = false;
             self.last_position = None;
         }
@@ -219,14 +290,20 @@ impl VideoDecoder {
         if serial != self.shared.serial.load(Ordering::Relaxed) {
             return;
         }
-        let position = frame
+        let source = frame
             .timestamp()
             .or(frame.pts())
             .and_then(|timestamp| info::seconds(timestamp, self.time_base))
             .map(|seconds| seconds - self.start)
             .or_else(|| self.last_position.map(|last| last + self.frame_duration))
             .unwrap_or(0.0);
-        self.last_position = Some(position);
+        self.last_position = Some(source);
+        // A picture belongs to the part its middle shows in.
+        let middle = source + self.frame_duration / 2.0;
+        if middle < self.span.from || middle >= self.span.to {
+            return;
+        }
+        let position = source + self.span.shift;
         *self
             .shared
             .decoded
@@ -340,6 +417,7 @@ pub(crate) fn spawn_audio(
         shared,
         queue: queue.clone(),
         serial: 0,
+        span: Span::WHOLE,
         needs_flush: false,
         graph: None,
         cursor: None,
@@ -368,9 +446,11 @@ struct AudioDecoder {
     shared: Arc<Shared>,
     queue: Arc<PacketQueue>,
     serial: u64,
+    /// The part of the file the sound in the decoder and graph is from.
+    span: Span,
     needs_flush: bool,
     graph: Option<AudioGraph>,
-    /// The media time of the next sample out of the graph.
+    /// The file's time of the next sample out of the graph.
     cursor: Option<f64>,
 }
 
@@ -384,10 +464,19 @@ impl AudioDecoder {
                 Ok(Some(item)) => item,
             };
             match item {
-                Item::Packet(serial, packet) => {
-                    self.renew(serial);
+                Item::Packet(serial, span, packet) => {
+                    self.renew(serial, span);
                     if serial != self.shared.serial.load(Ordering::Relaxed) {
                         continue;
+                    }
+                    if span.index != self.span.index {
+                        // The last part's sound plays out to its end
+                        // before the next part's starts.
+                        self.finish_part();
+                        self.decoder.flush();
+                        self.graph = None;
+                        self.cursor = None;
+                        self.span = span;
                     }
                     if self.decoder.send_packet(&packet).is_err() {
                         continue;
@@ -395,15 +484,8 @@ impl AudioDecoder {
                     self.drain();
                 }
                 Item::End(serial) => {
-                    self.renew(serial);
-                    let _ = self.decoder.send_eof();
-                    self.drain();
-                    if let Some(graph) = &mut self.graph
-                        && let Some(mut source) = graph.graph.get("in")
-                    {
-                        let _ = source.source().flush();
-                    }
-                    self.pull();
+                    self.renew(serial, self.span);
+                    self.finish_part();
                     self.needs_flush = true;
                     self.output.finish(serial);
                 }
@@ -411,14 +493,27 @@ impl AudioDecoder {
         }
     }
 
-    fn renew(&mut self, serial: u64) {
+    fn renew(&mut self, serial: u64, span: Span) {
         if serial != self.serial || self.needs_flush {
             self.decoder.flush();
             self.serial = serial;
+            self.span = span;
             self.needs_flush = false;
             self.graph = None;
             self.cursor = None;
         }
+    }
+
+    /// Takes everything left in the decoder and the graph.
+    fn finish_part(&mut self) {
+        let _ = self.decoder.send_eof();
+        self.drain();
+        if let Some(graph) = &mut self.graph
+            && let Some(mut source) = graph.graph.get("in")
+        {
+            let _ = source.source().flush();
+        }
+        self.pull();
     }
 
     fn drain(&mut self) {
@@ -503,15 +598,21 @@ impl AudioDecoder {
                 continue;
             }
             let step = tempo / rate;
-            // At normal speed the graph's timestamps are media time; with
-            // tempo they count played time, so media time is counted here.
+            // At normal speed the graph's timestamps are the file's time;
+            // with tempo they count played time, so its time is counted
+            // here.
             let stamped = (tempo == 1.0)
                 .then(|| out.pts())
                 .flatten()
                 .and_then(|pts| info::seconds(pts, time_base))
                 .map(|seconds| seconds - self.start);
-            let mut position = stamped.or(self.cursor).unwrap_or(0.0);
-            self.cursor = Some(position + frames as f64 * step);
+            let mut source = stamped.or(self.cursor).unwrap_or(0.0);
+            let end = source + frames as f64 * step;
+            self.cursor = Some(end);
+            let span = self.span;
+            if end <= span.from || source >= span.to {
+                continue;
+            }
             let bytes = &out.data(0)[..(frames * channels * 4).min(out.data(0).len())];
             let mut samples: Vec<f32> = bytes
                 .as_chunks::<4>()
@@ -519,6 +620,21 @@ impl AudioDecoder {
                 .iter()
                 .map(|bytes| f32::from_ne_bytes(*bytes))
                 .collect();
+            // Only the sound within the part plays.
+            if source < span.from {
+                let skip = (((span.from - source) / step) as usize).min(frames);
+                samples.drain(..skip * channels);
+                source += skip as f64 * step;
+            }
+            if end > span.to {
+                let keep = (((span.to - source) / step).ceil().max(0.0) as usize) * channels;
+                samples.truncate(keep);
+            }
+            if samples.is_empty() {
+                continue;
+            }
+            let frames = samples.len() / channels;
+            let mut position = source + span.shift;
             if let Some(target) = self.shared.target(self.serial) {
                 let end = position + frames as f64 * step;
                 if end <= target {
