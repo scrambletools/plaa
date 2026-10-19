@@ -1015,10 +1015,12 @@ fn fitted_window(width: u32, height: u32, aspect: f64, turns: u8, overlay: bool)
 
 /// "plaa <file> 0.01.02.png", without characters file systems refuse.
 fn screenshot_name(name: &str, position: Duration) -> String {
-    let stem = std::path::Path::new(name)
-        .file_stem()
-        .map(|stem| stem.to_string_lossy().into_owned())
-        .unwrap_or_else(|| name.to_owned());
+    // By hand, not with `Path`, which on Windows reads "b:" as a drive.
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    let stem = match base.rsplit_once('.') {
+        Some((stem, _)) if !stem.is_empty() => stem,
+        _ => base,
+    };
     let stem: String = stem
         .chars()
         .map(|character| {
@@ -1220,6 +1222,10 @@ mod tests {
         assert_eq!(
             screenshot_name("b:c?.mkv", Duration::from_secs(3723)),
             "b_c_ 1.02.03.png"
+        );
+        assert_eq!(
+            screenshot_name("https://example.com/live.m3u8", Duration::from_secs(5)),
+            "live 0.00.05.png"
         );
     }
 }
