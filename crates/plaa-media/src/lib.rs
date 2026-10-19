@@ -15,6 +15,7 @@ mod inputs;
 pub mod player;
 mod queue;
 pub mod record;
+pub mod screen;
 pub mod subtitle;
 pub mod thumbnails;
 pub mod web;

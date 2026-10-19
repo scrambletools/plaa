@@ -50,6 +50,7 @@ pub enum Action {
     Revert,
     Export,
     RecordSound,
+    RecordScreen,
 }
 
 /// Every action, its name in the settings file and its default
@@ -102,6 +103,7 @@ const ACTIONS: &[(Action, &str, &[&str])] = &[
     (Action::Revert, "revert", &[]),
     (Action::Export, "export", &["Ctrl+E"]),
     (Action::RecordSound, "record-sound", &["Ctrl+Shift+N"]),
+    (Action::RecordScreen, "record-screen", &["Ctrl+Alt+N"]),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]

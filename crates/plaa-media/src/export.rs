@@ -29,6 +29,26 @@ pub enum Format {
 }
 
 impl Format {
+    /// The formats of pictures.
+    pub const VIDEO: [Format; 3] = [Format::H264, Format::Hevc, Format::Av1];
+
+    /// The format's name in the settings file.
+    pub fn key(self) -> &'static str {
+        match self {
+            Format::H264 => "h264",
+            Format::Hevc => "hevc",
+            Format::Av1 => "av1",
+            Format::Sound(sound) => sound.key(),
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Format> {
+        Format::VIDEO
+            .into_iter()
+            .find(|format| format.key().eq_ignore_ascii_case(key.trim()))
+            .or_else(|| Sound::from_key(key).map(Format::Sound))
+    }
+
     /// The file name ending its files usually have.
     pub fn extension(self) -> &'static str {
         match self {
@@ -282,7 +302,7 @@ pub(crate) fn temporary_path(destination: &Path) -> PathBuf {
 
 /// The encoders to try for `format` on this system, best first: the
 /// graphics cards' APIs, then the processor's.
-fn candidates(format: Format) -> Vec<Encoder> {
+pub(crate) fn candidates(format: Format) -> Vec<Encoder> {
     let hardware: &[&str] = match format {
         Format::H264 if cfg!(target_os = "macos") => &["h264_videotoolbox"],
         Format::H264 if cfg!(windows) => &["h264_nvenc", "h264_amf", "h264_qsv"],
@@ -339,11 +359,14 @@ pub fn encoder(format: Format, size: (u32, u32), hdr: bool, hardware: bool) -> O
         rate: ffmpeg::Rational::new(30, 1),
         time_base: ffmpeg::Rational::new(1, 30),
         ten_bit: hdr,
+        live: false,
     };
     let chosen = candidates(format)
         .into_iter()
         .filter(|candidate| hardware || !candidate.hardware)
-        .find(|candidate| open_video(*candidate, format, &picture, None, false).is_some());
+        .find(|candidate| {
+            open_video(*candidate, format, &picture, Colors::Unknown, false).is_some()
+        });
     FOUND
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -354,29 +377,41 @@ pub fn encoder(format: Format, size: (u32, u32), hdr: bool, hardware: bool) -> O
 
 /// What a picture encoder is opened for.
 #[derive(Clone, Copy)]
-struct Picture {
-    width: u32,
-    height: u32,
-    rate: ffmpeg::Rational,
-    time_base: ffmpeg::Rational,
-    ten_bit: bool,
+pub(crate) struct Picture {
+    pub width: u32,
+    pub height: u32,
+    pub rate: ffmpeg::Rational,
+    pub time_base: ffmpeg::Rational,
+    pub ten_bit: bool,
+    /// Pictures come as they happen, as a screen's, and are encoded as
+    /// fast: software encoders take their quick presets.
+    pub live: bool,
+}
+
+/// Where an encoder's colors come from.
+pub(crate) enum Colors<'a> {
+    /// A file's stream's.
+    Stream(&'a ffmpeg::format::stream::Stream<'a>),
+    /// A screen's: sRGB, made BT.709 video.
+    Screen,
+    Unknown,
 }
 
 /// An opened picture encoder: the pixel format it takes from memory, and
 /// the graphics memory pictures go through first when it needs that.
-struct VideoEncoder {
-    encoder: ffmpeg::encoder::video::Encoder,
-    format: Pixel,
-    frames: Option<ffi::HardwareFrames>,
+pub(crate) struct VideoEncoder {
+    pub encoder: ffmpeg::encoder::video::Encoder,
+    pub format: Pixel,
+    pub frames: Option<ffi::HardwareFrames>,
 }
 
-/// Opens `candidate` for `picture`, as an encoder of `format`, with the
-/// colors of `stream`. None when it is not there or will not open.
-fn open_video(
+/// Opens `candidate` for `picture`, as an encoder of `format`, with
+/// `colors`. None when it is not there or will not open.
+pub(crate) fn open_video(
     candidate: Encoder,
     format: Format,
     picture: &Picture,
-    stream: Option<&ffmpeg::format::stream::Stream>,
+    colors: Colors<'_>,
     global_header: bool,
 ) -> Option<VideoEncoder> {
     let codec = ffmpeg::encoder::find_by_name(candidate.name)?;
@@ -404,10 +439,17 @@ fn open_video(
         *wanted.iter().find(|pixel| formats.contains(pixel))?
     };
     let mut context = ffmpeg::codec::Context::new_with_codec(codec);
-    if let Some(stream) = stream {
+    if let Colors::Stream(stream) = colors {
         ffi::copy_colors(stream, &mut context);
     }
     let mut encoder = context.encoder().video().ok()?;
+    if matches!(colors, Colors::Screen) {
+        use ffmpeg::util::color::{Primaries, Range, Space, TransferCharacteristic};
+        encoder.set_colorspace(Space::BT709);
+        encoder.set_color_range(Range::MPEG);
+        encoder.set_color_primaries(Primaries::BT709);
+        encoder.set_color_transfer_characteristic(TransferCharacteristic::IEC61966_2_1);
+    }
     encoder.set_width(picture.width);
     encoder.set_height(picture.height);
     encoder.set_format(pixel);
@@ -463,6 +505,7 @@ fn quality(
         _ => 30,
     };
     let mut bit_rate = None;
+    let live = picture.live;
     if name.ends_with("_nvenc") {
         options.set("preset", "p5");
         options.set("tune", "hq");
@@ -470,36 +513,42 @@ fn quality(
         options.set("cq", &level.to_string());
         options.set("b", "0");
     } else if name.ends_with("_amf") {
-        options.set("quality", "quality");
+        options.set("quality", if live { "balanced" } else { "quality" });
         options.set("rc", "qvbr");
         options.set("qvbr_quality_level", &level.to_string());
         bit_rate = Some(estimate);
     } else if name.ends_with("_qsv") {
-        options.set("preset", "medium");
+        options.set("preset", if live { "veryfast" } else { "medium" });
         options.set("global_quality", &level.to_string());
     } else if name.ends_with("_vaapi") {
         options.set("rc_mode", "QVBR");
         options.set("global_quality", &level.to_string());
         bit_rate = Some(estimate);
     } else if name.ends_with("_videotoolbox") {
+        if live {
+            options.set("realtime", "1");
+        }
         bit_rate = Some(estimate);
     } else {
         match name {
             "libx264" => {
-                options.set("preset", "medium");
+                options.set("preset", if live { "veryfast" } else { "medium" });
                 options.set("crf", "20");
             }
             "libx265" => {
-                options.set("preset", "fast");
+                options.set("preset", if live { "ultrafast" } else { "fast" });
                 options.set("crf", "23");
                 options.set("x265-params", "log-level=error");
             }
             "libsvtav1" => {
-                options.set("preset", "8");
+                options.set("preset", if live { "12" } else { "8" });
                 options.set("crf", "32");
             }
             "libaom-av1" => {
-                options.set("cpu-used", "6");
+                options.set("cpu-used", if live { "10" } else { "6" });
+                if live {
+                    options.set("usage", "realtime");
+                }
                 options.set("crf", "32");
                 options.set("row-mt", "1");
                 options.set("b", "0");
@@ -875,6 +924,7 @@ fn video_side(
         rate,
         time_base: stream.time_base(),
         ten_bit: ffi::bit_depth(&stream) > 8,
+        live: false,
     };
     // A card that will not take ten bits encodes eight, unless the
     // picture is HDR, which needs them.
@@ -887,7 +937,13 @@ fn video_side(
         .filter(|candidate| job.hardware || !candidate.hardware)
         .find_map(|candidate| {
             let open = |picture: &Picture| {
-                open_video(candidate, job.format, picture, Some(&stream), global_header)
+                open_video(
+                    candidate,
+                    job.format,
+                    picture,
+                    Colors::Stream(&stream),
+                    global_header,
+                )
             };
             open(&picture)
                 .or_else(|| {
@@ -1392,7 +1448,13 @@ mod tests {
         for sound in Sound::ALL {
             assert!(sound.qualities().contains(&sound.usual_quality()));
             assert_eq!(Sound::from_key(sound.key()), Some(sound));
+            assert_eq!(Format::from_key(sound.key()), Some(Format::Sound(sound)));
         }
+        for format in Format::VIDEO {
+            assert_eq!(Format::from_key(format.key()), Some(format));
+        }
+        assert_eq!(Format::from_key("HEVC"), Some(Format::Hevc));
+        assert_eq!(Format::from_key("vp9"), None);
     }
 
     #[test]

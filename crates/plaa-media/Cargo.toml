@@ -28,6 +28,8 @@ tempfile = "3"
 # The subtitles example saves pictures.
 png = "0.18"
 
-# Looks up the name of the VAAPI driver in libva, which FFmpeg loads.
 [target.'cfg(target_os = "linux")'.dependencies]
+# Looks up the name of the VAAPI driver in libva, which FFmpeg loads.
 libc = "0.2"
+# Takes the frames of a screen recording the ScreenCast portal shares.
+pipewire = "0.10"

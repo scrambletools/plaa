@@ -241,6 +241,12 @@ pub enum Message {
     /// The portal had no answer.
     #[cfg(target_os = "linux")]
     Nothing,
+    /// What the system shared for a screen recording, if anything.
+    #[cfg(target_os = "linux")]
+    ScreenShared(
+        window::Id,
+        Result<Option<crate::screen_share::Shared>, String>,
+    ),
 }
 
 fn window_icon() -> Option<window::Icon> {
@@ -1194,6 +1200,8 @@ impl Plaa {
                 Task::none()
             }
             Message::Recorder(id, control) => self.recorder_control(id, control),
+            #[cfg(target_os = "linux")]
+            Message::ScreenShared(id, result) => self.screen_shared(id, result),
             Message::MeterTick => {
                 for window in self.windows.values_mut() {
                     if let Content::Recorder(recorder) = &mut window.content {
@@ -1519,6 +1527,7 @@ impl Plaa {
             }
             Action::PictureInPicture => return self.toggle_pip(id),
             Action::RecordSound => return self.open_recorder(id),
+            Action::RecordScreen => return self.open_screen_recorder(id),
             Action::Previous => return self.previous(id),
             Action::Next => return self.next(id),
             Action::FullScreen => {
@@ -1900,6 +1909,9 @@ impl Plaa {
     pub fn title(&self, id: window::Id) -> String {
         let base = match self.windows.get(&id).map(|window| &window.content) {
             Some(Content::Player(player)) => player.window_title(),
+            Some(Content::Recorder(recorder)) if recorder.screen.is_some() => {
+                crate::fl!("record-screen-title")
+            }
             Some(Content::Recorder(_)) => crate::fl!("record-title"),
             _ => crate::fl!("app-name"),
         };
@@ -2429,6 +2441,8 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
         Action::Open,
         Action::OpenAddress,
         Action::RecordSound,
+        #[cfg(target_os = "linux")]
+        Action::RecordScreen,
         Action::Settings,
     ]
     .into_iter()
@@ -2442,36 +2456,50 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
         .spacing(8)
         .into()
     });
+    #[cfg_attr(not(target_os = "linux"), expect(unused_mut))]
+    let mut starts = vec![
+        (
+            button::Kind::Filled,
+            Icon::FolderOpen,
+            crate::fl!("start-open"),
+            Action::Open,
+        ),
+        (
+            button::Kind::Tonal,
+            Icon::Link,
+            crate::fl!("start-open-address"),
+            Action::OpenAddress,
+        ),
+        (
+            button::Kind::Tonal,
+            Icon::Mic,
+            crate::fl!("start-record-sound"),
+            Action::RecordSound,
+        ),
+    ];
+    #[cfg(target_os = "linux")]
+    starts.push((
+        button::Kind::Tonal,
+        Icon::ScreenRecord,
+        crate::fl!("start-record-screen"),
+        Action::RecordScreen,
+    ));
+    let starts: Vec<Element<'static, Message>> = starts
+        .into_iter()
+        .map(|(kind, glyph, label, action)| {
+            scramble_ui::with_icon(kind, glyph, label)
+                .size(button::Size::Medium)
+                .on_press(Message::Perform(id, action))
+                .into()
+        })
+        .collect();
     let content = container(
         column![
             icon::filled(Icon::Movie, 64).style(style::primary_text),
             scramble_ui::styled(crate::fl!("app-name"), Type::DisplaySmall),
             scramble_ui::styled(crate::fl!("start-hint"), Type::BodyLarge)
                 .style(style::on_surface_variant),
-            row![
-                scramble_ui::with_icon(
-                    button::Kind::Filled,
-                    Icon::FolderOpen,
-                    crate::fl!("start-open")
-                )
-                .size(button::Size::Medium)
-                .on_press(Message::Perform(id, Action::Open)),
-                scramble_ui::with_icon(
-                    button::Kind::Tonal,
-                    Icon::Link,
-                    crate::fl!("start-open-address")
-                )
-                .size(button::Size::Medium)
-                .on_press(Message::Perform(id, Action::OpenAddress)),
-                scramble_ui::with_icon(
-                    button::Kind::Tonal,
-                    Icon::Mic,
-                    crate::fl!("start-record-sound")
-                )
-                .size(button::Size::Medium)
-                .on_press(Message::Perform(id, Action::RecordSound)),
-            ]
-            .spacing(12),
+            scramble_ui::dir::row(starts).spacing(12),
             scramble_ui::dir::row(hints).spacing(24),
         ]
         .spacing(16)
@@ -2518,6 +2546,7 @@ fn action_name(action: Action) -> String {
         Action::Open => crate::fl!("action-open"),
         Action::OpenAddress => crate::fl!("action-open-address"),
         Action::RecordSound => crate::fl!("action-record-sound"),
+        Action::RecordScreen => crate::fl!("action-record-screen"),
         Action::Settings => crate::fl!("action-settings"),
         _ => String::new(),
     }

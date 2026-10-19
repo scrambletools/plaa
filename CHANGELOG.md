@@ -43,3 +43,6 @@ The first build.
   as AAC, MP3, Opus, FLAC, ALAC or WAV, at a quality chosen.
 - Recording sound from a microphone, or what the computer plays, with a
   level meter, played back once saved.
+- Recording the screen, a window or a region on Linux, through the
+  ScreenCast portal and PipeWire, with a microphone's sound or what the
+  computer plays, encoded on the graphics card where it can.

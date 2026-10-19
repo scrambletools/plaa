@@ -83,6 +83,10 @@ pub struct Settings {
     pub recording_format: String,
     /// Its quality: kb/s for compressed sound, bits for lossless.
     pub recording_quality: u32,
+    /// Whether screen recordings take the sound of the recording input.
+    pub screen_sound: bool,
+    /// What screen recordings are recorded as: `h264`, `hevc` or `av1`.
+    pub screen_format: String,
     /// Where frames saved as pictures go.
     #[serde(with = "home_path")]
     pub screenshots: PathBuf,
@@ -120,6 +124,8 @@ impl Default for Settings {
             microphone: None,
             recording_format: "aac".to_owned(),
             recording_quality: 256,
+            screen_sound: false,
+            screen_format: "h264".to_owned(),
             screenshots: paths::default_screenshots(),
             keys: toml::Table::new(),
         }

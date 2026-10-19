@@ -21,6 +21,8 @@ mod mpris;
 mod now_playing_macos;
 mod playlist;
 mod recorder;
+#[cfg(target_os = "linux")]
+mod screen_share;
 mod screenshot;
 mod settings_view;
 mod shortcuts;

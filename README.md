@@ -11,9 +11,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 > **Status:** early development, not yet released. Files, streams and
 > web videos play, with the controls floating over the picture, and
-> files can be trimmed, split, turned and exported, and sound recorded;
-> see the [development plan](docs/PLAN.md) for what comes next:
-> recording the screen and a camera, casting, an AVB/Milan talker and
+> files can be trimmed, split, turned and exported, and sound and the
+> screen (on Linux, so far) recorded; see the [development
+> plan](docs/PLAN.md) for what comes next: recording the screen on
+> Windows and macOS, a camera, casting, an AVB/Milan talker and
 > listener, and an assistant.
 
 ## Features
@@ -92,6 +93,12 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   computer plays where the sound server offers it, with a level meter,
   in any of the export's sound formats, to the Recordings folder; the
   window then plays the recording, ready to trim and export.
+- **Record the screen** (Ctrl+Alt+N) on Linux: a screen, a window or a
+  region, as the system's picker offers, with the pointer, and the sound
+  of a microphone or of what the computer plays if chosen, as H.264,
+  HEVC or AV1 on the graphics card's encoder where one opens. A
+  recording ends when Stop is pressed or the screen is no longer
+  shared.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
@@ -105,7 +112,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Recording the screen and a camera, a visualizer, casting, the AVB/Milan
+Recording the screen on Windows and macOS and a camera, a visualizer,
+casting, the AVB/Milan
 entity, the assistant and MCP, packages and translations. The [plan](docs/PLAN.md) has the
 order.
 
@@ -194,6 +202,7 @@ On macOS, use ⌘ in place of Ctrl.
 | Undo, redo | Ctrl+Z, Ctrl+Shift+Z |
 | Export | Ctrl+E |
 | Record sound | Ctrl+Shift+N (Space starts and stops) |
+| Record the screen | Ctrl+Alt+N (Space starts and stops) |
 | Open, open address | Ctrl+O, Ctrl+U |
 | Inspector | Ctrl+I |
 | Settings | Ctrl+, |
@@ -216,8 +225,8 @@ next-frame, volume-up, volume-down, mute, full-screen, faster, slower,
 normal-speed, loop, screenshot, subtitles, audio-track, to-start,
 previous, next, playlist, previous-chapter, next-chapter, ab-loop,
 picture-in-picture, trim, split, rotate-left, rotate-right,
-flip-horizontal, flip-vertical, undo, redo, revert, export and
-record-sound. A shortcut the settings give one action is taken
+flip-horizontal, flip-vertical, undo, redo, revert, export,
+record-sound and record-screen. A shortcut the settings give one action is taken
 from any other that had it by default.
 
 ## License

@@ -1,0 +1,131 @@
+//! Records a PipeWire video node, as the screen recording window records
+//! the stream the ScreenCast portal shares, with the sound of an input
+//! device when one is given.
+//!
+//! cargo run --release -p plaa-media --example screen -- [--format
+//! h264|hevc|av1] [--software] [--sound <device id>] <node> <seconds> <to>
+
+fn main() {
+    #[cfg(target_os = "linux")]
+    linux::main();
+    #[cfg(not(target_os = "linux"))]
+    eprintln!("screen recording through PipeWire is Linux's");
+}
+
+#[cfg(target_os = "linux")]
+mod linux {
+    use std::os::unix::net::UnixStream;
+    use std::path::PathBuf;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    use plaa_media::export::Format;
+    use plaa_media::record::{Microphone, RecordEvent, input_devices};
+    use plaa_media::screen::ScreenCapture;
+
+    pub fn main() {
+        let mut arguments = std::env::args().skip(1).peekable();
+        let mut format = Format::H264;
+        let mut hardware = true;
+        let mut sound = None;
+        while let Some(option) = arguments.next_if(|argument| argument.starts_with("--")) {
+            match option.as_str() {
+                "--format" => {
+                    format = match arguments.next().as_deref() {
+                        Some("hevc") => Format::Hevc,
+                        Some("av1") => Format::Av1,
+                        _ => Format::H264,
+                    }
+                }
+                "--software" => hardware = false,
+                "--sound" => sound = arguments.next(),
+                other => {
+                    eprintln!("unknown option {other}");
+                    std::process::exit(2);
+                }
+            }
+        }
+        let (Some(node), Some(seconds), Some(destination)) = (
+            arguments.next().and_then(|text| text.parse::<u32>().ok()),
+            arguments.next().and_then(|text| text.parse::<f64>().ok()),
+            arguments.next(),
+        ) else {
+            eprintln!(
+                "usage: screen [--format h264|hevc|av1] [--software] [--sound <device id>] \
+                 <node> <seconds> <to>"
+            );
+            std::process::exit(2);
+        };
+        // The portal hands over a connection of its own; this one is the
+        // sound server's, which reaches every node.
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR").unwrap_or_default();
+        let socket = match UnixStream::connect(PathBuf::from(runtime).join("pipewire-0")) {
+            Ok(socket) => socket,
+            Err(error) => {
+                eprintln!("could not reach PipeWire: {error}");
+                std::process::exit(1);
+            }
+        };
+        let mut capture = match ScreenCapture::open(socket.into(), node) {
+            Ok(capture) => capture,
+            Err(error) => {
+                eprintln!("could not open node {node}: {error}");
+                std::process::exit(1);
+            }
+        };
+        // As the window shows the capture a while before recording starts.
+        std::thread::sleep(Duration::from_secs(1));
+        // An id that is not listed would record the default input instead.
+        if let Some(device) = &sound
+            && !input_devices().iter().any(|listed| listed.id == *device)
+        {
+            eprintln!("no input {device}; the record example's --list shows them");
+            std::process::exit(1);
+        }
+        let microphone = sound.map(|device| match Microphone::open(Some(&device)) {
+            Ok(microphone) => microphone,
+            Err(error) => {
+                eprintln!("could not open the input: {error}");
+                std::process::exit(1);
+            }
+        });
+        let (sender, receiver) = mpsc::channel();
+        if let Err(error) = capture.record(
+            microphone.as_ref(),
+            (format, hardware),
+            PathBuf::from(destination),
+            move |event| {
+                let _ = sender.send(event);
+            },
+        ) {
+            eprintln!("could not record: {error}");
+            std::process::exit(1);
+        }
+        let started = Instant::now();
+        while started.elapsed().as_secs_f64() < seconds {
+            std::thread::sleep(Duration::from_millis(500));
+            let (recorded, written) = capture.recorded();
+            println!(
+                "{:.1} s recorded, {written} bytes, {:?}",
+                recorded.as_secs_f64(),
+                capture.size()
+            );
+            if let Some(reason) = capture.ended_because() {
+                println!("the stream ended: {reason}");
+                break;
+            }
+        }
+        capture.stop();
+        match receiver.recv_timeout(Duration::from_secs(10)) {
+            Ok(RecordEvent::Finished(Ok(path))) => println!("saved {}", path.display()),
+            Ok(RecordEvent::Finished(Err(error))) => {
+                eprintln!("failed: {error}");
+                std::process::exit(1);
+            }
+            Err(_) => {
+                eprintln!("never finished");
+                std::process::exit(1);
+            }
+        }
+    }
+}

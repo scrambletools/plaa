@@ -49,6 +49,13 @@ fn main() {
         );
         std::process::exit(2);
     };
+    // An id that is not listed would record the default input instead.
+    if let Some(device) = &device
+        && !input_devices().iter().any(|listed| listed.id == *device)
+    {
+        eprintln!("no input {device}; --list shows them");
+        std::process::exit(1);
+    }
     let mut microphone = match Microphone::open(device.as_deref()) {
         Ok(microphone) => microphone,
         Err(error) => {

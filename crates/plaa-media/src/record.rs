@@ -157,6 +157,14 @@ impl Microphone {
         (self.shared.rate, self.shared.channels)
     }
 
+    /// The device's sound for something else to record, as a screen
+    /// recording takes it.
+    pub(crate) fn tap(&self) -> SoundTap {
+        SoundTap {
+            shared: self.shared.clone(),
+        }
+    }
+
     /// The loudest sample of each channel since last asked, 0 to 1.
     pub fn levels(&self) -> Vec<f32> {
         self.shared
@@ -248,6 +256,46 @@ impl Drop for Microphone {
         if let Some(input) = self.input.take() {
             let _ = input.join();
         }
+    }
+}
+
+/// An input device's sound, taken by something else that records.
+pub(crate) struct SoundTap {
+    shared: Arc<Shared>,
+}
+
+impl SoundTap {
+    /// The sample rate and channels.
+    pub fn format(&self) -> (u32, u16) {
+        (self.shared.rate, self.shared.channels)
+    }
+
+    /// Starts keeping the sound, from now on.
+    pub fn start(&self) {
+        *self.shared.waiting() = Some(VecDeque::new());
+    }
+
+    /// The sound kept since last asked, interleaved, waiting up to `wait`
+    /// for some.
+    pub fn take(&self, wait: Duration) -> Vec<f32> {
+        let mut waiting = self.shared.waiting();
+        if waiting.as_ref().is_some_and(VecDeque::is_empty) && !wait.is_zero() {
+            waiting = self
+                .shared
+                .arrived
+                .wait_timeout(waiting, wait)
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
+        }
+        waiting
+            .as_mut()
+            .map(|queue| queue.drain(..).collect())
+            .unwrap_or_default()
+    }
+
+    /// Stops keeping the sound.
+    pub fn end(&self) {
+        *self.shared.waiting() = None;
     }
 }
 

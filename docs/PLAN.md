@@ -84,9 +84,10 @@ trimming and splitting, and Intel Macs.
    flip, with undo, the edit playing without gaps; export to H.264,
    HEVC or AV1, as edited and made smaller, on hardware encoders where
    they open, or the sound alone, compressed or lossless.
-5. **Recording**: microphone (done), screen (the ScreenCast portal and
-   PipeWire, ScreenCaptureKit, Windows.Graphics.Capture), camera; AVB
-   streams with the entity, in milestone 7.
+5. **Recording**: microphone (done), screen (on Linux, done: the
+   ScreenCast portal and PipeWire; FFmpeg's ddagrab on Windows,
+   ScreenCaptureKit on macOS), camera; AVB streams with the entity, in
+   milestone 7.
 6. **Visualizer**: waveform, spectrum and cover art for sound.
 7. **AVB and Milan**: the entity, talker and listener.
 8. **Casting**: Chromecast and DLNA/UPnP.
@@ -191,6 +192,23 @@ into a hidden file renamed once stopped; the window then plays it. The
 sound server lists what each output plays as an input too, offered
 apart from microphones.
 
+A screen recording on Linux asks the ScreenCast portal, whose picker is
+the desktop's own, for a screen, window or region with the pointer in
+it, then reads the stream it shares through PipeWire on a thread of its
+own. A still screen sends no pictures, so while not recording one is
+kept every quarter second, and the last one kept starts the recording.
+Once Record is pressed, the encoder opens first (NVENC takes a fifth of
+a second), then the pictures and the sound are taken from that moment:
+each picture is copied out of PipeWire's buffer, timed in microseconds
+as it came, made BT.709 limited range in the filter graph (encoders
+that take RGB convert it as they please, NVENC by BT.601) and encoded
+with the export's encoders, software ones at their quick presets. The
+sound is the chosen input's, taken from its callback as a sound
+recording takes it. The last picture is repeated where the recording
+ends. Stopping sharing from the desktop ends the recording, saved as
+it is; closing the window ends the portal's session, or the compositor
+would keep copying the screen.
+
 ### Pictures
 
 The picture is a shader widget that asks the player for the picture due
@@ -239,6 +257,7 @@ next pixel, so it moves a pixel at a time at any width.
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
 | Hardware encoding | NVENC, VAAPI, Quick Sync | NVENC, AMF, Quick Sync | VideoToolbox |
 | Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI) | cpal (Core Audio) |
+| Screen in | the ScreenCast portal (ashpd), its picture through PipeWire | FFmpeg's ddagrab (planned) | ScreenCaptureKit (planned) |
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |
