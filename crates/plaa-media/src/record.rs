@@ -26,7 +26,7 @@ pub struct InputDevice {
 }
 
 /// How the id of what an output plays ends, as PulseAudio names its
-/// monitors; on Windows, the output's id with this added.
+/// monitors; on Windows and macOS, the output's id with this added.
 const PLAYS_BACK: &str = ".monitor";
 
 /// The system's sound input devices, and what each output plays where
@@ -44,10 +44,11 @@ pub fn input_devices() -> Vec<InputDevice> {
             .collect()
     }
     let host = cpal::default_host();
-    #[cfg_attr(not(windows), expect(unused_mut))]
+    #[cfg_attr(not(any(windows, target_os = "macos")), expect(unused_mut))]
     let mut devices = listed(host.input_devices().into_iter().flatten(), "");
-    // Windows records what an output plays from the output itself.
-    #[cfg(windows)]
+    // Windows and macOS record what an output plays from the output
+    // itself, macOS through a tap of it.
+    #[cfg(any(windows, target_os = "macos"))]
     devices.extend(listed(
         host.output_devices().into_iter().flatten(),
         PLAYS_BACK,
@@ -388,12 +389,13 @@ fn open_stream(device: Option<&str>) -> Result<(cpal::Stream, Arc<Shared>, Strin
         devices.find(|candidate| candidate.id().is_ok_and(|id| id.to_string() == wanted))
     }
     let chosen = device.and_then(|wanted| find(host.input_devices().into_iter().flatten(), wanted));
-    // What an output plays, on Windows: an input stream on the output.
+    // What an output plays, on Windows and macOS: an input stream on the
+    // output.
     let playing = match (
         &chosen,
         device.and_then(|wanted| wanted.strip_suffix(PLAYS_BACK)),
     ) {
-        (None, Some(output)) if cfg!(windows) => {
+        (None, Some(output)) if cfg!(any(windows, target_os = "macos")) => {
             find(host.output_devices().into_iter().flatten(), output)
         }
         _ => None,

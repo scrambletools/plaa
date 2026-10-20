@@ -84,10 +84,10 @@ trimming and splitting, and Intel Macs.
    flip, with undo, the edit playing without gaps; export to H.264,
    HEVC or AV1, as edited and made smaller, on hardware encoders where
    they open, or the sound alone, compressed or lossless.
-5. **Recording**: microphone (done), screen (done on Linux, through
-   the ScreenCast portal and PipeWire, and on Windows, through
-   Windows.Graphics.Capture; ScreenCaptureKit on macOS next), camera;
-   AVB streams with the entity, in milestone 7.
+5. **Recording**: microphone (done), screen (done: the ScreenCast
+   portal and PipeWire on Linux, Windows.Graphics.Capture on Windows,
+   ScreenCaptureKit on macOS), camera; AVB streams with the entity, in
+   milestone 7.
 6. **Visualizer**: waveform, spectrum and cover art for sound.
 7. **AVB and Milan**: the entity, talker and listener.
 8. **Casting**: Chromecast and DLNA/UPnP.
@@ -250,6 +250,19 @@ that comes after a silence is timed by the clock rather than by the
 samples counted, and the filter graph fills the silence; a recording
 whose input fell quiet ends with silence up to where the clock does.
 
+On macOS, ScreenCaptureKit lists the displays and windows (the windows
+of other apps that are on screen, in the normal layer and named) and
+captures one: a display with plaa's own application left out, as
+QuickTime Player leaves itself out, so the recording window stays where
+it is; or a window on its own. Pictures come as BGRA in sRGB, asked for
+as the display may be P3, on a dispatch queue of plaa's, as often as
+the display sends them; those saying nothing changed are skipped, and
+each new one is copied out of its CVPixelBuffer into the same queue and
+graph as elsewhere. Asking what there is to record fails until macOS
+lets plaa record the screen, which the notice says. What an output
+plays comes through cpal's process tap of it, which sends silence while
+nothing plays.
+
 ### Pictures
 
 The picture is a shader widget that asks the player for the picture due
@@ -310,9 +323,9 @@ next pixel, so it moves a pixel at a time at any width.
 | Screen kept on | the screen saver's D-Bus service, else logind's idle lock (keepawake) | execution state (keepawake) | power assertions (keepawake) |
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
 | Hardware encoding | NVENC, VAAPI, Quick Sync | NVENC, AMF, Quick Sync | VideoToolbox |
-| Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI; what an output plays through its loopback) | cpal (Core Audio) |
-| Screen in | the ScreenCast portal (ashpd), its picture through PipeWire | Windows.Graphics.Capture through FFmpeg's gfxcapture, screens and windows listed by plaa (Win32) | ScreenCaptureKit (planned) |
-| Tray, while recording hidden | StatusNotifierItem over D-Bus (zbus) | the notification area (planned) | a menu bar item (planned) |
+| Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI; what an output plays through its loopback) | cpal (Core Audio; what an output plays through a process tap, from macOS 14.2) |
+| Screen in | the ScreenCast portal (ashpd), its picture through PipeWire | Windows.Graphics.Capture through FFmpeg's gfxcapture, screens and windows listed by plaa (Win32) | ScreenCaptureKit (objc2), screens and windows listed by it, plaa's own windows left out |
+| Tray, while recording hidden | StatusNotifierItem over D-Bus (zbus) | the notification area (planned) | none needed: plaa's windows are left out, so it does not hide |
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |

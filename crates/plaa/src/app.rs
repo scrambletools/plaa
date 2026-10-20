@@ -2473,7 +2473,6 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
         Action::Open,
         Action::OpenAddress,
         Action::RecordSound,
-        #[cfg(any(target_os = "linux", windows))]
         Action::RecordScreen,
         Action::Settings,
     ]
@@ -2488,8 +2487,7 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
         .spacing(8)
         .into()
     });
-    #[cfg_attr(not(any(target_os = "linux", windows)), expect(unused_mut))]
-    let mut starts = vec![
+    let starts = vec![
         (
             button::Kind::Filled,
             Icon::FolderOpen,
@@ -2508,14 +2506,13 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
             crate::fl!("start-record-sound"),
             Action::RecordSound,
         ),
+        (
+            button::Kind::Tonal,
+            Icon::ScreenRecord,
+            crate::fl!("start-record-screen"),
+            Action::RecordScreen,
+        ),
     ];
-    #[cfg(any(target_os = "linux", windows))]
-    starts.push((
-        button::Kind::Tonal,
-        Icon::ScreenRecord,
-        crate::fl!("start-record-screen"),
-        Action::RecordScreen,
-    ));
     let starts: Vec<Element<'static, Message>> = starts
         .into_iter()
         .map(|(kind, glyph, label, action)| {

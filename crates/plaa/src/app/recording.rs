@@ -33,8 +33,47 @@ pub(super) struct Hidden {
     _tray: Option<crate::tray::Tray>,
 }
 
+/// The screens and windows plaa offers to record, where it lists them
+/// itself, or why it cannot, as when macOS does not let it record.
+#[cfg(any(windows, target_os = "macos"))]
+fn offered_list() -> Result<Vec<recorder::Offered>, String> {
+    #[cfg(windows)]
+    return Ok(crate::screens_windows::offered());
+    #[cfg(target_os = "macos")]
+    {
+        use plaa_media::screen::Target;
+        let shareable = plaa_media::screen::shareable()?;
+        let screens = shareable
+            .iter()
+            .filter(|shareable| matches!(shareable.target, Target::Screen(_)))
+            .count();
+        Ok(shareable
+            .into_iter()
+            .map(|shareable| match shareable.target {
+                Target::Screen(number) => {
+                    let shown = number + 1;
+                    recorder::Offered {
+                        id: u64::from(number),
+                        window: false,
+                        name: match (screens > 1, shareable.main) {
+                            (false, _) => crate::fl!("record-screen-whole"),
+                            (true, true) => crate::fl!("record-screen-main", number = shown),
+                            (true, false) => crate::fl!("record-screen-number", number = shown),
+                        },
+                    }
+                }
+                Target::Window(id) => recorder::Offered {
+                    id,
+                    window: true,
+                    name: shareable.name,
+                },
+            })
+            .collect())
+    }
+}
+
 /// What recording `offered` takes: its capture, or why it would not open.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn offered_screen(offered: recorder::Offered) -> recorder::Screen {
     use plaa_media::screen::{ScreenCapture, Target};
     let target = if offered.window {
@@ -122,16 +161,22 @@ impl Plaa {
     }
 
     /// Asks the system what screen or window to record, for window `id`;
-    /// on Windows, a window opens to record the main screen, with a menu
-    /// of the others and of windows.
+    /// on Windows and macOS, a window opens to record the main screen,
+    /// with a menu of the others and of windows.
     pub(super) fn open_screen_recorder(&mut self, id: window::Id) -> Task<Message> {
         #[cfg(target_os = "linux")]
         return Task::perform(crate::screen_share::share(), move |result| {
             Message::ScreenShared(id, result)
         });
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         {
-            self.offers = crate::screens_windows::offered();
+            self.offers = match offered_list() {
+                Ok(offers) => offers,
+                Err(error) => {
+                    self.notify(id, crate::fl!("notice-record-failed", error = error));
+                    return Task::none();
+                }
+            };
             let Some(first) = self.offers.first().cloned() else {
                 return Task::none();
             };
@@ -142,7 +187,7 @@ impl Plaa {
             let recorder = Recorder::screen(offered_screen(first), sound);
             self.show_recorder(id, recorder, SCREEN_RECORDER_SIZE).1
         }
-        #[cfg(not(any(target_os = "linux", windows)))]
+        #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
         {
             let _ = id;
             Task::none()
@@ -238,9 +283,11 @@ impl Plaa {
             RecorderControl::Close => return window::close(id),
             RecorderControl::Reshare => return self.open_screen_recorder(id),
             // Windows come and go: the menu lists them as they are.
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             RecorderControl::Choosing(true) => {
-                self.offers = crate::screens_windows::offered();
+                if let Ok(offers) = offered_list() {
+                    self.offers = offers;
+                }
             }
             _ => {}
         }
@@ -279,7 +326,9 @@ impl Plaa {
                     .screen
                     .as_ref()
                     .is_some_and(|screen| !screen.window);
-                let hides = whole_screen && can_hide;
+                // macOS leaves plaa's own windows out of a screen's
+                // recording, so nothing needs to hide there.
+                let hides = whole_screen && can_hide && cfg!(not(target_os = "macos"));
                 let agreed =
                     recorder.warning.take().is_some() || matches!(control, RecorderControl::Hide);
                 if hides && !agreed {
@@ -327,11 +376,11 @@ impl Plaa {
                 if recorder.is_recording() || recorder.saving {
                     return Task::none();
                 }
-                #[cfg(windows)]
+                #[cfg(any(windows, target_os = "macos"))]
                 {
                     recorder.screen = Some(offered_screen(offered));
                 }
-                #[cfg(not(windows))]
+                #[cfg(not(any(windows, target_os = "macos")))]
                 let _ = offered;
             }
             RecorderControl::Microphone(device) => {

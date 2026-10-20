@@ -116,7 +116,6 @@ impl Recorder {
 
     /// Records `screen`, with the sound of `sound` when given: an input
     /// device, or the system's default.
-    #[cfg(any(target_os = "linux", windows))]
     pub fn screen(screen: Screen, sound: Option<Option<&str>>) -> Self {
         Self {
             microphone: sound.map(Microphone::open),

@@ -50,6 +50,8 @@ The first build.
   computer plays, encoded on the graphics card where it can. Recording
   a screen, plaa's recording window hides, and a red dot in the tray,
   or opening plaa again, stops it.
+- Recording the screen or a window on macOS, through ScreenCaptureKit,
+  plaa's own windows left out, and what the computer plays there.
 - Screen recordings at 24, 30, 60 or 120 pictures a second, or every
   picture the screen sends, and the pictures dropped shown as they
   record.

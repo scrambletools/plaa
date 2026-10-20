@@ -1,7 +1,8 @@
 //! Recording the screen: pictures a capture hands over, as the ScreenCast
-//! portal shares them through PipeWire on Linux and Windows.Graphics.
-//! Capture takes them on Windows, encoded as exports encode pictures, with
-//! the sound of a recording input when one is given, into an MP4.
+//! portal shares them through PipeWire on Linux, Windows.Graphics.Capture
+//! takes them on Windows and ScreenCaptureKit on macOS, encoded as exports
+//! encode pictures, with the sound of a recording input when one is given,
+//! into an MP4.
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -19,13 +20,13 @@ use crate::record::{self, RecordEvent, SoundTap};
 
 /// Pictures waiting for the encoder; more than this, and the newest are
 /// dropped until it catches up.
-#[cfg(any(target_os = "linux", windows, test))]
+#[cfg(any(target_os = "linux", windows, target_os = "macos", test))]
 const MOST_WAITING: usize = 8;
 /// How long the capture may take to say its size.
 const FIRST_PICTURE: Duration = Duration::from_secs(5);
 /// How often a picture is kept while not recording: a still screen sends
 /// none, so the last one kept starts a recording.
-#[cfg(any(target_os = "linux", windows, test))]
+#[cfg(any(target_os = "linux", windows, target_os = "macos", test))]
 const KEEP_EVERY: Duration = Duration::from_millis(250);
 /// The frame rate encoders are told, for their rate control, when every
 /// picture the screen sends is kept; pictures come as the screen changes.
@@ -60,7 +61,10 @@ struct Waiting {
 /// keeps every picture, though they come a little early or late, and a
 /// faster one keeps them as evenly as its own come. Unused where no
 /// capture hands pictures over yet.
-#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "linux", windows, target_os = "macos")),
+    allow(dead_code)
+)]
 struct Pace {
     every: Duration,
     /// Credit left when the last picture was kept, in pictures.
@@ -70,15 +74,24 @@ struct Pace {
 
 /// The credit a picture takes to be kept: most of one picture, so one
 /// that comes a little early still is.
-#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "linux", windows, target_os = "macos")),
+    allow(dead_code)
+)]
 const CREDIT_TO_KEEP: f64 = 0.75;
 /// The most credit there is: a little more than one picture's, so one
 /// that came late leaves the next its due, but a still screen saves next
 /// to nothing up for later.
-#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "linux", windows, target_os = "macos")),
+    allow(dead_code)
+)]
 const MOST_CREDIT: f64 = 1.25;
 
-#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "linux", windows, target_os = "macos")),
+    allow(dead_code)
+)]
 impl Pace {
     /// The credit there is at `at`.
     fn credit(&self, at: Instant) -> f64 {
@@ -113,7 +126,7 @@ pub struct ScreenEncoding {
 }
 
 impl Frames {
-    #[cfg(any(target_os = "linux", windows, test))]
+    #[cfg(any(target_os = "linux", windows, target_os = "macos", test))]
     fn new() -> Self {
         Self {
             waiting: Mutex::new(Waiting::default()),
@@ -127,7 +140,7 @@ impl Frames {
     }
 
     /// Whether a picture that came at `at` is wanted.
-    #[cfg(any(target_os = "linux", windows, test))]
+    #[cfg(any(target_os = "linux", windows, target_os = "macos", test))]
     pub fn wanted(&self, at: Instant) -> bool {
         let waiting = self.waiting();
         if waiting.queue.is_some() {
@@ -140,7 +153,7 @@ impl Frames {
     }
 
     /// Hands over a picture taken at `at`, unless too many wait.
-    #[cfg(any(target_os = "linux", windows, test))]
+    #[cfg(any(target_os = "linux", windows, target_os = "macos", test))]
     pub fn push(&self, at: Instant, frame: ffmpeg::frame::Video) {
         let mut waiting = self.waiting();
         if waiting.queue.is_some()
@@ -226,16 +239,40 @@ pub struct ScreenCapture {
     capture: Option<pipewire_capture::Capture>,
     #[cfg(windows)]
     capture: Option<graphics_capture::Capture>,
+    #[cfg(target_os = "macos")]
+    capture: Option<screen_capture_kit::Capture>,
 }
 
-/// A screen to record on Windows, by its number in the order Windows lists
-/// screens in from 0, or a window, by its handle.
-#[cfg(windows)]
+/// A screen to record on Windows or macOS, by its number in the order the
+/// system lists screens in from 0, or a window, by the system's id of it.
+#[cfg(any(windows, target_os = "macos"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
     Screen(u32),
     Window(u64),
 }
+
+/// A screen or window there is to record, as macOS lists them.
+#[cfg(target_os = "macos")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Shareable {
+    pub target: Target,
+    /// The main one of several screens.
+    pub main: bool,
+    /// A window's name: its app's, and its title.
+    pub name: String,
+}
+
+/// The screens, the main one first, then the windows of other apps, or
+/// why the system would not say, as when plaa may not record the screen.
+#[cfg(target_os = "macos")]
+pub fn shareable() -> Result<Vec<Shareable>, String> {
+    screen_capture_kit::shareable()
+}
+
+#[cfg(target_os = "macos")]
+#[path = "screen_capture_kit.rs"]
+mod screen_capture_kit;
 
 /// What a capture says of itself.
 #[derive(Default)]
@@ -264,13 +301,18 @@ impl ScreenCapture {
         })
     }
 
-    /// Takes the pictures of `target` through Windows.Graphics.Capture.
-    #[cfg(windows)]
+    /// Takes the pictures of `target` through Windows.Graphics.Capture,
+    /// or ScreenCaptureKit on macOS, which leaves plaa's own windows out
+    /// of a screen.
+    #[cfg(any(windows, target_os = "macos"))]
     pub fn open(target: Target) -> Result<Self, String> {
         crate::init();
         let frames = Arc::new(Frames::new());
         let shared = Arc::new(CaptureShared::default());
+        #[cfg(windows)]
         let capture = graphics_capture::Capture::open(target, frames.clone(), shared.clone())?;
+        #[cfg(target_os = "macos")]
+        let capture = screen_capture_kit::Capture::open(target, frames.clone(), shared.clone())?;
         Ok(Self {
             frames,
             shared,
@@ -403,7 +445,7 @@ impl Drop for ScreenCapture {
     fn drop(&mut self) {
         self.stop();
         self.ended();
-        #[cfg(any(target_os = "linux", windows))]
+        #[cfg(any(target_os = "linux", windows, target_os = "macos"))]
         drop(self.capture.take());
     }
 }

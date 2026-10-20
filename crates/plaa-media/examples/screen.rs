@@ -1,20 +1,16 @@
 //! Records the screen as the screen recording window does, with the
 //! sound of an input device when one is given: on Linux a PipeWire video
-//! node, as the ScreenCast portal shares one, and on Windows a screen by
-//! its number.
+//! node, as the ScreenCast portal shares one, and on Windows and macOS a
+//! screen by its number.
 //!
 //! cargo run --release -p plaa-media --example screen -- [--format
 //! h264|hevc|av1] [--software] [--rate <pictures a second>] [--sound
 //! <device id>] <node or screen> <seconds> <to>
 
 fn main() {
-    #[cfg(any(target_os = "linux", windows))]
     record::main();
-    #[cfg(not(any(target_os = "linux", windows)))]
-    eprintln!("screen recording here comes later");
 }
 
-#[cfg(any(target_os = "linux", windows))]
 mod record {
     #[cfg(target_os = "linux")]
     use std::os::unix::net::UnixStream;
@@ -142,7 +138,7 @@ mod record {
     }
 
     /// Screen number `screen`.
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     fn open(screen: u32) -> Result<ScreenCapture, String> {
         ScreenCapture::open(plaa_media::screen::Target::Screen(screen))
     }
