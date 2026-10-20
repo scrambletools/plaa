@@ -213,48 +213,80 @@ Write-Host $printed
 if ($printed -notmatch "^plaa $([regex]::Escape($version)) \(.*\), FFmpeg \d") { Fail "plaa --version printed '$printed'" }
 
 if (-not $NoWindow) {
-    # Where the drawing types are, which differs between Windows
-    # PowerShell and PowerShell 7.
-    Add-Type -AssemblyName System.Drawing
-    $drawing = @([System.Drawing.Bitmap], [System.Drawing.Rectangle]) |
-        ForEach-Object { $_.Assembly.Location } | Sort-Object -Unique
-    Add-Type -ReferencedAssemblies $drawing @"
+    # Plain GDI, as System.Drawing's assemblies differ between Windows
+    # PowerShell and each PowerShell 7.
+    Add-Type @"
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
+using System.IO;
 using System.Runtime.InteropServices;
 public static class Screen {
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window, out RECT rect);
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr window, IntPtr context, uint flags);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr context);
+    [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr context);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateDIBSection(IntPtr context, ref BITMAPINFOHEADER info,
+        uint usage, out IntPtr bits, IntPtr section, uint offset);
+    [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr context, IntPtr picked);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr picked);
+    [DllImport("gdi32.dll")] static extern bool GdiFlush();
     [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] struct BITMAPINFOHEADER {
+        public uint Size; public int Width, Height; public ushort Planes, BitCount;
+        public uint Compression, SizeImage; public int XPerMeter, YPerMeter; public uint Used, Important;
+    }
     // The window's picture, drawn by the window itself, even where others
     // cover it; the fewest pixels of any of the yellow, cyan and magenta
     // bars of the test clip in it, in hundredths of the picture.
     public static int Bars(IntPtr window, string save) {
         RECT rect;
         GetWindowRect(window, out rect);
-        using (Bitmap bitmap = new Bitmap(rect.Right - rect.Left, rect.Bottom - rect.Top, PixelFormat.Format32bppArgb)) {
-            using (Graphics graphics = Graphics.FromImage(bitmap)) {
-                IntPtr context = graphics.GetHdc();
-                PrintWindow(window, context, 2);
-                graphics.ReleaseHdc(context);
-            }
-            if (save != null) bitmap.Save(save, ImageFormat.Png);
-            BitmapData data = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height),
-                ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-            byte[] bytes = new byte[data.Stride * data.Height];
-            Marshal.Copy(data.Scan0, bytes, 0, bytes.Length);
-            bitmap.UnlockBits(data);
-            int yellow = 0, cyan = 0, magenta = 0;
-            for (int at = 0; at + 3 < bytes.Length; at += 4) {
-                int blue = bytes[at], green = bytes[at + 1], red = bytes[at + 2];
-                if (red > 180 && green > 180 && blue < 80) yellow++;
-                else if (red < 80 && green > 180 && blue > 180) cyan++;
-                else if (red > 180 && green < 80 && blue > 180) magenta++;
-            }
-            long least = Math.Min(yellow, Math.Min(cyan, magenta));
-            return (int)(least * 10000 / Math.Max((long)bitmap.Width * bitmap.Height, 1));
+        int width = Math.Max(rect.Right - rect.Left, 1), height = Math.Max(rect.Bottom - rect.Top, 1);
+        BITMAPINFOHEADER info = new BITMAPINFOHEADER();
+        info.Size = (uint)Marshal.SizeOf(info);
+        info.Width = width;
+        info.Height = -height;
+        info.Planes = 1;
+        info.BitCount = 32;
+        byte[] bytes = new byte[width * height * 4];
+        IntPtr context = CreateCompatibleDC(IntPtr.Zero);
+        IntPtr bits;
+        IntPtr picture = CreateDIBSection(context, ref info, 0, out bits, IntPtr.Zero, 0);
+        if (picture == IntPtr.Zero) { DeleteDC(context); return 0; }
+        IntPtr previous = SelectObject(context, picture);
+        PrintWindow(window, context, 2);
+        GdiFlush();
+        Marshal.Copy(bits, bytes, 0, bytes.Length);
+        SelectObject(context, previous);
+        DeleteObject(picture);
+        DeleteDC(context);
+        if (save != null) Save(save, bytes, width, height);
+        int yellow = 0, cyan = 0, magenta = 0;
+        for (int at = 0; at + 3 < bytes.Length; at += 4) {
+            int blue = bytes[at], green = bytes[at + 1], red = bytes[at + 2];
+            if (red > 180 && green > 180 && blue < 80) yellow++;
+            else if (red < 80 && green > 180 && blue > 180) cyan++;
+            else if (red > 180 && green < 80 && blue > 180) magenta++;
+        }
+        long least = Math.Min(yellow, Math.Min(cyan, magenta));
+        return (int)(least * 10000 / ((long)width * height));
+    }
+    // As a BMP, its top row first.
+    static void Save(string path, byte[] bytes, int width, int height) {
+        using (BinaryWriter writer = new BinaryWriter(File.Create(path))) {
+            writer.Write((ushort)0x4D42);
+            writer.Write(14 + 40 + bytes.Length);
+            writer.Write(0);
+            writer.Write(14 + 40);
+            writer.Write(40);
+            writer.Write(width);
+            writer.Write(-height);
+            writer.Write((ushort)1);
+            writer.Write((ushort)32);
+            writer.Write(0);
+            writer.Write(bytes.Length);
+            writer.Write(new byte[16]);
+            writer.Write(bytes);
         }
     }
 }
@@ -288,10 +320,10 @@ public static class Screen {
     $seen = 0
     for ($wait = 0; $wait -lt 20 -and $seen -lt 100; $wait++) {
         Start-Sleep -Milliseconds 500
-        $seen = [Screen]::Bars($process.MainWindowHandle, (Join-Path $work 'video.png'))
+        $seen = [Screen]::Bars($process.MainWindowHandle, (Join-Path $work 'video.bmp'))
     }
     if ($process.HasExited) { Fail "plaa quit while playing, with $('0x{0:X8}' -f $process.ExitCode)" }
-    if ($seen -lt 100) { Fail "the video's pictures did not show; the window is in $work\video.png" }
+    if ($seen -lt 100) { Fail "the video's pictures did not show; the window is in $work\video.bmp" }
     Write-Host "it played, each bar $($seen / 100)% of the window"
     Stop-Process -Id $process.Id
     $process.WaitForExit()
