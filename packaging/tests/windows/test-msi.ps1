@@ -213,8 +213,12 @@ Write-Host $printed
 if ($printed -notmatch "^plaa $([regex]::Escape($version)) \(.*\), FFmpeg \d") { Fail "plaa --version printed '$printed'" }
 
 if (-not $NoWindow) {
+    # Where the drawing types are, which differs between Windows
+    # PowerShell and PowerShell 7.
     Add-Type -AssemblyName System.Drawing
-    Add-Type -ReferencedAssemblies System.Drawing @"
+    $drawing = @([System.Drawing.Bitmap], [System.Drawing.Rectangle]) |
+        ForEach-Object { $_.Assembly.Location } | Sort-Object -Unique
+    Add-Type -ReferencedAssemblies $drawing @"
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
