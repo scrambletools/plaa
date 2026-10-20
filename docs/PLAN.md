@@ -34,7 +34,7 @@ look follows Material Design 3, as in prev.
 | Color | Y'CbCr to RGB in the shader, BT.601, BT.709 and BT.2020, limited and full range, 8 to 16 bits. PQ and HLG are tone mapped for standard screens, BT.2020 mapped to BT.709 |
 | Subtitles | Text subtitles (SubRip, WebVTT, MP4 text and the rest FFmpeg reads) drawn by plaa; ASS and SSA drawn as styled by libass, loaded as plaa runs, with the file's fonts; Blu-ray, DVD and DVB picture subtitles. Both kinds of picture are laid over the video in its shader, and fit and shrink with it |
 | Windows | One window per file, one running instance; a start window when nothing is open |
-| Overlay | For video, M3 floating toolbars over the picture by default, hiding once the pointer rests (2 s, adjustable) or leaves the window; Settings docks them. Sound always has them docked |
+| Overlay | M3 floating toolbars over the picture, or a sound file's cover, by default, hiding once the pointer rests (2 s, adjustable) or leaves the window; the toolbar or Settings docks them |
 | Editing | Not destructive: an edit is the file's clips in order and a turn and flip, played as it will be and kept until exported, as QuickTime Player keeps it until saved |
 | Export | Re-encoded through FFmpeg: NVENC, AMF or Quick Sync where they open, VAAPI on Linux, VideoToolbox on macOS, else x264, x265 and SVT-AV1, in MP4 with AAC sound (Apple's encoder on macOS); sound alone as AAC, MP3 or Opus at a bit rate chosen, or FLAC, ALAC or WAV in 16 or 24 bits |
 | Web pages | yt-dlp, run as a program of its own when it is installed, not bundled: it follows the sites' changes faster than plaa could; its JSON names the streams, which FFmpeg plays |

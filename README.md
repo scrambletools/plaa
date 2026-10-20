@@ -49,9 +49,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   clock.
 - **Controls floating over the picture**, as M3 floating toolbars that
   slide away once the pointer rests or leaves the window, and come back
-  when it moves; Settings can dock them above and below instead. Sound
-  files show their cover art, title, artist and album, with the controls
-  docked.
+  when it moves, over a sound file's cover as over a picture; the
+  toolbar or Settings can dock them above and below instead. Sound files
+  show their cover art, title, artist and album.
 - **A visualizer** under a sound file's cover: the spectrum of what is
   heard, as bars that rise with it and fall back slowly, or the file's
   waveform from start to end, the part played in the accent color,

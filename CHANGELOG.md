@@ -11,8 +11,9 @@ The first build.
   8 to 16 bits, HDR10 and HLG tone mapped, phone videos turned upright,
   and shrunk pictures filtered as mpv does, so text and fine lines stay
   free of moiré.
-- Controls float over the picture and slide away while the pointer rests,
-  or dock above and below it; sound files show their cover and tags.
+- Controls float over the picture or a sound file's cover and slide away
+  while the pointer rests, or dock above and below; sound files show
+  their cover and tags.
 - A timeline that moves a pixel at a time at any window size, and
   shows the frame under its handle as it is dragged.
 - Seeking, skipping, frame steps, speed with the pitch kept, looping,

@@ -311,12 +311,12 @@ impl PlayerWindow {
         }
     }
 
-    /// Whether the floating overlay should show now: always for sound
-    /// with its cover, and while a menu is open or something is dragged;
-    /// else while the pointer is inside the window and it is paused, being
+    /// Whether the floating overlay should show now: always until the file
+    /// has opened, and while a menu is open or something is dragged; else
+    /// while the pointer is inside the window and it is paused, being
     /// edited, shows a sheet, or the pointer moved lately.
     pub fn wants_overlay(&self, delay: Duration) -> bool {
-        if !self.fills_window() || self.error.is_some() {
+        if self.info.is_none() || self.error.is_some() {
             return true;
         }
         if self.menu.is_some() || self.dragging.is_some() {
@@ -453,7 +453,7 @@ pub struct Context {
 }
 
 /// The window: the picture with bars over it or around it, or for sound,
-/// the cover with bars docked above and below.
+/// the cover with bars over it or docked above and below.
 pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
     if let Some(error) = &window.error {
         let body = container(component::empty_state(
@@ -601,8 +601,8 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             context.pip,
             Control::TogglePip,
         ));
-        tools.push(component::floating_bars_toggle(Control::ToggleOverlay));
     }
+    tools.push(component::floating_bars_toggle(Control::ToggleOverlay));
     tools.push(component::tool(
         Icon::Settings,
         crate::fl!("action-settings"),
@@ -1188,8 +1188,8 @@ fn subtitle_view<'a>(
 }
 
 /// A sound file: its cover art, or a note, with its title, artist and
-/// album, the visualizer chosen under them, and the bars docked above and
-/// below.
+/// album, the visualizer chosen under them, and the bars floating over
+/// them or docked above and below.
 fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
     let info = window.info.as_deref();
     let visualizer = visualizer(window, context);
@@ -1263,16 +1263,37 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
     };
     let body = container(middle).center(Fill).style(style::surface);
     let body = with_spinner(body.into(), window);
+    if !component::floating_bars_enabled() {
+        let body: Element<'a, Control> = match sheet(window, context) {
+            Some(sheet) => iced::widget::row![body, sheet].into(),
+            None => body,
+        };
+        return column![
+            docked(toolbar(window, context)),
+            body,
+            docked(transport(window, context))
+        ]
+        .into();
+    }
+    // Floating, the bars come and go as over a picture.
+    let body = crate::watch::watch(body, window.activity.clone(), Control::Activity);
     let body: Element<'a, Control> = match sheet(window, context) {
-        Some(sheet) => iced::widget::row![body, sheet].into(),
+        Some(sheet) => {
+            let sheet = component::between_bars(
+                sheet,
+                component::floating_room(true),
+                component::floating_room(true),
+            );
+            iced::widget::row![body, sheet].into()
+        }
         None => body,
     };
-    column![
-        docked(toolbar(window, context)),
+    component::window_bars(
+        component::toolbar(toolbar(window, context)),
+        Some(component::toolbar(transport(window, context))),
         body,
-        docked(transport(window, context))
-    ]
-    .into()
+        window.overlay_shown,
+    )
 }
 
 /// A sound file with the prism filling the window, the bars floating over

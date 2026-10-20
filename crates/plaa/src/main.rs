@@ -40,6 +40,7 @@ mod title_bar_macos;
 mod tray;
 mod video;
 mod visualizer;
+mod watch;
 mod window;
 
 use std::sync::{Mutex, OnceLock, PoisonError};
