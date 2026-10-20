@@ -84,10 +84,10 @@ trimming and splitting, and Intel Macs.
    flip, with undo, the edit playing without gaps; export to H.264,
    HEVC or AV1, as edited and made smaller, on hardware encoders where
    they open, or the sound alone, compressed or lossless.
-5. **Recording**: microphone (done), screen (done: the ScreenCast
-   portal and PipeWire on Linux, Windows.Graphics.Capture on Windows,
-   ScreenCaptureKit on macOS), camera; AVB streams with the entity, in
-   milestone 7.
+5. **Recording** (done): microphone, screen (the ScreenCast portal and
+   PipeWire on Linux, Windows.Graphics.Capture on Windows,
+   ScreenCaptureKit on macOS), camera (FFmpeg's device inputs); AVB
+   streams with the entity, in milestone 7.
 6. **Visualizer**: waveform, spectrum and cover art for sound.
 7. **AVB and Milan**: the entity, talker and listener.
 8. **Casting**: Chromecast and DLNA/UPnP.
@@ -263,6 +263,20 @@ lets plaa record the screen, which the notice says. What an output
 plays comes through cpal's process tap of it, which sends silence while
 nothing plays.
 
+A camera is read by FFmpeg's device input for the system, v4l2,
+dshow or avfoundation, which decodes its pictures, MJPEG included, on
+a thread of the capture's own, into the same queue, graph and encoders
+as a screen's; its colors are made BT.709 video. FFmpeg lists the
+cameras on Linux and Windows (one each where Linux has several nodes,
+its doubled name tidied) and AVFoundation on macOS, where FFmpeg cannot.
+v4l2 is asked for MJPEG at 1080p and 30 pictures a second first, as raw
+pictures of that size come slowly over USB, then smaller, then as the
+camera likes; avfoundation needs a rate the camera offers. Each picture
+is also made a small RGBA preview, which the window shows mirrored, as
+people expect to see themselves; the recording is as the camera sees.
+`PLAA_TEST_CAMERA` adds FFmpeg's test picture as the first camera, for
+machines without one.
+
 ### Pictures
 
 The picture is a shader widget that asks the player for the picture due
@@ -324,6 +338,7 @@ next pixel, so it moves a pixel at a time at any width.
 | Hardware decoding | VAAPI, CUDA, Vulkan | D3D11VA, CUDA, DXVA2 | VideoToolbox |
 | Hardware encoding | NVENC, VAAPI, Quick Sync | NVENC, AMF, Quick Sync | VideoToolbox |
 | Sound in | cpal (the sound server through the PulseAudio protocol, which also offers what outputs play; ALSA without one) | cpal (WASAPI; what an output plays through its loopback) | cpal (Core Audio; what an output plays through a process tap, from macOS 14.2) |
+| Camera in | FFmpeg's v4l2 input, cameras listed by it | FFmpeg's dshow input, cameras listed by it | FFmpeg's avfoundation input, cameras listed by AVFoundation (objc2) |
 | Screen in | the ScreenCast portal (ashpd), its picture through PipeWire | Windows.Graphics.Capture through FFmpeg's gfxcapture, screens and windows listed by plaa (Win32) | ScreenCaptureKit (objc2), screens and windows listed by it, plaa's own windows left out |
 | Tray, while recording hidden | StatusNotifierItem over D-Bus (zbus) | the notification area (planned) | none needed: plaa's windows are left out, so it does not hide |
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |

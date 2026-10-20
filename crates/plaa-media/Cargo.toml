@@ -12,8 +12,8 @@ workspace = true
 
 [dependencies]
 # FFmpeg through its C libraries: the system's on Linux, bundled with the
-# packages elsewhere.
-ffmpeg-next = { version = "9", default-features = false, features = ["codec", "format", "filter", "software-resampling", "software-scaling"] }
+# packages elsewhere; its device inputs read cameras.
+ffmpeg-next = { version = "9", default-features = false, features = ["codec", "device", "format", "filter", "software-resampling", "software-scaling"] }
 # Through the sound server on Linux, PulseAudio or PipeWire, whose devices
 # are the ones people know; ALSA when there is none.
 cpal = { version = "0.18", features = ["pulseaudio"] }
@@ -34,8 +34,10 @@ libc = "0.2"
 # Takes the frames of a screen recording the ScreenCast portal shares.
 pipewire = "0.10"
 
-# ScreenCaptureKit, which records the screen on macOS.
+# ScreenCaptureKit, which records the screen on macOS, and AVFoundation,
+# which lists the cameras there.
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2-av-foundation = { version = "0.3", default-features = false, features = ["std", "AVCaptureDevice", "AVMediaFormat"] }
 block2 = "0.6"
 dispatch2 = { version = "0.3", default-features = false, features = ["std", "objc2"] }
 objc2 = "0.6"

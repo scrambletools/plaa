@@ -51,6 +51,7 @@ pub enum Action {
     Export,
     RecordSound,
     RecordScreen,
+    RecordCamera,
 }
 
 /// Every action, its name in the settings file and its default
@@ -104,6 +105,7 @@ const ACTIONS: &[(Action, &str, &[&str])] = &[
     (Action::Export, "export", &["Ctrl+E"]),
     (Action::RecordSound, "record-sound", &["Ctrl+Shift+N"]),
     (Action::RecordScreen, "record-screen", &["Ctrl+Alt+N"]),
+    (Action::RecordCamera, "record-camera", &["Ctrl+Alt+M"]),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]

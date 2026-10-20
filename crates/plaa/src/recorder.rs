@@ -1,15 +1,16 @@
-//! A window recording sound or the screen, as QuickTime Player's New
-//! Audio Recording and New Screen Recording: a level meter that moves
-//! before recording starts, a button to start and stop, how long and how
-//! large the recording is, and what to record from and in.
+//! A window recording sound, the screen or a camera, as QuickTime
+//! Player's New Audio, Screen and Movie Recording: a level meter that
+//! moves before recording starts, the camera's picture, a button to start
+//! and stop, how long and how large the recording is, and what to record
+//! from and in.
 
 use std::time::Duration;
 
-use iced::widget::{container, progress_bar, space};
+use iced::widget::{container, image, progress_bar, space};
 use iced::{Center, Element, Fill, Theme};
+use plaa_media::capture::{Camera, Capture, Preview};
 use plaa_media::export::{Format, Sound};
 use plaa_media::record::{InputDevice, Microphone};
-use plaa_media::screen::ScreenCapture;
 use scramble_ui::button;
 use scramble_ui::dropdown::{self, Entry};
 use scramble_ui::{Icon, Scheme, Type, column, component, icon, style};
@@ -39,6 +40,8 @@ pub enum RecorderControl {
     Choose(Offered),
     /// The menu of what to record opened, or closed.
     Choosing(bool),
+    /// Records from this camera.
+    Camera(Camera),
     /// Records the screen with plaa hidden, as the warning said.
     Hide,
     /// Closes the warning, recording nothing.
@@ -69,6 +72,9 @@ pub struct Recorder {
     pub hiding: bool,
     /// The menu of what to record is open.
     pub choosing: bool,
+    /// A camera's latest picture as the window shows it, mirrored, and
+    /// its count.
+    pub preview: Option<(u64, image::Handle)>,
 }
 
 /// A screen or window plaa offers to record, where it lists them itself,
@@ -90,14 +96,16 @@ pub struct Warning {
 /// The screen or window a screen recording records.
 pub struct Screen {
     /// Its pictures, or why they would not come.
-    pub capture: Result<ScreenCapture, String>,
+    pub capture: Result<Capture, String>,
     /// A window is shared, not a whole screen.
     pub window: bool,
     /// What plaa offered and this records, where it offers them.
     pub offered: Option<Offered>,
-    /// Keeps it shared, until dropped.
+    /// The camera this records, rather than a screen.
+    pub camera: Option<Camera>,
+    /// Keeps a screen shared, until dropped.
     #[cfg(target_os = "linux")]
-    pub _sharing: crate::screen_share::Sharing,
+    pub _sharing: Option<crate::screen_share::Sharing>,
 }
 
 impl Recorder {
@@ -111,6 +119,7 @@ impl Recorder {
             warning: None,
             hiding: false,
             choosing: false,
+            preview: None,
         }
     }
 
@@ -125,6 +134,7 @@ impl Recorder {
             warning: None,
             hiding: false,
             choosing: false,
+            preview: None,
         }
     }
 
@@ -132,16 +142,13 @@ impl Recorder {
         self.microphone.as_ref()?.as_ref().ok()
     }
 
-    pub fn capture_mut(&mut self) -> Option<&mut ScreenCapture> {
+    pub fn capture_mut(&mut self) -> Option<&mut Capture> {
         self.screen.as_mut()?.capture.as_mut().ok()
     }
 
     pub fn is_recording(&self) -> bool {
         match &self.screen {
-            Some(screen) => screen
-                .capture
-                .as_ref()
-                .is_ok_and(ScreenCapture::is_recording),
+            Some(screen) => screen.capture.as_ref().is_ok_and(Capture::is_recording),
             None => self.microphone().is_some_and(Microphone::is_recording),
         }
     }
@@ -156,6 +163,18 @@ impl Recorder {
             capture.stop();
             self.saving = true;
         }
+        // A camera's newest picture, mirrored, as people see themselves.
+        if let Some(screen) = &self.screen
+            && screen.camera.is_some()
+            && let Ok(capture) = &screen.capture
+            && let Some(preview) = capture.preview()
+            && self
+                .preview
+                .as_ref()
+                .is_none_or(|(count, _)| *count != preview.count)
+        {
+            self.preview = Some((preview.count, mirrored(&preview)));
+        }
         let Some(microphone) = self.microphone() else {
             self.levels.clear();
             return;
@@ -166,6 +185,18 @@ impl Recorder {
             *shown = meter_position(peak).max(*shown - FALL);
         }
     }
+}
+
+/// `preview` flipped left to right, as a mirror shows.
+fn mirrored(preview: &Preview) -> image::Handle {
+    let row = preview.width as usize * 4;
+    let mut pixels = Vec::with_capacity(preview.rgba.len());
+    for line in preview.rgba.chunks_exact(row) {
+        for pixel in line.as_chunks::<4>().0.iter().rev() {
+            pixels.extend_from_slice(pixel);
+        }
+    }
+    image::Handle::from_rgba(preview.width, preview.height, pixels)
 }
 
 /// Where a peak of `level`, 0 to 1, falls along the meter: by decibels,
@@ -190,14 +221,18 @@ pub struct Context<'a> {
     pub rate: u32,
     /// The screens and windows plaa offers to record, where it lists them.
     pub offers: &'a [Offered],
+    /// The cameras there are.
+    pub cameras: &'a [Camera],
     pub close_button: bool,
 }
 
 pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, RecorderControl> {
-    let (glyph, title) = if recorder.screen.is_some() {
-        (Icon::ScreenRecord, crate::fl!("record-screen-title"))
-    } else {
-        (Icon::Mic, crate::fl!("record-title"))
+    let (glyph, title) = match &recorder.screen {
+        Some(screen) if screen.camera.is_some() => {
+            (Icon::Videocam, crate::fl!("record-camera-title"))
+        }
+        Some(_) => (Icon::ScreenRecord, crate::fl!("record-screen-title")),
+        None => (Icon::Mic, crate::fl!("record-title")),
     };
     let mut tools: Vec<Element<'a, RecorderControl>> = vec![
         icon::icon(glyph, 20)
@@ -226,6 +261,7 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
         .style(style::chrome);
     let body = match (&recorder.screen, &recorder.warning) {
         (Some(_), Some(warning)) => warning_body(warning),
+        (Some(screen), None) if screen.camera.is_some() => camera_body(recorder, screen, context),
         (Some(screen), None) => screen_body(recorder, screen, context),
         (None, _) => sound_body(recorder, context),
     };
@@ -276,6 +312,111 @@ fn sound_body<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, 
         .align_x(Center),
     )
     .center(Fill)
+    .into()
+}
+
+/// A camera recording: the camera's picture, and below it, how long and
+/// how large the recording is, the button, the camera, the sound it takes
+/// and the format.
+fn camera_body<'a>(
+    recorder: &'a Recorder,
+    screen: &'a Screen,
+    context: &Context<'_>,
+) -> Element<'a, RecorderControl> {
+    let recording = recorder.is_recording();
+    let busy = recording || recorder.saving;
+    let (picture, progress_line): (Element<'a, RecorderControl>, _) = match &screen.capture {
+        Ok(capture) => {
+            let picture: Element<'a, RecorderControl> = match &recorder.preview {
+                Some((_, handle)) => image(handle.clone())
+                    .content_fit(iced::ContentFit::Contain)
+                    .width(Fill)
+                    .height(Fill)
+                    .into(),
+                None => space().width(Fill).height(Fill).into(),
+            };
+            (
+                picture,
+                Some(progress(capture.recorded(), capture.dropped(), busy)),
+            )
+        }
+        Err(error) => (
+            component::empty_state(Icon::VideocamOff, crate::fl!("record-camera-failed"), error),
+            None,
+        ),
+    };
+    let picture = container(picture)
+        .width(Fill)
+        .height(Fill)
+        .style(|_theme: &Theme| container::Style {
+            background: Some(iced::Color::BLACK.into()),
+            ..container::Style::default()
+        });
+    let camera_name = screen
+        .camera
+        .as_ref()
+        .map(|camera| camera.name.clone())
+        .unwrap_or_default();
+    let cameras = context
+        .cameras
+        .iter()
+        .map(|camera| {
+            Entry::item(camera.name.clone(), RecorderControl::Camera(camera.clone()))
+                .icon(Icon::Videocam)
+                .checked(screen.camera.as_ref() == Some(camera))
+        })
+        .collect();
+    let camera_menu = menu_or_chosen(
+        dropdown::menu(camera_name.clone(), cameras)
+            .tip(crate::fl!("record-camera"))
+            .open(recorder.choosing, RecorderControl::Choosing),
+        busy,
+        &camera_name,
+    );
+    let sound_name = match &recorder.microphone {
+        None => crate::fl!("record-no-sound"),
+        Some(Ok(microphone)) => microphone.name().to_owned(),
+        Some(Err(_)) => crate::fl!("record-no-input"),
+    };
+    let mut sounds = vec![
+        Entry::item(crate::fl!("record-no-sound"), RecorderControl::Silent)
+            .icon(Icon::MicOff)
+            .checked(recorder.microphone.is_none()),
+        Entry::divider(),
+    ];
+    sounds.extend(input_entries(context, recorder.microphone.is_some()));
+    let sound_menu = menu_or_chosen(
+        dropdown::menu(sound_name.clone(), sounds).tip(crate::fl!("record-sound")),
+        busy,
+        &sound_name,
+    );
+    let (time, size) = match progress_line {
+        Some(line) => line,
+        None => (space().into(), space().into()),
+    };
+    let ready = screen.capture.is_ok() && !recorder.saving;
+    let mut controls = column![
+        scramble_ui::dir::row(vec![time, size])
+            .spacing(16)
+            .align_y(Center),
+        record_button(recording, ready),
+        scramble_ui::dir::row(vec![camera_menu, sound_menu])
+            .spacing(8)
+            .align_y(Center),
+    ]
+    .spacing(10)
+    .align_x(Center);
+    if recorder.microphone().is_some() {
+        controls = controls.push(meters(&recorder.levels));
+    }
+    controls = controls.push(video_menus(context.video, context.rate, busy));
+    column![
+        picture,
+        container(controls)
+            .width(Fill)
+            .padding([12, 16])
+            .center_x(Fill)
+    ]
     .into()
 }
 

@@ -18,9 +18,9 @@ mod record {
     use std::sync::mpsc;
     use std::time::{Duration, Instant};
 
+    use plaa_media::capture::{Capture, VideoEncoding};
     use plaa_media::export::Format;
     use plaa_media::record::{Microphone, RecordEvent, input_devices};
-    use plaa_media::screen::{ScreenCapture, ScreenEncoding};
 
     pub fn main() {
         let mut arguments = std::env::args().skip(1).peekable();
@@ -84,7 +84,7 @@ mod record {
         let (sender, receiver) = mpsc::channel();
         if let Err(error) = capture.record(
             microphone.as_ref(),
-            ScreenEncoding {
+            VideoEncoding {
                 format,
                 hardware,
                 rate,
@@ -130,16 +130,16 @@ mod record {
     /// PipeWire node `node`, through the sound server's own connection,
     /// which reaches every node; the portal hands over one of its own.
     #[cfg(target_os = "linux")]
-    fn open(node: u32) -> Result<ScreenCapture, String> {
+    fn open(node: u32) -> Result<Capture, String> {
         let runtime = std::env::var_os("XDG_RUNTIME_DIR").unwrap_or_default();
         let socket = UnixStream::connect(PathBuf::from(runtime).join("pipewire-0"))
             .map_err(|error| format!("could not reach PipeWire: {error}"))?;
-        ScreenCapture::open(socket.into(), node)
+        Capture::open(socket.into(), node)
     }
 
     /// Screen number `screen`.
     #[cfg(any(windows, target_os = "macos"))]
-    fn open(screen: u32) -> Result<ScreenCapture, String> {
-        ScreenCapture::open(plaa_media::screen::Target::Screen(screen))
+    fn open(screen: u32) -> Result<Capture, String> {
+        Capture::open(plaa_media::capture::Target::Screen(screen))
     }
 }

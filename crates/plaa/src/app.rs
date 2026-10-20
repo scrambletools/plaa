@@ -98,6 +98,8 @@ pub struct Plaa {
     /// The screens and windows plaa offers to record, where it lists them,
     /// as when last looked at.
     offers: Vec<crate::recorder::Offered>,
+    /// The cameras, as when last looked at.
+    cameras: Vec<plaa_media::capture::Camera>,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -321,6 +323,7 @@ impl Plaa {
             input_devices: Vec::new(),
             hidden: None,
             offers: Vec::new(),
+            cameras: Vec::new(),
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -1553,6 +1556,7 @@ impl Plaa {
             Action::PictureInPicture => return self.toggle_pip(id),
             Action::RecordSound => return self.open_recorder(id),
             Action::RecordScreen => return self.open_screen_recorder(id),
+            Action::RecordCamera => return self.open_camera_recorder(id),
             Action::Previous => return self.previous(id),
             Action::Next => return self.next(id),
             Action::FullScreen => {
@@ -1940,6 +1944,14 @@ impl Plaa {
     pub fn title(&self, id: window::Id) -> String {
         let base = match self.windows.get(&id).map(|window| &window.content) {
             Some(Content::Player(player)) => player.window_title(),
+            Some(Content::Recorder(recorder))
+                if recorder
+                    .screen
+                    .as_ref()
+                    .is_some_and(|screen| screen.camera.is_some()) =>
+            {
+                crate::fl!("record-camera-title")
+            }
             Some(Content::Recorder(recorder)) if recorder.screen.is_some() => {
                 crate::fl!("record-screen-title")
             }
@@ -2469,25 +2481,37 @@ fn recent_addresses<'a>(
 }
 
 fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
-    let hints = [
-        Action::Open,
-        Action::OpenAddress,
-        Action::RecordSound,
-        Action::RecordScreen,
-        Action::Settings,
-    ]
-    .into_iter()
-    .filter_map(|action| Some((action, shortcuts::label(action)?)))
-    .map(|(action, label)| {
-        row![
-            scramble_ui::styled(action_name(action), Type::BodyMedium)
-                .style(style::on_surface_variant),
-            scramble_ui::styled(label, Type::LabelLarge),
-        ]
-        .spacing(8)
-        .into()
-    });
-    let starts = vec![
+    // Each action's name and shortcut, in a row.
+    let hints = |actions: &[Action]| -> Element<'static, Message> {
+        let shown: Vec<Element<'static, Message>> = actions
+            .iter()
+            .filter_map(|&action| Some((action, shortcuts::label(action)?)))
+            .map(|(action, label)| {
+                row![
+                    scramble_ui::styled(action_name(action), Type::BodyMedium)
+                        .style(style::on_surface_variant),
+                    scramble_ui::styled(label, Type::LabelLarge),
+                ]
+                .spacing(8)
+                .into()
+            })
+            .collect();
+        scramble_ui::dir::row(shown).spacing(24).into()
+    };
+    let buttons = |starts: Vec<(button::Kind, Icon, String, Action)>| -> Element<'static, Message> {
+        let shown: Vec<Element<'static, Message>> = starts
+            .into_iter()
+            .map(|(kind, glyph, label, action)| {
+                scramble_ui::with_icon(kind, glyph, label)
+                    .size(button::Size::Medium)
+                    .on_press(Message::Perform(id, action))
+                    .into()
+            })
+            .collect();
+        scramble_ui::dir::row(shown).spacing(12).into()
+    };
+    // Opening, then recording, each a row, so they fit a small window.
+    let opening = buttons(vec![
         (
             button::Kind::Filled,
             Icon::FolderOpen,
@@ -2500,6 +2524,8 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
             crate::fl!("start-open-address"),
             Action::OpenAddress,
         ),
+    ]);
+    let recording = buttons(vec![
         (
             button::Kind::Tonal,
             Icon::Mic,
@@ -2512,24 +2538,30 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
             crate::fl!("start-record-screen"),
             Action::RecordScreen,
         ),
-    ];
-    let starts: Vec<Element<'static, Message>> = starts
-        .into_iter()
-        .map(|(kind, glyph, label, action)| {
-            scramble_ui::with_icon(kind, glyph, label)
-                .size(button::Size::Medium)
-                .on_press(Message::Perform(id, action))
-                .into()
-        })
-        .collect();
+        (
+            button::Kind::Tonal,
+            Icon::Videocam,
+            crate::fl!("start-record-camera"),
+            Action::RecordCamera,
+        ),
+    ]);
     let content = container(
         column![
             icon::filled(Icon::Movie, 64).style(style::primary_text),
             scramble_ui::styled(crate::fl!("app-name"), Type::DisplaySmall),
             scramble_ui::styled(crate::fl!("start-hint"), Type::BodyLarge)
                 .style(style::on_surface_variant),
-            scramble_ui::dir::row(starts).spacing(12),
-            scramble_ui::dir::row(hints).spacing(24),
+            column![opening, recording].spacing(12).align_x(Center),
+            column![
+                hints(&[Action::Open, Action::OpenAddress, Action::Settings]),
+                hints(&[
+                    Action::RecordSound,
+                    Action::RecordScreen,
+                    Action::RecordCamera
+                ]),
+            ]
+            .spacing(8)
+            .align_x(Center),
         ]
         .spacing(16)
         .align_x(Center),
@@ -2576,6 +2608,7 @@ fn action_name(action: Action) -> String {
         Action::OpenAddress => crate::fl!("action-open-address"),
         Action::RecordSound => crate::fl!("action-record-sound"),
         Action::RecordScreen => crate::fl!("action-record-screen"),
+        Action::RecordCamera => crate::fl!("action-record-camera"),
         Action::Settings => crate::fl!("action-settings"),
         _ => String::new(),
     }

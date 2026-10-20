@@ -4,9 +4,9 @@
 use std::time::Duration;
 
 use iced::{Element, Size, Task, window};
+use plaa_media::capture::{Capture, VideoEncoding};
 use plaa_media::export::{Format, Sound};
 use plaa_media::record::{Microphone, RecordEvent};
-use plaa_media::screen::ScreenEncoding;
 use plaa_media::{Quality, Source};
 
 use super::{Content, Message, Opening, Plaa};
@@ -19,6 +19,9 @@ use crate::shortcuts::Action;
 const RECORDER_SIZE: Size = Size::new(440.0, 380.0);
 /// The screen recording window's size, with room for what is shared.
 const SCREEN_RECORDER_SIZE: Size = Size::new(440.0, 440.0);
+/// The camera recording window's size: the picture, and the controls
+/// below it.
+const CAMERA_RECORDER_SIZE: Size = Size::new(720.0, 680.0);
 /// How long a window takes to close out of the way of a screen recording
 /// before it begins.
 const HIDING: Duration = Duration::from_millis(800);
@@ -41,8 +44,8 @@ fn offered_list() -> Result<Vec<recorder::Offered>, String> {
     return Ok(crate::screens_windows::offered());
     #[cfg(target_os = "macos")]
     {
-        use plaa_media::screen::Target;
-        let shareable = plaa_media::screen::shareable()?;
+        use plaa_media::capture::Target;
+        let shareable = plaa_media::capture::shareable()?;
         let screens = shareable
             .iter()
             .filter(|shareable| matches!(shareable.target, Target::Screen(_)))
@@ -75,16 +78,30 @@ fn offered_list() -> Result<Vec<recorder::Offered>, String> {
 /// What recording `offered` takes: its capture, or why it would not open.
 #[cfg(any(windows, target_os = "macos"))]
 fn offered_screen(offered: recorder::Offered) -> recorder::Screen {
-    use plaa_media::screen::{ScreenCapture, Target};
+    use plaa_media::capture::Target;
     let target = if offered.window {
         Target::Window(offered.id)
     } else {
         Target::Screen(offered.id as u32)
     };
     recorder::Screen {
-        capture: ScreenCapture::open(target),
+        capture: Capture::open(target),
         window: offered.window,
         offered: Some(offered),
+        camera: None,
+    }
+}
+
+/// What recording `camera` takes: its pictures, or why they would not
+/// come.
+fn camera_screen(camera: plaa_media::capture::Camera) -> recorder::Screen {
+    recorder::Screen {
+        capture: Capture::camera(&camera),
+        window: false,
+        offered: None,
+        camera: Some(camera),
+        #[cfg(target_os = "linux")]
+        _sharing: None,
     }
 }
 
@@ -101,10 +118,20 @@ fn tray_shows() -> bool {
 fn record_screen(
     recorder: &mut Recorder,
     id: window::Id,
-    encoding: ScreenEncoding,
+    encoding: VideoEncoding,
     folder: &std::path::Path,
     after: Duration,
 ) -> Result<(), String> {
+    let camera = recorder
+        .screen
+        .as_ref()
+        .is_some_and(|screen| screen.camera.is_some());
+    let name = if camera {
+        crate::fl!("record-camera-file-name")
+    } else {
+        crate::fl!("record-screen-file-name")
+    };
+    let name = format!("{name}.mp4");
     let microphone = recorder
         .microphone
         .as_ref()
@@ -117,7 +144,6 @@ fn record_screen(
         return Ok(());
     };
     std::fs::create_dir_all(folder).map_err(|error| error.to_string())?;
-    let name = format!("{}.mp4", crate::fl!("record-screen-file-name"));
     let destination = crate::screenshot::unused(&folder.join(name));
     capture.record(microphone, encoding, destination, after, move |event| {
         crate::post(External::Recorded(id, event))
@@ -214,14 +240,15 @@ impl Plaa {
             return Task::none();
         };
         let capture = match sharing.stream() {
-            Some((fd, node)) => plaa_media::screen::ScreenCapture::open(fd, node),
+            Some((fd, node)) => plaa_media::capture::Capture::open(fd, node),
             None => Err(String::new()),
         };
         let screen = recorder::Screen {
             capture,
             window: sharing.window,
             offered: None,
-            _sharing: sharing,
+            camera: None,
+            _sharing: Some(sharing),
         };
         let sound = self
             .settings
@@ -229,6 +256,29 @@ impl Plaa {
             .then_some(self.settings.microphone.as_deref());
         let recorder = Recorder::screen(screen, sound);
         self.show_recorder(id, recorder, SCREEN_RECORDER_SIZE).1
+    }
+
+    /// Opens a camera recording window: the camera Settings chose, or the
+    /// first there is, showing its picture.
+    pub(super) fn open_camera_recorder(&mut self, id: window::Id) -> Task<Message> {
+        self.cameras = plaa_media::capture::cameras();
+        let chosen = self
+            .settings
+            .camera
+            .as_ref()
+            .and_then(|wanted| self.cameras.iter().find(|camera| camera.id == *wanted))
+            .or(self.cameras.first())
+            .cloned();
+        let Some(camera) = chosen else {
+            self.notify(id, crate::fl!("notice-no-camera"));
+            return Task::none();
+        };
+        let sound = self
+            .settings
+            .camera_sound
+            .then_some(self.settings.microphone.as_deref());
+        let recorder = Recorder::screen(camera_screen(camera), sound);
+        self.show_recorder(id, recorder, CAMERA_RECORDER_SIZE).1
     }
 
     /// The format and quality recordings are made in, as Settings say,
@@ -267,6 +317,7 @@ impl Plaa {
                 video: self.recording_video(),
                 rate: self.settings.screen_rate,
                 offers: &self.offers,
+                cameras: &self.cameras,
                 close_button,
             },
         )
@@ -282,10 +333,18 @@ impl Plaa {
             RecorderControl::Settings => return self.perform(id, Action::Settings),
             RecorderControl::Close => return window::close(id),
             RecorderControl::Reshare => return self.open_screen_recorder(id),
-            // Windows come and go: the menu lists them as they are.
-            #[cfg(any(windows, target_os = "macos"))]
+            // Windows and cameras come and go: the menu lists them as
+            // they are.
             RecorderControl::Choosing(true) => {
-                if let Ok(offers) = offered_list() {
+                let camera = self.windows.get(&id).is_some_and(|window| {
+                    matches!(&window.content, Content::Recorder(recorder)
+                        if recorder.screen.as_ref().is_some_and(|screen| screen.camera.is_some()))
+                });
+                if camera {
+                    self.cameras = plaa_media::capture::cameras();
+                }
+                #[cfg(any(windows, target_os = "macos"))]
+                if !camera && let Ok(offers) = offered_list() {
                     self.offers = offers;
                 }
             }
@@ -293,7 +352,7 @@ impl Plaa {
         }
         let sound = self.recording_sound();
         let video = self.recording_video();
-        let encoding = ScreenEncoding {
+        let encoding = VideoEncoding {
             format: video,
             hardware: self.settings.hardware_decoding,
             rate: Some(self.settings.screen_rate).filter(|rate| *rate > 0),
@@ -325,7 +384,7 @@ impl Plaa {
                 let whole_screen = recorder
                     .screen
                     .as_ref()
-                    .is_some_and(|screen| !screen.window);
+                    .is_some_and(|screen| !screen.window && screen.camera.is_none());
                 // macOS leaves plaa's own windows out of a screen's
                 // recording, so nothing needs to hide there.
                 let hides = whole_screen && can_hide && cfg!(not(target_os = "macos"));
@@ -371,6 +430,18 @@ impl Plaa {
             }
             RecorderControl::Cancel => recorder.warning = None,
             RecorderControl::Choosing(open) => recorder.choosing = open,
+            RecorderControl::Camera(camera) => {
+                recorder.choosing = false;
+                if recorder.is_recording() || recorder.saving {
+                    return Task::none();
+                }
+                // The old camera closes before the new one opens.
+                recorder.screen = None;
+                recorder.preview = None;
+                self.settings.camera = Some(camera.id.clone());
+                recorder.screen = Some(camera_screen(camera));
+                self.save_settings();
+            }
             RecorderControl::Choose(offered) => {
                 recorder.choosing = false;
                 if recorder.is_recording() || recorder.saving {
@@ -391,8 +462,10 @@ impl Plaa {
                 recorder.microphone = None;
                 recorder.microphone = Some(Microphone::open(device.as_deref()));
                 recorder.levels.clear();
-                if recorder.screen.is_some() {
-                    self.settings.screen_sound = true;
+                match &recorder.screen {
+                    Some(screen) if screen.camera.is_some() => self.settings.camera_sound = true,
+                    Some(_) => self.settings.screen_sound = true,
+                    None => {}
                 }
                 self.settings.microphone = device;
                 self.save_settings();
@@ -401,9 +474,17 @@ impl Plaa {
                 if recorder.is_recording() || recorder.saving {
                     return Task::none();
                 }
+                let camera = recorder
+                    .screen
+                    .as_ref()
+                    .is_some_and(|screen| screen.camera.is_some());
                 recorder.microphone = None;
                 recorder.levels.clear();
-                self.settings.screen_sound = false;
+                if camera {
+                    self.settings.camera_sound = false;
+                } else {
+                    self.settings.screen_sound = false;
+                }
                 self.save_settings();
             }
             RecorderControl::Format(chosen) => {

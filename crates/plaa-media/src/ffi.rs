@@ -1,6 +1,7 @@
 //! The few FFmpeg calls the safe wrapper lacks: hardware decoding and
 //! encoding, moving a decoded picture out of graphics memory, a stream's
-//! rotation, colors and index of keyframes, and cutting sound frames.
+//! rotation, colors and index of keyframes, cutting sound frames, and the
+//! cameras a device input lists.
 #![allow(unsafe_code)]
 
 use ffmpeg::ffi;
@@ -847,6 +848,63 @@ pub fn version() -> String {
         std::ffi::CStr::from_ptr(info)
             .to_string_lossy()
             .into_owned()
+    }
+}
+
+/// The video devices input `format` lists: the name it opens each by, and
+/// the one people know it by. None where it lists none, as some cannot.
+#[cfg(not(target_os = "macos"))]
+pub fn video_sources(format: &ffmpeg::format::Input) -> Vec<(String, String)> {
+    let text = |pointer: *const std::ffi::c_char| {
+        // SAFETY: a C string FFmpeg set, or null.
+        (!pointer.is_null()).then(|| {
+            unsafe { std::ffi::CStr::from_ptr(pointer) }
+                .to_string_lossy()
+                .into_owned()
+        })
+    };
+    // SAFETY: a device input format; the list FFmpeg fills holds
+    // `nb_devices` devices, each with `nb_media_types` types, and is freed
+    // once read.
+    unsafe {
+        let mut list: *mut ffi::AVDeviceInfoList = std::ptr::null_mut();
+        let found = ffi::avdevice_list_input_sources(
+            format.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null_mut(),
+            &mut list,
+        );
+        if found < 0 || list.is_null() {
+            return Vec::new();
+        }
+        let mut sources = Vec::new();
+        if !(*list).devices.is_null() {
+            for &device in
+                std::slice::from_raw_parts((*list).devices, (*list).nb_devices.max(0) as usize)
+            {
+                if device.is_null() {
+                    continue;
+                }
+                // Those that say what they give: video.
+                let types = if (*device).media_types.is_null() {
+                    &[][..]
+                } else {
+                    std::slice::from_raw_parts(
+                        (*device).media_types,
+                        (*device).nb_media_types.max(0) as usize,
+                    )
+                };
+                if !types.is_empty() && !types.contains(&ffi::AVMediaType::AVMEDIA_TYPE_VIDEO) {
+                    continue;
+                }
+                if let Some(name) = text((*device).device_name) {
+                    let description = text((*device).device_description).unwrap_or_default();
+                    sources.push((name, description));
+                }
+            }
+        }
+        ffi::avdevice_free_list_devices(&mut list);
+        sources
     }
 }
 

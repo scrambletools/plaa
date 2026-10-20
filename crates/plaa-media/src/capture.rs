@@ -1,6 +1,7 @@
-//! Recording the screen: pictures a capture hands over, as the ScreenCast
-//! portal shares them through PipeWire on Linux, Windows.Graphics.Capture
-//! takes them on Windows and ScreenCaptureKit on macOS, encoded as exports
+//! Recording the screen or a camera: pictures a capture hands over, as
+//! the ScreenCast portal shares a screen's through PipeWire on Linux,
+//! Windows.Graphics.Capture takes them on Windows and ScreenCaptureKit on
+//! macOS, and FFmpeg's device inputs read a camera's, encoded as exports
 //! encode pictures, with the sound of a recording input when one is given,
 //! into an MP4.
 
@@ -119,7 +120,7 @@ impl Pace {
 /// `hardware` allows, at most `rate` pictures a second, or as many as the
 /// screen sends when none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScreenEncoding {
+pub struct VideoEncoding {
     pub format: Format,
     pub hardware: bool,
     pub rate: Option<u32>,
@@ -230,7 +231,7 @@ struct Recording {
 
 /// The screen, or part of it, as a capture shares it, ready to record.
 /// Dropping it finishes any recording, then ends the capture.
-pub struct ScreenCapture {
+pub struct Capture {
     frames: Arc<Frames>,
     shared: Arc<CaptureShared>,
     progress: Arc<Progress>,
@@ -241,7 +242,99 @@ pub struct ScreenCapture {
     capture: Option<graphics_capture::Capture>,
     #[cfg(target_os = "macos")]
     capture: Option<screen_capture_kit::Capture>,
+    camera: Option<camera_capture::Capture>,
 }
+
+/// A camera there is to record: the FFmpeg device input that reads it
+/// (`v4l2`, `dshow` or `avfoundation`, or `lavfi` for a test picture),
+/// the name that input opens it by, and the one people know it by.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Camera {
+    pub input: String,
+    pub id: String,
+    pub name: String,
+}
+
+/// The cameras the system lists, and with `PLAA_TEST_CAMERA` set, FFmpeg's
+/// test picture as one, first, to try recording a camera without one.
+pub fn cameras() -> Vec<Camera> {
+    crate::init();
+    let mut cameras = listed_cameras();
+    if std::env::var_os("PLAA_TEST_CAMERA").is_some() {
+        cameras.insert(
+            0,
+            Camera {
+                input: "lavfi".to_owned(),
+                id: "testsrc2=s=1280x720:r=30,realtime".to_owned(),
+                name: "Test picture".to_owned(),
+            },
+        );
+    }
+    cameras
+}
+
+fn listed_cameras() -> Vec<Camera> {
+    #[cfg(target_os = "macos")]
+    return camera_macos::cameras();
+    #[cfg(not(target_os = "macos"))]
+    {
+        let input = if cfg!(windows) { "dshow" } else { "v4l2" };
+        let Some(format) = camera_capture::device_input(input) else {
+            return Vec::new();
+        };
+        let mut sources = crate::ffi::video_sources(&format);
+        // A camera may have several nodes, as one for its pictures and one
+        // for what it says of them: the first is the one to open.
+        sources.sort();
+        let mut cameras: Vec<Camera> = Vec::new();
+        for (id, description) in sources {
+            let name = camera_name(&description).unwrap_or_else(|| id.clone());
+            if cameras.iter().any(|camera| camera.name == name) {
+                continue;
+            }
+            cameras.push(Camera {
+                input: input.to_owned(),
+                // DirectShow opens a camera as `video=` its name.
+                id: if cfg!(windows) {
+                    format!("video={id}")
+                } else {
+                    id
+                },
+                name,
+            });
+        }
+        cameras
+    }
+}
+
+/// The name of a camera as its driver describes it, without the second
+/// copy cut short that Linux's adds, as in `Anker PowerConf C200: Anker
+/// Pow`.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+fn camera_name(description: &str) -> Option<String> {
+    let description = description.trim();
+    if description.is_empty() {
+        return None;
+    }
+    Some(match description.split_once(": ") {
+        Some((name, again)) if name.starts_with(again.trim()) => name.to_owned(),
+        _ => description.to_owned(),
+    })
+}
+
+/// A camera's latest picture, made small for a window to show, as RGBA:
+/// `count` tells one from the one before.
+#[derive(Debug)]
+pub struct Preview {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+    pub count: u64,
+}
+
+#[cfg(target_os = "macos")]
+#[path = "camera_macos.rs"]
+mod camera_macos;
 
 /// A screen to record on Windows or macOS, by its number in the order the
 /// system lists screens in from 0, or a window, by the system's id of it.
@@ -281,9 +374,49 @@ struct CaptureShared {
     size: Mutex<Option<(u32, u32)>>,
     /// Why it ended, if it did: the person stopped sharing, or it failed.
     ended: Mutex<Option<String>>,
+    /// The pictures are a camera's, whose colors are video's.
+    camera: bool,
+    /// A camera's latest picture, made small.
+    preview: Mutex<Option<Arc<Preview>>>,
 }
 
-impl ScreenCapture {
+impl Capture {
+    /// Takes the pictures of `camera`.
+    pub fn camera(camera: &Camera) -> Result<Self, String> {
+        crate::init();
+        let frames = Arc::new(Frames::new());
+        let shared = Arc::new(CaptureShared {
+            camera: true,
+            ..CaptureShared::default()
+        });
+        let capture = camera_capture::Capture::open(camera, frames.clone(), shared.clone())?;
+        let mut taking = Self::taking(frames, shared);
+        taking.camera = Some(capture);
+        Ok(taking)
+    }
+
+    /// A capture taking pictures into `frames`, of no source yet.
+    fn taking(frames: Arc<Frames>, shared: Arc<CaptureShared>) -> Self {
+        Self {
+            frames,
+            shared,
+            progress: Arc::new(Progress::default()),
+            recording: None,
+            #[cfg(any(target_os = "linux", windows, target_os = "macos"))]
+            capture: None,
+            camera: None,
+        }
+    }
+
+    /// A camera's latest picture, made small, once one has come.
+    pub fn preview(&self) -> Option<Arc<Preview>> {
+        self.shared
+            .preview
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
     /// Takes the pictures of stream `node` of the PipeWire remote `fd`,
     /// as the ScreenCast portal gives them.
     #[cfg(target_os = "linux")]
@@ -292,13 +425,9 @@ impl ScreenCapture {
         let frames = Arc::new(Frames::new());
         let shared = Arc::new(CaptureShared::default());
         let capture = pipewire_capture::Capture::open(fd, node, frames.clone(), shared.clone())?;
-        Ok(Self {
-            frames,
-            shared,
-            progress: Arc::new(Progress::default()),
-            recording: None,
-            capture: Some(capture),
-        })
+        let mut taking = Self::taking(frames, shared);
+        taking.capture = Some(capture);
+        Ok(taking)
     }
 
     /// Takes the pictures of `target` through Windows.Graphics.Capture,
@@ -313,13 +442,9 @@ impl ScreenCapture {
         let capture = graphics_capture::Capture::open(target, frames.clone(), shared.clone())?;
         #[cfg(target_os = "macos")]
         let capture = screen_capture_kit::Capture::open(target, frames.clone(), shared.clone())?;
-        Ok(Self {
-            frames,
-            shared,
-            progress: Arc::new(Progress::default()),
-            recording: None,
-            capture: Some(capture),
-        })
+        let mut taking = Self::taking(frames, shared);
+        taking.capture = Some(capture);
+        Ok(taking)
     }
 
     /// The size of the pictures, once the stream says.
@@ -348,7 +473,7 @@ impl ScreenCapture {
     pub fn record(
         &mut self,
         microphone: Option<&crate::record::Microphone>,
-        encoding: ScreenEncoding,
+        encoding: VideoEncoding,
         destination: PathBuf,
         after: Duration,
         events: impl Fn(RecordEvent) + Send + 'static,
@@ -441,12 +566,13 @@ impl ScreenCapture {
     }
 }
 
-impl Drop for ScreenCapture {
+impl Drop for Capture {
     fn drop(&mut self) {
         self.stop();
         self.ended();
         #[cfg(any(target_os = "linux", windows, target_os = "macos"))]
         drop(self.capture.take());
+        drop(self.camera.take());
     }
 }
 
@@ -619,11 +745,11 @@ impl SoundSide {
 /// on a graphics card, and from `begin` if that is later.
 fn write(
     (frames, shared, sound): (&Frames, &CaptureShared, Option<&SoundTap>),
-    encoding: ScreenEncoding,
+    encoding: VideoEncoding,
     temporary: &std::path::Path,
     (begin, finish, progress): (Instant, &AtomicBool, &Progress),
 ) -> Result<(), ExportError> {
-    let ScreenEncoding {
+    let VideoEncoding {
         format,
         hardware,
         rate,
@@ -659,7 +785,12 @@ fn write(
         .into_iter()
         .filter(|candidate| hardware || !candidate.hardware)
         .find_map(|candidate| {
-            export::open_video(candidate, format, &picture, Colors::Screen, global_header)
+            let colors = if shared.camera {
+                Colors::Camera
+            } else {
+                Colors::Screen
+            };
+            export::open_video(candidate, format, &picture, colors, global_header)
                 .map(|opened| (candidate, opened))
         })
         .ok_or_else(|| export::failed("no encoder for this format opens"))?;
@@ -789,6 +920,249 @@ fn write(
     output.context.write_trailer().map_err(export::failed)?;
     progress.written.store(output.written, Ordering::Relaxed);
     Ok(())
+}
+
+/// A camera's pictures, as FFmpeg's device input reads and decodes them.
+mod camera_capture {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, PoisonError, mpsc};
+    use std::thread::JoinHandle;
+    use std::time::{Duration, Instant};
+
+    use ffmpeg::format::Pixel;
+    use ffmpeg::software::scaling;
+    use ffmpeg_next as ffmpeg;
+
+    use super::{Camera, CaptureShared, Frames, Preview};
+
+    /// How wide and tall a preview is at most.
+    const PREVIEW: (u32, u32) = (960, 540);
+
+    /// The device input format named `name`, as `v4l2`, if FFmpeg has it:
+    /// some have several names, as `video4linux2,v4l2`.
+    pub fn device_input(name: &str) -> Option<ffmpeg::format::Input> {
+        ffmpeg::device::input::video().find_map(|format| match format {
+            ffmpeg::Format::Input(input) if input.name().split(',').any(|named| named == name) => {
+                Some(input)
+            }
+            _ => None,
+        })
+    }
+
+    /// The options to open a camera with, the most wanted first: a
+    /// camera's best is often MJPEG, as raw pictures of a large size come
+    /// slowly over USB, and macOS's needs a rate it offers.
+    fn attempts(input: &str) -> Vec<Vec<(&'static str, &'static str)>> {
+        match input {
+            "v4l2" => vec![
+                vec![
+                    ("input_format", "mjpeg"),
+                    ("video_size", "1920x1080"),
+                    ("framerate", "30"),
+                ],
+                vec![("video_size", "1280x720"), ("framerate", "30")],
+                vec![],
+            ],
+            "avfoundation" => vec![
+                vec![("video_size", "1920x1080"), ("framerate", "30")],
+                vec![("video_size", "1280x720"), ("framerate", "30")],
+                vec![("framerate", "30")],
+            ],
+            _ => vec![vec![]],
+        }
+    }
+
+    /// The camera's thread, and the flag that ends it.
+    pub struct Capture {
+        quit: Arc<AtomicBool>,
+        thread: Option<JoinHandle<()>>,
+    }
+
+    impl Capture {
+        pub fn open(
+            camera: &Camera,
+            frames: Arc<Frames>,
+            shared: Arc<CaptureShared>,
+        ) -> Result<Self, String> {
+            let quit = Arc::new(AtomicBool::new(false));
+            let (ready, readied) = mpsc::channel();
+            let thread = {
+                let (camera, quit) = (camera.clone(), quit.clone());
+                std::thread::Builder::new()
+                    .name("plaa-camera".into())
+                    .spawn(move || match open(&camera) {
+                        Ok(opened) => {
+                            let _ = ready.send(Ok(()));
+                            run(opened, &frames, &shared, &quit);
+                        }
+                        Err(error) => {
+                            let _ = ready.send(Err(error));
+                        }
+                    })
+                    .map_err(|error| error.to_string())?
+            };
+            readied
+                .recv_timeout(Duration::from_secs(10))
+                .map_err(|_| "the camera did not open".to_owned())??;
+            Ok(Self {
+                quit,
+                thread: Some(thread),
+            })
+        }
+    }
+
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            self.quit.store(true, Ordering::Relaxed);
+            // A camera that stopped sending would keep its thread
+            // waiting: it is left to end on its own after a second.
+            let waited = Instant::now();
+            while self
+                .thread
+                .as_ref()
+                .is_some_and(|thread| !thread.is_finished())
+                && waited.elapsed() < Duration::from_secs(1)
+            {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            if let Some(thread) = self.thread.take()
+                && thread.is_finished()
+            {
+                let _ = thread.join();
+            }
+        }
+    }
+
+    /// A camera opened: its input, the stream of pictures, and their
+    /// decoder.
+    type Opened = (
+        ffmpeg::format::context::Input,
+        usize,
+        ffmpeg::decoder::Video,
+    );
+
+    fn open(camera: &Camera) -> Result<Opened, String> {
+        let format = device_input(&camera.input)
+            .map(ffmpeg::Format::Input)
+            .ok_or_else(|| format!("this FFmpeg has no {} input", camera.input))?;
+        let mut last = String::new();
+        for options in attempts(&camera.input) {
+            let mut dictionary = ffmpeg::Dictionary::new();
+            for (key, value) in options {
+                dictionary.set(key, value);
+            }
+            let input = match ffmpeg::format::open_with(&camera.id, &format, dictionary) {
+                Ok(ffmpeg::format::context::Context::Input(input)) => input,
+                Ok(_) => continue,
+                Err(error) => {
+                    last = error.to_string();
+                    continue;
+                }
+            };
+            let Some(stream) = input.streams().best(ffmpeg::media::Type::Video) else {
+                last = "the camera sends no pictures".to_owned();
+                continue;
+            };
+            let index = stream.index();
+            let decoder = ffmpeg::codec::Context::from_parameters(stream.parameters())
+                .and_then(|context| context.decoder().video())
+                .map_err(|error| error.to_string())?;
+            return Ok((input, index, decoder));
+        }
+        Err(last)
+    }
+
+    fn run(
+        (mut input, index, mut decoder): Opened,
+        frames: &Frames,
+        shared: &CaptureShared,
+        quit: &AtomicBool,
+    ) {
+        let mut decoded = ffmpeg::frame::Video::empty();
+        let mut previewer: Option<((u32, u32, Pixel), scaling::Context)> = None;
+        let mut count = 0;
+        for (stream, packet) in input.packets() {
+            if quit.load(Ordering::Relaxed) {
+                return;
+            }
+            if stream.index() != index || decoder.send_packet(&packet).is_err() {
+                continue;
+            }
+            while decoder.receive_frame(&mut decoded).is_ok() {
+                let at = Instant::now();
+                let shape = (decoded.width(), decoded.height(), decoded.format());
+                *shared.size.lock().unwrap_or_else(PoisonError::into_inner) =
+                    Some((shape.0, shape.1));
+                count += 1;
+                if let Some(preview) = preview(&decoded, shape, &mut previewer, count) {
+                    *shared
+                        .preview
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner) = Some(Arc::new(preview));
+                }
+                if frames.wanted(at) {
+                    frames.push(at, decoded.clone());
+                }
+            }
+        }
+        if !quit.load(Ordering::Relaxed) {
+            *shared.ended.lock().unwrap_or_else(PoisonError::into_inner) =
+                Some("the camera stopped".to_owned());
+        }
+    }
+
+    /// `frame` made small, as RGBA, through a scaler kept for its shape.
+    fn preview(
+        frame: &ffmpeg::frame::Video,
+        (width, height, format): (u32, u32, Pixel),
+        previewer: &mut Option<((u32, u32, Pixel), scaling::Context)>,
+        count: u64,
+    ) -> Option<Preview> {
+        if width == 0 || height == 0 {
+            return None;
+        }
+        let fit = f64::min(
+            f64::from(PREVIEW.0) / f64::from(width),
+            f64::from(PREVIEW.1) / f64::from(height),
+        )
+        .min(1.0);
+        let shown = (
+            ((f64::from(width) * fit) as u32).max(2) / 2 * 2,
+            ((f64::from(height) * fit) as u32).max(2) / 2 * 2,
+        );
+        if previewer
+            .as_ref()
+            .is_none_or(|(built, _)| *built != (width, height, format))
+        {
+            let scaler = scaling::Context::get(
+                format,
+                width,
+                height,
+                Pixel::RGBA,
+                shown.0,
+                shown.1,
+                scaling::Flags::BILINEAR,
+            )
+            .ok()?;
+            *previewer = Some(((width, height, format), scaler));
+        }
+        let (_, scaler) = previewer.as_mut()?;
+        let mut rgba = ffmpeg::frame::Video::empty();
+        scaler.run(frame, &mut rgba).ok()?;
+        let row = shown.0 as usize * 4;
+        let stride = rgba.stride(0);
+        let data = rgba.data(0);
+        let mut packed = Vec::with_capacity(row * shown.1 as usize);
+        for line in 0..shown.1 as usize {
+            packed.extend_from_slice(&data[line * stride..line * stride + row]);
+        }
+        Some(Preview {
+            width: shown.0,
+            height: shown.1,
+            rgba: packed,
+            count,
+        })
+    }
 }
 
 /// Windows.Graphics.Capture's pictures, through FFmpeg's gfxcapture.
@@ -1278,7 +1652,7 @@ mod tests {
             let writer = scope.spawn(|| {
                 write(
                     (&frames, &shared, None),
-                    ScreenEncoding {
+                    VideoEncoding {
                         format: Format::H264,
                         hardware: true,
                         rate: None,
@@ -1364,6 +1738,82 @@ mod tests {
         }
         let (width, height) = (frame.width() as usize, frame.height() as usize);
         frame.data(0)[height / 2 * frame.stride(0) + width / 2]
+    }
+
+    #[test]
+    fn cameras_are_named_once() {
+        assert_eq!(
+            camera_name("Anker PowerConf C200: Anker Pow").as_deref(),
+            Some("Anker PowerConf C200")
+        );
+        assert_eq!(
+            camera_name("Integrated Camera: Integrated C").as_deref(),
+            Some("Integrated Camera")
+        );
+        assert_eq!(
+            camera_name("Logitech: C920").as_deref(),
+            Some("Logitech: C920")
+        );
+        assert_eq!(camera_name(" "), None);
+    }
+
+    #[test]
+    fn a_camera_is_shown_and_recorded() {
+        crate::init();
+        if export::encoder(Format::H264, (320, 240), false, true).is_none() {
+            eprintln!("no H.264 encoder here");
+            return;
+        }
+        // FFmpeg's test picture, read in real time as a camera's come.
+        let camera = Camera {
+            input: "lavfi".to_owned(),
+            id: "testsrc2=s=320x240:r=30,realtime".to_owned(),
+            name: "test".to_owned(),
+        };
+        let mut capture = Capture::camera(&camera).unwrap();
+        let waited = Instant::now();
+        while capture.preview().is_none() && waited.elapsed() < Duration::from_secs(5) {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let preview = capture.preview().expect("a preview");
+        assert_eq!((preview.width, preview.height), (320, 240));
+        assert_eq!(preview.rgba.len(), 320 * 240 * 4);
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("camera.mp4");
+        let (sender, receiver) = std::sync::mpsc::channel();
+        capture
+            .record(
+                None,
+                VideoEncoding {
+                    format: Format::H264,
+                    hardware: true,
+                    rate: None,
+                },
+                path.clone(),
+                Duration::ZERO,
+                move |event| {
+                    let _ = sender.send(event);
+                },
+            )
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+        capture.stop();
+        let RecordEvent::Finished(saved) = receiver.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert_eq!(saved.unwrap(), path);
+        let input = ffmpeg::format::input(&path).unwrap();
+        let stream = input.streams().best(ffmpeg::media::Type::Video).unwrap();
+        let frames = stream.frames();
+        // About a second of 30 a second, and video's colors.
+        assert!((24..=36).contains(&frames), "{frames}");
+        let decoder = ffmpeg::codec::Context::from_parameters(stream.parameters())
+            .unwrap()
+            .decoder()
+            .video()
+            .unwrap();
+        assert_eq!(
+            decoder.color_transfer_characteristic(),
+            ffmpeg::util::color::TransferCharacteristic::BT709
+        );
     }
 
     /// The video stream's time base's units a second.

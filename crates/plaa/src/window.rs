@@ -499,6 +499,11 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
                 Control::Action(Action::RecordScreen),
             )
             .icon(Icon::ScreenRecord),
+            Entry::item(
+                crate::fl!("open-record-camera"),
+                Control::Action(Action::RecordCamera),
+            )
+            .icon(Icon::Videocam),
         ],
     )
     .size(button::Size::Small)

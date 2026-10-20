@@ -394,6 +394,8 @@ pub(crate) enum Colors<'a> {
     Stream(&'a ffmpeg::format::stream::Stream<'a>),
     /// A screen's: sRGB, made BT.709 video.
     Screen,
+    /// A camera's, made BT.709 video.
+    Camera,
     Unknown,
 }
 
@@ -443,12 +445,16 @@ pub(crate) fn open_video(
         ffi::copy_colors(stream, &mut context);
     }
     let mut encoder = context.encoder().video().ok()?;
-    if matches!(colors, Colors::Screen) {
+    if matches!(colors, Colors::Screen | Colors::Camera) {
         use ffmpeg::util::color::{Primaries, Range, Space, TransferCharacteristic};
         encoder.set_colorspace(Space::BT709);
         encoder.set_color_range(Range::MPEG);
         encoder.set_color_primaries(Primaries::BT709);
-        encoder.set_color_transfer_characteristic(TransferCharacteristic::IEC61966_2_1);
+        encoder.set_color_transfer_characteristic(if matches!(colors, Colors::Screen) {
+            TransferCharacteristic::IEC61966_2_1
+        } else {
+            TransferCharacteristic::BT709
+        });
     }
     encoder.set_width(picture.width);
     encoder.set_height(picture.height);

@@ -87,9 +87,14 @@ pub struct Settings {
     pub screen_sound: bool,
     /// What screen recordings are recorded as: `h264`, `hevc` or `av1`.
     pub screen_format: String,
-    /// The most pictures a second screen recordings keep; 0 keeps every
-    /// picture the screen sends.
+    /// The most pictures a second screen and camera recordings keep; 0
+    /// keeps every picture.
     pub screen_rate: u32,
+    /// The camera recordings come from, by the id FFmpeg opens it by; the
+    /// first there is when none, or when it is gone.
+    pub camera: Option<String>,
+    /// Whether camera recordings take the sound of the recording input.
+    pub camera_sound: bool,
     /// Where frames saved as pictures go.
     #[serde(with = "home_path")]
     pub screenshots: PathBuf,
@@ -130,6 +135,8 @@ impl Default for Settings {
             screen_sound: false,
             screen_format: "h264".to_owned(),
             screen_rate: 60,
+            camera: None,
+            camera_sound: true,
             screenshots: paths::default_screenshots(),
             keys: toml::Table::new(),
         }

@@ -11,9 +11,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 > **Status:** early development, not yet released. Files, streams and
 > web videos play, with the controls floating over the picture, and
-> files can be trimmed, split, turned and exported, and sound and the
-> screen recorded; see the [development plan](docs/PLAN.md) for what
-> comes next: recording a camera, casting, an AVB/Milan talker and
+> files can be trimmed, split, turned and exported, and sound, the
+> screen and a camera recorded; see the [development plan](docs/PLAN.md)
+> for what comes next: a visualizer, casting, an AVB/Milan talker and
 > listener, and an assistant.
 
 ## Features
@@ -109,6 +109,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   out of the way, after saying how to stop: click the red dot plaa puts
   in the tray (on Linux), or open plaa again. A recording also ends
   when the screen is no longer shared or the window recorded closes.
+- **Record a camera** (Ctrl+Alt+M), as QuickTime Player's New Movie
+  Recording: the camera's picture shows, mirrored, as it records, with
+  the sound of a microphone if chosen, in the screen recording's formats
+  and rates; the recording itself is as the camera sees.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
@@ -122,7 +126,7 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Recording a camera, a visualizer, casting, the AVB/Milan
+A visualizer, casting, the AVB/Milan
 entity, the assistant and MCP, packages and translations. The [plan](docs/PLAN.md) has the
 order.
 
@@ -166,7 +170,9 @@ their own settings (`~/.config/plaa-dev.toml`) and data under
 `plaa-dev`, show "(dev)" in window titles, and run alongside an installed
 copy. Packages are built with `PLAA_PRODUCTION=1`.
 
-`PLAA_FFMPEG_LOG=1` shows FFmpeg's own messages,
+`PLAA_FFMPEG_LOG=1` shows FFmpeg's own messages, `PLAA_TEST_CAMERA=1`
+offers FFmpeg's test picture as a camera, first, for trying camera
+recording without one,
 `cargo run --release -p plaa-media --example play -- <file>` plays a file
 without a window and says what it showed, and the `export` example
 exports one as the Export dialog does.
@@ -214,6 +220,7 @@ On macOS, use ⌘ in place of Ctrl.
 | Export | Ctrl+E |
 | Record sound | Ctrl+Shift+N (Space starts and stops) |
 | Record the screen | Ctrl+Alt+N (Space starts and stops) |
+| Record a camera | Ctrl+Alt+M (Space starts and stops) |
 | Open, open address | Ctrl+O, Ctrl+U |
 | Inspector | Ctrl+I |
 | Settings | Ctrl+, |
@@ -237,7 +244,7 @@ normal-speed, loop, screenshot, subtitles, audio-track, to-start,
 previous, next, playlist, previous-chapter, next-chapter, ab-loop,
 picture-in-picture, trim, split, rotate-left, rotate-right,
 flip-horizontal, flip-vertical, undo, redo, revert, export,
-record-sound and record-screen. A shortcut the settings give one action is taken
+record-sound, record-screen and record-camera. A shortcut the settings give one action is taken
 from any other that had it by default.
 
 ## License

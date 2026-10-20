@@ -52,6 +52,9 @@ The first build.
   or opening plaa again, stops it.
 - Recording the screen or a window on macOS, through ScreenCaptureKit,
   plaa's own windows left out, and what the computer plays there.
+- Recording a camera, its picture shown mirrored as it records, through
+  FFmpeg's device inputs: V4L2 on Linux, DirectShow on Windows and
+  AVFoundation on macOS.
 - Screen recordings at 24, 30, 60 or 120 pictures a second, or every
   picture the screen sends, and the pictures dropped shown as they
   record.
