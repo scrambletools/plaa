@@ -9,6 +9,7 @@ use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{container, image, space, stack};
 use iced::window::{self, settings::PlatformSpecific};
 use iced::{Center, Color, Element, Event, Fill, Size, Subscription, Task, Theme, event};
+use plaa_media::waveform::Waveform;
 use plaa_media::web::Page;
 use plaa_media::{Event as PlayerEvent, Options, Player, Quality, Source, Thumbnails};
 use plaa_store::positions::{self, Positions};
@@ -1143,6 +1144,12 @@ impl Plaa {
                 }
                 Task::none()
             }
+            Message::External(External::Waveform(id, shape)) => {
+                if let Some(player) = self.player_mut(id) {
+                    player.shape = Some(shape);
+                }
+                Task::none()
+            }
             Message::External(External::Thumbnail(id, thumbnail)) => {
                 if let Some(player) = self.player_mut(id) {
                     if thumbnail.strip {
@@ -1310,6 +1317,7 @@ impl Plaa {
         if let Some((source, title)) = named {
             self.name_address(&source, title.as_deref());
         }
+        let visualizer = self.settings.visualizer;
         let Some(player) = self.player_mut(id) else {
             return Task::none();
         };
@@ -1338,6 +1346,7 @@ impl Plaa {
                         }));
                 }
                 player.info = Some(info);
+                read_waveform(id, player, visualizer);
                 player.refresh_chapters();
                 player.refresh();
                 let size = match video {
@@ -1795,6 +1804,17 @@ impl Plaa {
             Control::TogglePip => return self.toggle_pip(id),
             Control::Previous => return self.previous(id),
             Control::Next => return self.next(id),
+            Control::Visualizer(visualizer) => {
+                self.settings.visualizer = visualizer;
+                for (window_id, window) in &mut self.windows {
+                    if let Content::Player(player) = &mut window.content {
+                        player.menu = None;
+                        read_waveform(*window_id, player, visualizer);
+                    }
+                }
+                self.save_settings();
+                return Task::none();
+            }
             Control::ToggleOverlay => {
                 self.settings.overlay = !self.settings.overlay;
                 self.apply_looks();
@@ -2046,6 +2066,7 @@ impl Plaa {
                     width: window.size.width,
                     scale: window.scale,
                     close_button,
+                    visualizer: self.settings.visualizer,
                 },
             )
             .map(move |control| Message::Control(id, control)),
@@ -2328,6 +2349,26 @@ fn meter_ticks() -> impl iced::futures::Stream<Item = ()> {
             }
         });
     receiver
+}
+
+/// Starts reading the waveform of the sound file window `id` plays, when
+/// it is to show and is not read yet: from files only, as a stream would
+/// be read a second time over the network.
+fn read_waveform(id: window::Id, player: &mut PlayerWindow, visualizer: settings::Visualizer) {
+    if visualizer != settings::Visualizer::Waveform || player.waveform.is_some() {
+        return;
+    }
+    let Some(info) = &player.info else {
+        return;
+    };
+    if let Source::File(path) = player.source()
+        && !info.has_video()
+        && info.seekable
+    {
+        player.waveform = Some(Waveform::open(path.clone(), move |shape| {
+            crate::post(External::Waveform(id, shape));
+        }));
+    }
 }
 
 /// A tick every `TICK` from a thread of its own, as iced's executor has

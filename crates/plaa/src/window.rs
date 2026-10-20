@@ -10,8 +10,10 @@ use iced::widget::{container, image, mouse_area, slider, space, stack, text};
 use iced::{Center, Element, Fill, Length, Theme};
 use plaa_media::info::Chapter;
 use plaa_media::subtitle::Cue;
+use plaa_media::waveform::{Shape, Waveform};
 use plaa_media::web::Page;
 use plaa_media::{MediaInfo, Picture, Player, Quality, Source, Status, Thumbnails, Transform};
+use plaa_store::settings::Visualizer;
 use scramble_ui::component::{self, Backdrop};
 use scramble_ui::dir::row;
 use scramble_ui::dropdown::{self, Entry};
@@ -50,6 +52,7 @@ pub enum Menu {
     Chapters,
     Quality,
     Edit,
+    Visualizer,
 }
 
 /// What the quality menu offers.
@@ -149,6 +152,10 @@ pub struct PlayerWindow {
     /// file's time, as they come and as they show.
     pub strip: Vec<(f64, Arc<Picture>)>,
     pub stills: Vec<Still>,
+    /// Reads a sound file's waveform, once it is to be shown.
+    pub waveform: Option<Waveform>,
+    /// The waveform read so far.
+    pub shape: Option<Arc<Shape>>,
 }
 
 impl PlayerWindow {
@@ -186,6 +193,8 @@ impl PlayerWindow {
             chapters: Vec::new(),
             strip: Vec::new(),
             stills: Vec::new(),
+            waveform: None,
+            shape: None,
         }
     }
 
@@ -376,6 +385,8 @@ pub enum Control {
     /// Floats the bars over pictures or docks them, for every window.
     ToggleOverlay,
     Screenshot,
+    /// Shows this under a sound file's cover, in every window.
+    Visualizer(Visualizer),
     Open,
     Settings,
     Close,
@@ -412,6 +423,8 @@ pub struct Context {
     /// The window manager draws no title bar, so the toolbar ends with a
     /// close button.
     pub close_button: bool,
+    /// What sound files show under their cover.
+    pub visualizer: Visualizer,
 }
 
 /// The window: the picture with bars over it or around it, or for sound,
@@ -521,6 +534,8 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             crate::fl!("action-screenshot"),
             Some(Control::Screenshot),
         ));
+    } else if window.info.is_some() {
+        tools.push(visualizer_menu(window, context.visualizer));
     }
     tools.push(component::toggle_tool(
         Icon::Repeat,
@@ -870,6 +885,46 @@ fn timeline_backdrop(theme: &Theme) -> iced::Color {
     Backdrop::ContainerLow.color(&Scheme::of(theme))
 }
 
+/// What shows under a sound file's cover.
+fn visualizer_menu(window: &PlayerWindow, current: Visualizer) -> Element<'_, Control> {
+    let choices = [
+        (
+            Visualizer::Spectrum,
+            Icon::Equalizer,
+            crate::fl!("visualizer-spectrum"),
+        ),
+        (
+            Visualizer::Waveform,
+            Icon::GraphicEq,
+            crate::fl!("visualizer-waveform"),
+        ),
+        (
+            Visualizer::Cover,
+            Icon::Album,
+            crate::fl!("visualizer-cover"),
+        ),
+    ];
+    let glyph = choices
+        .iter()
+        .find(|(choice, _, _)| *choice == current)
+        .map_or(Icon::Equalizer, |(_, glyph, _)| *glyph);
+    let entries = choices
+        .into_iter()
+        .map(|(choice, glyph, label)| {
+            Entry::item(label, Control::Visualizer(choice))
+                .icon(glyph)
+                .checked(choice == current)
+        })
+        .collect();
+    dropdown::icon_menu(glyph, entries)
+        .size(button::Size::Small)
+        .tip(crate::fl!("action-visualizer"))
+        .open(window.menu == Some(Menu::Visualizer), |open| {
+            Control::Menu(Menu::Visualizer, open)
+        })
+        .into()
+}
+
 fn speed_menu(window: &PlayerWindow) -> Element<'_, Control> {
     let current = window.status.speed;
     let entries = SPEEDS
@@ -1088,42 +1143,80 @@ fn subtitle_view<'a>(
 }
 
 /// A sound file: its cover art, or a note, with its title, artist and
-/// album, and the bars docked above and below.
+/// album, the visualizer chosen under them, and the bars docked above and
+/// below.
 fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
     let info = window.info.as_deref();
-    let art: Element<'a, Control> = match &window.cover {
-        Some(cover) => container(image(cover.clone()).content_fit(iced::ContentFit::Contain))
-            .max_width(480)
-            .max_height(480)
-            .into(),
-        None => container(icon::filled(Icon::MusicNote, 96).style(style::primary_text))
-            .width(192)
-            .height(192)
-            .center(192)
-            .style(|theme: &Theme| {
-                let scheme = Scheme::of(theme);
-                container::Style {
-                    background: Some(scheme.secondary_container.into()),
-                    border: iced::border::rounded(scramble_ui::shape::EXTRA_LARGE),
-                    ..container::Style::default()
-                }
-            })
-            .into(),
+    let visualizer = visualizer(window, context);
+    // With a visualizer under it, the cover gives way in a short window.
+    let art_height = if visualizer.is_some() {
+        Length::Fill
+    } else {
+        Length::Shrink
     };
+    let (art, art_most): (Element<'a, Control>, f32) = match &window.cover {
+        Some(cover) => (
+            container(image(cover.clone()).content_fit(iced::ContentFit::Contain))
+                .max_width(COVER_MOST)
+                .max_height(COVER_MOST)
+                .height(art_height)
+                .align_y(Center)
+                .into(),
+            COVER_MOST,
+        ),
+        None => (
+            container(icon::filled(Icon::MusicNote, 96).style(style::primary_text))
+                .width(192)
+                .height(192)
+                .center(192)
+                .style(|theme: &Theme| {
+                    let scheme = Scheme::of(theme);
+                    container::Style {
+                        background: Some(scheme.secondary_container.into()),
+                        border: iced::border::rounded(scramble_ui::shape::EXTRA_LARGE),
+                        ..container::Style::default()
+                    }
+                })
+                .into(),
+            192.0,
+        ),
+    };
+    // The lines' height, about, by their type's.
+    let mut lines_height = 32.0;
     let mut lines = column![scramble_ui::styled(window.title(), Type::HeadlineSmall).center()]
         .spacing(4)
         .align_x(Center);
     if let Some(artist) = info.and_then(|info| info.artist.as_deref()) {
         lines = lines
             .push(scramble_ui::styled(artist, Type::TitleMedium).style(style::on_surface_variant));
+        lines_height += 28.0;
     }
     if let Some(album) = info.and_then(|info| info.album.as_deref()) {
         lines = lines
             .push(scramble_ui::styled(album, Type::BodyMedium).style(style::on_surface_variant));
+        lines_height += 24.0;
     }
-    let body = container(column![art, lines].spacing(24).align_x(Center).padding(24))
-        .center(Fill)
-        .style(style::surface);
+    let middle = column![art, lines]
+        .spacing(SPACING)
+        .align_x(Center)
+        .padding(SPACING);
+    let middle: Element<'a, Control> = match visualizer {
+        // Filling the height, the column lays the cover out after the
+        // rest, in the room they leave; and it is no taller than the
+        // cover at its largest needs, so it stays in the middle.
+        Some(visualizer) => {
+            let most = art_most + lines_height + VISUALIZER_HEIGHT + SPACING * 4.0;
+            container(
+                middle
+                    .push(container(visualizer).max_width(VISUALIZER_WIDTH))
+                    .height(Fill),
+            )
+            .max_height(most)
+            .into()
+        }
+        None => middle.into(),
+    };
+    let body = container(middle).center(Fill).style(style::surface);
     let body = with_spinner(body.into(), window);
     let body: Element<'a, Control> = match sheet(window) {
         Some(sheet) => iced::widget::row![body, sheet].into(),
@@ -1135,6 +1228,44 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
         docked(transport(window, context))
     ]
     .into()
+}
+
+/// The largest a sound's cover shows, and the room around it.
+const COVER_MOST: f32 = 480.0;
+const SPACING: f32 = 24.0;
+
+/// The widest and the height of the visualizer under a sound's cover.
+const VISUALIZER_WIDTH: f32 = 640.0;
+const VISUALIZER_HEIGHT: f32 = 88.0;
+
+/// The spectrum or waveform under a sound's cover, as chosen; a waveform
+/// only for files, which it is read from.
+fn visualizer<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, Control>> {
+    match context.visualizer {
+        Visualizer::Spectrum => Some(crate::visualizer::spectrum(
+            &window.player,
+            VISUALIZER_HEIGHT,
+        )),
+        Visualizer::Waveform => {
+            window.waveform.as_ref()?;
+            let duration = window.status.duration?.as_secs_f64();
+            let editor = &window.editor;
+            Some(
+                crate::visualizer::Waveform::new(
+                    &window.player,
+                    window.shape.as_deref(),
+                    duration,
+                    move |seconds| editor.source_of(seconds),
+                    context.scale,
+                    Control::Scrub,
+                    Control::ScrubEnded,
+                    VISUALIZER_HEIGHT,
+                )
+                .into(),
+            )
+        }
+        Visualizer::Cover => None,
+    }
 }
 
 /// `content` with a spinner over its middle while the player waits for

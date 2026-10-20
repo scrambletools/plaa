@@ -88,7 +88,8 @@ trimming and splitting, and Intel Macs.
    PipeWire on Linux, Windows.Graphics.Capture on Windows,
    ScreenCaptureKit on macOS), camera (FFmpeg's device inputs); AVB
    streams with the entity, in milestone 7.
-6. **Visualizer**: waveform, spectrum and cover art for sound.
+6. **Visualizer** (done): a spectrum of what is heard and the file's
+   waveform under a sound file's cover, or the cover alone.
 7. **AVB and Milan**: the entity, talker and listener.
 8. **Casting**: Chromecast and DLNA/UPnP.
 9. **Assistant and MCP**.
@@ -286,6 +287,33 @@ is also made a small RGBA preview, which the window shows mirrored, as
 people expect to see themselves; the recording is as the camera sees.
 `PLAA_TEST_CAMERA` adds FFmpeg's test picture as the first camera, for
 machines without one.
+
+### Visualizer
+
+Under a sound file's cover, the toolbar's menu chooses a spectrum, the
+waveform, or the cover alone, kept in Settings for every window. With
+one showing, the cover gives way to it in a short window.
+
+The output's callback keeps the last third of a second it was handed,
+mixed to one channel before the volume, and when the newest of it is
+heard. The spectrum takes the 4096 frames heard by now, leaving out
+what the device holds yet, through a Hann window and a Fourier
+transform of plaa's own (85 ms at 48 kHz, so the bass's pitches part),
+into bars spaced evenly by octave from 40 Hz to 16 kHz, 70 dB deep,
+tilted 3 dB an octave about 1 kHz as music's highs are quieter. Each
+frame drawn asks for the next while there is sound or a bar is still
+falling: bars rise to the sound in a frame or two and fall back a
+little more than their height a second, so a paused spectrum comes to
+rest and stops drawing.
+
+The waveform is read from the file on a thread of its own, decoded from
+start to end into 4096 stretches of its length, each its loudest sample
+and root mean square, handed over every quarter second as it goes so it
+draws from the left as it is read. Lines are drawn by the square root
+of the loudness, so quiet sound is seen, the played part in the accent
+color; an edit's time is turned into the file's for each line. Clicking
+or dragging seeks as the timeline does. Streams have no waveform, as
+they would be read twice over the network.
 
 ### Pictures
 

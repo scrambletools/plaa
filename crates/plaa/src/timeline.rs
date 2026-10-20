@@ -204,7 +204,7 @@ fn mix(from: iced::Color, to: iced::Color, share: f32) -> iced::Color {
 /// Seconds until an edge at `edge` pixels, moving `speed` pixels a
 /// second, is drawn a pixel further: snapping rounds, so it moves on as
 /// it passes the next half pixel.
-fn until_next_pixel(edge: f64, speed: f64) -> f64 {
+pub fn until_next_pixel(edge: f64, speed: f64) -> f64 {
     let next = (edge - 0.5).floor() + 1.5;
     (next - edge) / speed
 }

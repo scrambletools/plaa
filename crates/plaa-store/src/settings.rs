@@ -56,6 +56,9 @@ pub struct Settings {
     /// Volume, 0 to 1, as last set.
     pub volume: f32,
     pub muted: bool,
+    /// What a sound file shows under its cover as it plays: `spectrum`,
+    /// `waveform`, or `cover` for the cover alone.
+    pub visualizer: Visualizer,
     /// Start a file where it was left off.
     pub resume: bool,
     /// When one file opens, list the other files in its folder with it,
@@ -128,6 +131,7 @@ impl Default for Settings {
             audio_device: None,
             volume: 1.0,
             muted: false,
+            visualizer: Visualizer::Spectrum,
             resume: true,
             folder_playlists: false,
             stream_quality: StreamQuality::Auto,
@@ -204,6 +208,19 @@ pub enum Appearance {
     System,
     Light,
     Dark,
+}
+
+/// What a sound file shows as it plays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Visualizer {
+    /// The pitches heard, as bars.
+    #[default]
+    Spectrum,
+    /// The file's loudness from start to end.
+    Waveform,
+    /// The cover alone.
+    Cover,
 }
 
 /// Which of a stream's qualities to play.

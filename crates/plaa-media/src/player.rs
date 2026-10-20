@@ -555,6 +555,13 @@ impl Player {
         self.shared.clock.pace()
     }
 
+    /// The `count` frames heard last, mixed to one channel, and their
+    /// rate, for a visualizer; None while nothing is heard.
+    pub fn heard(&self, count: usize) -> Option<(Vec<f32>, u32)> {
+        let output = self.shared.audio_output()?;
+        Some((output.heard(count)?, output.rate))
+    }
+
     /// How far ahead the source has been read, if known.
     pub fn buffered(&self) -> Option<Duration> {
         let seconds = f64::from_bits(self.shared.buffered.load(Ordering::Relaxed));

@@ -16,8 +16,10 @@ mod inputs;
 pub mod player;
 mod queue;
 pub mod record;
+pub mod spectrum;
 pub mod subtitle;
 pub mod thumbnails;
+pub mod waveform;
 pub mod web;
 
 pub use audio::{OutputDevice, output_devices};

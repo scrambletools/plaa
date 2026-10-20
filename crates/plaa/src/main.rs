@@ -37,6 +37,7 @@ mod title_bar_macos;
 #[cfg(target_os = "linux")]
 mod tray;
 mod video;
+mod visualizer;
 mod window;
 
 use std::sync::{Mutex, OnceLock, PoisonError};
@@ -58,6 +59,11 @@ pub enum External {
     DropsGathered(iced::window::Id),
     /// A picture for a window's timeline.
     Thumbnail(iced::window::Id, plaa_media::Thumbnail),
+    /// The waveform of a window's sound file, as far as it is read.
+    Waveform(
+        iced::window::Id,
+        std::sync::Arc<plaa_media::waveform::Shape>,
+    ),
     /// Media keys or the desktop asked something of what plays.
     Media(media::Command),
     /// What a window's recording says.

@@ -12,9 +12,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 > **Status:** early development, not yet released. Files, streams and
 > web videos play, with the controls floating over the picture, and
 > files can be trimmed, split, turned and exported, and sound, the
-> screen and a camera recorded; see the [development plan](docs/PLAN.md)
-> for what comes next: a visualizer, casting, an AVB/Milan talker and
-> listener, and an assistant.
+> screen and a camera recorded, and sound files show a spectrum or their
+> waveform; see the [development plan](docs/PLAN.md) for what comes
+> next: casting, an AVB/Milan talker and listener, and an assistant.
 
 ## Features
 
@@ -50,6 +50,11 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   when it moves; Settings can dock them above and below instead. Sound
   files show their cover art, title, artist and album, with the controls
   docked.
+- **A visualizer** under a sound file's cover: the spectrum of what is
+  heard, as bars that rise with it and fall back slowly, or the file's
+  waveform from start to end, the part played in the accent color,
+  which a click or drag seeks along. The toolbar chooses between them,
+  or the cover alone.
 - **Seeking** by dragging the timeline, the picture following the
   handle exactly and only the way it goes; back and forward 5 and 10
   seconds, and frame by frame. Pointing at the timeline shows a picture
@@ -127,9 +132,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-A visualizer, casting, the AVB/Milan
-entity, the assistant and MCP, packages and translations. The [plan](docs/PLAN.md) has the
-order.
+Casting, the AVB/Milan entity, the assistant and MCP, packages and
+translations. The [plan](docs/PLAN.md) has the order.
 
 ## Building
 

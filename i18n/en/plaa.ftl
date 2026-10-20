@@ -68,6 +68,13 @@ action-previous = Previous
 action-next = Next
 action-exit-full-screen = Exit Full Screen
 action-quality = Quality
+action-visualizer = Visualizer
+
+## What a sound file shows under its cover
+
+visualizer-spectrum = Spectrum
+visualizer-waveform = Waveform
+visualizer-cover = Cover only
 
 ## The floating controls
 

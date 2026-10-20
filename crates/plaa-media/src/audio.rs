@@ -14,6 +14,15 @@ use crate::clock::Clock;
 /// How much decoded sound is kept ahead of the device.
 pub const AHEAD: Duration = Duration::from_millis(400);
 
+/// How many frames of the sound played are kept for a visualizer to look
+/// at, a third of a second at 48 kHz: enough to reach past the device's
+/// latency to the sound heard.
+const RECENT: usize = 16_384;
+
+/// Sound played longer ago than this is not heard any more, so a paused
+/// visualizer comes to rest.
+const STALE: Duration = Duration::from_millis(150);
+
 #[derive(Debug)]
 pub enum OutputError {
     NoDevice,
@@ -55,10 +64,28 @@ struct Queue {
     finished: bool,
 }
 
+/// The latest sound handed to the device, mixed to one channel before
+/// the volume, and when the newest of it is heard.
+#[derive(Default)]
+struct Recent {
+    frames: VecDeque<f32>,
+    heard_by: Option<Instant>,
+}
+
+impl Recent {
+    fn push(&mut self, frame: f32) {
+        if self.frames.len() >= RECENT {
+            self.frames.pop_front();
+        }
+        self.frames.push_back(frame);
+    }
+}
+
 /// What the decoder and the device's callback share.
 pub struct Shared {
     queue: Mutex<Queue>,
     room: Condvar,
+    recent: Mutex<Recent>,
     clock: Arc<Clock>,
     /// The volume as the slider has it, 0 to 1, as f32 bits.
     volume: AtomicU32,
@@ -198,6 +225,26 @@ impl Shared {
         volume * volume * volume
     }
 
+    /// The `count` frames heard last, mixed to one channel before the
+    /// volume, the newest last and silence before the first; None once
+    /// nothing has been heard for a while, as when paused.
+    pub fn heard(&self, count: usize) -> Option<Vec<f32>> {
+        let recent = self.recent.lock().unwrap_or_else(PoisonError::into_inner);
+        let now = Instant::now();
+        let heard_by = recent.heard_by?;
+        if now > heard_by + STALE {
+            return None;
+        }
+        // The device plays what it was handed after its latency: the
+        // frames still to be heard are left out.
+        let coming = heard_by.saturating_duration_since(now).as_secs_f64() * f64::from(self.rate);
+        let end = recent.frames.len().saturating_sub(coming.ceil() as usize);
+        let start = end.saturating_sub(count);
+        let mut frames = vec![0.0; count - (end - start)];
+        frames.extend(recent.frames.range(start..end));
+        Some(frames)
+    }
+
     /// Fills `out` from the queue and sets the clock to the media time of
     /// its first frame, heard after `latency`.
     fn fill<T: cpal::SizedSample + cpal::FromSample<f32>>(&self, out: &mut [T], latency: Duration) {
@@ -210,6 +257,7 @@ impl Shared {
             return;
         }
         let mut queue = self.queue();
+        let mut recent = self.recent.lock().unwrap_or_else(PoisonError::into_inner);
         let serial = queue.serial;
         let mut first = None;
         let mut written = 0;
@@ -233,6 +281,9 @@ impl Shared {
             {
                 *target = T::from_sample(sample * gain);
             }
+            for frame in chunk.samples[chunk.played..chunk.played + take].chunks_exact(channels) {
+                recent.push(frame.iter().sum::<f32>() / channels as f32);
+            }
             chunk.played += take;
             written += take;
             let done = chunk.played >= chunk.samples.len();
@@ -246,6 +297,16 @@ impl Shared {
         let finished = queue.finished && queue.chunks.is_empty();
         drop(queue);
         out[written..].fill(silence);
+        for _ in (written..out.len()).step_by(channels) {
+            recent.push(0.0);
+        }
+        recent.heard_by = Some(
+            heard_at
+                + Duration::from_secs_f64(
+                    (out.len() / channels) as f64 / f64::from(self.rate.max(1)),
+                ),
+        );
+        drop(recent);
         self.room.notify_all();
         match first {
             Some(position) => self.clock.anchor(position, heard_at),
@@ -346,6 +407,7 @@ impl Output {
         let shared = Arc::new(Shared {
             queue: Mutex::new(Queue::default()),
             room: Condvar::new(),
+            recent: Mutex::new(Recent::default()),
             clock,
             volume: AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()),
             muted: AtomicBool::new(muted),
@@ -379,6 +441,7 @@ impl Output {
         let shared = Arc::new(Shared {
             queue: Mutex::new(Queue::default()),
             room: Condvar::new(),
+            recent: Mutex::new(Recent::default()),
             clock,
             volume: AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()),
             muted: AtomicBool::new(muted),
@@ -446,6 +509,7 @@ mod tests {
         Shared {
             queue: Mutex::new(Queue::default()),
             room: Condvar::new(),
+            recent: Mutex::new(Recent::default()),
             clock,
             volume: AtomicU32::new(1.0f32.to_bits()),
             muted: AtomicBool::new(false),
@@ -514,6 +578,30 @@ mod tests {
         shared.fill(&mut out, Duration::ZERO);
         assert_eq!(out, [0.0; 4]);
         assert!(!shared.clock.running(), "no sound stalls the clock");
+    }
+
+    #[test]
+    fn the_sound_heard_is_kept_for_a_visualizer() {
+        let shared = shared();
+        let stop = AtomicBool::new(false);
+        assert!(shared.heard(4).is_none(), "nothing heard yet");
+        shared.set_volume(0.5);
+        // Left and right differ; the mix is their middle, at full volume.
+        let samples: Vec<f32> = (0..10)
+            .flat_map(|frame| [frame as f32, frame as f32 + 1.0])
+            .collect();
+        assert!(shared.push(0, 0.0, 0.001, samples, &stop));
+        // Ten frames of sound and two of silence, the last heard 12 ms
+        // from now, so none is heard yet.
+        let mut out = [0.0f32; 24];
+        shared.fill(&mut out, Duration::ZERO);
+        assert!(shared.heard(4).unwrap().iter().all(|&frame| frame == 0.0));
+        std::thread::sleep(Duration::from_millis(30));
+        let mut expected: Vec<f32> = (0..10).map(|frame| frame as f32 + 0.5).collect();
+        expected.extend([0.0, 0.0]);
+        assert_eq!(shared.heard(12).unwrap(), expected);
+        std::thread::sleep(STALE);
+        assert!(shared.heard(4).is_none(), "long since heard");
     }
 
     #[test]
