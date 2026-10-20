@@ -950,9 +950,15 @@ fn visualizer_menu(window: &PlayerWindow) -> Element<'_, Control> {
     let entries = choices
         .into_iter()
         .map(|(choice, glyph, label)| {
-            Entry::item(label, Control::Visualizer(choice))
+            let entry = Entry::item(label, Control::Visualizer(choice))
                 .icon(glyph)
-                .checked(choice == current)
+                .checked(choice == current);
+            // Drawn by a shader of plaa's own on the graphics card.
+            if choice == Visualizer::Prism {
+                entry.badge(Icon::Flare)
+            } else {
+                entry
+            }
         })
         .collect();
     dropdown::icon_menu(glyph, entries)
