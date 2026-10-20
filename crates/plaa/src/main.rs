@@ -20,6 +20,7 @@ mod mpris;
 #[cfg(target_os = "macos")]
 mod now_playing_macos;
 mod playlist;
+mod prism;
 mod recorder;
 #[cfg(target_os = "linux")]
 mod screen_share;

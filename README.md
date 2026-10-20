@@ -53,8 +53,12 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 - **A visualizer** under a sound file's cover: the spectrum of what is
   heard, as bars that rise with it and fall back slowly, or the file's
   waveform from start to end, the part played in the accent color,
-  which a click or drag seeks along. The toolbar chooses between them,
-  or the cover alone.
+  which a click or drag seeks along. Or Prism, a scene in three
+  dimensions filling the window, the controls floating over it as over
+  a video: a lace orb in thin-film colors around a core that swells on
+  each beat, ringed by glass shards rising with the spectrum, over a
+  rippling grid of light, in a nebula. The toolbar chooses between
+  them, or the cover alone.
 - **Seeking** by dragging the timeline, the picture following the
   handle exactly and only the way it goes; back and forward 5 and 10
   seconds, and frame by frame. Pointing at the timeline shows a picture

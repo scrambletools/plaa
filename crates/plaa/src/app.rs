@@ -765,6 +765,7 @@ impl Plaa {
             );
             playing.fit_window = !opening.moving_on;
             playing.quality = opening.quality;
+            playing.visualizer = self.settings.visualizer;
             playing.page = opening.page;
             if let Content::Player(previous) = &window.content {
                 remember_position(&mut self.positions, previous);
@@ -892,13 +893,13 @@ impl Plaa {
         Task::none()
     }
 
-    /// Keeps the screen on while video plays, and the computer from
-    /// sleeping while sound does; lets go once nothing plays.
+    /// Keeps the screen on while video or the prism plays, and the computer
+    /// from sleeping while sound does; lets go once nothing plays.
     fn keep_awake(&mut self) {
         let playing = |video: bool| {
             self.windows.values().any(|window| {
                 window.player().is_some_and(|player| {
-                    !player.status.paused && !player.status.ended && player.is_video() == video
+                    !player.status.paused && !player.status.ended && player.fills_window() == video
                 })
             })
         };
@@ -1352,6 +1353,11 @@ impl Plaa {
                 let size = match video {
                     Some((width, height, aspect, turns)) => {
                         fitted_window(width, height, aspect, turns, overlay, WINDOW_ROOM)
+                    }
+                    // Wide for the prism's scene, else as tall as a cover
+                    // with its tags.
+                    None if player.visualizer == settings::Visualizer::Prism => {
+                        Size::new(960.0, 600.0)
                     }
                     None => Size::new(440.0, 600.0),
                 };
@@ -1809,6 +1815,8 @@ impl Plaa {
                 for (window_id, window) in &mut self.windows {
                     if let Content::Player(player) = &mut window.content {
                         player.menu = None;
+                        player.visualizer = visualizer;
+                        player.refresh_overlay(self.settings.overlay_delay());
                         read_waveform(*window_id, player, visualizer);
                     }
                 }
@@ -1997,7 +2005,7 @@ impl Plaa {
                 || matches!(&window.content, Content::Player(player)
                     if !player.status.paused
                         || player.status.seeking
-                        || player.overlay_shown != !player.is_video()
+                        || player.overlay_shown != !player.fills_window()
                         || player.info.is_none())
         });
         let ticks = if ticking {
@@ -2066,7 +2074,6 @@ impl Plaa {
                     width: window.size.width,
                     scale: window.scale,
                     close_button,
-                    visualizer: self.settings.visualizer,
                 },
             )
             .map(move |control| Message::Control(id, control)),
@@ -2079,7 +2086,7 @@ impl Plaa {
                 // Above the playback controls: floating over a video, or
                 // docked along the bottom.
                 let player = window.player().filter(|player| player.error.is_none());
-                let floating = player.is_some_and(|player| player.is_video())
+                let floating = player.is_some_and(|player| player.fills_window())
                     && component::floating_bars_enabled();
                 let docked = player.is_some() && !floating;
                 let snackbar = component::snackbar_above_bar(

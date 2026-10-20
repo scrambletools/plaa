@@ -74,6 +74,7 @@ action-visualizer = Visualizer
 
 visualizer-spectrum = Spectrum
 visualizer-waveform = Waveform
+visualizer-prism = Prism
 visualizer-cover = Cover only
 
 ## The floating controls

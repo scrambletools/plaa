@@ -156,6 +156,8 @@ pub struct PlayerWindow {
     pub waveform: Option<Waveform>,
     /// The waveform read so far.
     pub shape: Option<Arc<Shape>>,
+    /// What a sound file shows, as Settings have it.
+    pub visualizer: Visualizer,
 }
 
 impl PlayerWindow {
@@ -195,6 +197,7 @@ impl PlayerWindow {
             stills: Vec::new(),
             waveform: None,
             shape: None,
+            visualizer: Visualizer::default(),
         }
     }
 
@@ -205,6 +208,13 @@ impl PlayerWindow {
     /// Whether the file shows a moving picture, rather than only sound.
     pub fn is_video(&self) -> bool {
         self.info.as_ref().is_some_and(|info| info.has_video())
+    }
+
+    /// Whether a picture fills the window, the bars floating over it: a
+    /// video's, or the prism's for sound.
+    pub fn fills_window(&self) -> bool {
+        self.is_video()
+            || (self.info.is_some() && self.error.is_none() && self.visualizer == Visualizer::Prism)
     }
 
     /// The picture's track that shows.
@@ -297,12 +307,12 @@ impl PlayerWindow {
         }
     }
 
-    /// Whether the floating overlay should show now: always for sound, and
-    /// while a menu is open or something is dragged; else while the
-    /// pointer is inside the window and it is paused, being edited, shows
-    /// a sheet, or the pointer moved lately.
+    /// Whether the floating overlay should show now: always for sound
+    /// with its cover, and while a menu is open or something is dragged;
+    /// else while the pointer is inside the window and it is paused, being
+    /// edited, shows a sheet, or the pointer moved lately.
     pub fn wants_overlay(&self, delay: Duration) -> bool {
-        if !self.is_video() || self.error.is_some() {
+        if !self.fills_window() || self.error.is_some() {
             return true;
         }
         if self.menu.is_some() || self.dragging.is_some() {
@@ -423,8 +433,6 @@ pub struct Context {
     /// The window manager draws no title bar, so the toolbar ends with a
     /// close button.
     pub close_button: bool,
-    /// What sound files show under their cover.
-    pub visualizer: Visualizer,
 }
 
 /// The window: the picture with bars over it or around it, or for sound,
@@ -440,7 +448,11 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
         return column![docked(toolbar(window, context)), body].into();
     }
     if window.info.is_some() && !window.is_video() {
-        return audio_view(window, context);
+        return if window.fills_window() {
+            prism_view(window, context)
+        } else {
+            audio_view(window, context)
+        };
     }
     let picture = mouse_area(crate::video::view(
         &window.player,
@@ -535,7 +547,7 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             Some(Control::Screenshot),
         ));
     } else if window.info.is_some() {
-        tools.push(visualizer_menu(window, context.visualizer));
+        tools.push(visualizer_menu(window));
     }
     tools.push(component::toggle_tool(
         Icon::Repeat,
@@ -699,7 +711,7 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
     if let Some(menu) = tracks_menu(window) {
         controls.push(menu);
     }
-    if window.is_video() {
+    if window.fills_window() {
         controls.push(component::tool(
             if context.fullscreen {
                 Icon::FullscreenExit
@@ -886,7 +898,8 @@ fn timeline_backdrop(theme: &Theme) -> iced::Color {
 }
 
 /// What shows under a sound file's cover.
-fn visualizer_menu(window: &PlayerWindow, current: Visualizer) -> Element<'_, Control> {
+fn visualizer_menu(window: &PlayerWindow) -> Element<'_, Control> {
+    let current = window.visualizer;
     let choices = [
         (
             Visualizer::Spectrum,
@@ -898,6 +911,7 @@ fn visualizer_menu(window: &PlayerWindow, current: Visualizer) -> Element<'_, Co
             Icon::GraphicEq,
             crate::fl!("visualizer-waveform"),
         ),
+        (Visualizer::Prism, Icon::Hub, crate::fl!("visualizer-prism")),
         (
             Visualizer::Cover,
             Icon::Album,
@@ -1230,6 +1244,92 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
     .into()
 }
 
+/// A sound file with the prism filling the window, the bars floating over
+/// it as over a video, and its cover, title, artist and album over the
+/// scene's bottom corner, above the controls while they show.
+fn prism_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
+    let scene = mouse_area(crate::prism::view(
+        &window.player,
+        window.surface,
+        window.activity.clone(),
+        !window.overlay_shown,
+        Control::Activity,
+    ))
+    .on_double_click(Control::ToggleFullScreen);
+    let info = window.info.as_deref();
+    let mut lines =
+        column![scramble_ui::styled(window.title(), Type::TitleLarge).color(iced::Color::WHITE)]
+            .spacing(2);
+    let detail: Vec<&str> = [
+        info.and_then(|info| info.artist.as_deref()),
+        info.and_then(|info| info.album.as_deref()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if !detail.is_empty() {
+        lines = lines.push(
+            scramble_ui::styled(detail.join(" · "), Type::BodyMedium)
+                .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.8)),
+        );
+    }
+    let mut tag: Vec<Element<'a, Control>> = Vec::new();
+    if let Some(cover) = &window.cover {
+        tag.push(
+            image(cover.clone())
+                .width(TAG_COVER)
+                .height(TAG_COVER)
+                .content_fit(iced::ContentFit::Cover)
+                .border_radius(10)
+                .into(),
+        );
+    }
+    tag.push(lines.into());
+    let tag = container(row(tag).spacing(12).align_y(Center))
+        .padding(10)
+        .style(|_theme: &Theme| container::Style {
+            background: Some(iced::Color::from_rgba(0.0, 0.0, 0.0, 0.35).into()),
+            border: iced::border::rounded(16),
+            ..container::Style::default()
+        });
+    let lifted = if window.overlay_shown {
+        component::floating_room(true) + 8.0
+    } else {
+        24.0
+    };
+    let tag = container(tag)
+        .padding(iced::Padding {
+            top: 0.0,
+            right: 24.0,
+            bottom: lifted,
+            left: 24.0,
+        })
+        .width(Fill)
+        .height(Fill)
+        .align_bottom(Fill);
+    let body = with_spinner(stack![scene, tag].into(), window);
+    let body: Element<'a, Control> = match sheet(window) {
+        Some(sheet) => {
+            let sheet = component::between_bars(
+                sheet,
+                component::floating_room(true),
+                component::floating_room(true),
+            );
+            iced::widget::row![body, sheet].into()
+        }
+        None => body,
+    };
+    component::window_bars(
+        component::toolbar(toolbar(window, context)),
+        Some(component::toolbar(transport(window, context))),
+        body,
+        window.overlay_shown,
+    )
+}
+
+/// The cover's size beside the title over the prism.
+const TAG_COVER: f32 = 56.0;
+
 /// The largest a sound's cover shows, and the room around it.
 const COVER_MOST: f32 = 480.0;
 const SPACING: f32 = 24.0;
@@ -1241,7 +1341,7 @@ const VISUALIZER_HEIGHT: f32 = 88.0;
 /// The spectrum or waveform under a sound's cover, as chosen; a waveform
 /// only for files, which it is read from.
 fn visualizer<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, Control>> {
-    match context.visualizer {
+    match window.visualizer {
         Visualizer::Spectrum => Some(crate::visualizer::spectrum(
             &window.player,
             VISUALIZER_HEIGHT,
@@ -1264,7 +1364,7 @@ fn visualizer<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element
                 .into(),
             )
         }
-        Visualizer::Cover => None,
+        Visualizer::Prism | Visualizer::Cover => None,
     }
 }
 

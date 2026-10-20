@@ -56,8 +56,9 @@ pub struct Settings {
     /// Volume, 0 to 1, as last set.
     pub volume: f32,
     pub muted: bool,
-    /// What a sound file shows under its cover as it plays: `spectrum`,
-    /// `waveform`, or `cover` for the cover alone.
+    /// What a sound file shows as it plays: `spectrum` or `waveform`
+    /// under its cover, `prism` for a scene filling the window, or `cover`
+    /// for the cover alone.
     pub visualizer: Visualizer,
     /// Start a file where it was left off.
     pub resume: bool,
@@ -219,6 +220,8 @@ pub enum Visualizer {
     Spectrum,
     /// The file's loudness from start to end.
     Waveform,
+    /// A scene in three dimensions filling the window.
+    Prism,
     /// The cover alone.
     Cover,
 }

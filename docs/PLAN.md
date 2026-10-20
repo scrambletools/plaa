@@ -89,7 +89,8 @@ trimming and splitting, and Intel Macs.
    ScreenCaptureKit on macOS), camera (FFmpeg's device inputs); AVB
    streams with the entity, in milestone 7.
 6. **Visualizer** (done): a spectrum of what is heard and the file's
-   waveform under a sound file's cover, or the cover alone.
+   waveform under a sound file's cover, a scene in three dimensions
+   filling the window, or the cover alone.
 7. **AVB and Milan**: the entity, talker and listener.
 8. **Casting**: Chromecast and DLNA/UPnP.
 9. **Assistant and MCP**.
@@ -314,6 +315,29 @@ of the loudness, so quiet sound is seen, the played part in the accent
 color; an edit's time is turned into the file's for each line. Clicking
 or dragging seeks as the timeline does. Streams have no waveform, as
 they would be read twice over the network.
+
+Prism fills the window as a video does, the bars floating over it and
+hiding while the pointer rests, the cover, title, artist and album in
+its corner. Each frame, 32 bands of the sound heard are eased as the
+spectrum's are; their low, middle and high thirds, the overall level,
+and beats (the bass rising 0.07 over its level of the last half second
+or so, once until it falls back) drive a scene of signed distance
+fields, ray marched in a shader of plaa's own with no textures: a
+sphere's shell carved by a gyroid into lace that turns, swells with
+the bass and opens with the highs, colored as a thin film by the angle
+it is seen at; a white-hot core lighting it from within, its halo the
+glow's integral along each ray worked out whole, so it has no seams;
+a tipped, spinning crown of 32 shards, the bands up one side and down
+the other, each glowing by its level; a grid of light below rippling
+out with the bass; and a nebula of Kali's fractal with stars, folding
+tighter with the bass, that the surfaces reflect. A beat punches the
+lens, flashes the core and sends a ring of light out from the middle.
+The scene's time runs faster as the sound is louder, so it drifts when
+quiet and races when loud; paused, it comes to rest and stops drawing.
+It is drawn at no more than 800,000 pixels into a picture of its own,
+then stretched over the window with its colors parting toward the
+edges, more on each beat, vignetted, and grained at the screen's own
+pixels.
 
 ### Pictures
 
