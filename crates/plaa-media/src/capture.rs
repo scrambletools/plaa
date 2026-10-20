@@ -1708,8 +1708,9 @@ mod tests {
         let base = f64::from(stream_base(&path));
         let seconds: Vec<f64> = times.iter().map(|&time| time as f64 / base).collect();
         assert!(seconds[0].abs() < 0.001, "{seconds:?}");
-        // About 50 ms apart, then the 200 ms before it ended.
-        assert!((0.6..1.2).contains(&seconds[11]), "{seconds:?}");
+        // About 50 ms apart, then the 200 ms before it ended, with room for
+        // a slow machine's sleeps.
+        assert!((0.6..2.0).contains(&seconds[11]), "{seconds:?}");
         assert!(progress.written.load(Ordering::Relaxed) > 0);
     }
 

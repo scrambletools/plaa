@@ -634,12 +634,12 @@ mod tests {
             .flat_map(|frame| [frame as f32, frame as f32 + 1.0])
             .collect();
         assert!(shared.push(0, 0.0, 0.001, samples, &stop));
-        // Ten frames of sound and two of silence, the last heard 12 ms
-        // from now, so none is heard yet.
+        // Ten frames of sound and two of silence, heard after the device's
+        // 200 ms, so none is heard yet.
         let mut out = [0.0f32; 24];
-        shared.fill(&mut out, Duration::ZERO);
+        shared.fill(&mut out, Duration::from_millis(200));
         assert!(shared.heard(4).unwrap().iter().all(|&frame| frame == 0.0));
-        std::thread::sleep(Duration::from_millis(30));
+        std::thread::sleep(Duration::from_millis(300));
         let mut expected: Vec<f32> = (0..10).map(|frame| frame as f32 + 0.5).collect();
         expected.extend([0.0, 0.0]);
         assert_eq!(shared.heard(12).unwrap(), expected);
