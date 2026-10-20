@@ -1,0 +1,90 @@
+<!--
+  plaa's Windows installer, built with WiX 5 by packaging/windows/build.ps1,
+  which also writes libraries.wxs, the FFmpeg DLLs plaa.exe loads:
+
+    wix build packaging\windows\plaa.wxs libraries.wxs -ext WixToolset.UI.wixext
+      -ext WixToolset.Util.wixext -d Version=0.1.0 -d Source=dist -o plaa.msi
+
+  It installs for the current user, with no administrator prompt, into
+  %LOCALAPPDATA%\Programs\plaa, adds plaa to the Start menu, and offers it
+  in Open With for video and audio files without taking them over.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <?define AppKey = Software\Scramble Tools\plaa ?>
+  <?define OpenWith = Software\Classes\Applications\plaa.exe ?>
+
+  <Package Name="plaa" Manufacturer="Scramble Tools" Version="$(var.Version)"
+           UpgradeCode="9e4b7c21-3a6d-4f58-b1c2-7d8e0f4a5b63" Scope="perUser"
+           Language="1033" InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of plaa is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <?ifdef Icon ?>
+    <Icon Id="plaa.ico" SourceFile="$(var.Icon)" />
+    <Property Id="ARPPRODUCTICON" Value="plaa.ico" />
+    <?endif ?>
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/scrambletools/plaa" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/scrambletools/plaa" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="Programs" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="plaa" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <!-- Per-user components are kept track of by a value under the app's
+         key rather than by their files, so those with files need GUIDs of
+         their own. Keep them: changing one breaks upgrades. -->
+    <ComponentGroup Id="Program" Directory="INSTALLFOLDER">
+      <Component Id="App" Guid="5b2e8f14-c7a9-4d36-8e01-3f6a9c2d7b45">
+        <File Id="plaa.exe" Source="$(var.Source)\plaa.exe" />
+        <RegistryValue Root="HKCU" Key="$(var.AppKey)" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+        <RemoveFolder Id="RemovePrograms" Directory="Programs" On="uninstall" />
+      </Component>
+      <!-- Open With: plaa among the programs Windows offers for these
+           files, which stay with whatever opens them now. -->
+      <Component Id="OpenWith" Guid="c41d7a9e-2f6b-4b58-9a3c-8e5d1f7b2a60">
+        <RegistryValue Root="HKCU" Key="$(var.OpenWith)" Name="FriendlyAppName" Type="string" Value="plaa" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="$(var.OpenWith)\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot; &quot;%1&quot;" />
+        <RegistryValue Root="HKCU" Key="$(var.OpenWith)\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot;,0" />
+        <?foreach Extension in .3g2;.3gp;.aac;.ac3;.aif;.aiff;.ape;.avi;.dts;.flac;.flv;.m2ts;.m3u;.m3u8;.m4a;.m4v;.mka;.mkv;.mov;.mp3;.mp4;.mpeg;.mpg;.mpc;.mts;.oga;.ogg;.ogv;.opus;.pls;.ts;.wav;.webm;.wma;.wmv;.wv ?>
+        <RegistryValue Root="HKCU" Key="$(var.OpenWith)\SupportedTypes" Name="$(Extension)" Type="string" Value="" />
+        <?endforeach ?>
+      </Component>
+      <ComponentGroupRef Id="Libraries" />
+    </ComponentGroup>
+
+    <Component Id="StartMenu" Directory="ProgramMenuFolder">
+      <?ifdef Icon ?>
+      <Shortcut Id="StartMenuShortcut" Name="plaa" Description="Play video and audio files and streams"
+                Target="[INSTALLFOLDER]plaa.exe" WorkingDirectory="INSTALLFOLDER" Icon="plaa.ico" />
+      <?else ?>
+      <Shortcut Id="StartMenuShortcut" Name="plaa" Description="Play video and audio files and streams"
+                Target="[INSTALLFOLDER]plaa.exe" WorkingDirectory="INSTALLFOLDER" />
+      <?endif ?>
+      <RegistryValue Root="HKCU" Key="$(var.AppKey)" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="Program" />
+      <ComponentRef Id="StartMenu" />
+    </Feature>
+
+    <!-- One page with the license, then the last page's choice to open
+         plaa. The program's path is known only once costing is done. -->
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)license.rtf" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open plaa" />
+    <SetProperty Id="WixShellExecTarget" Action="OpenPlaaTarget" Sequence="ui" After="CostFinalize"
+                 Value="[#plaa.exe]" />
+    <CustomAction Id="OpenAtFinish" DllEntry="WixShellExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Impersonate="yes" />
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="OpenAtFinish"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+  </Package>
+</Wix>

@@ -148,7 +148,17 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 ### Planned
 
 Listening to AVB streams and AVB Lite, casting, the assistant and MCP,
-packages and translations. The [plan](docs/PLAN.md) has the order.
+and translations. The [plan](docs/PLAN.md) has the order.
+
+## Packages
+
+Each release has packages for Debian 13, Ubuntu 24.04 and 26.04,
+Fedora 44 and Arch (x86_64 and ARM64), Windows (an MSI and a zip, x64 and
+ARM64) and macOS (Apple Silicon, macOS 14 and later), each installed,
+upgraded, run, made to play a video and removed in a clean system before
+the release goes out. On Linux the packages use the system's FFmpeg, each
+built for its release; on Windows and macOS they carry their own.
+[Releasing](docs/RELEASING.md) says how they are made and checked.
 
 ## Building
 
@@ -189,6 +199,8 @@ Builds made with plain `cargo build` are development builds: they keep
 their own settings (`~/.config/plaa-dev.toml`) and data under
 `plaa-dev`, show "(dev)" in window titles, and run alongside an installed
 copy. Packages are built with `PLAA_PRODUCTION=1`.
+`plaa --interfaces` says whether plaa may use raw Ethernet and which
+wired interfaces could send an AVB stream.
 
 `PLAA_FFMPEG_LOG=1` shows FFmpeg's own messages, `PLAA_TEST_CAMERA=1`
 offers FFmpeg's test picture as a camera, first, for trying camera

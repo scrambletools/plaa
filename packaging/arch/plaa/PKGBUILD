@@ -1,0 +1,50 @@
+# Maintainer: Scramble Tools <https://github.com/scrambletools>
+pkgname=plaa
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Play video and audio files and streams'
+arch=('x86_64' 'aarch64')
+url='https://github.com/scrambletools/plaa'
+license=('GPL-3.0-or-later')
+depends=('alsa-lib' 'ffmpeg' 'gcc-libs' 'glibc' 'libass' 'libcap' 'libpipewire' 'libxkbcommon'
+         'vulkan-icd-loader' 'wayland')
+makedepends=('cargo' 'clang' 'git')
+optdepends=('vulkan-driver: drawing on the graphics card, or vulkan-swrast without one'
+            'yt-dlp: playing videos from web pages'
+            'linuxptp: sending what plays to AVB speakers and amplifiers'
+            'libx11: running under X11'
+            'libxcursor: running under X11'
+            'libxi: running under X11')
+install=plaa.install
+# makepkg's link-time optimization makes GCC's objects, such as libspa's
+# C wrapper, ones Rust's linker cannot read.
+options=('!lto')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    # The installed copy, with its own settings and cache, not a dev build.
+    export PLAA_PRODUCTION=1
+    cargo build --frozen --release -p plaa -p plaa-avb --bin plaa --bin plaa-netraw
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo test --frozen --workspace
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    scripts/dist-install.sh target/release "$pkgdir" /usr
+}

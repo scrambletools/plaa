@@ -32,8 +32,10 @@ usage-help =
     plaa, which starts if needed.
 
     Options:
-      -h, --help     Show this help
-      -V, --version  Show the version
+      -h, --help        Show this help
+      -V, --version     Show the version
+          --interfaces  Show the wired interfaces, and whether plaa can
+                        send AVB streams on them
 
 ## Start window
 

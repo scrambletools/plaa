@@ -1,0 +1,18 @@
+#!/bin/sh
+# After the package installs: the user installing it joins access_bpf,
+# and the launch daemon opens the capture devices now and at every
+# start, so plaa reaches AVB devices on the network.
+group=access_bpf
+support="/Library/Application Support/plaa"
+daemon=/Library/LaunchDaemons/io.github.scrambletools.plaa.bpf.plist
+
+dseditgroup -q -o read "$group" >/dev/null 2>&1 || dseditgroup -q -o create "$group"
+user=$(stat -f%Su /dev/console)
+if [ -n "$user" ] && [ "$user" != root ]; then
+    dseditgroup -q -o edit -a "$user" -t user "$group"
+fi
+chown root:wheel "$daemon"
+chmod 644 "$daemon"
+launchctl bootout system "$daemon" 2>/dev/null || true
+launchctl bootstrap system "$daemon" || "$support/bpf-access"
+exit 0

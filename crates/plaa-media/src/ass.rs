@@ -8,9 +8,11 @@ use std::sync::{Arc, OnceLock};
 
 use crate::subtitle::SubtitlePicture;
 
-/// The names libass goes by on each system, most likely first.
+/// The names libass goes by on each system, most likely first: on macOS
+/// the copy plaa.app carries first.
 const NAMES: &[&str] = if cfg!(target_os = "macos") {
     &[
+        "@executable_path/../Frameworks/libass.9.dylib",
         "libass.9.dylib",
         "/opt/homebrew/lib/libass.9.dylib",
         "/usr/local/lib/libass.9.dylib",

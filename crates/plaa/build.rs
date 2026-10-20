@@ -2,8 +2,9 @@
 //! and time it is built from for its version line.
 
 /// The commit plaa is built from, with `+` when the working tree has
-/// changes: from git, or from a `BUILD` file beside the workspace for
-/// copies of the source without `.git`.
+/// changes: from git, or for copies of the source without `.git` from the
+/// `BUILD` file beside the workspace, where `git archive` and GitHub's
+/// source archives write the commit (`.gitattributes`).
 fn commit() -> String {
     let git = |args: &[&str]| {
         std::process::Command::new("git")
@@ -22,7 +23,9 @@ fn commit() -> String {
         }
         None => std::fs::read_to_string("../../BUILD")
             .map(|text| text.trim().to_owned())
-            .unwrap_or_else(|_| "unknown".to_owned()),
+            .ok()
+            .filter(|text| !text.is_empty() && !text.starts_with("$Format"))
+            .unwrap_or_else(|| "unknown".to_owned()),
     }
 }
 

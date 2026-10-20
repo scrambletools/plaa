@@ -178,6 +178,14 @@ fn use_helper() -> io::Result<()> {
     avb_net::broker::use_helper(HELPER, &folders)
 }
 
+/// Whether plaa may send and receive raw Ethernet here, through its
+/// helper on Linux: an error saying why not.
+pub fn check_access() -> io::Result<()> {
+    #[cfg(target_os = "linux")]
+    use_helper()?;
+    avb_net::check_access()
+}
+
 /// An interface AVB can run on: wired, and on Linux with a PTP hardware
 /// clock for the stream's times.
 #[derive(Debug, Clone, PartialEq, Eq)]

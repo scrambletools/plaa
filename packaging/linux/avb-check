@@ -1,0 +1,25 @@
+#!/bin/sh
+# Run as the packages install: says when no interface can send plaa's
+# AVB stream, a wired one with a PTP hardware clock, and which cards have
+# one. Silent otherwise.
+for interface in /sys/class/net/*; do
+    [ "$(cat "$interface/type" 2>/dev/null)" = 1 ] || continue
+    [ -e "$interface/device" ] || continue
+    if [ -e "$interface/wireless" ] || [ -e "$interface/phy80211" ]; then
+        continue
+    fi
+    # The clock sits under the PCI device for most drivers, under the
+    # interface itself for some (atlantic).
+    for clock in "$interface"/device/ptp/ptp[0-9]* "$interface"/ptp[0-9]*; do
+        [ -e "$clock" ] && exit 0
+    done
+done
+cat >&2 <<'EOF'
+plaa: sending what plays to AVB speakers and amplifiers requires an AVB
+Ethernet port, a wired interface with a PTP hardware clock, and none was
+found. plaa plays everything else as usual.
+  Supported Ethernet cards: Intel I210 (igb), Intel I225 and I226 (igc),
+  Marvell AQtion AQC107 (atlantic), or any other whose driver gives it a
+  PTP hardware clock (ethtool -T <interface> shows one).
+EOF
+exit 0

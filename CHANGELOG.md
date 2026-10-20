@@ -72,3 +72,10 @@ The first build.
 - Prism, a visualizer in three dimensions filling the window, drawn on
   the graphics card from shapes alone, no pictures, moved by the
   spectrum and its beats.
+- Packages: a .deb for each of Debian 13 and Ubuntu 24.04 and 26.04, an
+  .rpm for Fedora 44, the AUR's PKGBUILD, an MSI and zip for Windows and
+  an installer for macOS, the Windows and macOS ones carrying FFmpeg,
+  each installed, upgraded, run, made to play a video and removed in a
+  clean system by the Release workflow before a release goes out.
+- `plaa --interfaces` says whether plaa may use raw Ethernet and which
+  wired interfaces could send an AVB stream.

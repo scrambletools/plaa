@@ -1,0 +1,37 @@
+# Debian and RPM packages, made with nfpm (https://nfpm.goreleaser.com)
+# from a tree staged by scripts/dist-install.sh. Each is built in a
+# container of the release it is for, by packaging/linux/build.sh, as
+# FFmpeg's libraries change names from release to release:
+# build-package.sh there appends the dependencies it reads from the
+# programs, overrides.deb or overrides.rpm, and runs nfpm.
+#
+# Installing grants plaa-netraw CAP_NET_RAW (packaging/linux).
+name: plaa
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+release: ${RELEASE}
+section: video
+priority: optional
+maintainer: Scramble Tools <https://github.com/scrambletools>
+vendor: Scramble Tools
+homepage: https://github.com/scrambletools/plaa
+license: GPL-3.0-or-later
+description: |-
+  Play video and audio files and streams
+  plaa is a fast, lightweight media player: nearly every video and audio
+  format through FFmpeg, decoded on the graphics card where it can, with
+  controls that float over the picture, tracks, subtitles, HDR shown on
+  ordinary screens, and what plays sent to AVB speakers and amplifiers.
+
+contents:
+  - src: ./stage/usr/
+    dst: /usr
+    type: tree
+
+scripts:
+  postinstall: ./packaging/linux/postinstall.sh
+
+rpm:
+  group: Applications/Multimedia
+  summary: Play video and audio files and streams

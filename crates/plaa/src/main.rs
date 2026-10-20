@@ -128,6 +128,37 @@ fn version() -> String {
     )
 }
 
+/// Says whether plaa may use raw Ethernet, and which wired interfaces it
+/// could send an AVB stream on, as packages are checked and for anyone
+/// setting AVB up.
+fn print_interfaces() {
+    match plaa_avb::check_access() {
+        Ok(()) => println!("raw Ethernet: ready"),
+        Err(error) => println!("raw Ethernet: {error}"),
+    }
+    let interfaces = plaa_avb::interfaces();
+    if interfaces.is_empty() {
+        println!("no wired interfaces found");
+    }
+    let width = interfaces
+        .iter()
+        .map(|interface| interface.name.len())
+        .max()
+        .unwrap_or(0);
+    for interface in interfaces {
+        println!(
+            "{:<width$}  {:<4}  {}",
+            interface.name,
+            if interface.up { "up" } else { "down" },
+            if interface.clock {
+                "PTP hardware clock, can send AVB streams"
+            } else {
+                "no PTP hardware clock"
+            },
+        );
+    }
+}
+
 fn main() -> iced::Result {
     #[cfg(windows)]
     attach_console();
@@ -148,6 +179,10 @@ fn main() -> iced::Result {
                 }
                 "-V" | "--version" => {
                     println!("{}", version());
+                    return Ok(());
+                }
+                "--interfaces" => {
+                    print_interfaces();
                     return Ok(());
                 }
                 "--" => {

@@ -95,7 +95,8 @@ trimming and splitting, and Intel Macs.
    talkers and listeners (done); the listener and AVB Lite next.
 8. **Casting**: Chromecast and DLNA/UPnP.
 9. **Assistant and MCP**.
-10. **Release**: packages, translations, signing, the website.
+10. **Release**: packages (made, with installer tests on each system,
+    `docs/RELEASING.md`), translations, signing, the website.
 
 ## Architecture
 
@@ -487,6 +488,9 @@ Targets, to be measured as prev's are.
   errors and the tests on Linux, Windows and macOS (FFmpeg from Ubuntu,
   Homebrew and BtbN's builds), the minimum Rust version, `cargo deny`,
   and the desktop entry and AppStream data.
+- The packages, by the Release workflow: each installed, upgraded, run,
+  made to play a clip and removed in a clean container, runner or Windows
+  Server container (`packaging/tests`), as triib's are.
 - The interface is tested by hand, as prev's is.
 
 ## Risks

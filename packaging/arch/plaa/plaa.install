@@ -1,0 +1,15 @@
+# Lets plaa send and receive raw Ethernet for AVB without root, through
+# plaa-netraw, the one program granted CAP_NET_RAW, then says when no
+# interface can send plaa's AVB stream.
+grant() {
+    setcap cap_net_raw+ep usr/lib/plaa/plaa-netraw
+    usr/lib/plaa/avb-check || true
+}
+
+post_install() {
+    grant
+}
+
+post_upgrade() {
+    grant
+}
