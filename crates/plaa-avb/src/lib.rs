@@ -1,7 +1,8 @@
 //! plaa on an AVB network: a controller that finds the talkers and
-//! listeners there and connects them, and on Linux plaa's own Milan
-//! entity, whose one stream output sends what plaa plays once a listener
-//! is ready for it.
+//! listeners there and connects them, and a talker sending what plaa
+//! plays once a listener is ready for it: on Linux plaa's own Milan
+//! entity, whose one stream output sends it, and on a Mac the Mac's own
+//! entity, which macOS runs and plaa plays into (`host`).
 //!
 //! One thread runs it all on the interface, as triib's endpoint daemon
 //! does: frames from raw sockets, the controller's and the entity's state
@@ -13,6 +14,8 @@
 
 #[cfg(target_os = "linux")]
 mod gptp;
+#[cfg(target_os = "macos")]
+mod host;
 #[cfg(target_os = "linux")]
 mod own;
 #[cfg(target_os = "linux")]
@@ -186,27 +189,38 @@ pub fn check_access() -> io::Result<()> {
     avb_net::check_access()
 }
 
-/// An interface AVB can run on: wired, and on Linux with a PTP hardware
-/// clock for the stream's times.
+/// An interface AVB can run on: wired.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Interface {
     pub name: String,
     pub up: bool,
-    /// Whether it can send a stream: it has a PTP hardware clock.
-    pub clock: bool,
+    /// Whether plaa can send a stream on it: on Linux it has a PTP
+    /// hardware clock for the stream's times, on a Mac AVB is on for it.
+    pub can_send: bool,
 }
 
-/// The computer's wired interfaces, those with a PTP hardware clock first.
+/// The computer's wired interfaces, those plaa can send on first.
 pub fn interfaces() -> Vec<Interface> {
     let mut found: Vec<Interface> = avb_net::interfaces()
         .into_iter()
         .filter(|interface| interface.physical && !interface.wireless)
         .map(|interface| Interface {
+            can_send: can_send(&interface),
             name: interface.name,
             up: interface.up,
-            clock: interface.hardware_clock.is_some(),
         })
         .collect();
-    found.sort_by_key(|interface| (!interface.clock, interface.name.clone()));
+    found.sort_by_key(|interface| (!interface.can_send, interface.name.clone()));
     found
+}
+
+#[cfg(not(target_os = "macos"))]
+fn can_send(interface: &avb_net::Interface) -> bool {
+    cfg!(target_os = "linux") && interface.hardware_clock.is_some()
+}
+
+/// On a Mac, the Mac's own entity sends, once AVB is on for the interface.
+#[cfg(target_os = "macos")]
+fn can_send(interface: &avb_net::Interface) -> bool {
+    atdecc::blocking::avb_enabled(&interface.name) == Some(true)
 }

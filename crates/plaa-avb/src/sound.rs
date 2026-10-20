@@ -59,13 +59,13 @@ impl Sound {
     }
 
     /// The buffer the talker takes the frames from.
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    #[cfg_attr(not(any(target_os = "linux", target_os = "macos")), allow(dead_code))]
     pub(crate) fn buffer(&self) -> SharedBuffer {
         self.inner().shared.clone()
     }
 
     /// Sends in `channels` from now on, a new buffer taking the frames.
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    #[cfg_attr(not(any(target_os = "linux", target_os = "macos")), allow(dead_code))]
     pub(crate) fn set_channels(&self, channels: u16) {
         let mut inner = self.inner();
         if inner.shared.channels != channels {

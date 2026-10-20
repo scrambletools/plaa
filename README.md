@@ -125,15 +125,14 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   Recording: the camera's picture shows, mirrored, as it records, with
   the sound of a microphone if chosen, in the screen recording's formats
   and rates; the recording itself is as the camera sees.
-- **Send what plays over AVB** (Milan) on Linux: plaa becomes a talker
+- **Send what plays over AVB** (Milan): on Linux plaa becomes a talker
   entity of its own, named as Settings say, with a stereo 48 kHz AAF
   stream on gPTP time, which any Milan controller can connect, and which
-  sends the sound of the window last played once a listener is ready.
-- **Network Audio**: the AVB talkers and listeners on the interface
-  Settings choose, on Linux, macOS and Windows, with what each listener
-  is bound to; connect plaa to a listener with a switch, or any talker's
-  output to any listener's input, the listener's format following the
-  talker's where it can.
+  sends the sound of the window last played once a listener is ready; on
+  a Mac it sends through the Mac's own AVB entity, as triib does.
+- **Network Audio**: the listeners on the interface Settings choose that
+  can play what plays, by name, each with one button: play there, stop,
+  or the formats both share, the listener's format following plaa's.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
@@ -228,6 +227,17 @@ pinned by commit. To change them alongside, `cargo --config
 .cargo/avb-local.toml build` builds against a checkout beside this one,
 from a git-ignored file with `[patch."https://github.com/scrambletools/avb"]`
 path entries for `atdecc`, `avb-mrp`, `avb-net` and `avb-stream`.
+
+### AVB on a Mac
+
+On a Mac, plaa's talker is the Mac's own AVB entity, which macOS runs
+once AVB is on for the port in Audio MIDI Setup's Network Device
+Browser. plaa's controller reaches it through Apple's AudioVideoBridging
+framework, as triib does, and while one of its stream outputs is
+connected, macOS makes a Core Audio device of it, which plaa plays what
+it plays into, in its first two channels. Finding the other entities
+takes the BPF devices, which the installer opens to the user, as
+triib's does.
 
 ### Changing scramble-ui alongside
 

@@ -486,8 +486,10 @@ impl Plaa {
     fn network_settings(&self) -> iced::widget::Column<'_, SettingsMessage> {
         let off = crate::fl!("settings-avb-off");
         let label = |interface: &plaa_avb::Interface| {
-            if interface.clock {
+            if interface.can_send {
                 interface.name.clone()
+            } else if cfg!(target_os = "macos") {
+                crate::fl!("settings-avb-off-mac", interface = interface.name.clone())
             } else {
                 crate::fl!("settings-avb-no-clock", interface = interface.name.clone())
             }
@@ -511,19 +513,28 @@ impl Plaa {
             )
         })
         .width(Fill);
+        let idle_note = if cfg!(target_os = "macos") {
+            crate::fl!("settings-avb-talker-note-mac")
+        } else {
+            crate::fl!("settings-avb-talker-note")
+        };
         let talker_note = match &self.avb_snapshot.talker {
-            _ if self.settings.avb_interface.is_none() => crate::fl!("settings-avb-talker-note"),
+            _ if self.settings.avb_interface.is_none() => idle_note,
             plaa_avb::TalkerState::Blocked(why) => {
                 crate::fl!("network-blocked", reason = why.clone())
             }
             plaa_avb::TalkerState::Waiting => crate::fl!("network-waiting"),
             plaa_avb::TalkerState::Streaming => crate::fl!("network-sending"),
-            plaa_avb::TalkerState::Off => crate::fl!("settings-avb-talker-note"),
+            plaa_avb::TalkerState::Off => idle_note,
         };
         let mut content = column![
             column![
                 scramble_ui::styled(crate::fl!("settings-avb-interface"), Type::BodyLarge),
-                note(crate::fl!("settings-avb-interface-note")),
+                note(if cfg!(target_os = "macos") {
+                    crate::fl!("settings-avb-interface-note-mac")
+                } else {
+                    crate::fl!("settings-avb-interface-note")
+                }),
                 pick,
             ]
             .spacing(8),
@@ -540,6 +551,10 @@ impl Plaa {
             self.settings.avb_talker,
             SettingsMessage::AvbTalker,
         ));
+        // macOS names the Mac's own entity, in Audio MIDI Setup.
+        if cfg!(target_os = "macos") {
+            return content;
+        }
         content = content.push(component::text_field(
             crate::fl!("settings-avb-name"),
             &self.settings.avb_name,

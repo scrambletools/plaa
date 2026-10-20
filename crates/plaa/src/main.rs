@@ -145,16 +145,25 @@ fn print_interfaces() {
         .map(|interface| interface.name.len())
         .max()
         .unwrap_or(0);
+    let (can, cannot) = if cfg!(target_os = "macos") {
+        (
+            "AVB on, can send AVB streams",
+            "AVB off in Audio MIDI Setup",
+        )
+    } else if cfg!(target_os = "linux") {
+        (
+            "PTP hardware clock, can send AVB streams",
+            "no PTP hardware clock",
+        )
+    } else {
+        ("can send AVB streams", "lists only")
+    };
     for interface in interfaces {
         println!(
             "{:<width$}  {:<4}  {}",
             interface.name,
             if interface.up { "up" } else { "down" },
-            if interface.clock {
-                "PTP hardware clock, can send AVB streams"
-            } else {
-                "no PTP hardware clock"
-            },
+            if interface.can_send { can } else { cannot },
         );
     }
 }

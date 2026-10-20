@@ -1,6 +1,6 @@
 [package]
 name = "plaa-avb"
-description = "plaa on an AVB network: a Milan controller, and on Linux plaa's own entity sending what plays"
+description = "plaa on an AVB network: a Milan controller, and a talker sending what plays, on Linux plaa's own entity, on a Mac the Mac's own"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,3 +15,8 @@ atdecc.workspace = true
 avb-mrp.workspace = true
 avb-net.workspace = true
 avb-stream.workspace = true
+
+# The Mac's own AVB entity's Core Audio device, found by its UID.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-core-audio = { version = "0.3", default-features = false, features = ["std", "AudioHardware", "objc2", "objc2-core-audio-types", "objc2-foundation"] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFString"] }

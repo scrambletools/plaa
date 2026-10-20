@@ -229,6 +229,9 @@ settings-avb-interface-note = The wired port plaa finds AVB and Milan talkers an
 settings-avb-off = Off
 # An interface plaa can list streams on but not send from.
 settings-avb-no-clock = { $interface } (lists only: no PTP clock)
+settings-avb-off-mac = { $interface } (lists only: AVB is off)
+settings-avb-interface-note-mac = The wired port plaa finds AVB and Milan talkers and listeners on. Sending goes through this Mac's own AVB entity, which needs AVB turned on for the port in Audio MIDI Setup's Network Device Browser.
+settings-avb-talker-note-mac = plaa sends the sound of the window last played through this Mac's own AVB entity, to the listeners connected to it.
 settings-avb-talker = Send what plays
 settings-avb-talker-note = plaa becomes a Milan talker, sending the sound of the window last played to the listeners connected to it.
 settings-avb-name = Name on the network

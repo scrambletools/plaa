@@ -2,6 +2,8 @@
 //! reader threads and commands from the app come in on one channel; the
 //! controller, and on Linux plaa's entity, run their timers and send what
 //! they queue; and what the controller has read is laid out for the app.
+//! On a Mac, commands to the Mac's own entity, plaa's talker there, go
+//! through Apple's AVB framework, which answers them.
 
 use std::collections::{HashMap, VecDeque};
 use std::io;
@@ -20,6 +22,8 @@ use avb_net::Socket;
 
 #[cfg(target_os = "linux")]
 use crate::gptp;
+#[cfg(target_os = "macos")]
+use crate::host::Host;
 #[cfg(target_os = "linux")]
 use crate::own::{self, Own};
 use crate::sound::Sound;
@@ -41,6 +45,22 @@ enum Step {
 
 /// The longest the thread waits without looking at its timers.
 const MOST_WAIT: Duration = Duration::from_millis(250);
+
+/// The longest wait while the Mac's own entity owes answers, which come
+/// through the framework, not the socket.
+#[cfg(target_os = "macos")]
+const LOCAL_WAIT: Duration = Duration::from_millis(2);
+
+/// Apple's framework on the interface, opened and used on the runtime's
+/// thread alone.
+#[cfg(target_os = "macos")]
+struct OnThread(Option<atdecc::blocking::Local>);
+
+// SAFETY: it holds nothing while the runtime moves to its thread, which
+// alone opens the framework and uses it.
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+unsafe impl Send for OnThread {}
 
 pub(crate) enum Input {
     /// An ATDECC or MAAP frame, and who sent it.
@@ -137,6 +157,13 @@ pub(crate) fn start(
     controller_config.read_talker_state = false;
     controller_config.lite_status = false;
     controller_config.wireless_status = false;
+    // Without Apple's framework the Mac's own entity is out of reach, so
+    // the controller leaves what is advertised from this address alone,
+    // until AVB is on and the runtime's thread opens the framework.
+    #[cfg(target_os = "macos")]
+    if atdecc::blocking::avb_enabled(&config.interface) != Some(true) {
+        controller_config.own_mac = Some(mac);
+    }
     let mut runtime = Runtime {
         start: std::time::Instant::now(),
         mac,
@@ -145,6 +172,14 @@ pub(crate) fn start(
         pending: HashMap::new(),
         #[cfg(target_os = "linux")]
         own: None,
+        #[cfg(target_os = "macos")]
+        interface: config.interface.clone(),
+        #[cfg(target_os = "macos")]
+        controller_config,
+        #[cfg(target_os = "macos")]
+        local: OnThread(None),
+        #[cfg(target_os = "macos")]
+        host: None,
         talker: TalkerState::Off,
         failure: None,
         inputs,
@@ -161,10 +196,15 @@ pub(crate) fn start(
             Err(error) => runtime.talker = TalkerState::Blocked(error.to_string()),
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
+    if config.talker {
+        runtime.host = Some(Host::new(&config.interface, mac, sound));
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     if config.talker {
         let _ = sound;
-        runtime.talker = TalkerState::Blocked("plaa sends streams on Linux only, for now".into());
+        runtime.talker =
+            TalkerState::Blocked("plaa sends streams on Linux and macOS only, for now".into());
     }
     let thread = std::thread::Builder::new()
         .name("plaa-avb".into())
@@ -181,6 +221,18 @@ struct Runtime {
     pending: HashMap<CommandId, VecDeque<Step>>,
     #[cfg(target_os = "linux")]
     own: Option<Own>,
+    #[cfg(target_os = "macos")]
+    interface: String,
+    /// The controller's, to start it again once the framework opens.
+    #[cfg(target_os = "macos")]
+    controller_config: controller::Config,
+    /// The Mac's own entities, through Apple's framework, opened on the
+    /// runtime's thread, which alone uses it.
+    #[cfg(target_os = "macos")]
+    local: OnThread,
+    /// The Mac's own entity, as plaa's talker.
+    #[cfg(target_os = "macos")]
+    host: Option<Host>,
     /// The talker's state where there is no entity to ask.
     talker: TalkerState,
     failure: Option<String>,
@@ -200,6 +252,8 @@ impl Runtime {
     }
 
     fn run(mut self) {
+        #[cfg(target_os = "macos")]
+        self.open_local();
         #[cfg(target_os = "linux")]
         {
             let (now, since) = (self.now(), self.since());
@@ -242,6 +296,14 @@ impl Runtime {
             .and_then(|own| own.poll_timeout(now, self.since()));
         #[cfg(not(target_os = "linux"))]
         let own = None;
+        #[cfg(target_os = "macos")]
+        let own = self
+            .local
+            .0
+            .as_ref()
+            .is_some_and(atdecc::blocking::Local::waiting)
+            .then_some(LOCAL_WAIT)
+            .or(own);
         [controller, own, Some(MOST_WAIT)]
             .into_iter()
             .flatten()
@@ -294,11 +356,14 @@ impl Runtime {
                 self.failure = None;
                 self.controller.disconnect(now, listener);
             }
-            Input::SoundRate =>
-            {
+            Input::SoundRate => {
                 #[cfg(target_os = "linux")]
                 if let Some(own) = &mut self.own {
                     own.sound_changed();
+                }
+                #[cfg(target_os = "macos")]
+                if let Some(host) = &mut self.host {
+                    host.sound_changed();
                 }
             }
             Input::Stop => {}
@@ -381,12 +446,21 @@ impl Runtime {
     fn turn(&mut self) {
         let now = self.now();
         let since = self.since();
+        #[cfg(target_os = "macos")]
+        self.take_local();
         self.controller.handle_timeout(now);
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         let talker_before = self.talker_state();
         #[cfg(target_os = "linux")]
         if let Some(own) = &mut self.own {
             own.turn(now, since);
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(host) = &mut self.host {
+            host.turn(&self.controller);
+            if host.avb_on() && self.local.0.is_none() {
+                self.open_local();
+            }
         }
         let _ = since;
         let mut changed = false;
@@ -398,7 +472,7 @@ impl Runtime {
                 break;
             }
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             changed |= self.talker_state() != talker_before;
         }
@@ -443,6 +517,10 @@ impl Runtime {
         let mut from_controller = Vec::new();
         while let Ok(Some(transmit)) = self.controller.poll_transmit(&mut out) {
             let bytes = &out[..transmit.length];
+            #[cfg(target_os = "macos")]
+            if self.send_local(bytes) {
+                continue;
+            }
             let _ = self.avtp.send(transmit.destination, bytes);
             if transmit.destination == ADP_ACMP_MULTICAST || transmit.destination == self.mac {
                 from_controller.push(bytes.to_vec());
@@ -471,10 +549,62 @@ impl Runtime {
         handed
     }
 
+    /// Opens Apple's framework on the interface once AVB is on for it: a
+    /// controller that left the Mac's own entity alone starts again,
+    /// reaching it.
+    #[cfg(target_os = "macos")]
+    fn open_local(&mut self) {
+        if self.local.0.is_some() {
+            return;
+        }
+        let entity_id = self.controller_config.entity_id;
+        let Some(local) = atdecc::blocking::Local::open(&self.interface, entity_id) else {
+            return;
+        };
+        self.local.0 = Some(local);
+        if self.controller_config.own_mac.take().is_some() {
+            self.controller = Controller::new(self.controller_config);
+            self.controller.discover(None);
+        }
+    }
+
+    /// Hands the controller what the Mac's own entity answered through
+    /// the framework, as frames from it.
+    #[cfg(target_os = "macos")]
+    fn take_local(&mut self) {
+        let now = self.now();
+        while let Some(bytes) = self
+            .local
+            .0
+            .as_ref()
+            .and_then(atdecc::blocking::Local::poll)
+        {
+            let _ = self.controller.handle_frame(now, self.mac, &bytes);
+        }
+    }
+
+    /// Sends a command to the Mac's own entity through the framework,
+    /// returning whether it did.
+    #[cfg(target_os = "macos")]
+    fn send_local(&self, bytes: &[u8]) -> bool {
+        let Some(local) = &self.local.0 else {
+            return false;
+        };
+        local.send(bytes, |entity_id| {
+            self.controller
+                .entity(entity_id)
+                .is_some_and(|entity| entity.mac == self.mac)
+        })
+    }
+
     fn talker_state(&self) -> TalkerState {
         #[cfg(target_os = "linux")]
         if let Some(own) = &self.own {
             return own.state();
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(host) = &self.host {
+            return host.state();
         }
         self.talker.clone()
     }
@@ -483,7 +613,9 @@ impl Runtime {
     fn publish(&mut self) {
         #[cfg(target_os = "linux")]
         let own = self.own.as_ref().map(Own::entity_id);
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(target_os = "macos")]
+        let own = self.host.as_ref().and_then(Host::entity_id);
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         let own: Option<EntityId> = None;
         let mut entities: Vec<Found> = self
             .controller

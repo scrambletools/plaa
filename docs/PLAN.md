@@ -41,7 +41,7 @@ look follows Material Design 3, as in prev.
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first; the 38 languages prev has once the interface settles |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
-| AVB and Milan | plaa's own Milan entity, with triib's `atdecc`, `avb-mrp` and `avb-net` crates pinned by revision: a talker of what plays, and a listener to play or record a stream. Linux first, with ptp4l as triib runs it; audio first (AAF, AM824), IEEE 1722 CVF video later |
+| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb pinned by revision: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
 | Distribution | As prev, once the features settle: .deb, .rpm, AppImage, tarball, Flatpak, PKGBUILD, MSI and zip, disk image |
 
 ## Scope
@@ -441,6 +441,16 @@ dialogs and screen sharing. `plaa-netraw`, built beside it, is the one
 file granted CAP_NET_RAW. plaa starts it once, and every raw socket the
 avb crates open comes from it, passed over a Unix socket
 (`avb_net::broker`), as triib's binaries get theirs too.
+
+On a Mac, the talker is the Mac's own entity, which macOS runs once AVB
+is on for the port in Audio MIDI Setup: macOS never shows its AVB stack
+what a program writes to BPF, so the controller sends that entity its
+commands through Apple's AudioVideoBridging framework
+(`atdecc::blocking::Local`), which answers them, and the Network Audio
+sheet offers the entity's first output as plaa's. While one of its
+stream outputs is connected, macOS makes a Core Audio device of it; plaa
+plays into its first two channels from the same buffer the Linux talker
+drains, steering both sides to their clocks (`host.rs`).
 
 Two MRP participants on one port withdraw each other's declarations, so
 where triib's entity service runs on the interface, the entity reserves

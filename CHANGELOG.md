@@ -69,6 +69,10 @@ The first build.
   plays as a stereo AAF stream on gPTP time, beside triib's entity
   service, which reserves the stream for it, and a Network Audio sheet
   listing the listeners that can play it.
+- On a Mac, plaa sends through the Mac's own AVB entity, turned on in
+  Audio MIDI Setup, as triib uses it: its controller reaches the entity
+  through Apple's AVB framework, and plaa plays into the Core Audio
+  device macOS makes of it while a listener is connected.
 - Prism, a visualizer in three dimensions filling the window, drawn on
   the graphics card from shapes alone, no pictures, moved by the
   spectrum and its beats.
