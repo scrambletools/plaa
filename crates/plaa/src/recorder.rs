@@ -30,6 +30,9 @@ pub enum RecorderControl {
     Quality(u32),
     /// What a screen recording is recorded as.
     Video(Format),
+    /// The most pictures a second a screen recording keeps; 0 for every
+    /// picture the screen sends.
+    Rate(u32),
     /// Asks the system again what to record.
     Reshare,
     /// Records this screen or window, where plaa offers them.
@@ -184,6 +187,8 @@ pub struct Context<'a> {
     pub quality: u32,
     /// What a screen recording is recorded as.
     pub video: Format,
+    /// The most pictures a second it keeps; 0 for every picture.
+    pub rate: u32,
     /// The screens and windows plaa offers to record, where it lists them.
     pub offers: &'a [Offered],
     pub close_button: bool,
@@ -248,7 +253,7 @@ fn sound_body<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, 
     };
     let recording = recorder.is_recording();
     let busy = recording || recorder.saving;
-    let (time, size) = progress(microphone.recorded(), busy);
+    let (time, size) = progress(microphone.recorded(), 0, busy);
     container(
         column![
             time,
@@ -301,7 +306,7 @@ fn screen_body<'a>(
     };
     let recording = recorder.is_recording();
     let busy = recording || recorder.saving;
-    let (time, size) = progress(capture.recorded(), busy);
+    let (time, size) = progress(capture.recorded(), capture.dropped(), busy);
     let ended = capture.ended_because().is_some();
     let shared = if ended {
         crate::fl!("record-screen-ended")
@@ -405,7 +410,7 @@ fn screen_body<'a>(
         controls = controls.push(meters(&recorder.levels));
     }
     controls = controls
-        .push(video_menu(context.video, busy))
+        .push(video_menus(context.video, context.rate, busy))
         .push(record_button(recording, !recorder.saving && !ended));
     container(controls).center(Fill).into()
 }
@@ -484,21 +489,24 @@ fn shortened(name: &str) -> String {
 /// and as it is saved.
 fn progress<'a>(
     (recorded, written): (Duration, u64),
+    dropped: u64,
     busy: bool,
 ) -> (Element<'a, RecorderControl>, Element<'a, RecorderControl>) {
     let time = format::precise_time(
         if busy { recorded.as_secs_f64() } else { 0.0 },
         recorded >= Duration::from_secs(3600),
     );
-    let size = scramble_ui::styled(
-        if busy {
-            format::size(written)
-        } else {
-            String::new()
-        },
-        Type::BodyMedium,
-    )
-    .style(style::on_surface_variant);
+    // Pictures dropped as the encoder fell behind, where there were any.
+    let size = match (busy, dropped) {
+        (false, _) => String::new(),
+        (true, 0) => format::size(written),
+        (true, count) => crate::fl!(
+            "record-dropped",
+            size = format::size(written),
+            count = count
+        ),
+    };
+    let size = scramble_ui::styled(size, Type::BodyMedium).style(style::on_surface_variant);
     (
         scramble_ui::styled(time, Type::DisplaySmall).into(),
         size.into(),
@@ -733,20 +741,51 @@ impl std::fmt::Display for VideoFormat {
     }
 }
 
-/// The format a screen recording is recorded in, fixed while recording.
-fn video_menu<'a>(video: Format, busy: bool) -> Element<'a, RecorderControl> {
-    if busy {
-        return scramble_ui::styled(VideoFormat(video).to_string(), Type::LabelLarge)
-            .style(style::on_surface_variant)
-            .into();
+/// The most pictures a second, as the rate menu lists it: 0 for every
+/// picture the screen sends.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Rate(u32);
+
+impl Rate {
+    const OFFERED: [u32; 5] = [24, 30, 60, 120, 0];
+}
+
+impl std::fmt::Display for Rate {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&match self.0 {
+            0 => crate::fl!("record-rate-every"),
+            rate => crate::fl!("record-rate", rate = rate),
+        })
     }
-    dropdown::pick(
+}
+
+/// The format a screen recording is recorded in, and its pictures a
+/// second, fixed while recording.
+fn video_menus<'a>(video: Format, rate: u32, busy: bool) -> Element<'a, RecorderControl> {
+    if busy {
+        return scramble_ui::styled(
+            format!("{} · {}", VideoFormat(video), Rate(rate)),
+            Type::LabelLarge,
+        )
+        .style(style::on_surface_variant)
+        .into();
+    }
+    let formats = dropdown::pick(
         Format::VIDEO.into_iter().map(VideoFormat),
         Some(VideoFormat(video)),
         |VideoFormat(format)| RecorderControl::Video(format),
     )
-    .tip(crate::fl!("export-format"))
-    .into()
+    .tip(crate::fl!("export-format"));
+    let rates = dropdown::pick(
+        Rate::OFFERED.into_iter().map(Rate),
+        Some(Rate(rate)),
+        |Rate(rate)| RecorderControl::Rate(rate),
+    )
+    .tip(crate::fl!("record-rate-tip"));
+    scramble_ui::dir::row(vec![formats.into(), rates.into()])
+        .spacing(8)
+        .align_y(Center)
+        .into()
 }
 
 #[cfg(test)]

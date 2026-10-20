@@ -4,8 +4,8 @@
 //! its number.
 //!
 //! cargo run --release -p plaa-media --example screen -- [--format
-//! h264|hevc|av1] [--software] [--sound <device id>] <node or screen>
-//! <seconds> <to>
+//! h264|hevc|av1] [--software] [--rate <pictures a second>] [--sound
+//! <device id>] <node or screen> <seconds> <to>
 
 fn main() {
     #[cfg(any(target_os = "linux", windows))]
@@ -24,13 +24,14 @@ mod record {
 
     use plaa_media::export::Format;
     use plaa_media::record::{Microphone, RecordEvent, input_devices};
-    use plaa_media::screen::ScreenCapture;
+    use plaa_media::screen::{ScreenCapture, ScreenEncoding};
 
     pub fn main() {
         let mut arguments = std::env::args().skip(1).peekable();
         let mut format = Format::H264;
         let mut hardware = true;
         let mut sound = None;
+        let mut rate = None;
         while let Some(option) = arguments.next_if(|argument| argument.starts_with("--")) {
             match option.as_str() {
                 "--format" => {
@@ -41,6 +42,7 @@ mod record {
                     }
                 }
                 "--software" => hardware = false,
+                "--rate" => rate = arguments.next().and_then(|text| text.parse().ok()),
                 "--sound" => sound = arguments.next(),
                 other => {
                     eprintln!("unknown option {other}");
@@ -54,7 +56,8 @@ mod record {
             arguments.next(),
         ) else {
             eprintln!(
-                "usage: screen [--format h264|hevc|av1] [--software] [--sound <device id>] \
+                "usage: screen [--format h264|hevc|av1] [--software] [--rate <per second>] \
+                 [--sound <device id>] \
                  <node or screen> <seconds> <to>"
             );
             std::process::exit(2);
@@ -85,7 +88,11 @@ mod record {
         let (sender, receiver) = mpsc::channel();
         if let Err(error) = capture.record(
             microphone.as_ref(),
-            (format, hardware),
+            ScreenEncoding {
+                format,
+                hardware,
+                rate,
+            },
             PathBuf::from(destination),
             Duration::ZERO,
             move |event| {
@@ -100,9 +107,10 @@ mod record {
             std::thread::sleep(Duration::from_millis(500));
             let (recorded, written) = capture.recorded();
             println!(
-                "{:.1} s recorded, {written} bytes, {:?}",
+                "{:.1} s recorded, {written} bytes, {:?}, {} dropped",
                 recorded.as_secs_f64(),
-                capture.size()
+                capture.size(),
+                capture.dropped()
             );
             if let Some(reason) = capture.ended_because() {
                 println!("the stream ended: {reason}");

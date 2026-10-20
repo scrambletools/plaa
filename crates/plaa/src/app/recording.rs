@@ -6,6 +6,7 @@ use std::time::Duration;
 use iced::{Element, Size, Task, window};
 use plaa_media::export::{Format, Sound};
 use plaa_media::record::{Microphone, RecordEvent};
+use plaa_media::screen::ScreenEncoding;
 use plaa_media::{Quality, Source};
 
 use super::{Content, Message, Opening, Plaa};
@@ -56,12 +57,12 @@ fn tray_shows() -> bool {
     false
 }
 
-/// Starts recording `recorder`'s screen, `after` from now, saving it in
-/// `folder`; window `id` hears when it is saved.
+/// Starts recording `recorder`'s screen as `encoding` says, `after` from
+/// now, saving it in `folder`; window `id` hears when it is saved.
 fn record_screen(
     recorder: &mut Recorder,
     id: window::Id,
-    (video, hardware): (Format, bool),
+    encoding: ScreenEncoding,
     folder: &std::path::Path,
     after: Duration,
 ) -> Result<(), String> {
@@ -79,13 +80,9 @@ fn record_screen(
     std::fs::create_dir_all(folder).map_err(|error| error.to_string())?;
     let name = format!("{}.mp4", crate::fl!("record-screen-file-name"));
     let destination = crate::screenshot::unused(&folder.join(name));
-    capture.record(
-        microphone,
-        (video, hardware),
-        destination,
-        after,
-        move |event| crate::post(External::Recorded(id, event)),
-    )
+    capture.record(microphone, encoding, destination, after, move |event| {
+        crate::post(External::Recorded(id, event))
+    })
 }
 
 impl Plaa {
@@ -223,6 +220,7 @@ impl Plaa {
                 sound,
                 quality,
                 video: self.recording_video(),
+                rate: self.settings.screen_rate,
                 offers: &self.offers,
                 close_button,
             },
@@ -248,7 +246,11 @@ impl Plaa {
         }
         let sound = self.recording_sound();
         let video = self.recording_video();
-        let hardware = self.settings.hardware_decoding;
+        let encoding = ScreenEncoding {
+            format: video,
+            hardware: self.settings.hardware_decoding,
+            rate: Some(self.settings.screen_rate).filter(|rate| *rate > 0),
+        };
         let folder = self.settings.recordings.clone();
         // One recording hides at a time.
         let can_hide = self.hidden.is_none();
@@ -285,7 +287,7 @@ impl Plaa {
                     return Task::none();
                 }
                 let after = if hides { HIDING } else { Duration::ZERO };
-                match record_screen(recorder, id, (video, hardware), &folder, after) {
+                match record_screen(recorder, id, encoding, &folder, after) {
                     Ok(()) if hides => {
                         recorder.hiding = true;
                         return window::close(id);
@@ -371,6 +373,10 @@ impl Plaa {
             }
             RecorderControl::Video(format) => {
                 self.settings.screen_format = format.key().to_owned();
+                self.save_settings();
+            }
+            RecorderControl::Rate(rate) => {
+                self.settings.screen_rate = rate;
                 self.save_settings();
             }
             RecorderControl::Settings

@@ -27,9 +27,9 @@ const FIRST_PICTURE: Duration = Duration::from_secs(5);
 /// none, so the last one kept starts a recording.
 #[cfg(any(target_os = "linux", windows, test))]
 const KEEP_EVERY: Duration = Duration::from_millis(250);
-/// The frame rate encoders are told, for their rate control; pictures
-/// come as the screen changes.
-const RATE: i32 = 60;
+/// The frame rate encoders are told, for their rate control, when every
+/// picture the screen sends is kept; pictures come as the screen changes.
+const USUAL_RATE: u32 = 60;
 /// Timestamps count microseconds.
 const TIME_BASE: ffmpeg::Rational = ffmpeg::Rational(1, 1_000_000);
 
@@ -40,6 +40,8 @@ type Taken = (Instant, ffmpeg::frame::Video);
 pub(crate) struct Frames {
     waiting: Mutex<Waiting>,
     arrived: Condvar,
+    /// Pictures dropped while recording, as the encoder fell behind.
+    dropped: AtomicU64,
 }
 
 #[derive(Default)]
@@ -48,6 +50,66 @@ struct Waiting {
     queue: Option<VecDeque<Taken>>,
     /// The last picture kept.
     latest: Option<Taken>,
+    /// The rate pictures are kept to while recording, if any.
+    pace: Option<Pace>,
+}
+
+/// Pictures kept to a rate, the rest skipped before they are copied:
+/// credit for one picture builds up each `every`, and a picture is kept
+/// once there is most of one. A screen as fast as the rate or slower
+/// keeps every picture, though they come a little early or late, and a
+/// faster one keeps them as evenly as its own come. Unused where no
+/// capture hands pictures over yet.
+#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+struct Pace {
+    every: Duration,
+    /// Credit left when the last picture was kept, in pictures.
+    credit: f64,
+    last: Option<Instant>,
+}
+
+/// The credit a picture takes to be kept: most of one picture, so one
+/// that comes a little early still is.
+#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+const CREDIT_TO_KEEP: f64 = 0.75;
+/// The most credit there is: a little more than one picture's, so one
+/// that came late leaves the next its due, but a still screen saves next
+/// to nothing up for later.
+#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+const MOST_CREDIT: f64 = 1.25;
+
+#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+impl Pace {
+    /// The credit there is at `at`.
+    fn credit(&self, at: Instant) -> f64 {
+        match self.last {
+            None => 1.0,
+            Some(last) => {
+                let built = at.saturating_duration_since(last).as_secs_f64()
+                    / self.every.as_secs_f64().max(f64::EPSILON);
+                (self.credit + built).min(MOST_CREDIT)
+            }
+        }
+    }
+
+    fn takes(&self, at: Instant) -> bool {
+        self.credit(at) >= CREDIT_TO_KEEP
+    }
+
+    fn keep(&mut self, at: Instant) {
+        self.credit = self.credit(at) - 1.0;
+        self.last = Some(at);
+    }
+}
+
+/// How a screen is recorded: as `format`, on a graphics card when
+/// `hardware` allows, at most `rate` pictures a second, or as many as the
+/// screen sends when none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScreenEncoding {
+    pub format: Format,
+    pub hardware: bool,
+    pub rate: Option<u32>,
 }
 
 impl Frames {
@@ -56,6 +118,7 @@ impl Frames {
         Self {
             waiting: Mutex::new(Waiting::default()),
             arrived: Condvar::new(),
+            dropped: AtomicU64::new(0),
         }
     }
 
@@ -67,22 +130,34 @@ impl Frames {
     #[cfg(any(target_os = "linux", windows, test))]
     pub fn wanted(&self, at: Instant) -> bool {
         let waiting = self.waiting();
-        waiting.queue.is_some()
-            || waiting
-                .latest
-                .as_ref()
-                .is_none_or(|(kept, _)| at.saturating_duration_since(*kept) >= KEEP_EVERY)
+        if waiting.queue.is_some() {
+            return waiting.pace.as_ref().is_none_or(|pace| pace.takes(at));
+        }
+        waiting
+            .latest
+            .as_ref()
+            .is_none_or(|(kept, _)| at.saturating_duration_since(*kept) >= KEEP_EVERY)
     }
 
     /// Hands over a picture taken at `at`, unless too many wait.
     #[cfg(any(target_os = "linux", windows, test))]
     pub fn push(&self, at: Instant, frame: ffmpeg::frame::Video) {
         let mut waiting = self.waiting();
+        if waiting.queue.is_some()
+            && let Some(pace) = waiting.pace.as_mut()
+        {
+            if !pace.takes(at) {
+                return;
+            }
+            pace.keep(at);
+        }
         match waiting.queue.as_mut() {
             Some(queue) => {
                 if queue.len() < MOST_WAITING {
                     queue.push_back((at, frame));
                     self.arrived.notify_one();
+                } else {
+                    self.dropped.fetch_add(1, Ordering::Relaxed);
                 }
             }
             None => waiting.latest = Some((at, frame)),
@@ -90,8 +165,15 @@ impl Frames {
     }
 
     /// Starts taking every picture, the last one kept first.
-    fn start(&self) {
+    /// Keeping them to at most one each `every`, when given.
+    fn start(&self, every: Option<Duration>) {
+        self.dropped.store(0, Ordering::Relaxed);
         let mut waiting = self.waiting();
+        waiting.pace = every.map(|every| Pace {
+            every,
+            credit: 0.0,
+            last: None,
+        });
         let latest = waiting.latest.take();
         waiting.queue = Some(latest.into_iter().collect());
     }
@@ -216,15 +298,15 @@ impl ScreenCapture {
             .clone()
     }
 
-    /// Starts recording to `destination` in `format`, on a graphics card
-    /// when `hardware` allows, with the sound of `microphone` when given.
-    /// It begins `after` from now, as a window gets out of the way first:
-    /// of what shows until then, only the last picture is kept, which
-    /// begins it. `events` hears when it ends, from its thread.
+    /// Starts recording to `destination` as `encoding` says, with the
+    /// sound of `microphone` when given. It begins `after` from now, as a
+    /// window gets out of the way first: of what shows until then, only
+    /// the last picture is kept, which begins it. `events` hears when it
+    /// ends, from its thread.
     pub fn record(
         &mut self,
         microphone: Option<&crate::record::Microphone>,
-        (format, hardware): (Format, bool),
+        encoding: ScreenEncoding,
         destination: PathBuf,
         after: Duration,
         events: impl Fn(RecordEvent) + Send + 'static,
@@ -232,7 +314,7 @@ impl ScreenCapture {
         if self.recording.is_some() {
             return Err("already recording".to_owned());
         }
-        if matches!(format, Format::Sound(_)) {
+        if matches!(encoding.format, Format::Sound(_)) {
             return Err("a screen is recorded as video".to_owned());
         }
         self.progress.recorded.store(0, Ordering::Relaxed);
@@ -253,7 +335,7 @@ impl ScreenCapture {
                     let temporary = export::temporary_path(&destination);
                     let written = write(
                         (&frames, &shared, sound.as_ref()),
-                        (format, hardware),
+                        encoding,
                         &temporary,
                         (begin, &finish, &progress),
                     );
@@ -293,6 +375,12 @@ impl ScreenCapture {
             .is_some_and(|recording| !recording.finish.load(Ordering::Relaxed))
     }
 
+    /// How many pictures the recording has dropped so far, as the encoder
+    /// fell behind the screen.
+    pub fn dropped(&self) -> u64 {
+        self.frames.dropped.load(Ordering::Relaxed)
+    }
+
     /// How long the recording lasts so far, and how many bytes it takes.
     pub fn recorded(&self) -> (Duration, u64) {
         (
@@ -326,6 +414,9 @@ struct VideoSide {
     encoder: export::VideoEncoder,
     size: (u32, u32),
     graph: Option<(ffmpeg::filter::Graph, (u32, u32, Pixel))>,
+    /// How long a picture lasts at the rate the encoder is told, in
+    /// microseconds, for the packets that do not say.
+    duration: i64,
 }
 
 impl VideoSide {
@@ -395,7 +486,7 @@ impl VideoSide {
         let Some((graph, _)) = &mut self.graph else {
             return Ok(());
         };
-        let duration = i64::from(TIME_BASE.denominator() / RATE);
+        let duration = self.duration;
         let mut filtered = ffmpeg::frame::Video::empty();
         while let Some(mut sink) = graph.get("out")
             && sink.sink().frame(&mut filtered).is_ok()
@@ -423,8 +514,7 @@ impl VideoSide {
         }
         self.pull(output)?;
         let _ = self.encoder.encoder.send_eof();
-        let duration = i64::from(TIME_BASE.denominator() / RATE);
-        output.drain(&mut self.encoder.encoder, 0, TIME_BASE, duration)
+        output.drain(&mut self.encoder.encoder, 0, TIME_BASE, self.duration)
     }
 }
 
@@ -487,10 +577,16 @@ impl SoundSide {
 /// on a graphics card, and from `begin` if that is later.
 fn write(
     (frames, shared, sound): (&Frames, &CaptureShared, Option<&SoundTap>),
-    (format, hardware): (Format, bool),
+    encoding: ScreenEncoding,
     temporary: &std::path::Path,
     (begin, finish, progress): (Instant, &AtomicBool, &Progress),
 ) -> Result<(), ExportError> {
+    let ScreenEncoding {
+        format,
+        hardware,
+        rate,
+    } = encoding;
+    let told = rate.unwrap_or(USUAL_RATE).max(1);
     let waited = Instant::now();
     let (width, height) = loop {
         let size = *shared.size.lock().unwrap_or_else(PoisonError::into_inner);
@@ -512,7 +608,7 @@ fn write(
     let picture = Picture {
         width: size.0,
         height: size.1,
-        rate: ffmpeg::Rational::new(RATE, 1),
+        rate: ffmpeg::Rational::new(told as i32, 1),
         time_base: TIME_BASE,
         ten_bit: false,
         live: true,
@@ -574,8 +670,9 @@ fn write(
         encoder,
         size,
         graph: None,
+        duration: i64::from(TIME_BASE.denominator()) / i64::from(told),
     };
-    frames.start();
+    frames.start(rate.map(|rate| Duration::from_secs(1) / rate.max(1)));
     // Until it begins, each picture replaces the one before, the last
     // beginning the recording.
     let mut pending: Vec<Taken> = Vec::new();
@@ -605,8 +702,12 @@ fn write(
         let finishing = finish.load(Ordering::Relaxed);
         for (at, frame) in pending.drain(..) {
             let time = micros(at);
-            // Each later than the last, as encoders need.
+            // Each later than the last, as encoders need; those from
+            // before it began are left out, but the last of them.
             if last.as_ref().is_some_and(|(previous, _)| time <= *previous) {
+                if time > 0 {
+                    frames.dropped.fetch_add(1, Ordering::Relaxed);
+                }
                 continue;
             }
             last = Some((time, frame.clone()));
@@ -720,10 +821,10 @@ mod graphics_capture {
         // with, as it is, rather than cut.
         let arguments = match target {
             Target::Screen(number) => {
-                format!("monitor_idx={number}:capture_cursor=1:max_framerate=60")
+                format!("monitor_idx={number}:capture_cursor=1:max_framerate=240")
             }
             Target::Window(window) => {
-                format!("hwnd={window}:capture_cursor=1:max_framerate=60:resize_mode=scale_aspect")
+                format!("hwnd={window}:capture_cursor=1:max_framerate=240:resize_mode=scale_aspect")
             }
         };
         let mut graph = ffmpeg::filter::Graph::new();
@@ -1041,7 +1142,7 @@ mod tests {
         // Nothing is queued before recording; the last picture kept
         // comes first once it starts.
         assert!(frames.take(Duration::ZERO).is_empty());
-        frames.start();
+        frames.start(None);
         assert!(frames.wanted(start + Duration::from_millis(1)));
         let taken = frames.take(Duration::ZERO);
         assert_eq!(taken.len(), 1);
@@ -1053,6 +1154,62 @@ mod tests {
         assert_eq!(frames.take(Duration::ZERO).len(), MOST_WAITING);
         frames.end();
         assert!(frames.take(Duration::from_millis(50)).is_empty());
+    }
+
+    #[test]
+    fn pictures_are_kept_to_the_rate_chosen() {
+        crate::init();
+        // The pictures kept of `count` coming each `every`, give or take
+        // `jitter` by turns, and the shortest and longest gap between them.
+        let kept = |rate: Option<u32>, every: Duration, count: u32, jitter: Duration| {
+            let frames = Frames::new();
+            frames.start(rate.map(|rate| Duration::from_secs(1) / rate));
+            let origin = Instant::now() + Duration::from_millis(10);
+            let mut times = Vec::new();
+            for index in 0..count {
+                let ideal = origin + every * index;
+                let at = if index % 2 == 0 {
+                    ideal + jitter
+                } else {
+                    ideal - jitter
+                };
+                if frames.wanted(at) {
+                    frames.push(at, picture(4, 4, 1));
+                }
+                times.extend(frames.take(Duration::ZERO).into_iter().map(|(at, _)| at));
+            }
+            let gaps: Vec<Duration> = times.windows(2).map(|pair| pair[1] - pair[0]).collect();
+            (
+                times.len(),
+                gaps.iter().min().copied().unwrap_or_default(),
+                gaps.iter().max().copied().unwrap_or_default(),
+            )
+        };
+        let still = Duration::ZERO;
+        let ms = Duration::from_millis;
+        let hz = |rate: u32| Duration::from_secs(1) / rate;
+        // A second of a 120 Hz screen kept to 60: every other picture,
+        // evenly.
+        let (count, shortest, longest) = kept(Some(60), hz(120), 120, still);
+        assert!((59..=61).contains(&count), "{count}");
+        assert!(
+            shortest >= ms(16) && longest <= ms(17),
+            "{shortest:?} {longest:?}"
+        );
+        let (count, ..) = kept(Some(30), hz(120), 120, still);
+        assert!((29..=31).contains(&count), "{count}");
+        // Every picture, or a rate above the screen's: all of them.
+        assert_eq!(kept(None, hz(120), 120, still).0, 120);
+        assert_eq!(kept(Some(240), hz(120), 120, still).0, 120);
+        // A 60 Hz screen kept to 60 loses none, though its pictures come
+        // 2 ms early or late by turns, and at most one coming 3 ms so.
+        assert_eq!(kept(Some(60), hz(60), 60, ms(2)).0, 60);
+        assert!(kept(Some(60), hz(60), 60, ms(3)).0 >= 59);
+        // A 144 Hz screen kept to 60: no more than 60.
+        let (count, ..) = kept(Some(60), hz(144), 144, still);
+        assert!((58..=61).contains(&count), "{count}");
+        // A screen that sends less often than the rate loses nothing.
+        assert_eq!(kept(Some(60), ms(100), 10, still).0, 10);
     }
 
     #[test]
@@ -1079,7 +1236,11 @@ mod tests {
             let writer = scope.spawn(|| {
                 write(
                     (&frames, &shared, None),
-                    (Format::H264, true),
+                    ScreenEncoding {
+                        format: Format::H264,
+                        hardware: true,
+                        rate: None,
+                    },
                     &path,
                     (begin, &finish, &progress),
                 )

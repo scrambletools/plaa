@@ -209,6 +209,19 @@ ends. Stopping sharing from the desktop ends the recording, saved as
 it is; closing the window ends the portal's session, or the compositor
 would keep copying the screen.
 
+A screen sends as many pictures as it refreshes, 120 or more a second
+on some, while it changes. A recording keeps at most the rate chosen
+(60 by default), skipping the rest before they are copied: credit for
+a picture builds with time, one is kept once there is three quarters
+of a picture's, and up to a quarter more carries over. So a screen as
+fast as the rate keeps every picture though they come a few
+milliseconds early or late, a faster one keeps them evenly spaced, and
+a still screen saves nothing up. Measured at 3840×1080 from a 120
+picture source: NVENC keeps every picture at any rate; x264 drops none
+at 60 and about one in fifteen at 120. Pictures dropped because the
+encoder fell behind, with eight waiting, are counted and shown beside
+the size.
+
 Recording a screen or a region would show the recording window, so it
 closes first, after a warning saying how to stop: no system lets a
 Wayland window hide itself (Hyprland ignores minimizing), so the window

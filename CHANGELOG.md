@@ -50,6 +50,9 @@ The first build.
   computer plays, encoded on the graphics card where it can. Recording
   a screen, plaa's recording window hides, and a red dot in the tray,
   or opening plaa again, stops it.
+- Screen recordings at 24, 30, 60 or 120 pictures a second, or every
+  picture the screen sends, and the pictures dropped shown as they
+  record.
 - Recording the screen or a window on Windows, through Windows.Graphics.
   Capture, and recording what the computer plays there through each
   output's loopback.

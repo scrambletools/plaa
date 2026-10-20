@@ -349,6 +349,13 @@ record-screen-main = Screen { $number } (main)
 record-screens = Screens
 record-windows = Windows
 record-screen-what = What to record
+# The most pictures a second a screen recording keeps, as "60 fps".
+record-rate = { $rate } fps
+record-rate-every = Every picture
+record-rate-tip = Pictures a second
+# The recording's size, and the pictures it dropped as the encoder fell
+# behind, as "12.3 MB · 4 dropped".
+record-dropped = { $size } · { $count } dropped
 record-screen-window = Window
 # What is shared and its size, as "Whole screen · 3840 × 2160".
 record-screen-size = { $what } · { $width } × { $height }

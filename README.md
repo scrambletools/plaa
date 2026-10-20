@@ -101,7 +101,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   window or (on Linux) a region, as the system's picker offers on
   Linux and plaa lists them on Windows, with the pointer, and the sound
   of a microphone or of what the computer plays if chosen, as H.264,
-  HEVC or AV1 on the graphics card's encoder where one opens. Recording
+  HEVC or AV1 on the graphics card's encoder where one opens, at 24,
+  30, 60 or 120 pictures a second or every picture the screen sends;
+  pictures dropped because the encoder fell behind show beside the
+  size. Recording
   a screen, the recording window gets out of the way, after saying how
   to stop: click the red dot plaa puts in the tray (on Linux), or open
   plaa again. A recording also ends when the screen is no longer shared

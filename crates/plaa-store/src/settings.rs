@@ -87,6 +87,9 @@ pub struct Settings {
     pub screen_sound: bool,
     /// What screen recordings are recorded as: `h264`, `hevc` or `av1`.
     pub screen_format: String,
+    /// The most pictures a second screen recordings keep; 0 keeps every
+    /// picture the screen sends.
+    pub screen_rate: u32,
     /// Where frames saved as pictures go.
     #[serde(with = "home_path")]
     pub screenshots: PathBuf,
@@ -126,6 +129,7 @@ impl Default for Settings {
             recording_quality: 256,
             screen_sound: false,
             screen_format: "h264".to_owned(),
+            screen_rate: 60,
             screenshots: paths::default_screenshots(),
             keys: toml::Table::new(),
         }
