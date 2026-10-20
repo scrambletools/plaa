@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use iced::widget::{container, image, progress_bar, space};
+use iced::widget::{container, image, progress_bar, slider, space, toggler};
 use iced::{Center, Element, Fill, Theme};
 use plaa_media::capture::{Camera, Capture, Preview};
 use plaa_media::export::{Format, Sound};
@@ -29,6 +29,12 @@ pub enum RecorderControl {
     Format(Sound),
     /// The sound's quality: kb/s, or bits for lossless sound.
     Quality(u32),
+    /// The input taken this many decibels louder, as the slider moves.
+    Gain(f32),
+    /// The slider was let go: the input keeps that level.
+    GainSet,
+    /// Recordings even out the sound's level, or not.
+    Leveled(bool),
     /// What a screen recording is recorded as.
     Video(Format),
     /// The most pictures a second a screen recording keeps; 0 for every
@@ -49,6 +55,9 @@ pub enum RecorderControl {
     Settings,
     Close,
 }
+
+/// How much louder an input can be taken, in decibels.
+const MOST_GAIN: f32 = 30.0;
 
 /// How quiet the meter shows, in decibels below full scale.
 const FLOOR: f32 = 60.0;
@@ -219,6 +228,10 @@ pub struct Context<'a> {
     pub video: Format,
     /// The most pictures a second it keeps; 0 for every picture.
     pub rate: u32,
+    /// How much louder the input is taken, in decibels.
+    pub gain: f32,
+    /// Recordings even out the sound's level.
+    pub leveled: bool,
     /// The screens and windows plaa offers to record, where it lists them.
     pub offers: &'a [Offered],
     /// The cameras there are.
@@ -300,6 +313,7 @@ fn sound_body<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, 
                 microphone.name()
             ),
             meters(&recorder.levels),
+            level_controls(context, busy),
             sound_menus(context, busy),
             scramble_ui::styled(
                 recorded_format(microphone.format(), context),
@@ -407,7 +421,9 @@ fn camera_body<'a>(
     .spacing(10)
     .align_x(Center);
     if recorder.microphone().is_some() {
-        controls = controls.push(meters(&recorder.levels));
+        controls = controls
+            .push(meters(&recorder.levels))
+            .push(level_controls(context, busy));
     }
     controls = controls.push(video_menus(context.video, context.rate, busy));
     column![
@@ -547,7 +563,9 @@ fn screen_body<'a>(
         );
     }
     if recorder.microphone().is_some() {
-        controls = controls.push(meters(&recorder.levels));
+        controls = controls
+            .push(meters(&recorder.levels))
+            .push(level_controls(context, busy));
     }
     controls = controls
         .push(video_menus(context.video, context.rate, busy))
@@ -671,6 +689,46 @@ fn meters<'a>(levels: &[f32]) -> Element<'a, RecorderControl> {
     .spacing(6)
     .width(280)
     .into()
+}
+
+/// How much louder the input is taken, which the meter shows and may
+/// change while recording, and whether recordings even out its level,
+/// fixed while recording.
+fn level_controls<'a>(context: &Context<'_>, busy: bool) -> Element<'a, RecorderControl> {
+    let gain = slider(0.0..=MOST_GAIN, context.gain, RecorderControl::Gain)
+        .step(1.0_f32)
+        .on_release(RecorderControl::GainSet)
+        .width(150)
+        .height(style::SLIDER_HEIGHT)
+        .style(|theme: &Theme, status| style::slider(Scheme::of(theme).surface)(theme, status));
+    let louder = scramble_ui::dir::row(vec![
+        scramble_ui::styled(crate::fl!("record-gain"), Type::BodyMedium)
+            .style(style::on_surface_variant)
+            .into(),
+        gain.into(),
+        scramble_ui::styled(
+            {
+                let decibels = context.gain.round() as i32;
+                crate::fl!("record-gain-value", decibels = decibels)
+            },
+            Type::BodyMedium,
+        )
+        .style(style::on_surface_variant)
+        .width(52)
+        .into(),
+    ])
+    .spacing(10)
+    .align_y(Center);
+    let leveling = toggler(context.leveled)
+        .label(crate::fl!("record-level-automatically"))
+        .size(20)
+        .style(style::switch);
+    let leveling = if busy {
+        leveling
+    } else {
+        leveling.on_toggle(RecorderControl::Leveled)
+    };
+    column![louder, leveling].spacing(8).align_x(Center).into()
 }
 
 /// The input's rate and channels, which it records at, and the rate the

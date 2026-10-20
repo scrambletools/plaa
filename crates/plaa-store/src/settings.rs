@@ -1,6 +1,7 @@
 //! User settings, stored as TOML in `$XDG_CONFIG_HOME/plaa.toml`
 //! (`plaa-dev.toml` for development builds).
 
+use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -95,9 +96,14 @@ pub struct Settings {
     pub camera: Option<String>,
     /// Whether camera recordings take the sound of the recording input.
     pub camera_sound: bool,
+    /// Whether recordings even out their sound's level.
+    pub level_automatically: bool,
     /// Where frames saved as pictures go.
     #[serde(with = "home_path")]
     pub screenshots: PathBuf,
+    /// How much louder each input is taken, in decibels, by the id the
+    /// system gives it; "" for the system's default.
+    pub input_gains: BTreeMap<String, f32>,
     /// Keyboard shortcuts replacing the defaults: an action's name, such
     /// as `play-pause`, set to a shortcut such as "Space", a list of them,
     /// or an empty list for none; and the same in `linux`, `windows` and
@@ -137,6 +143,8 @@ impl Default for Settings {
             screen_rate: 60,
             camera: None,
             camera_sound: true,
+            level_automatically: false,
+            input_gains: BTreeMap::new(),
             screenshots: paths::default_screenshots(),
             keys: toml::Table::new(),
         }

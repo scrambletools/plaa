@@ -192,6 +192,16 @@ into a hidden file renamed once stopped; the window then plays it. The
 sound server lists what each output plays as an input too, offered
 apart from microphones.
 
+Many microphones are quiet even at their full gain: a USB one here
+peaks at −20 dB. The callback makes the samples louder by the gain
+Settings keep for that input, up to 30 dB, held within full scale,
+before noting peaks or queueing them, so the meter shows the level
+recorded, every recording takes it, and the slider works while
+recording. "Level automatically" puts FFmpeg's dynaudnorm first in the
+sound graph (frames of 200 ms over about three seconds, up to twenty
+times louder, peaks 3 dB below full as encoders overshoot), chosen as
+a recording starts.
+
 A screen recording on Linux asks the ScreenCast portal, whose picker is
 the desktop's own, for a screen, window or region with the pointer in
 it, then reads the stream it shares through PipeWire on a thread of its

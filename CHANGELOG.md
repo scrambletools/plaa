@@ -52,6 +52,8 @@ The first build.
   or opening plaa again, stops it.
 - Recording the screen or a window on macOS, through ScreenCaptureKit,
   plaa's own windows left out, and what the computer plays there.
+- Recordings take a quiet input up to 30 dB louder, kept for each input,
+  and can even out the sound's level automatically.
 - Recording a camera, its picture shown mirrored as it records, through
   FFmpeg's device inputs: V4L2 on Linux, DirectShow on Windows and
   AVFoundation on macOS.

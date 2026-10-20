@@ -16,12 +16,12 @@ use crate::recorder::{self, Recorder, RecorderControl};
 use crate::shortcuts::Action;
 
 /// The recording window's size.
-const RECORDER_SIZE: Size = Size::new(440.0, 380.0);
+const RECORDER_SIZE: Size = Size::new(440.0, 460.0);
 /// The screen recording window's size, with room for what is shared.
-const SCREEN_RECORDER_SIZE: Size = Size::new(440.0, 440.0);
+const SCREEN_RECORDER_SIZE: Size = Size::new(440.0, 540.0);
 /// The camera recording window's size: the picture, and the controls
 /// below it.
-const CAMERA_RECORDER_SIZE: Size = Size::new(720.0, 680.0);
+const CAMERA_RECORDER_SIZE: Size = Size::new(720.0, 760.0);
 /// How long a window takes to close out of the way of a screen recording
 /// before it begins.
 const HIDING: Duration = Duration::from_millis(800);
@@ -158,6 +158,13 @@ impl Plaa {
         self.show_recorder(id, recorder, RECORDER_SIZE).1
     }
 
+    /// How much louder the recording input is taken, in decibels, as
+    /// Settings keep it for that input.
+    fn gain(&self) -> f32 {
+        let input = self.settings.microphone.as_deref().unwrap_or_default();
+        self.settings.input_gains.get(input).copied().unwrap_or(0.0)
+    }
+
     /// Shows `recorder` in window `id` if it shows the start view or a
     /// recorder that is not recording, else in a new window: the window,
     /// and the task opening or resizing it.
@@ -167,6 +174,10 @@ impl Plaa {
         recorder: Recorder,
         size: Size,
     ) -> (window::Id, Task<Message>) {
+        if let Some(microphone) = recorder.microphone() {
+            microphone.set_gain(self.gain());
+            microphone.set_leveled(self.settings.level_automatically);
+        }
         let recorder = Box::new(recorder);
         self.input_devices = plaa_media::record::input_devices();
         if let Some(window) = self.windows.get_mut(&id)
@@ -316,6 +327,8 @@ impl Plaa {
                 quality,
                 video: self.recording_video(),
                 rate: self.settings.screen_rate,
+                gain: self.gain(),
+                leveled: self.settings.level_automatically,
                 offers: &self.offers,
                 cameras: &self.cameras,
                 close_button,
@@ -352,6 +365,10 @@ impl Plaa {
         }
         let sound = self.recording_sound();
         let video = self.recording_video();
+        let (gains, leveled) = (
+            self.settings.input_gains.clone(),
+            self.settings.level_automatically,
+        );
         let encoding = VideoEncoding {
             format: video,
             hardware: self.settings.hardware_decoding,
@@ -462,6 +479,11 @@ impl Plaa {
                 recorder.microphone = None;
                 recorder.microphone = Some(Microphone::open(device.as_deref()));
                 recorder.levels.clear();
+                if let Some(microphone) = recorder.microphone() {
+                    let input = device.as_deref().unwrap_or_default();
+                    microphone.set_gain(gains.get(input).copied().unwrap_or(0.0));
+                    microphone.set_leveled(leveled);
+                }
                 match &recorder.screen {
                     Some(screen) if screen.camera.is_some() => self.settings.camera_sound = true,
                     Some(_) => self.settings.screen_sound = true,
@@ -499,6 +521,21 @@ impl Plaa {
             }
             RecorderControl::Quality(quality) => {
                 self.settings.recording_quality = quality;
+                self.save_settings();
+            }
+            RecorderControl::Gain(decibels) => {
+                if let Some(microphone) = recorder.microphone() {
+                    microphone.set_gain(decibels);
+                }
+                let input = self.settings.microphone.clone().unwrap_or_default();
+                self.settings.input_gains.insert(input, decibels);
+            }
+            RecorderControl::GainSet => self.save_settings(),
+            RecorderControl::Leveled(on) => {
+                if let Some(microphone) = recorder.microphone() {
+                    microphone.set_leveled(on);
+                }
+                self.settings.level_automatically = on;
                 self.save_settings();
             }
             RecorderControl::Video(format) => {

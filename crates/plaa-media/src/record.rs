@@ -152,6 +152,10 @@ struct Shared {
     written: AtomicU64,
     /// Ends the device's thread.
     stop: AtomicBool,
+    /// How much louder the sound is taken, as f32 bits of a factor.
+    gain: AtomicU32,
+    /// Recordings even out its level.
+    leveled: AtomicBool,
 }
 
 impl Shared {
@@ -159,9 +163,21 @@ impl Shared {
         self.waiting.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Takes samples from the device: notes their peaks, and keeps them
-    /// for the encoder while recording.
+    /// Takes samples from the device, made as much louder as asked, held
+    /// within full scale: notes their peaks, and keeps them for the
+    /// encoder while recording.
     fn take(&self, samples: &[f32]) {
+        let gain = f32::from_bits(self.gain.load(Ordering::Relaxed));
+        let louder: Vec<f32>;
+        let samples = if gain == 1.0 {
+            samples
+        } else {
+            louder = samples
+                .iter()
+                .map(|sample| (sample * gain).clamp(-1.0, 1.0))
+                .collect();
+            &louder
+        };
         let channels = usize::from(self.channels.max(1));
         let mut peaks = vec![0.0f32; channels];
         for (index, sample) in samples.iter().enumerate() {
@@ -237,6 +253,20 @@ impl Microphone {
     /// The device's sample rate and channels, which it records at.
     pub fn format(&self) -> (u32, u16) {
         (self.shared.rate, self.shared.channels)
+    }
+
+    /// Takes the sound `decibels` louder, as a quiet microphone needs; at
+    /// once, while recording too. The levels say how loud it is then.
+    pub fn set_gain(&self, decibels: f32) {
+        let factor = 10f32.powf(decibels / 20.0);
+        self.shared.gain.store(factor.to_bits(), Ordering::Relaxed);
+    }
+
+    /// Whether recordings even out the sound's level, bringing quiet
+    /// passages up and holding loud ones back; recordings that start
+    /// from then on.
+    pub fn set_leveled(&self, leveled: bool) {
+        self.shared.leveled.store(leveled, Ordering::Relaxed);
     }
 
     /// The device's sound for something else to record, as a screen
@@ -352,6 +382,11 @@ impl SoundTap {
         (self.shared.rate, self.shared.channels)
     }
 
+    /// Whether the recording evens out the sound's level.
+    pub fn leveled(&self) -> bool {
+        self.shared.leveled.load(Ordering::Relaxed)
+    }
+
     /// Starts keeping the sound, from now on.
     pub fn start(&self) {
         *self.shared.waiting() = Some(VecDeque::new());
@@ -432,6 +467,8 @@ fn open_stream(device: Option<&str>) -> Result<(cpal::Stream, Arc<Shared>, Strin
         recorded: AtomicU64::new(0),
         written: AtomicU64::new(0),
         stop: AtomicBool::new(false),
+        gain: AtomicU32::new(1.0f32.to_bits()),
+        leveled: AtomicBool::new(false),
     });
     let stream = match supported.sample_format() {
         cpal::SampleFormat::F32 => build::<f32>(&device, config, &shared),
@@ -503,7 +540,11 @@ fn write(
     let channels = usize::from(shared.channels.max(1));
     let layout = ffi::default_layout(i32::from(shared.channels));
     let samples_format = ffmpeg::format::Sample::F32(ffmpeg::format::sample::Type::Packed);
-    let mut graph = export::sound_graph((shared.rate, samples_format, &layout), &encoder)?;
+    let mut graph = export::sound_graph(
+        (shared.rate, samples_format, &layout),
+        &encoder,
+        shared.leveled.load(Ordering::Relaxed),
+    )?;
     let pull = |graph: &mut ffmpeg::filter::Graph,
                 encoder: &mut ffmpeg::encoder::audio::Encoder,
                 output: &mut Output|
@@ -567,9 +608,46 @@ fn write(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+    use std::sync::{Condvar, Mutex};
     use std::time::{Duration, Instant};
 
-    use super::{closing_silence, sound_time};
+    use super::{Shared, closing_silence, sound_time};
+
+    #[test]
+    fn sound_is_taken_louder_within_full_scale() {
+        let shared = Shared {
+            rate: 48_000,
+            channels: 2,
+            peaks: (0..2).map(|_| AtomicU32::new(0)).collect(),
+            waiting: Mutex::new(Some(VecDeque::new())),
+            arrived: Condvar::new(),
+            recorded: AtomicU64::new(0),
+            written: AtomicU64::new(0),
+            stop: AtomicBool::new(false),
+            gain: AtomicU32::new(10f32.powf(20.0 / 20.0).to_bits()),
+            leveled: AtomicBool::new(false),
+        };
+        // 20 dB louder: ten times, held at full scale.
+        shared.take(&[0.01, -0.05, 0.2, -0.2]);
+        let taken: Vec<f32> = shared.waiting().take().unwrap().into_iter().collect();
+        let expected = [0.1, -0.5, 1.0, -1.0];
+        assert!(
+            taken
+                .iter()
+                .zip(expected)
+                .all(|(taken, expected)| (taken - expected).abs() < 1e-6),
+            "{taken:?}"
+        );
+        // The meter reads the louder sound.
+        let peaks: Vec<f32> = shared
+            .peaks
+            .iter()
+            .map(|peak| f32::from_bits(peak.load(Ordering::Relaxed)))
+            .collect();
+        assert_eq!(peaks, [1.0, 1.0]);
+    }
 
     #[test]
     fn sound_follows_the_clock_after_a_silence() {

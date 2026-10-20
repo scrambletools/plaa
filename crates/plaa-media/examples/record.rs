@@ -3,7 +3,7 @@
 //!
 //! cargo run --release -p plaa-media --example record -- [--list]
 //! [--device <id>] [--format aac|mp3|opus|flac|alac|wav] [--quality
-//! <kb/s or bits>] <seconds> <to>
+//! <kb/s or bits>] [--gain <dB>] [--level] <seconds> <to>
 
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -17,6 +17,8 @@ fn main() {
     let mut device = None;
     let mut sound = Sound::Aac;
     let mut quality = None;
+    let mut gain = 0.0;
+    let mut leveled = false;
     while let Some(option) = arguments.next_if(|argument| argument.starts_with("--")) {
         match option.as_str() {
             "--list" => {
@@ -33,6 +35,13 @@ fn main() {
                     .unwrap_or(Sound::Aac)
             }
             "--quality" => quality = arguments.next().and_then(|text| text.parse().ok()),
+            "--gain" => {
+                gain = arguments
+                    .next()
+                    .and_then(|text| text.parse().ok())
+                    .unwrap_or(0.0)
+            }
+            "--level" => leveled = true,
             other => {
                 eprintln!("unknown option {other}");
                 std::process::exit(2);
@@ -45,7 +54,7 @@ fn main() {
     ) else {
         eprintln!(
             "usage: record [--list] [--device <id>] [--format aac|mp3|opus|flac|alac|wav] \
-             [--quality <kb/s or bits>] <seconds> <to>"
+             [--quality <kb/s or bits>] [--gain <dB>] [--level] <seconds> <to>"
         );
         std::process::exit(2);
     };
@@ -64,6 +73,8 @@ fn main() {
         }
     };
     println!("recording from {}", microphone.name());
+    microphone.set_gain(gain);
+    microphone.set_leveled(leveled);
     let (sender, receiver) = mpsc::channel();
     let quality = quality.unwrap_or(sound.usual_quality());
     if let Err(error) =

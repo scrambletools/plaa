@@ -1203,10 +1203,12 @@ pub(crate) fn sound_encoder(
 
 /// The graph that turns sound of `rate` Hz, `format` and channel
 /// `layout` into what `encoder` takes, in frames of the size it takes,
-/// filling any gap in the timestamps.
+/// filling any gap in the timestamps; `leveled`, its level evened out
+/// first, quiet passages brought up and loud ones held back.
 pub(crate) fn sound_graph(
     (rate, format, layout): (u32, ffmpeg::format::Sample, &str),
     encoder: &ffmpeg::encoder::audio::Encoder,
+    leveled: bool,
 ) -> Result<ffmpeg::filter::Graph, ExportError> {
     let mut graph = ffmpeg::filter::Graph::new();
     let arguments = format!(
@@ -1218,7 +1220,15 @@ pub(crate) fn sound_graph(
         ffmpeg::filter::find("abuffersink").ok_or_else(|| failed("no abuffersink filter"))?;
     graph.add(&abuffer, "in", &arguments).map_err(failed)?;
     graph.add(&sink, "out", "").map_err(failed)?;
-    let mut filters = format!(
+    // Frames of a fifth of a second, over three seconds or so, up to
+    // twenty times louder, peaks kept 3 dB below full, as encoders
+    // overshoot a little.
+    let mut filters = String::from(if leveled {
+        "dynaudnorm=f=200:g=15:m=20:p=0.7,"
+    } else {
+        ""
+    });
+    filters += &format!(
         "aresample={rate}:async=1:first_pts=0,\
          aformat=sample_fmts={format}:channel_layouts={layout}",
         rate = encoder.rate(),
@@ -1349,6 +1359,7 @@ impl AudioSide {
         sound_graph(
             (frame.rate(), frame.format(), &ffi::frame_layout(frame)),
             &self.encoder,
+            false,
         )
     }
 

@@ -820,6 +820,7 @@ fn write(
                     &layout,
                 ),
                 &encoder,
+                sound.leveled(),
             )?;
             Some(SoundSide {
                 encoder,

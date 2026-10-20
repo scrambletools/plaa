@@ -94,9 +94,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 - **Record sound** (Ctrl+Shift+N) from a microphone, or from what the
   computer plays where the system offers it (the sound server's
   monitors on Linux, every output on Windows and macOS), with a level
-  meter,
-  in any of the export's sound formats, to the Recordings folder; the
-  window then plays the recording, ready to trim and export.
+  meter, a quiet input made up to 30 dB louder (kept for each input) and
+  its level evened out automatically if chosen, in any of the export's
+  sound formats, to the Recordings folder; the window then plays the
+  recording, ready to trim and export.
 - **Record the screen** (Ctrl+Alt+N): a screen, a window or (on Linux)
   a region, as the system's picker offers on Linux and plaa lists them
   on Windows and macOS, with the pointer, and the sound

@@ -364,6 +364,10 @@ record-screen-again = Choose again
 record-screen-failed = Couldn’t record the screen
 record-sound = Sound
 record-no-sound = No sound
+# How much louder the input is taken, for a quiet microphone.
+record-gain = Louder
+record-gain-value = +{ $decibels } dB
+record-level-automatically = Level automatically
 record-hide-title = plaa hides while it records
 record-hide-tray = To stop recording, click the red dot plaa puts in the tray, or open plaa again.
 record-hide-reopen = To stop recording, open plaa again.
