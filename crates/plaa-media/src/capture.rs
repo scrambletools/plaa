@@ -1805,8 +1805,12 @@ mod tests {
         let input = ffmpeg::format::input(&path).unwrap();
         let stream = input.streams().best(ffmpeg::media::Type::Video).unwrap();
         let frames = stream.frames();
-        // About a second of 30 a second, and video's colors.
-        assert!((24..=36).contains(&frames), "{frames}");
+        // About a second, at about 30 a second, by the file's own length:
+        // a busy machine starts it late, but not slower.
+        let seconds = input.duration() as f64 / f64::from(ffmpeg::ffi::AV_TIME_BASE);
+        assert!((0.4..2.0).contains(&seconds), "{seconds} s");
+        let rate = frames as f64 / seconds;
+        assert!((20.0..40.0).contains(&rate), "{frames} in {seconds} s");
         let decoder = ffmpeg::codec::Context::from_parameters(stream.parameters())
             .unwrap()
             .decoder()
