@@ -69,6 +69,7 @@ action-next = Next
 action-exit-full-screen = Exit Full Screen
 action-quality = Quality
 action-visualizer = Visualizer
+action-network = Network Audio
 
 ## What a sound file shows under its cover
 
@@ -160,6 +161,7 @@ error-empty-list = This list has nothing to play.
 settings-title = Settings
 settings-tab-appearance = Appearance
 settings-tab-playback = Playback
+settings-tab-network = Network
 settings-tab-language = Language
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (dev build, { $build })
@@ -217,6 +219,34 @@ settings-track-languages = Track languages
 settings-track-languages-note = Language codes such as en or fra, most wanted first, separated by commas. plaa picks audio and subtitles in these languages when a file has them.
 settings-audio-languages = Audio
 settings-subtitle-languages = Subtitles
+
+## The AVB network, in Settings and the Network Audio sheet
+
+settings-avb-interface = AVB interface
+settings-avb-interface-note = The wired port plaa finds AVB and Milan talkers and listeners on. Sending needs a port with a PTP hardware clock, such as an Intel I210's.
+settings-avb-off = Off
+# An interface plaa can list streams on but not send from.
+settings-avb-no-clock = { $interface } (lists only: no PTP clock)
+settings-avb-talker = Send what plays
+settings-avb-talker-note = plaa becomes a Milan talker, sending the sound of the window last played to the listeners connected to it.
+settings-avb-name = Name on the network
+settings-avb-name-note = Controllers show plaa as “{ $name }”. Press Enter to rename it.
+# plaa's name as a Milan entity, by default.
+avb-default-name = plaa on { $computer }
+avb-could-not-start = Could not use { $interface }: { $error }
+network-title = Network Audio
+network-plaa = plaa
+network-off = Not sending. Turn on Send what plays in Settings to send the sound to listeners.
+network-blocked = Not sending: { $reason }
+network-waiting = Ready to send, waiting for a listener to connect.
+network-sending = Sending to the listeners connected.
+network-connections = Connections
+network-looking = Looking for talkers and listeners…
+network-not-connected = Not connected
+# A stream on the network: its device's name and its own.
+network-stream = { $entity }: { $stream }
+network-unknown-talker = A talker not found ({ $talker })
+network-failed = Could not connect: { $reason }
 
 ## The macOS menu bar
 

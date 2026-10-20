@@ -309,6 +309,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "atdecc"
+version = "0.1.0"
+source = "git+https://github.com/scrambletools/avb?rev=5d3186c333d2cc13bb51ea1f84df7f77eb1a9311#5d3186c333d2cc13bb51ea1f84df7f77eb1a9311"
+dependencies = [
+ "avb-mrp",
+ "avb-net",
+ "block2 0.6.2",
+ "objc2 0.6.5",
+ "objc2-foundation 0.3.2",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -319,6 +331,34 @@ name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
+
+[[package]]
+name = "avb-mrp"
+version = "0.1.0"
+source = "git+https://github.com/scrambletools/avb?rev=5d3186c333d2cc13bb51ea1f84df7f77eb1a9311#5d3186c333d2cc13bb51ea1f84df7f77eb1a9311"
+dependencies = [
+ "avb-net",
+]
+
+[[package]]
+name = "avb-net"
+version = "0.1.0"
+source = "git+https://github.com/scrambletools/avb?rev=5d3186c333d2cc13bb51ea1f84df7f77eb1a9311#5d3186c333d2cc13bb51ea1f84df7f77eb1a9311"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "avb-stream"
+version = "0.1.0"
+source = "git+https://github.com/scrambletools/avb?rev=5d3186c333d2cc13bb51ea1f84df7f77eb1a9311#5d3186c333d2cc13bb51ea1f84df7f77eb1a9311"
+dependencies = [
+ "atdecc",
+ "avb-net",
+ "cpal",
+ "libc",
+]
 
 [[package]]
 name = "basic-toml"
@@ -3217,6 +3257,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
  "objc2-media-player",
+ "plaa-avb",
  "plaa-media",
  "plaa-store",
  "png",
@@ -3230,6 +3271,16 @@ dependencies = [
  "windows 0.62.2",
  "windows-sys 0.61.2",
  "zbus",
+]
+
+[[package]]
+name = "plaa-avb"
+version = "0.1.0"
+dependencies = [
+ "atdecc",
+ "avb-mrp",
+ "avb-net",
+ "avb-stream",
 ]
 
 [[package]]

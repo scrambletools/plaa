@@ -41,6 +41,8 @@ pub const SKIP_SHORT: f64 = 5.0;
 pub enum Sheet {
     Inspector,
     Playlist,
+    /// The AVB network's talkers and listeners.
+    Network,
 }
 
 /// The menus a window can have open, which keep its overlay shown.
@@ -386,6 +388,12 @@ pub enum Control {
     ToggleFullScreen,
     ToggleInspector,
     TogglePlaylist,
+    /// Shows or hides the AVB network's talkers and listeners.
+    ToggleNetwork,
+    /// Binds a listener's input to a talker's output on the AVB network.
+    AvbConnect((plaa_avb::EntityId, u16), (plaa_avb::EntityId, u16)),
+    /// Unbinds a listener's input.
+    AvbDisconnect((plaa_avb::EntityId, u16)),
     TogglePip,
     /// Plays the list's item at this index.
     PlayItem(usize),
@@ -433,6 +441,8 @@ pub struct Context {
     /// The window manager draws no title bar, so the toolbar ends with a
     /// close button.
     pub close_button: bool,
+    /// The AVB network, while plaa is on one.
+    pub avb: Option<Arc<plaa_avb::Snapshot>>,
 }
 
 /// The window: the picture with bars over it or around it, or for sound,
@@ -482,7 +492,7 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
         None => picture.into(),
     };
     let with_subtitles = with_spinner(with_subtitles, window);
-    let body: Element<'a, Control> = match sheet(window) {
+    let body: Element<'a, Control> = match sheet(window, context) {
         Some(sheet) => {
             let sheet = component::between_bars(
                 sheet,
@@ -561,6 +571,14 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             crate::fl!("action-playlist"),
             window.sheet == Some(Sheet::Playlist),
             Control::TogglePlaylist,
+        ));
+    }
+    if context.avb.is_some() {
+        tools.push(component::toggle_tool(
+            Icon::Lan,
+            crate::fl!("action-network"),
+            window.sheet == Some(Sheet::Network),
+            Control::ToggleNetwork,
         ));
     }
     tools.push(component::toggle_tool(
@@ -1232,7 +1250,7 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
     };
     let body = container(middle).center(Fill).style(style::surface);
     let body = with_spinner(body.into(), window);
-    let body: Element<'a, Control> = match sheet(window) {
+    let body: Element<'a, Control> = match sheet(window, context) {
         Some(sheet) => iced::widget::row![body, sheet].into(),
         None => body,
     };
@@ -1308,7 +1326,7 @@ fn prism_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
         .height(Fill)
         .align_bottom(Fill);
     let body = with_spinner(stack![scene, tag].into(), window);
-    let body: Element<'a, Control> = match sheet(window) {
+    let body: Element<'a, Control> = match sheet(window, context) {
         Some(sheet) => {
             let sheet = component::between_bars(
                 sheet,
@@ -1399,10 +1417,11 @@ fn docked<'a>(content: Element<'a, Control>) -> Element<'a, Control> {
 }
 
 /// The sheet beside the picture, if one is open.
-fn sheet(window: &PlayerWindow) -> Option<Element<'_, Control>> {
+fn sheet<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, Control>> {
     match window.sheet? {
         Sheet::Inspector => Some(inspector(window)),
         Sheet::Playlist => Some(playlist_sheet(window)),
+        Sheet::Network => Some(crate::network::sheet(context.avb.clone()?)),
     }
 }
 

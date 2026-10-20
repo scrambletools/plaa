@@ -27,6 +27,7 @@ use crate::window::{
     self as player_window, Control, Menu, PlayerWindow, QualityChoice, SPEEDS, Sheet,
 };
 
+mod avb;
 mod edits;
 mod export;
 mod recording;
@@ -101,6 +102,18 @@ pub struct Plaa {
     offers: Vec<crate::recorder::Offered>,
     /// The cameras, as when last looked at.
     cameras: Vec<plaa_media::capture::Camera>,
+    /// plaa on the AVB network, while Settings name an interface.
+    avb: Option<plaa_avb::Network>,
+    /// Why it could not start there.
+    pub(crate) avb_error: Option<String>,
+    /// The talkers and listeners its controller found, and how plaa's own
+    /// talker stands.
+    pub(crate) avb_snapshot: std::sync::Arc<plaa_avb::Snapshot>,
+    /// The window whose sound plaa's talker sends, and its player's
+    /// surface, as a window's player changes when its list moves on.
+    avb_feeding: Option<(window::Id, u64)>,
+    /// The wired interfaces, as when Settings last opened.
+    pub(crate) avb_interfaces: Vec<plaa_avb::Interface>,
     /// What is kept awake while something plays, and the hold on it when
     /// the system gave one.
     awake: Option<(Awake, Option<keepawake::KeepAwake>)>,
@@ -325,6 +338,11 @@ impl Plaa {
             hidden: None,
             offers: Vec::new(),
             cameras: Vec::new(),
+            avb: None,
+            avb_error: None,
+            avb_snapshot: std::sync::Arc::default(),
+            avb_feeding: None,
+            avb_interfaces: Vec::new(),
             awake: None,
             media_window: None,
             media: crate::media::Service::start("plaa", |command| {
@@ -335,6 +353,7 @@ impl Plaa {
             next_surface: 1,
         };
         plaa.apply_looks();
+        plaa.apply_avb();
         plaa.reload_omarchy();
         #[cfg(target_os = "macos")]
         crate::menu_macos::install();
@@ -943,6 +962,7 @@ impl Plaa {
             Message::External(External::Player(id, event)) => self.player_event(id, event),
             Message::WindowOpened => Task::none(),
             Message::WindowClosed(id) => {
+                self.avb_window_closed(id);
                 match self.windows.remove(&id).map(|window| window.content) {
                     Some(Content::Player(player)) => {
                         remember_position(&mut self.positions, &player);
@@ -1149,6 +1169,10 @@ impl Plaa {
                 if let Some(player) = self.player_mut(id) {
                     player.shape = Some(shape);
                 }
+                Task::none()
+            }
+            Message::External(External::Avb) => {
+                self.avb_changed();
                 Task::none()
             }
             Message::External(External::Thumbnail(id, thumbnail)) => {
@@ -1435,6 +1459,7 @@ impl Plaa {
         if self.positions_saved.elapsed() > POSITIONS_SAVE {
             self.save_positions();
         }
+        self.feed_avb();
     }
 
     fn key(&mut self, id: window::Id, key: Key, modifiers: Modifiers) -> Task<Message> {
@@ -1562,6 +1587,7 @@ impl Plaa {
             }
             Action::Settings => {
                 self.audio_devices = plaa_media::output_devices();
+                self.avb_interfaces = plaa_avb::interfaces();
                 self.yt_dlp_found = plaa_media::web::program().is_some();
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.settings_open = true;
@@ -1810,6 +1836,14 @@ impl Plaa {
             Control::TogglePip => return self.toggle_pip(id),
             Control::Previous => return self.previous(id),
             Control::Next => return self.next(id),
+            Control::AvbConnect(talker, listener) => {
+                self.avb_connect(talker, listener);
+                return Task::none();
+            }
+            Control::AvbDisconnect(listener) => {
+                self.avb_disconnect(listener);
+                return Task::none();
+            }
             Control::Visualizer(visualizer) => {
                 self.settings.visualizer = visualizer;
                 for (window_id, window) in &mut self.windows {
@@ -1959,6 +1993,7 @@ impl Plaa {
             }
             Control::ToggleInspector => player.toggle_sheet(Sheet::Inspector),
             Control::TogglePlaylist => player.toggle_sheet(Sheet::Playlist),
+            Control::ToggleNetwork => player.toggle_sheet(Sheet::Network),
             Control::ToggleLoop => player.looping = !player.looping,
             Control::Activity => {}
             _ => {}
@@ -2074,6 +2109,7 @@ impl Plaa {
                     width: window.size.width,
                     scale: window.scale,
                     close_button,
+                    avb: self.avb.as_ref().map(|_| self.avb_snapshot.clone()),
                 },
             )
             .map(move |control| Message::Control(id, control)),

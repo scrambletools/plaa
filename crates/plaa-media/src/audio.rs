@@ -81,11 +81,24 @@ impl Recent {
     }
 }
 
+/// Takes a copy of what an output plays, from its device's thread: two
+/// channels interleaved, after the volume, and their rate.
+pub type SoundCopy = Arc<dyn Fn(&[f32], u32) + Send + Sync>;
+
+/// Where the copy goes, and the room it is made in, kept from one
+/// callback to the next.
+#[derive(Default)]
+struct Copying {
+    to: Option<SoundCopy>,
+    frames: Vec<f32>,
+}
+
 /// What the decoder and the device's callback share.
 pub struct Shared {
     queue: Mutex<Queue>,
     room: Condvar,
     recent: Mutex<Recent>,
+    copying: Mutex<Copying>,
     clock: Arc<Clock>,
     /// The volume as the slider has it, 0 to 1, as f32 bits.
     volume: AtomicU32,
@@ -225,6 +238,14 @@ impl Shared {
         volume * volume * volume
     }
 
+    /// Hands a copy of what plays to `to`, or to nothing.
+    pub fn set_copy(&self, to: Option<SoundCopy>) {
+        self.copying
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .to = to;
+    }
+
     /// The `count` frames heard last, mixed to one channel before the
     /// volume, the newest last and silence before the first; None once
     /// nothing has been heard for a while, as when paused.
@@ -252,8 +273,16 @@ impl Shared {
         let channels = usize::from(self.channels.max(1));
         let gain = self.gain();
         let silence = T::from_sample(0.0f32);
+        let mut copying = self.copying.lock().unwrap_or_else(PoisonError::into_inner);
+        let copying = &mut *copying;
+        copying.frames.clear();
+        let copy = copying.to.clone();
         if self.clock.still() {
             out.fill(silence);
+            if let Some(copy) = copy {
+                copying.frames.resize(out.len() / channels * 2, 0.0);
+                copy(&copying.frames, self.rate);
+            }
             return;
         }
         let mut queue = self.queue();
@@ -283,6 +312,13 @@ impl Shared {
             }
             for frame in chunk.samples[chunk.played..chunk.played + take].chunks_exact(channels) {
                 recent.push(frame.iter().sum::<f32>() / channels as f32);
+                if copy.is_some() {
+                    let left = frame[0] * gain;
+                    copying.frames.push(left);
+                    copying
+                        .frames
+                        .push(frame.get(1).map_or(left, |right| right * gain));
+                }
             }
             chunk.played += take;
             written += take;
@@ -299,6 +335,10 @@ impl Shared {
         out[written..].fill(silence);
         for _ in (written..out.len()).step_by(channels) {
             recent.push(0.0);
+        }
+        if let Some(copy) = copy {
+            copying.frames.resize(out.len() / channels * 2, 0.0);
+            copy(&copying.frames, self.rate);
         }
         recent.heard_by = Some(
             heard_at
@@ -408,6 +448,7 @@ impl Output {
             queue: Mutex::new(Queue::default()),
             room: Condvar::new(),
             recent: Mutex::new(Recent::default()),
+            copying: Mutex::new(Copying::default()),
             clock,
             volume: AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()),
             muted: AtomicBool::new(muted),
@@ -442,6 +483,7 @@ impl Output {
             queue: Mutex::new(Queue::default()),
             room: Condvar::new(),
             recent: Mutex::new(Recent::default()),
+            copying: Mutex::new(Copying::default()),
             clock,
             volume: AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()),
             muted: AtomicBool::new(muted),
@@ -510,6 +552,7 @@ mod tests {
             queue: Mutex::new(Queue::default()),
             room: Condvar::new(),
             recent: Mutex::new(Recent::default()),
+            copying: Mutex::new(Copying::default()),
             clock,
             volume: AtomicU32::new(1.0f32.to_bits()),
             muted: AtomicBool::new(false),
@@ -602,6 +645,36 @@ mod tests {
         assert_eq!(shared.heard(12).unwrap(), expected);
         std::thread::sleep(STALE);
         assert!(shared.heard(4).is_none(), "long since heard");
+    }
+
+    #[test]
+    fn a_copy_of_what_plays_goes_out_in_stereo() {
+        let shared = shared();
+        let stop = AtomicBool::new(false);
+        let copied = Arc::new(Mutex::new(Vec::new()));
+        let into = copied.clone();
+        shared.set_copy(Some(Arc::new(move |frames: &[f32], rate| {
+            assert_eq!(rate, 1000);
+            into.lock().unwrap().extend_from_slice(frames);
+        })));
+        shared.set_volume(0.5);
+        assert!(shared.push(0, 0.0, 0.001, vec![0.8, -0.8, 0.4, -0.4], &stop));
+        let mut out = [0.0f32; 8];
+        shared.fill(&mut out, Duration::ZERO);
+        // After the volume, its cube, and silence where the sound ran out.
+        let expected = [0.1, -0.1, 0.05, -0.05, 0.0, 0.0, 0.0, 0.0];
+        let got = copied.lock().unwrap().clone();
+        assert_eq!(got.len(), expected.len());
+        for (got, expected) in got.iter().zip(expected) {
+            assert!((got - expected).abs() < 1e-6, "{got} for {expected}");
+        }
+        // Held still, as paused: silence still goes out, to keep it fed.
+        shared.clock.hold(true);
+        shared.fill(&mut out, Duration::ZERO);
+        assert_eq!(copied.lock().unwrap().len(), 16);
+        shared.set_copy(None);
+        shared.fill(&mut out, Duration::ZERO);
+        assert_eq!(copied.lock().unwrap().len(), 16);
     }
 
     #[test]

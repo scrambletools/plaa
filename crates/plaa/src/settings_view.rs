@@ -19,6 +19,7 @@ pub enum SettingsTab {
     #[default]
     Appearance,
     Playback,
+    Network,
     Language,
 }
 
@@ -55,6 +56,12 @@ pub enum SettingsMessage {
     FolderChosen(Folder, Result<Option<PathBuf>, String>),
     /// A slider was let go: save what it set.
     SliderReleased,
+    /// The interface plaa goes on the AVB network on, or none.
+    AvbInterface(Option<String>),
+    AvbTalker(bool),
+    /// The entity's name as typed, and Enter.
+    AvbName(String),
+    AvbNameDone,
 }
 
 /// The colors offered when the system's accent is not used.
@@ -214,6 +221,7 @@ impl Plaa {
                 SettingsTab::Appearance,
             ),
             tab(crate::fl!("settings-tab-playback"), SettingsTab::Playback),
+            tab(crate::fl!("settings-tab-network"), SettingsTab::Network),
             tab(crate::fl!("settings-tab-language"), SettingsTab::Language),
         ]);
         let header = column![
@@ -234,6 +242,7 @@ impl Plaa {
         let mut content = match self.settings_tab {
             SettingsTab::Appearance => self.appearance_settings(),
             SettingsTab::Playback => self.playback_settings(),
+            SettingsTab::Network => self.network_settings(),
             SettingsTab::Language => self.language_settings(),
         };
         if let Some(error) = &self.settings_error {
@@ -473,6 +482,80 @@ impl Plaa {
         .spacing(12)
     }
 
+    /// The AVB network: the interface plaa goes on, and plaa's own talker.
+    fn network_settings(&self) -> iced::widget::Column<'_, SettingsMessage> {
+        let off = crate::fl!("settings-avb-off");
+        let label = |interface: &plaa_avb::Interface| {
+            if interface.clock {
+                interface.name.clone()
+            } else {
+                crate::fl!("settings-avb-no-clock", interface = interface.name.clone())
+            }
+        };
+        let mut options = vec![off.clone()];
+        options.extend(self.avb_interfaces.iter().map(label));
+        let chosen = self.settings.avb_interface.as_ref();
+        let selected = chosen.map_or(off, |name| {
+            self.avb_interfaces
+                .iter()
+                .find(|interface| &interface.name == name)
+                .map_or_else(|| name.clone(), label)
+        });
+        let interfaces = self.avb_interfaces.clone();
+        let pick = dropdown::pick(options, Some(selected), move |picked| {
+            SettingsMessage::AvbInterface(
+                interfaces
+                    .iter()
+                    .find(|interface| label(interface) == picked)
+                    .map(|interface| interface.name.clone()),
+            )
+        })
+        .width(Fill);
+        let talker_note = match &self.avb_snapshot.talker {
+            _ if self.settings.avb_interface.is_none() => crate::fl!("settings-avb-talker-note"),
+            plaa_avb::TalkerState::Blocked(why) => {
+                crate::fl!("network-blocked", reason = why.clone())
+            }
+            plaa_avb::TalkerState::Waiting => crate::fl!("network-waiting"),
+            plaa_avb::TalkerState::Streaming => crate::fl!("network-sending"),
+            plaa_avb::TalkerState::Off => crate::fl!("settings-avb-talker-note"),
+        };
+        let mut content = column![
+            column![
+                scramble_ui::styled(crate::fl!("settings-avb-interface"), Type::BodyLarge),
+                note(crate::fl!("settings-avb-interface-note")),
+                pick,
+            ]
+            .spacing(8),
+        ]
+        .spacing(12);
+        if let Some(error) = &self.avb_error {
+            content = content.push(scramble_ui::aligned(
+                scramble_ui::styled(error, Type::BodyMedium).style(style::error_text),
+            ));
+        }
+        content = content.push(switch_row(
+            crate::fl!("settings-avb-talker"),
+            talker_note,
+            self.settings.avb_talker,
+            SettingsMessage::AvbTalker,
+        ));
+        content = content.push(component::text_field(
+            crate::fl!("settings-avb-name"),
+            &self.settings.avb_name,
+            Backdrop::ContainerHigh,
+            |input| {
+                input
+                    .on_input(SettingsMessage::AvbName)
+                    .on_submit(SettingsMessage::AvbNameDone)
+            },
+        ));
+        content.push(note(crate::fl!(
+            "settings-avb-name-note",
+            name = self.avb_name()
+        )))
+    }
+
     /// The quality streams play in: as tall as the screen, the best, or
     /// at most a height.
     fn stream_quality_row(&self) -> Element<'_, SettingsMessage> {
@@ -692,6 +775,21 @@ impl Plaa {
                 }
             },
             SettingsMessage::SliderReleased => {}
+            SettingsMessage::AvbInterface(interface) => {
+                self.settings.avb_interface = interface;
+                self.apply_avb();
+            }
+            SettingsMessage::AvbTalker(on) => {
+                self.settings.avb_talker = on;
+                self.apply_avb();
+            }
+            SettingsMessage::AvbName(name) => self.settings.avb_name = name,
+            // The entity starts again under its new name.
+            SettingsMessage::AvbNameDone => {
+                if self.settings.avb_talker {
+                    self.apply_avb();
+                }
+            }
         }
         self.save_settings();
         Task::none()

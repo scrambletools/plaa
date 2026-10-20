@@ -13,8 +13,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 > web videos play, with the controls floating over the picture, and
 > files can be trimmed, split, turned and exported, and sound, the
 > screen and a camera recorded, and sound files show a spectrum or their
-> waveform; see the [development plan](docs/PLAN.md) for what comes
-> next: casting, an AVB/Milan talker and listener, and an assistant.
+> waveform; plaa sends what it plays to AVB/Milan listeners on Linux and
+> connects talkers and listeners; see the [development plan](docs/PLAN.md)
+> for what comes next: listening to AVB streams, casting, and an
+> assistant.
 
 ## Features
 
@@ -123,6 +125,15 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   Recording: the camera's picture shows, mirrored, as it records, with
   the sound of a microphone if chosen, in the screen recording's formats
   and rates; the recording itself is as the camera sees.
+- **Send what plays over AVB** (Milan) on Linux: plaa becomes a talker
+  entity of its own, named as Settings say, with a stereo 48 kHz AAF
+  stream on gPTP time, which any Milan controller can connect, and which
+  sends the sound of the window last played once a listener is ready.
+- **Network Audio**: the AVB talkers and listeners on the interface
+  Settings choose, on Linux, macOS and Windows, with what each listener
+  is bound to; connect plaa to a listener with a switch, or any talker's
+  output to any listener's input, the listener's format following the
+  talker's where it can.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
@@ -136,8 +147,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Casting, the AVB/Milan entity, the assistant and MCP, packages and
-translations. The [plan](docs/PLAN.md) has the order.
+Listening to AVB streams and AVB Lite, casting, the assistant and MCP,
+packages and translations. The [plan](docs/PLAN.md) has the order.
 
 ## Building
 
@@ -185,6 +196,21 @@ recording without one,
 `cargo run --release -p plaa-media --example play -- <file>` plays a file
 without a window and says what it showed, and the `export` example
 exports one as the Export dialog does.
+
+### AVB on Linux
+
+Raw Ethernet needs `CAP_NET_RAW`: `sudo setcap cap_net_raw+ep
+target/release/plaa` after each build (packages will set it). Sending
+also needs ptp4l running gPTP on the interface, which must have a PTP
+hardware clock, as triib's units run it, and no other program declaring
+streams there: plaa's entity steps aside where triib's entity service
+runs.
+
+The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
+pinned by commit. To change them alongside, `cargo --config
+.cargo/avb-local.toml build` builds against a checkout beside this one,
+from a git-ignored file with `[patch."https://github.com/scrambletools/avb"]`
+path entries for `atdecc`, `avb-mrp`, `avb-net` and `avb-stream`.
 
 ### Changing scramble-ui alongside
 

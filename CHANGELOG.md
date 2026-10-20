@@ -65,6 +65,9 @@ The first build.
   output's loopback.
 - A visualizer under a sound file's cover: the spectrum of what is
   heard, or the file's waveform, which seeks where it is clicked.
+- plaa as an AVB talker on Linux: a Milan entity of its own sending what
+  plays as a stereo AAF stream on gPTP time, and a Network Audio sheet
+  listing the network's talkers and listeners to connect them.
 - Prism, a visualizer in three dimensions filling the window, drawn on
   the graphics card from shapes alone, no pictures, moved by the
   spectrum and its beats.

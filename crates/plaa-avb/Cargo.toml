@@ -1,0 +1,17 @@
+[package]
+name = "plaa-avb"
+description = "plaa on an AVB network: a Milan controller, and on Linux plaa's own entity sending what plays"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+atdecc.workspace = true
+avb-mrp.workspace = true
+avb-net.workspace = true
+avb-stream.workspace = true

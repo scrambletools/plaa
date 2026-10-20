@@ -199,6 +199,8 @@ pub(crate) struct Shared {
     pub video: Mutex<frame::Queue>,
     pub video_room: Condvar,
     pub audio: Mutex<Option<Arc<audio::Shared>>>,
+    /// Where a copy of what plays goes, for every output the player opens.
+    pub copy: Mutex<Option<audio::SoundCopy>>,
     pub cues: Mutex<Cues>,
     /// Picture subtitles decoded ahead of the clock.
     pub picture_cues: Mutex<PictureCues>,
@@ -257,6 +259,20 @@ impl Shared {
 
     pub fn video(&self) -> MutexGuard<'_, frame::Queue> {
         self.video.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Plays through `output` from now on, handing it where the copy of
+    /// what plays goes.
+    pub fn use_output(&self, output: Option<Arc<audio::Shared>>) {
+        if let Some(output) = &output {
+            output.set_copy(
+                self.copy
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .clone(),
+            );
+        }
+        *self.audio.lock().unwrap_or_else(PoisonError::into_inner) = output;
     }
 
     pub fn audio_output(&self) -> Option<Arc<audio::Shared>> {
@@ -333,6 +349,7 @@ impl Player {
             video: Mutex::new(frame::Queue::default()),
             video_room: Condvar::new(),
             audio: Mutex::new(None),
+            copy: Mutex::new(None),
             cues: Mutex::new(Cues::default()),
             picture_cues: Mutex::new(PictureCues::default()),
             ass: Mutex::new(None),
@@ -469,6 +486,19 @@ impl Player {
     /// default when none.
     pub fn set_audio_device(&self, device: Option<String>) {
         let _ = self.commands.send(Command::SetAudioDevice(device));
+    }
+
+    /// Hands a copy of what plays to `to`, from the output device's
+    /// thread, or to nothing.
+    pub fn set_copy(&self, to: Option<audio::SoundCopy>) {
+        *self
+            .shared
+            .copy
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = to.clone();
+        if let Some(output) = self.shared.audio_output() {
+            output.set_copy(to);
+        }
     }
 
     pub fn set_volume(&self, volume: f32) {
@@ -950,8 +980,7 @@ fn read(
             }
         }
     }
-    *shared.audio.lock().unwrap_or_else(PoisonError::into_inner) =
-        output.as_ref().map(|output| output.shared.clone());
+    shared.use_output(output.as_ref().map(|output| output.shared.clone()));
 
     let mut decoders = Decoders {
         video: None,
@@ -1213,8 +1242,7 @@ fn read(
                                 Some(audio::Output::silent(shared.clock.clone(), volume, muted));
                         }
                     }
-                    *shared.audio.lock().unwrap_or_else(PoisonError::into_inner) =
-                        output.as_ref().map(|output| output.shared.clone());
+                    shared.use_output(output.as_ref().map(|output| output.shared.clone()));
                     start_audio(playing, &inputs, output.as_ref(), &shared, &mut decoders);
                     decoders.skip_unused(&mut inputs);
                     let now = shared.clock.now().max(0.0);

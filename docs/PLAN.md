@@ -91,7 +91,8 @@ trimming and splitting, and Intel Macs.
 6. **Visualizer** (done): a spectrum of what is heard and the file's
    waveform under a sound file's cover, a scene in three dimensions
    filling the window, or the cover alone.
-7. **AVB and Milan**: the entity, talker and listener.
+7. **AVB and Milan**: the entity and talker, and a controller to connect
+   talkers and listeners (done); the listener and AVB Lite next.
 8. **Casting**: Chromecast and DLNA/UPnP.
 9. **Assistant and MCP**.
 10. **Release**: packages, translations, signing, the website.
@@ -406,6 +407,39 @@ next pixel, so it moves a pixel at a time at any width.
 | yt-dlp | on the path, or `~/.local/bin` | on the path, WinGet's or Scoop's | on the path, or Homebrew's |
 | FFmpeg | the system's | bundled | bundled |
 | Theme | the settings portal, Omarchy | accent color, light or dark | accent color, light or dark |
+
+### AVB and Milan
+
+plaa uses the AVB crates triib grew, which moved for it to their own
+repository, scrambletools/avb: `atdecc` for ATDECC's controller and
+entity state machines, `avb-mrp` for MSRP and MVRP, `avb-net` for raw
+Ethernet, and `avb-stream` for AAF talkers paced on gPTP time. The
+`plaa-avb` crate runs them on one thread for the interface Settings
+choose, as triib's endpoint daemon does.
+
+Its controller, on every system, reads each entity's names, streams,
+formats and bindings, and binds a listener's input to a talker's output,
+setting the input to the talker's format first where it lists it, as
+Milan listeners only take a stream in their own format.
+
+On Linux, plaa's entity has one stream output, "Playback", of two
+channels at 48 kHz, AAF in 32 or 24 bits, six samples a frame (class A),
+its entity ID the interface address with 0xff70 in the middle, beside
+triib's 0xff00 and up. MAAP claims its multicast address; MSRP declares
+it on VLAN 2 with class A and B's domains, as MVRP joins the VLAN; gPTP
+comes from ptp4l through pmc, and the stream's presentation times from
+the interface's PTP hardware clock. When MSRP says a listener is ready,
+the talker starts and stops again when none is. It sends what the media
+window plays: plaa's audio output hands a copy of each chunk it gives
+its device, in stereo after the volume, to a buffer the talker drains on
+gPTP time, resampling between the two clocks by how full it keeps.
+
+Two MRP participants on one port withdraw each other's declarations, so
+the entity does not start where triib's entity service has claimed the
+interface, and steps aside if it hears MRP from its own address that it
+did not send. Tested against an ESP32 Milan listener through a MOTU AVB
+switch: the listener locked to the stream, 8,000 frames a second, none
+late, early or out of sequence.
 
 ## Dependency and license policy
 

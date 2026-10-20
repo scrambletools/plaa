@@ -17,6 +17,7 @@ mod media;
 mod menu_macos;
 #[cfg(target_os = "linux")]
 mod mpris;
+mod network;
 #[cfg(target_os = "macos")]
 mod now_playing_macos;
 mod playlist;
@@ -60,6 +61,8 @@ pub enum External {
     DropsGathered(iced::window::Id),
     /// A picture for a window's timeline.
     Thumbnail(iced::window::Id, plaa_media::Thumbnail),
+    /// The AVB network changed, as plaa's controller sees it.
+    Avb,
     /// The waveform of a window's sound file, as far as it is read.
     Waveform(
         iced::window::Id,
