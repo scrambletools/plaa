@@ -250,8 +250,12 @@ impl Shared {
     /// volume, the newest last and silence before the first; None once
     /// nothing has been heard for a while, as when paused.
     pub fn heard(&self, count: usize) -> Option<Vec<f32>> {
+        self.heard_at(count, Instant::now())
+    }
+
+    /// The frames heard last as at `now`, as [`Self::heard`] has them.
+    fn heard_at(&self, count: usize, now: Instant) -> Option<Vec<f32>> {
         let recent = self.recent.lock().unwrap_or_else(PoisonError::into_inner);
-        let now = Instant::now();
         let heard_by = recent.heard_by?;
         if now > heard_by + STALE {
             return None;
@@ -635,16 +639,21 @@ mod tests {
             .collect();
         assert!(shared.push(0, 0.0, 0.001, samples, &stop));
         // Ten frames of sound and two of silence, heard after the device's
-        // 200 ms, so none is heard yet.
+        // 200 ms: the last of them 212 ms after the fill. Looked at as of
+        // given moments, so a slow machine's sleeps do not matter.
+        let latency = Duration::from_millis(200);
+        let before = Instant::now();
         let mut out = [0.0f32; 24];
-        shared.fill(&mut out, Duration::from_millis(200));
-        assert!(shared.heard(4).unwrap().iter().all(|&frame| frame == 0.0));
-        std::thread::sleep(Duration::from_millis(300));
+        shared.fill(&mut out, latency);
+        let after = Instant::now();
+        let all_heard = after + latency + Duration::from_millis(13);
+        let none_heard = shared.heard_at(4, before).unwrap();
+        assert!(none_heard.iter().all(|&frame| frame == 0.0));
         let mut expected: Vec<f32> = (0..10).map(|frame| frame as f32 + 0.5).collect();
         expected.extend([0.0, 0.0]);
-        assert_eq!(shared.heard(12).unwrap(), expected);
-        std::thread::sleep(STALE);
-        assert!(shared.heard(4).is_none(), "long since heard");
+        assert_eq!(shared.heard_at(12, all_heard).unwrap(), expected);
+        let long_after = all_heard + STALE + Duration::from_secs(1);
+        assert!(shared.heard_at(4, long_after).is_none(), "long since heard");
     }
 
     #[test]
