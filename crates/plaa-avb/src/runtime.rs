@@ -51,6 +51,12 @@ pub(crate) enum Input {
     Mvrp(MacAddress, Vec<u8>),
     #[cfg(target_os = "linux")]
     Gptp(Option<gptp::Status>),
+    /// What the program sharing its port's participant says.
+    #[cfg(target_os = "linux")]
+    Shared(avb_mrp::sharing::Notice),
+    /// Its connection of this generation closed.
+    #[cfg(target_os = "linux")]
+    SharedClosed(u64),
     /// Binds a listener's input to a talker's output, both in a format
     /// given, or the talker's.
     Connect(End, End, Option<StreamFormat>),
@@ -251,20 +257,34 @@ impl Runtime {
             Input::Msrp(source, bytes) => {
                 let since = self.since();
                 if let Some(own) = &mut self.own {
-                    own.handle_msrp(since, source, &bytes);
+                    own.handle_msrp(now, since, source, &bytes);
                 }
             }
             #[cfg(target_os = "linux")]
             Input::Mvrp(source, bytes) => {
                 let since = self.since();
                 if let Some(own) = &mut self.own {
-                    own.handle_mvrp(since, source, &bytes);
+                    own.handle_mvrp(now, since, source, &bytes);
                 }
             }
             #[cfg(target_os = "linux")]
             Input::Gptp(status) => {
                 if let Some(own) = &mut self.own {
                     own.handle_gptp(now, status);
+                }
+            }
+            #[cfg(target_os = "linux")]
+            Input::Shared(notice) => {
+                let since = self.since();
+                if let Some(own) = &mut self.own {
+                    own.handle_shared(since, notice);
+                }
+            }
+            #[cfg(target_os = "linux")]
+            Input::SharedClosed(generation) => {
+                let since = self.since();
+                if let Some(own) = &mut self.own {
+                    own.shared_closed(since, generation);
                 }
             }
             Input::Connect(talker, listener, format) => {

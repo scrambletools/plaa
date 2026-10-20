@@ -442,11 +442,18 @@ avb crates open comes from it, passed over a Unix socket
 (`avb_net::broker`), as triib's binaries get theirs too.
 
 Two MRP participants on one port withdraw each other's declarations, so
-the entity does not start where triib's entity service has claimed the
-interface, and steps aside if it hears MRP from its own address that it
-did not send. Tested against an ESP32 Milan listener through a MOTU AVB
-switch: the listener locked to the stream, 8,000 frames a second, none
-late, early or out of sequence.
+where triib's entity service runs on the interface, the entity reserves
+its stream in the service's participant (`avb_mrp::sharing`, a socket in
+the user's runtime folder): the service declares the stream and tells
+plaa its listeners, and that it cannot while the port runs AVB Lite.
+When the service goes, plaa runs its own participants a moment later,
+and shares the service's again when it is back. Beside an older service,
+which does not share it, or another program declaring MRP from this
+computer's address, the entity steps aside. Tested against an ESP32
+Milan listener through a MOTU AVB switch: the listener locked to the
+stream, 8,000 frames a second, none late or early, with plaa on its own
+participants and through triib's, the service stopped and started again
+while it streamed.
 
 ## Dependency and license policy
 

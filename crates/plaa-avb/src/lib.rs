@@ -6,15 +6,17 @@
 //! One thread runs it all on the interface, as triib's endpoint daemon
 //! does: frames from raw sockets, the controller's and the entity's state
 //! machines from the avb crates, MAAP for the stream's address, MSRP and
-//! MVRP for its reservation, and gPTP from ptp4l. The entity cannot share
-//! an interface with another program declaring streams there, such as
-//! triib's endpoint daemon: two MRP participants on one port withdraw each
-//! other's declarations.
+//! MVRP for its reservation, and gPTP from ptp4l. Two MRP participants on
+//! one port withdraw each other's declarations, so where triib's endpoint
+//! daemon runs on the interface, the entity reserves its stream in the
+//! daemon's participant, which it shares.
 
 #[cfg(target_os = "linux")]
 mod gptp;
 #[cfg(target_os = "linux")]
 mod own;
+#[cfg(target_os = "linux")]
+mod reservation;
 mod runtime;
 mod sound;
 

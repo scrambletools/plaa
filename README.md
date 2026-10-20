@@ -205,9 +205,11 @@ desktop's portals keep answering it: a tiny helper built beside it,
 them to plaa. Grant it after each build with `sudo setcap cap_net_raw+ep
 target/release/plaa-netraw` (packages will). Sending
 also needs ptp4l running gPTP on the interface, which must have a PTP
-hardware clock, as triib's units run it, and no other program declaring
-streams there: plaa's entity steps aside where triib's entity service
-runs.
+hardware clock, as triib's units run it. Where triib's entity service
+runs on the interface, plaa reserves its stream in the service's MRP
+participant, which the service shares, as two on one port withdraw each
+other's declarations; beside an older service, which does not share it,
+plaa's entity steps aside.
 
 The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
 pinned by commit. To change them alongside, `cargo --config

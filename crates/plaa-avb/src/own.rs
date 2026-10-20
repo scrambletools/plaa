@@ -1,7 +1,8 @@
 //! plaa's own Milan entity: one stream output of two channels that sends
 //! what plaa plays, on gPTP time, once a listener on the network is ready
 //! for it. MAAP claims the stream's multicast address; MSRP advertises it
-//! and hears listeners, MVRP joins its VLAN, as triib's endpoints do.
+//! and hears listeners, MVRP joins its VLAN, as triib's endpoints do, in
+//! triib's entity service's participant where it runs on the port.
 
 use std::io;
 use std::sync::Arc;
@@ -16,14 +17,14 @@ use atdecc::entity::{
 use atdecc::maap::{self, Maap, MaapEvent};
 use atdecc::stream_format::StreamFormat;
 use atdecc::{ClockIdentity, EntityId, EntityModelId, Instant, MacAddress, StreamId};
-use avb_mrp::msrp::{self, Domain, ListenerState, TalkerDeclaration};
-use avb_mrp::{Participant, Registration, mvrp};
-use avb_net::Socket;
+use avb_mrp::msrp::{ListenerState, TalkerDeclaration};
+use avb_mrp::sharing::Notice;
 use avb_stream::audio::Source;
 use avb_stream::media::Media;
 use avb_stream::{MediaClock, Talker, TalkerConfig};
 
-use crate::runtime::{Input, read_into};
+use crate::reservation::{self, Heard, Reservation, VLAN};
+use crate::runtime::Input;
 use crate::sound::{CHANNELS, Sound};
 use crate::{Config, TalkerState, gptp};
 
@@ -44,8 +45,7 @@ const FORMATS: [StreamFormat; 4] = [
     StreamFormat(0x0205_0218_0200_6000),
 ];
 
-/// The VLAN and priority of class A streams.
-const VLAN: u16 = 2;
+/// The priority of class A streams.
 const PRIORITY: u8 = 3;
 
 /// The latency the talker adds to the stream's path, in nanoseconds.
@@ -54,6 +54,10 @@ const TALKER_LATENCY: u32 = 125_000;
 /// How long after withdrawing the stream it is declared again, so a
 /// bridge has let the old declaration go.
 const REDECLARE: Duration = Duration::from_secs(2);
+
+/// How often it looks whether another program serves the port's
+/// participant, to share it, while it runs its own or none.
+const LOOK: Duration = Duration::from_secs(2);
 
 /// ptp4l's read-only management socket.
 const PTP4L_SOCKET: &str = "/var/run/ptp4lro";
@@ -64,23 +68,17 @@ pub(crate) fn entity_id(mac: MacAddress) -> EntityId {
     EntityId(u64::from_be_bytes([a, b, c, 0xff, INSTANCE, d, e, f]))
 }
 
-/// Why plaa's entity cannot run on `interface`, if another program
-/// declares streams there: triib's endpoint daemon claims each interface
-/// it runs on with an abstract socket name.
-fn taken(interface: &str) -> Option<String> {
-    let name = format!(" @triib-endpointd/{interface}");
-    std::fs::read_to_string("/proc/net/unix")
-        .is_ok_and(|sockets| sockets.lines().any(|line| line.ends_with(&name)))
-        .then(|| format!("triib's entity service runs on {interface}"))
-}
-
 pub(crate) struct Own {
     entity: Entity,
     maap: Maap,
-    msrp_socket: Arc<Socket>,
-    mvrp_socket: Arc<Socket>,
-    msrp: Participant,
-    mvrp: Participant,
+    /// Where the stream is reserved; none while plaa waits for a program
+    /// that went to come back, or cannot.
+    reservation: Option<Reservation>,
+    /// Counts the shared participants, to tell whose connection closed.
+    generation: u64,
+    /// When it next looks for a program serving the port's participant.
+    look_at: Duration,
+    sender: Sender<Input>,
     clock: Arc<MediaClock>,
     sound: Arc<Sound>,
     talker: Option<Talker>,
@@ -94,7 +92,8 @@ pub(crate) struct Own {
     /// When it is next declared, once it has an address.
     declare_at: Option<Duration>,
     withdrawn_at: Option<Duration>,
-    /// Why it stopped: another program declares streams on the port.
+    /// Why it stopped: another program declares streams on the port, and
+    /// does not share its participant.
     blocked: Option<String>,
 }
 
@@ -109,9 +108,6 @@ impl Own {
         sound: Arc<Sound>,
     ) -> io::Result<Self> {
         let interface = config.interface.clone();
-        if let Some(why) = taken(&interface) {
-            return Err(io::Error::other(why));
-        }
         let found = avb_net::interfaces()
             .into_iter()
             .find(|found| found.name == interface)
@@ -122,24 +118,18 @@ impl Own {
             )));
         };
         let clock = Arc::new(MediaClock::open(Some(phc))?);
-        let msrp_socket = Arc::new(Socket::open(&interface, avb_mrp::ETHERTYPE_MSRP)?);
-        msrp_socket.join_multicast(avb_mrp::MSRP_DESTINATION)?;
-        let mvrp_socket = Arc::new(Socket::open(&interface, avb_mrp::ETHERTYPE_MVRP)?);
-        mvrp_socket.join_multicast(avb_mrp::MVRP_DESTINATION)?;
-        read_into(
-            msrp_socket.clone(),
-            stop.clone(),
-            sender.clone(),
-            "plaa-msrp",
-            Input::Msrp,
-        )?;
-        read_into(
-            mvrp_socket.clone(),
-            stop.clone(),
-            sender.clone(),
-            "plaa-mvrp",
-            Input::Mvrp,
-        )?;
+        let generation = 1;
+        let mut blocked = None;
+        let reservation = match Reservation::share(&interface, sender, generation) {
+            Some(shared) => Some(shared),
+            None => match reservation::taken(&interface) {
+                Some(why) => {
+                    blocked = Some(why);
+                    None
+                }
+                None => Some(Reservation::own(&interface, mac, sender)?),
+            },
+        };
         gptp::watch(
             PTP4L_SOCKET.to_owned(),
             stop.clone(),
@@ -174,17 +164,13 @@ impl Own {
             clock_source_inputs: Vec::new(),
         };
         let stream = StreamId::new(mac, u16::from(INSTANCE) << 8);
-        let seed = mac
-            .0
-            .iter()
-            .fold(0u64, |seed, octet| (seed << 8) | u64::from(*octet));
         Ok(Self {
             entity: Entity::new(model, &[(stream, UNADDRESSED)]),
             maap: Maap::new(mac, 1),
-            msrp_socket,
-            mvrp_socket,
-            msrp: Participant::new(msrp::FORMAT, Duration::ZERO, seed ^ INSTANCE as u64),
-            mvrp: Participant::new(mvrp::FORMAT, Duration::ZERO, seed ^ 0x5555),
+            reservation,
+            generation,
+            look_at: LOOK,
+            sender: sender.clone(),
             clock,
             sound,
             talker: None,
@@ -195,7 +181,7 @@ impl Own {
             declared: false,
             declare_at: None,
             withdrawn_at: None,
-            blocked: None,
+            blocked,
         })
     }
 
@@ -206,20 +192,27 @@ impl Own {
     /// Starts advertising, joins VLAN 2 and class A and B's domains, and
     /// claims the stream's address.
     pub(crate) fn begin(&mut self, now: Instant, since: Duration) {
+        if self.blocked.is_some() {
+            return;
+        }
         self.entity.start(now);
-        self.mvrp.declare(since, mvrp::VID, mvrp::value(VLAN), None);
-        for domain in [Domain::CLASS_A, Domain::CLASS_B] {
-            self.msrp
-                .declare(since, msrp::attribute::DOMAIN, domain.value(), None);
+        if let Some(reservation) = &mut self.reservation {
+            reservation.begin(since);
         }
         self.maap.start(now);
     }
 
     pub(crate) fn state(&self) -> TalkerState {
-        match (&self.blocked, &self.talker) {
-            (Some(why), _) => TalkerState::Blocked(why.clone()),
-            (None, Some(_)) => TalkerState::Streaming,
-            (None, None) => TalkerState::Waiting,
+        match (&self.blocked, &self.reservation, &self.talker) {
+            (Some(why), _, _) => TalkerState::Blocked(why.clone()),
+            (None, Some(reservation), _) if !reservation.available() => {
+                TalkerState::Blocked(format!(
+                    "triib's entity service runs {} as AVB Lite, which reserves no streams",
+                    self.interface
+                ))
+            }
+            (None, _, Some(_)) => TalkerState::Streaming,
+            (None, _, None) => TalkerState::Waiting,
         }
     }
 
@@ -236,35 +229,171 @@ impl Own {
         }
     }
 
-    pub(crate) fn handle_msrp(&mut self, since: Duration, source: MacAddress, bytes: &[u8]) {
+    pub(crate) fn handle_msrp(
+        &mut self,
+        now: Instant,
+        since: Duration,
+        source: MacAddress,
+        bytes: &[u8],
+    ) {
         if source == self.mac {
-            self.foreign();
-        } else if self.blocked.is_none() {
-            self.msrp.handle_pdu(since, bytes);
+            self.foreign(now, since);
+        } else if let Some(reservation) = &mut self.reservation {
+            reservation.handle_msrp(since, bytes);
         }
     }
 
-    pub(crate) fn handle_mvrp(&mut self, since: Duration, source: MacAddress, bytes: &[u8]) {
+    pub(crate) fn handle_mvrp(
+        &mut self,
+        now: Instant,
+        since: Duration,
+        source: MacAddress,
+        bytes: &[u8],
+    ) {
         if source == self.mac {
-            self.foreign();
-        } else if self.blocked.is_none() {
-            self.mvrp.handle_pdu(since, bytes);
+            self.foreign(now, since);
+        } else if let Some(reservation) = &mut self.reservation {
+            reservation.handle_mvrp(since, bytes);
         }
     }
 
-    /// MRP from this computer's own address that these sockets did not
-    /// send: another participant on the port, whose declarations and ours
-    /// would withdraw each other. The entity steps aside.
-    fn foreign(&mut self) {
-        if self.blocked.is_some() {
+    /// MRP from this computer's own address that plaa's sockets did not
+    /// send: another participant on the port, whose declarations and
+    /// plaa's would withdraw each other. plaa shares it where it is
+    /// served, else steps aside.
+    fn foreign(&mut self, now: Instant, since: Duration) {
+        let own = self
+            .reservation
+            .as_ref()
+            .is_some_and(|reservation| !reservation.is_shared());
+        if !own || self.share(now, since) {
             return;
         }
         self.blocked = Some(format!(
-            "another program declares streams on {}, such as triib's entity service",
+            "another program declares streams on {}, and does not share them",
             self.interface
         ));
+        self.reservation = None;
         self.talker = None;
+        self.declared = false;
+        self.ready = false;
+        self.declare_at = None;
         self.entity.depart();
+    }
+
+    /// Shares the participant of a program serving the port's, if one
+    /// does: the stream is declared in it, or the entity starts again
+    /// where it had stepped aside. Whether it does.
+    fn share(&mut self, now: Instant, since: Duration) -> bool {
+        let generation = self.generation + 1;
+        let Some(shared) = Reservation::share(&self.interface, &self.sender, generation) else {
+            return false;
+        };
+        self.generation = generation;
+        // plaa's own participants go without a word, as the stream they
+        // declared is declared again in the shared one.
+        self.reservation = Some(shared);
+        if self.blocked.take().is_some() {
+            self.begin(now, since);
+        } else if self.declared {
+            self.declare(since);
+        } else if self.maap.address(0).is_some() && self.declare_at.is_none() {
+            self.declare_at = Some(self.redeclare_at(since));
+        }
+        true
+    }
+
+    /// What the program sharing its participant said.
+    pub(crate) fn handle_shared(&mut self, since: Duration, notice: Notice) {
+        let ours = self.entity.output_stream(0).map(|(id, _)| id.0);
+        if let Some(heard) = self
+            .reservation
+            .as_mut()
+            .and_then(|reservation| reservation.handle_notice(notice, ours))
+        {
+            self.heard(since, heard);
+        }
+    }
+
+    /// The program sharing its participant went, as its connection
+    /// `generation` closed: it withdrew the stream. plaa waits a moment
+    /// for it to come back, then runs its own.
+    pub(crate) fn shared_closed(&mut self, since: Duration, generation: u64) {
+        let ours = self.reservation.as_ref().and_then(Reservation::generation) == Some(generation);
+        if !ours {
+            return;
+        }
+        self.reservation = None;
+        self.talker = None;
+        if self.declared {
+            self.declared = false;
+            self.withdrawn_at = Some(since);
+        }
+        self.ready = false;
+        self.declare_at = None;
+        self.look_at = since + REDECLARE;
+        self.update_talker();
+    }
+
+    /// Looks for a program serving the port's participant, to share it;
+    /// where none does and plaa has no participant, it runs its own.
+    fn look(&mut self, now: Instant, since: Duration) {
+        self.look_at = since + LOOK;
+        let shared = self
+            .reservation
+            .as_ref()
+            .is_some_and(Reservation::is_shared);
+        if shared || self.share(now, since) || self.reservation.is_some() || self.blocked.is_some()
+        {
+            return;
+        }
+        match Reservation::own(&self.interface, self.mac, &self.sender) {
+            Ok(mut own) => {
+                own.begin(since);
+                self.reservation = Some(own);
+                if self.maap.address(0).is_some() {
+                    self.declare_at = Some(self.redeclare_at(since));
+                }
+            }
+            Err(error) => {
+                self.blocked = Some(error.to_string());
+                self.entity.depart();
+            }
+        }
+    }
+
+    /// When the stream can be declared again, a moment after it was
+    /// withdrawn.
+    fn redeclare_at(&self, since: Duration) -> Duration {
+        self.withdrawn_at
+            .map_or(since, |withdrawn| withdrawn + REDECLARE)
+            .max(since)
+    }
+
+    /// Acts on what the port says of the stream.
+    fn heard(&mut self, since: Duration, heard: Heard) {
+        match heard {
+            Heard::Listener(state) => {
+                self.ready = state.is_some_and(ListenerState::ready);
+            }
+            Heard::Unavailable => {
+                // Withdrawn by the program sharing its participant, or
+                // not declared.
+                self.talker = None;
+                self.declare_at = None;
+                if self.declared {
+                    self.declared = false;
+                    self.withdrawn_at = Some(since);
+                }
+                self.ready = false;
+            }
+            Heard::Available => {
+                if self.maap.address(0).is_some() && !self.declared {
+                    self.declare_at = Some(self.redeclare_at(since));
+                }
+            }
+        }
+        self.update_talker();
     }
 
     pub(crate) fn handle_gptp(&mut self, now: Instant, status: Option<gptp::Status>) {
@@ -285,23 +414,23 @@ impl Own {
 
     /// Runs the timers, then acts on what the entity, MAAP and MSRP say.
     pub(crate) fn turn(&mut self, now: Instant, since: Duration) {
+        if since >= self.look_at {
+            self.look(now, since);
+        }
         if self.blocked.is_some() {
             return;
         }
         self.entity.handle_timeout(now);
-        self.msrp.handle_timeout(since);
-        self.mvrp.handle_timeout(since);
+        if let Some(reservation) = &mut self.reservation {
+            reservation.handle_timeout(since);
+        }
         self.maap.handle_timeout(now);
         while let Some(event) = self.maap.poll_event() {
             match event {
                 MaapEvent::Acquired(_) => {
                     if let Some(address) = self.maap.address(0) {
                         self.entity.set_output_destination(0, address);
-                        let at = self
-                            .withdrawn_at
-                            .map_or(since, |withdrawn| withdrawn + REDECLARE)
-                            .max(since);
-                        self.declare_at = Some(at);
+                        self.declare_at = Some(self.redeclare_at(since));
                     }
                 }
                 MaapEvent::Lost => {
@@ -335,43 +464,31 @@ impl Own {
                 _ => {}
             }
         }
-        while let Some(registration) = self.msrp.poll_event() {
-            let ours = self.entity.output_stream(0).map(|(id, _)| id.0);
-            match registration {
-                Registration::Joined {
-                    attribute_type: msrp::attribute::LISTENER,
-                    value,
-                    four_packed,
-                } if stream_of(&value) == ours => {
-                    self.ready = ListenerState::from_number(four_packed.unwrap_or(0)).ready();
-                    self.update_talker();
-                }
-                Registration::Left {
-                    attribute_type: msrp::attribute::LISTENER,
-                    value,
-                } if stream_of(&value) == ours => {
-                    self.ready = false;
-                    self.update_talker();
-                }
-                _ => {}
-            }
+        let ours = self.entity.output_stream(0).map(|(id, _)| id.0);
+        while let Some(heard) = self
+            .reservation
+            .as_mut()
+            .and_then(|reservation| reservation.poll_heard(ours))
+        {
+            self.heard(since, heard);
         }
-        while self.mvrp.poll_event().is_some() {}
     }
 
     /// When the entity, MAAP or MRP next need their timers run.
     pub(crate) fn poll_timeout(&self, now: Instant, since: Duration) -> Option<Duration> {
         if self.blocked.is_some() {
-            return None;
+            return Some(self.look_at.saturating_sub(since));
         }
         let instants = [self.entity.poll_timeout(), self.maap.poll_timeout()]
             .into_iter()
             .flatten()
             .map(|at| at.saturating_duration_since(now));
         let durations = [
-            Some(self.msrp.poll_timeout()),
-            Some(self.mvrp.poll_timeout()),
+            self.reservation
+                .as_ref()
+                .and_then(Reservation::poll_timeout),
             self.declare_at,
+            Some(self.look_at),
         ]
         .into_iter()
         .flatten()
@@ -388,13 +505,10 @@ impl Own {
         })
     }
 
-    /// Sends what MSRP and MVRP queued.
+    /// Sends what plaa's own MSRP and MVRP queued.
     pub(crate) fn send_mrp(&mut self) {
-        while let Some(pdu) = self.msrp.poll_transmit() {
-            let _ = self.msrp_socket.send(avb_mrp::MSRP_DESTINATION, &pdu);
-        }
-        while let Some(pdu) = self.mvrp.poll_transmit() {
-            let _ = self.mvrp_socket.send(avb_mrp::MVRP_DESTINATION, &pdu);
+        if let Some(reservation) = &mut self.reservation {
+            reservation.send();
         }
     }
 
@@ -406,7 +520,9 @@ impl Own {
         }
         self.talker = None;
         self.withdraw(since);
-        self.msrp.handle_timeout(since);
+        if let Some(reservation) = &mut self.reservation {
+            reservation.handle_timeout(since);
+        }
         self.entity.depart();
     }
 
@@ -433,12 +549,14 @@ impl Own {
         let Some(declaration) = self.declaration() else {
             return;
         };
-        self.msrp.declare(
-            since,
-            msrp::attribute::TALKER_ADVERTISE,
-            msrp::talker_value(&declaration),
-            None,
-        );
+        let Some(reservation) = self
+            .reservation
+            .as_mut()
+            .filter(|reservation| reservation.available())
+        else {
+            return;
+        };
+        reservation.declare(since, &declaration);
         self.declared = true;
         self.update_talker();
     }
@@ -450,11 +568,9 @@ impl Own {
         if !self.declared {
             return;
         }
-        self.msrp.withdraw(
-            since,
-            msrp::attribute::TALKER_ADVERTISE,
-            &stream_id.0.to_be_bytes(),
-        );
+        if let Some(reservation) = &mut self.reservation {
+            reservation.withdraw(since, stream_id.0);
+        }
         self.declared = false;
         self.ready = false;
         self.withdrawn_at = Some(since);
@@ -514,11 +630,6 @@ impl Own {
     }
 }
 
-/// The stream ID a listener or talker attribute starts with.
-fn stream_of(value: &[u8]) -> Option<u64> {
-    Some(u64::from_be_bytes(value.get(..8)?.try_into().ok()?))
-}
-
 /// The MAAP block's destination, to listen for MAAP on.
 pub(crate) const MAAP_DESTINATION: MacAddress = maap::DESTINATION;
 
@@ -532,8 +643,6 @@ mod tests {
         // Beside triib's first endpoint on the same interface,
         // 0xa010a3ff00a51726.
         assert_eq!(entity_id(mac), EntityId(0xa010_a3ff_70a5_1726));
-        assert_eq!(stream_of(&0x1234u64.to_be_bytes()), Some(0x1234));
-        assert_eq!(stream_of(&[1, 2]), None);
     }
 
     #[test]
@@ -543,10 +652,5 @@ mod tests {
             assert_eq!(format.sample_rate(), Some(48_000));
             assert!(Media::of(format).is_some_and(|media| media.pdu_length() <= 1500));
         }
-    }
-
-    #[test]
-    fn triibs_claim_is_seen() {
-        assert!(taken("no-such-interface-here").is_none());
     }
 }
