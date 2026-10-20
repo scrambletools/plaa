@@ -199,8 +199,11 @@ exports one as the Export dialog does.
 
 ### AVB on Linux
 
-Raw Ethernet needs `CAP_NET_RAW`: `sudo setcap cap_net_raw+ep
-target/release/plaa` after each build (packages will set it). Sending
+Raw Ethernet needs `CAP_NET_RAW`, which plaa itself never holds, so the
+desktop's portals keep answering it: a tiny helper built beside it,
+`plaa-netraw`, holds the capability, opens the raw sockets and passes
+them to plaa. Grant it after each build with `sudo setcap cap_net_raw+ep
+target/release/plaa-netraw` (packages will). Sending
 also needs ptp4l running gPTP on the interface, which must have a PTP
 hardware clock, as triib's units run it, and no other program declaring
 streams there: plaa's entity steps aside where triib's entity service

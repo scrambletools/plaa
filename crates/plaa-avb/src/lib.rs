@@ -100,8 +100,11 @@ pub struct Network {
 impl Network {
     /// Starts on `config`'s interface, calling `changed` from its thread
     /// whenever the snapshot changes. Fails when raw Ethernet is out of
-    /// reach, as without CAP_NET_RAW, saying how to grant it.
+    /// reach, as when the helper lacks CAP_NET_RAW, saying how to grant
+    /// it.
     pub fn start(config: Config, changed: impl Fn() + Send + 'static) -> io::Result<Self> {
+        #[cfg(target_os = "linux")]
+        use_helper()?;
         let snapshot = Arc::new(Mutex::new(Snapshot::default()));
         let sound = Arc::new(Sound::new());
         let stop = Arc::new(AtomicBool::new(false));
@@ -152,6 +155,19 @@ impl Drop for Network {
             let _ = thread.join();
         }
     }
+}
+
+/// The helper that opens raw sockets for plaa, the one file granted
+/// CAP_NET_RAW, as packages and builds put it.
+#[cfg(target_os = "linux")]
+pub const HELPER: &str = "plaa-netraw";
+
+/// Has every raw socket come from the helper, started once: plaa itself
+/// holds no capability, so the desktop's portals keep answering it.
+#[cfg(target_os = "linux")]
+fn use_helper() -> io::Result<()> {
+    let folders = ["/usr/lib/plaa", "/usr/libexec/plaa"].map(std::path::Path::new);
+    avb_net::broker::use_helper(HELPER, &folders)
 }
 
 /// An interface AVB can run on: wired, and on Linux with a PTP hardware

@@ -434,6 +434,13 @@ window plays: plaa's audio output hands a copy of each chunk it gives
 its device, in stereo after the volume, to a buffer the talker drains on
 gPTP time, resampling between the two clocks by how full it keeps.
 
+plaa holds no capability: a program holding one runs as one other
+programs may not look into, and the desktop portal then refuses it file
+dialogs and screen sharing. `plaa-netraw`, built beside it, is the one
+file granted CAP_NET_RAW. plaa starts it once, and every raw socket the
+avb crates open comes from it, passed over a Unix socket
+(`avb_net::broker`), as triib's binaries get theirs too.
+
 Two MRP participants on one port withdraw each other's declarations, so
 the entity does not start where triib's entity service has claimed the
 interface, and steps aside if it hears MRP from its own address that it
