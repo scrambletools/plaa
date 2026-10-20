@@ -936,7 +936,13 @@ fn visualizer_menu(window: &PlayerWindow) -> Element<'_, Control> {
             Icon::GraphicEq,
             crate::fl!("visualizer-waveform"),
         ),
-        (Visualizer::Prism, Icon::Hub, crate::fl!("visualizer-prism")),
+        // Drawn by a shader of plaa's own on the graphics card, as the
+        // flare marks every such visualizer.
+        (
+            Visualizer::Prism,
+            Icon::Flare,
+            crate::fl!("visualizer-prism"),
+        ),
         (
             Visualizer::Cover,
             Icon::Album,
@@ -950,15 +956,9 @@ fn visualizer_menu(window: &PlayerWindow) -> Element<'_, Control> {
     let entries = choices
         .into_iter()
         .map(|(choice, glyph, label)| {
-            let entry = Entry::item(label, Control::Visualizer(choice))
+            Entry::item(label, Control::Visualizer(choice))
                 .icon(glyph)
-                .checked(choice == current);
-            // Drawn by a shader of plaa's own on the graphics card.
-            if choice == Visualizer::Prism {
-                entry.badge(Icon::Flare)
-            } else {
-                entry
-            }
+                .checked(choice == current)
         })
         .collect();
     dropdown::icon_menu(glyph, entries)
