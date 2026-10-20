@@ -55,6 +55,8 @@ pub enum Menu {
     Quality,
     Edit,
     Visualizer,
+    /// The formats a listener and plaa share, to play there in.
+    AvbFormats((plaa_avb::EntityId, u16)),
 }
 
 /// What the quality menu offers.
@@ -390,8 +392,13 @@ pub enum Control {
     TogglePlaylist,
     /// Shows or hides the AVB network's talkers and listeners.
     ToggleNetwork,
-    /// Binds a listener's input to a talker's output on the AVB network.
-    AvbConnect((plaa_avb::EntityId, u16), (plaa_avb::EntityId, u16)),
+    /// Binds a listener's input to a talker's output on the AVB network,
+    /// in a format chosen or the talker's.
+    AvbConnect(
+        (plaa_avb::EntityId, u16),
+        (plaa_avb::EntityId, u16),
+        Option<plaa_avb::StreamFormat>,
+    ),
     /// Unbinds a listener's input.
     AvbDisconnect((plaa_avb::EntityId, u16)),
     TogglePip,
@@ -1421,7 +1428,7 @@ fn sheet<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, 
     match window.sheet? {
         Sheet::Inspector => Some(inspector(window)),
         Sheet::Playlist => Some(playlist_sheet(window)),
-        Sheet::Network => Some(crate::network::sheet(context.avb.clone()?)),
+        Sheet::Network => Some(crate::network::sheet(context.avb.clone()?, window.menu)),
     }
 }
 

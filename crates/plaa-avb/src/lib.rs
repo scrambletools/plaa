@@ -131,10 +131,16 @@ impl Network {
             .clone()
     }
 
-    /// Binds a listener's input to a talker's output, giving the input
-    /// the talker's format first where it can take it.
-    pub fn connect(&self, talker: (EntityId, u16), listener: (EntityId, u16)) {
-        let _ = self.inputs.send(Input::Connect(talker, listener));
+    /// Binds a listener's input to a talker's output, in `format` or the
+    /// talker's: each is set to it first where it is in another and can
+    /// take it.
+    pub fn connect(
+        &self,
+        talker: (EntityId, u16),
+        listener: (EntityId, u16),
+        format: Option<StreamFormat>,
+    ) {
+        let _ = self.inputs.send(Input::Connect(talker, listener, format));
     }
 
     pub fn disconnect(&self, listener: (EntityId, u16)) {

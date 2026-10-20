@@ -3,7 +3,7 @@
 //! controller, and on Linux plaa's entity, run their timers and send what
 //! they queue; and what the controller has read is laid out for the app.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -14,6 +14,7 @@ use std::time::Duration;
 use atdecc::controller::{self, CommandId, Controller, Event, Outcome};
 use atdecc::descriptor::DescriptorType;
 use atdecc::model::EntityModel;
+use atdecc::stream_format::StreamFormat;
 use atdecc::{ADP_ACMP_MULTICAST, EntityId, Instant, MacAddress};
 use avb_net::Socket;
 
@@ -31,6 +32,13 @@ const CONTROLLER_INSTANCE: u8 = 0xfc;
 /// A stream's end: an entity, and its stream output's or input's index.
 type End = (EntityId, u16);
 
+/// A step in connecting: a stream's new format, then the binding.
+#[derive(Debug, Clone, Copy)]
+enum Step {
+    Format(EntityId, DescriptorType, u16, StreamFormat),
+    Bind(End, End),
+}
+
 /// The longest the thread waits without looking at its timers.
 const MOST_WAIT: Duration = Duration::from_millis(250);
 
@@ -43,7 +51,9 @@ pub(crate) enum Input {
     Mvrp(MacAddress, Vec<u8>),
     #[cfg(target_os = "linux")]
     Gptp(Option<gptp::Status>),
-    Connect((EntityId, u16), (EntityId, u16)),
+    /// Binds a listener's input to a talker's output, both in a format
+    /// given, or the talker's.
+    Connect(End, End, Option<StreamFormat>),
     Disconnect((EntityId, u16)),
     /// What plays arrives at another rate.
     SoundRate,
@@ -161,8 +171,8 @@ struct Runtime {
     mac: MacAddress,
     avtp: Arc<Socket>,
     controller: Controller,
-    /// Bindings waiting for the listener's format to be set first.
-    pending: HashMap<CommandId, (End, End)>,
+    /// What is left of connections waiting for a format to be set.
+    pending: HashMap<CommandId, VecDeque<Step>>,
     #[cfg(target_os = "linux")]
     own: Option<Own>,
     /// The talker's state where there is no entity to ask.
@@ -257,7 +267,9 @@ impl Runtime {
                     own.handle_gptp(now, status);
                 }
             }
-            Input::Connect(talker, listener) => self.connect(now, talker, listener),
+            Input::Connect(talker, listener, format) => {
+                self.connect(now, talker, listener, format);
+            }
             Input::Disconnect(listener) => {
                 self.failure = None;
                 self.controller.disconnect(now, listener);
@@ -285,35 +297,62 @@ impl Runtime {
         }
     }
 
-    /// Binds `listener` to `talker`, setting the listener's format to the
-    /// talker's first where they differ and the listener can take it.
-    fn connect(&mut self, now: Instant, talker: (EntityId, u16), listener: (EntityId, u16)) {
+    /// Binds `listener` to `talker` in `format`, or in the talker's: the
+    /// talker's output, then the listener's input, set to it first where
+    /// they are in another and can take it, as Milan listeners take a
+    /// stream only in their own format.
+    fn connect(&mut self, now: Instant, talker: End, listener: End, format: Option<StreamFormat>) {
         self.failure = None;
-        let format = |entity: EntityId, input: bool, index: u16| {
+        let stream = |entity: EntityId, input: bool, index: u16| {
             let model = self.controller.model(entity)?;
             model
                 .streams(input)
                 .find(|stream| stream.index == index)
                 .map(|stream| (stream.current_format, stream.formats().collect::<Vec<_>>()))
         };
-        let wanted = format(talker.0, false, talker.1).map(|(format, _)| format);
-        let have = format(listener.0, true, listener.1);
-        match (wanted, have) {
-            (Some(wanted), Some((current, formats)))
-                if wanted != current && formats.contains(&wanted) =>
-            {
-                let command = self.controller.set_stream_format(
-                    now,
-                    listener.0,
-                    DescriptorType::STREAM_INPUT,
-                    listener.1,
-                    wanted,
-                );
-                self.pending.insert(command, (talker, listener));
-            }
-            _ => {
-                self.controller.connect(now, talker, listener);
-            }
+        let mut steps = VecDeque::new();
+        let sent = stream(talker.0, false, talker.1);
+        let wanted = format.or(sent.as_ref().map(|(current, _)| *current));
+        if let (Some(wanted), Some((current, formats))) = (wanted, &sent)
+            && wanted != *current
+            && formats.contains(&wanted)
+        {
+            steps.push_back(Step::Format(
+                talker.0,
+                DescriptorType::STREAM_OUTPUT,
+                talker.1,
+                wanted,
+            ));
+        }
+        if let (Some(wanted), Some((current, formats))) =
+            (wanted, stream(listener.0, true, listener.1))
+            && wanted != current
+            && formats.contains(&wanted)
+        {
+            steps.push_back(Step::Format(
+                listener.0,
+                DescriptorType::STREAM_INPUT,
+                listener.1,
+                wanted,
+            ));
+        }
+        steps.push_back(Step::Bind(talker, listener));
+        self.next_step(now, steps);
+    }
+
+    /// Sends the first of `steps`, keeping the rest for when it is done.
+    fn next_step(&mut self, now: Instant, mut steps: VecDeque<Step>) {
+        let Some(step) = steps.pop_front() else {
+            return;
+        };
+        let command = match step {
+            Step::Format(entity, descriptor_type, index, format) => self
+                .controller
+                .set_stream_format(now, entity, descriptor_type, index, format),
+            Step::Bind(talker, listener) => self.controller.connect(now, talker, listener),
+        };
+        if !steps.is_empty() {
+            self.pending.insert(command, steps);
         }
     }
 
@@ -352,10 +391,10 @@ impl Runtime {
     fn controller_event(&mut self, now: Instant, event: Event) -> bool {
         match event {
             Event::CommandFinished(command, outcome) => {
-                if let Some((talker, listener)) = self.pending.remove(&command) {
-                    // The format is set, or could not be: bound either way,
-                    // as the listener may still take the stream.
-                    self.controller.connect(now, talker, listener);
+                if let Some(steps) = self.pending.remove(&command) {
+                    // A format is set, or could not be: on either way, as
+                    // the listener may still take the stream.
+                    self.next_step(now, steps);
                     return false;
                 }
                 if outcome != Outcome::Done {

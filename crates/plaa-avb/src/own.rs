@@ -34,11 +34,14 @@ const INSTANCE: u8 = 0x70;
 /// plaa's entity model, under Scramble Tools' MA-S block, as triib's.
 const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0001);
 
-/// What the stream sends: AAF at 48 kHz, two channels of 32 bits or 24 in
-/// 32, six samples a frame, as Milan's Basic Audio profile has them.
-const FORMATS: [StreamFormat; 2] = [
+/// What the stream sends: AAF at 48 kHz, six samples a frame, in 32 bits
+/// or 24 in 32, of two channels or eight, the sizes Milan's Basic Audio
+/// profile has, the sound in the first two of eight.
+const FORMATS: [StreamFormat; 4] = [
     StreamFormat(0x0205_0220_0080_6000),
     StreamFormat(0x0205_0218_0080_6000),
+    StreamFormat(0x0205_0220_0200_6000),
+    StreamFormat(0x0205_0218_0200_6000),
 ];
 
 /// The VLAN and priority of class A streams.
@@ -490,6 +493,9 @@ impl Own {
             return;
         };
         let transit = self.entity.max_transit_time(0).unwrap_or(2_000_000);
+        // The sound in the stream's first two channels, the rest silent.
+        self.sound
+            .set_channels(format.channels().unwrap_or(CHANNELS));
         let config = TalkerConfig {
             interface: self.interface.clone(),
             mac: self.mac,
@@ -531,9 +537,9 @@ mod tests {
     }
 
     #[test]
-    fn its_formats_are_stereo_and_fit() {
+    fn its_formats_are_milans_sizes_and_fit() {
         for format in FORMATS {
-            assert_eq!(format.channels(), Some(CHANNELS));
+            assert!(matches!(format.channels(), Some(2 | 8)));
             assert_eq!(format.sample_rate(), Some(48_000));
             assert!(Media::of(format).is_some_and(|media| media.pdu_length() <= 1500));
         }

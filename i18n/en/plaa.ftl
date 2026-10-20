@@ -235,17 +235,17 @@ settings-avb-name-note = Controllers show plaa as “{ $name }”. Press Enter t
 avb-default-name = plaa on { $computer }
 avb-could-not-start = Could not use { $interface }: { $error }
 network-title = Network Audio
-network-plaa = plaa
-network-off = Not sending. Turn on Send what plays in Settings to send the sound to listeners.
+network-off = Turn on Send what plays in Settings to play on the network.
 network-blocked = Not sending: { $reason }
 network-waiting = Ready to send, waiting for a listener to connect.
 network-sending = Sending to the listeners connected.
-network-connections = Connections
-network-looking = Looking for talkers and listeners…
-network-not-connected = Not connected
-# A stream on the network: its device's name and its own.
+network-looking = Looking for listeners…
+network-no-listeners = No listener on the network can play plaa's sound.
+# A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }
-network-unknown-talker = A talker not found ({ $talker })
+network-play-on = Play on { $listener }
+network-stop-on = Stop playing on { $listener }
+network-choose-format = Choose a format to play on { $listener } in
 network-failed = Could not connect: { $reason }
 
 ## The macOS menu bar

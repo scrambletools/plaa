@@ -1836,8 +1836,11 @@ impl Plaa {
             Control::TogglePip => return self.toggle_pip(id),
             Control::Previous => return self.previous(id),
             Control::Next => return self.next(id),
-            Control::AvbConnect(talker, listener) => {
-                self.avb_connect(talker, listener);
+            Control::AvbConnect(talker, listener, format) => {
+                self.avb_connect(talker, listener, format);
+                if let Some(player) = self.player_mut(id) {
+                    player.menu = None;
+                }
                 return Task::none();
             }
             Control::AvbDisconnect(listener) => {

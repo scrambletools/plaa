@@ -10,7 +10,7 @@ use avb_stream::audio::{FrameBuffer, SharedBuffer};
 
 use crate::runtime::Input;
 
-/// The channels the talker sends.
+/// The channels plaa plays in, which the stream's first channels carry.
 pub const CHANNELS: u16 = 2;
 
 /// The rate assumed until the output says its own.
@@ -18,17 +18,23 @@ const FIRST_RATE: u32 = 48_000;
 
 /// Where what plays goes, to be sent.
 pub struct Sound {
-    shared: Mutex<SharedBuffer>,
+    inner: Mutex<Inner>,
     /// Told when the rate changes, so the talker takes the new buffer.
     changed: Mutex<Option<Sender<Input>>>,
 }
 
-/// A buffer for frames at `rate`, holding 10 ms beyond the device's
+/// The buffer, and room to spread stereo over more channels in.
+struct Inner {
+    shared: SharedBuffer,
+    spread: Vec<f32>,
+}
+
+/// A buffer for `channels` at `rate`, holding 10 ms beyond the device's
 /// chunks, as for an audio device.
-fn buffer(rate: u32) -> SharedBuffer {
+fn buffer(rate: u32, channels: u16) -> SharedBuffer {
     SharedBuffer {
-        buffer: Arc::new(FrameBuffer::new(CHANNELS, rate as usize / 100)),
-        channels: CHANNELS,
+        buffer: Arc::new(FrameBuffer::new(channels, rate as usize / 100)),
+        channels,
         rate,
     }
 }
@@ -36,9 +42,16 @@ fn buffer(rate: u32) -> SharedBuffer {
 impl Sound {
     pub(crate) fn new() -> Self {
         Self {
-            shared: Mutex::new(buffer(FIRST_RATE)),
+            inner: Mutex::new(Inner {
+                shared: buffer(FIRST_RATE, CHANNELS),
+                spread: Vec::new(),
+            }),
             changed: Mutex::new(None),
         }
+    }
+
+    fn inner(&self) -> std::sync::MutexGuard<'_, Inner> {
+        self.inner.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     pub(crate) fn tell(&self, sender: Sender<Input>) {
@@ -48,27 +61,42 @@ impl Sound {
     /// The buffer the talker takes the frames from.
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub(crate) fn buffer(&self) -> SharedBuffer {
-        self.shared
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
+        self.inner().shared.clone()
+    }
+
+    /// Sends in `channels` from now on, a new buffer taking the frames.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    pub(crate) fn set_channels(&self, channels: u16) {
+        let mut inner = self.inner();
+        if inner.shared.channels != channels {
+            inner.shared = buffer(inner.shared.rate, channels.max(CHANNELS));
+        }
     }
 
     /// Takes interleaved stereo frames at `rate`, as the output hands them
     /// to its device, from the device's thread.
     pub fn take(&self, frames: &[f32], rate: u32) {
-        let target = {
-            let mut shared = self.shared.lock().unwrap_or_else(PoisonError::into_inner);
-            if rate > 0 && shared.rate != rate {
-                *shared = buffer(rate);
-                if let Some(sender) = &*self.changed.lock().unwrap_or_else(PoisonError::into_inner)
-                {
-                    let _ = sender.send(Input::SoundRate);
-                }
+        let mut inner = self.inner();
+        let inner = &mut *inner;
+        if rate > 0 && inner.shared.rate != rate {
+            inner.shared = buffer(rate, inner.shared.channels);
+            if let Some(sender) = &*self.changed.lock().unwrap_or_else(PoisonError::into_inner) {
+                let _ = sender.send(Input::SoundRate);
             }
-            shared.buffer.clone()
-        };
-        target.device_push(frames);
+        }
+        let channels = usize::from(inner.shared.channels);
+        if channels == usize::from(CHANNELS) {
+            inner.shared.buffer.device_push(frames);
+            return;
+        }
+        inner.spread.clear();
+        for frame in frames.as_chunks::<2>().0 {
+            inner.spread.extend_from_slice(frame);
+            inner
+                .spread
+                .extend(std::iter::repeat_n(0.0, channels - usize::from(CHANNELS)));
+        }
+        inner.shared.buffer.device_push(&inner.spread);
     }
 }
 
@@ -91,5 +119,18 @@ mod tests {
         assert_eq!(second.rate, 44_100);
         assert_ne!(first, second);
         assert_eq!(second.buffer.pushed(), 10);
+    }
+
+    #[test]
+    fn stereo_goes_out_in_the_first_of_eight() {
+        let sound = Sound::new();
+        sound.set_channels(8);
+        sound.take(&[0.25, -0.25, 0.5, -0.5], 48_000);
+        let shared = sound.buffer();
+        assert_eq!(shared.channels, 8);
+        let mut out = [1.0f32; 16];
+        shared.buffer.pull(&mut out);
+        assert_eq!(&out[..8], &[0.25, -0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(&out[8..10], &[0.5, -0.5]);
     }
 }

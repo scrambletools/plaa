@@ -58,9 +58,14 @@ impl Plaa {
         }
     }
 
-    pub(crate) fn avb_connect(&self, talker: (EntityId, u16), listener: (EntityId, u16)) {
+    pub(crate) fn avb_connect(
+        &self,
+        talker: (EntityId, u16),
+        listener: (EntityId, u16),
+        format: Option<plaa_avb::StreamFormat>,
+    ) {
         if let Some(network) = &self.avb {
-            network.connect(talker, listener);
+            network.connect(talker, listener, format);
         }
     }
 

@@ -115,7 +115,7 @@ fn main() {
             };
             let network = open(interface, false);
             std::thread::sleep(Duration::from_secs(5));
-            network.connect(talker, listener);
+            network.connect(talker, listener, None);
             std::thread::sleep(Duration::from_secs(3));
             print(&network.snapshot());
         }
