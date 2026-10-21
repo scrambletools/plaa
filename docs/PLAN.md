@@ -486,8 +486,9 @@ SET_LITE_CONFIG on to the service, which decides escalation for the
 port. Beside an older service, plaa plays what reaches the port anyway,
 and says to update triib; one without AVB Lite stops plaa's stream while
 the port runs it.
-When the service goes, plaa runs its own participants a moment later,
-and shares the service's again when it is back. Beside an older service,
+When the service goes, plaa waits 15 s for triib to bring it back, as it
+does within seconds, then runs its own participants, and shares the
+service's again when it is back. Beside an older service,
 which does not share it, or another program declaring MRP from this
 computer's address, the entity steps aside. Tested against an ESP32
 Milan listener through a MOTU AVB switch: the listener locked to the

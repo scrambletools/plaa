@@ -91,6 +91,12 @@ const PTP_PATIENCE: Duration = Duration::from_secs(15);
 /// participant, to share it, while it runs its own or none.
 const LOOK: Duration = Duration::from_secs(2);
 
+/// How long plaa waits for a program that served the port's participant
+/// to come back before it runs its own: triib's app starts its entity
+/// service again within seconds of it stopping, and plaa's participants
+/// running meanwhile would be two on the port as the service opens.
+const SERVICE_GRACE: Duration = Duration::from_secs(15);
+
 /// ptp4l's read-only management socket.
 const PTP4L_SOCKET: &str = "/var/run/ptp4lro";
 
@@ -169,6 +175,9 @@ pub(crate) struct Own {
     generation: u64,
     /// When it next looks for a program serving the port's participant.
     look_at: Duration,
+    /// When the program whose participant plaa shared went, for plaa to
+    /// wait a while for it to come back.
+    gone_at: Option<Duration>,
     sender: Sender<Input>,
     clock: Arc<MediaClock>,
     sound: Arc<Sound>,
@@ -303,6 +312,7 @@ impl Own {
             reservation,
             generation,
             look_at: LOOK,
+            gone_at: None,
             sender: sender.clone(),
             clock,
             sound,
@@ -469,6 +479,7 @@ impl Own {
             return false;
         };
         self.generation = generation;
+        self.gone_at = None;
         self.refused = None;
         // plaa's own participants go without a word, as the stream they
         // declared is declared again in the shared one.
@@ -519,6 +530,7 @@ impl Own {
         self.ready = false;
         self.declare_at = None;
         self.look_at = since + REDECLARE;
+        self.gone_at = Some(since);
         self.update_talker();
         self.lost_participant(since);
     }
@@ -547,6 +559,15 @@ impl Own {
         if shared || self.share(now, since) || self.reservation.is_some() || self.blocked.is_some()
         {
             return;
+        }
+        match alone(since, self.gone_at, reservation::taken(&self.interface)) {
+            Alone::Wait => return,
+            Alone::Blocked(why) => {
+                self.blocked = Some(why);
+                self.entity.depart();
+                return;
+            }
+            Alone::Own => {}
         }
         match Reservation::own(&self.interface, self.mac, &self.sender) {
             Ok(mut own) => {
@@ -1289,6 +1310,33 @@ impl Own {
     }
 }
 
+/// What plaa does where no program serves the port's participant.
+#[derive(Debug, PartialEq, Eq)]
+enum Alone {
+    /// Waits for the one that went to come back.
+    Wait,
+    /// Steps aside for one that runs on the port and does not serve it,
+    /// as an old triib entity service, for this reason.
+    Blocked(String),
+    /// Runs its own participants.
+    Own,
+}
+
+/// What plaa does at `since`, finding no program serving the port's
+/// participant: the one whose plaa shared went at `gone_at`, and
+/// `taken` says why another holds the port without serving it, as
+/// triib's entity service does a moment as it starts, and an old one
+/// always.
+fn alone(since: Duration, gone_at: Option<Duration>, taken: Option<String>) -> Alone {
+    if gone_at.is_some_and(|gone| since < gone + SERVICE_GRACE) {
+        return Alone::Wait;
+    }
+    match taken {
+        Some(why) => Alone::Blocked(why),
+        None => Alone::Own,
+    }
+}
+
 /// Where the input takes its stream: where its talker sends it, as it
 /// declares, `declared`, or as the probe found, `probed`. In AVB Lite
 /// that is this computer's own address, `own`, while the stream comes
@@ -1389,6 +1437,23 @@ mod tests {
             assert_eq!(&logo[16..24], &[0, 0, 0, 128, 0, 0, 0, 128]);
             assert!(logo.len() < 64 * 1024);
         }
+    }
+
+    /// plaa runs its own participants only once a program that served the
+    /// port's has not come back for a while, and steps aside for one that
+    /// holds the port without serving it.
+    #[test]
+    fn its_own_participants_wait_for_the_service() {
+        let gone = Some(Duration::from_secs(100));
+        let second = Duration::from_secs;
+        assert_eq!(alone(second(103), gone, None), Alone::Wait);
+        assert_eq!(alone(second(103), gone, Some("old".into())), Alone::Wait);
+        assert_eq!(alone(second(115), gone, None), Alone::Own);
+        assert_eq!(
+            alone(second(115), gone, Some("old".into())),
+            Alone::Blocked("old".into())
+        );
+        assert_eq!(alone(second(3), None, None), Alone::Own);
     }
 
     /// In AVB Lite the input takes its stream at this computer's address
