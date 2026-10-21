@@ -741,13 +741,15 @@ impl Plaa {
             bottom: 8.0,
             left: 24.0,
         });
-        // It slides in from the right, as the sheets do.
-        Some(ui::enter::from_right(
+        // Beside what plays, without the sheets' slide: that draws in a
+        // layer of its own, above the dialogs that would dim it.
+        Some(
             container(column![header, entries, input, model_row])
                 .width(WIDTH)
                 .height(Fill)
-                .style(style::chrome),
-        ))
+                .style(style::chrome)
+                .into(),
+        )
     }
 }
 
