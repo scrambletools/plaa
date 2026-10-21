@@ -32,8 +32,17 @@ use crate::{Config, TalkerState, gptp};
 /// half: triib's endpoints count up from 0 there.
 const INSTANCE: u8 = 0x70;
 
-/// plaa's entity model, under Scramble Tools' MA-S block, as triib's.
-const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0001);
+/// plaa's entity model, under Scramble Tools' MA-S block, as triib's. Its
+/// revision, the last octet, goes up as the model changes, so controllers
+/// that keep models by their ID read it again: 2 brought the logos.
+const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0002);
+
+/// plaa's app icon, which controllers show the entity with.
+const LOGO: &[u8] =
+    include_bytes!("../../../data/icons/hicolor/128x128/apps/io.github.scrambletools.plaa.png");
+
+/// Scramble Tools' logo, its vendor's, as triib's entities carry it.
+const VENDOR_LOGO: &[u8] = include_bytes!("../../../data/icons/scramble-vendor.png");
 
 /// What the stream sends: AAF at 48 kHz, six samples a frame, in 32 bits
 /// or 24 in 32, of two channels or eight, the sizes Milan's Basic Audio
@@ -165,6 +174,8 @@ impl Own {
             inputs: Vec::new(),
             clock_source: 0,
             clock_source_inputs: Vec::new(),
+            logo: Some(LOGO.to_vec()),
+            vendor_logo: Some(VENDOR_LOGO.to_vec()),
         };
         let stream = StreamId::new(mac, u16::from(INSTANCE) << 8);
         Ok(Self {
@@ -687,6 +698,19 @@ mod tests {
         // Beside triib's first endpoint on the same interface,
         // 0xa010a3ff00a51726.
         assert_eq!(entity_id(mac), EntityId(0xa010_a3ff_70a5_1726));
+    }
+
+    /// Its logo is the app's icon and its vendor's Scramble Tools', PNGs
+    /// small enough for controllers to read in a few dozen Address Access
+    /// responses.
+    #[test]
+    fn its_logos_are_pngs_of_128_pixels() {
+        for logo in [LOGO, VENDOR_LOGO] {
+            assert!(logo.starts_with(b"\x89PNG\r\n\x1a\n"));
+            // IHDR's width and height.
+            assert_eq!(&logo[16..24], &[0, 0, 0, 128, 0, 0, 0, 128]);
+            assert!(logo.len() < 64 * 1024);
+        }
     }
 
     #[test]

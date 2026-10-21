@@ -174,6 +174,7 @@ pub(crate) fn start(
     controller_config.read_talker_state = false;
     controller_config.lite_status = false;
     controller_config.wireless_status = false;
+    controller_config.read_logos = false;
     // Without Apple's framework the Mac's own entity is out of reach, so
     // the controller leaves what is advertised from this address alone,
     // until AVB is on and the runtime's thread opens the framework.
