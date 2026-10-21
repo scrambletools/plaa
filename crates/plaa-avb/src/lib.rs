@@ -157,6 +157,14 @@ impl Network {
         let _ = self.inputs.send(Input::Disconnect(listener));
     }
 
+    /// Keeps what the windows show of the network up to date by asking
+    /// again, as entities that send no notifications need: while `listed`,
+    /// each listener's name and formats in turn, and every second how the
+    /// `chosen` inputs take their streams.
+    pub fn watch(&self, listed: bool, chosen: Vec<(EntityId, u16)>) {
+        let _ = self.inputs.send(Input::Watch { listed, chosen });
+    }
+
     /// Where what plays goes, to be sent.
     pub fn sound(&self) -> Arc<Sound> {
         self.sound.clone()

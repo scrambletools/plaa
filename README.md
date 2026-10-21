@@ -134,7 +134,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   can play what plays, by name, each with one button: play there, stop,
   or the formats both share, the listener's format following plaa's.
   The one chosen shows how it takes its stream: from which talker, its
-  media clock lock, format, stream ID, destination, latency and counters.
+  media clock lock, format, stream ID, destination, latency and counters,
+  kept up to date as other controllers, such as triib's, change them.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame

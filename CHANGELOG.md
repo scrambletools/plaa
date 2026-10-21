@@ -70,7 +70,9 @@ The first build.
   plays as a stereo AAF stream on gPTP time, beside triib's entity
   service, which reserves the stream for it, and a Network Audio sheet
   listing the listeners that can play it, with the chosen one's status,
-  format, stream and counters under them.
+  format, stream and counters under them, kept up to date as other
+  controllers change them, by asking again where entities send no
+  notifications.
 - On a Mac, plaa sends through the Mac's own AVB entity, turned on in
   Audio MIDI Setup, as triib uses it: its controller reaches the entity
   through Apple's AVB framework, and plaa plays into the Core Audio

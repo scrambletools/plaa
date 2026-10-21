@@ -9,6 +9,7 @@ use plaa_avb::{EntityId, Network, Snapshot};
 
 use super::{Content, Plaa};
 use crate::External;
+use crate::window::Sheet;
 
 impl Plaa {
     /// Starts plaa on the interface Settings name, or stops it where they
@@ -19,6 +20,7 @@ impl Plaa {
         self.avb = None;
         self.avb_error = None;
         self.avb_snapshot = Arc::new(Snapshot::default());
+        self.avb_watched = (false, Vec::new());
         let Some(interface) = self.settings.avb_interface.clone() else {
             return;
         };
@@ -72,6 +74,30 @@ impl Plaa {
     pub(crate) fn avb_disconnect(&self, listener: (EntityId, u16)) {
         if let Some(network) = &self.avb {
             network.disconnect(listener);
+        }
+    }
+
+    /// Tells plaa's AVB side what the windows show of the network, which
+    /// it keeps up to date: whether any lists the listeners, and those
+    /// chosen there.
+    pub(crate) fn watch_avb(&mut self) {
+        let Some(network) = &self.avb else {
+            return;
+        };
+        let mut listed = false;
+        let mut chosen = Vec::new();
+        for window in self.windows.values() {
+            if let Some(player) = window.player()
+                && player.sheet == Some(Sheet::Network)
+            {
+                listed = true;
+                chosen.extend(player.listener);
+            }
+        }
+        let watched = (listed, chosen);
+        if self.avb_watched != watched {
+            network.watch(watched.0, watched.1.clone());
+            self.avb_watched = watched;
         }
     }
 

@@ -218,7 +218,8 @@ fn details<'a>(snapshot: &Snapshot, listener: &Listener<'_>) -> Element<'a, Cont
     let shared: Vec<String> = listener.shared.iter().map(ToString::to_string).collect();
     content = content.push(field(crate::fl!("network-formats"), shared.join("\n")));
     if let Some(info) = input.info.filter(|_| input.bound.is_some()) {
-        if info.settled() {
+        // Some entities have it without marking it valid.
+        if info.settled() || info.stream_id.0 != 0 {
             content = content.push(field(
                 crate::fl!("network-stream-id"),
                 info.stream_id.to_string(),
@@ -265,7 +266,9 @@ fn details<'a>(snapshot: &Snapshot, listener: &Listener<'_>) -> Element<'a, Cont
 }
 
 /// What an input takes, in words: nothing, or a talker's stream, and
-/// whether it has the stream or the talker's reservation failed.
+/// whether it has the stream, by its stream info or its media clock
+/// locked to it, as some entities never mark the stream's ID valid, or
+/// the talker's reservation failed.
 fn status(snapshot: &Snapshot, input: &Stream) -> String {
     let Some(talker) = input.bound else {
         return crate::fl!("network-not-connected");
@@ -277,7 +280,9 @@ fn status(snapshot: &Snapshot, input: &Stream) -> String {
             stream = stream,
             reason = reservation_failure(&info)
         ),
-        Some(info) if info.settled() => crate::fl!("network-from-receiving", stream = stream),
+        Some(info) if info.settled() || media_locked(input) == Some(true) => {
+            crate::fl!("network-from-receiving", stream = stream)
+        }
         Some(_) => crate::fl!("network-from-waiting", stream = stream),
         None => crate::fl!("network-from", stream = stream),
     }
@@ -442,6 +447,14 @@ mod tests {
             0,
         ));
         assert_eq!(status(&snapshot, &input), "From plaa, receiving");
+        // Locked to the stream, as an entity that leaves its ID unmarked.
+        input.info = Some(info(StreamInfoFlags::CONNECTED, 0, 0));
+        input.counters = Some(plaa_avb::StreamInputCounters {
+            media_locked: Some(1),
+            ..plaa_avb::StreamInputCounters::default()
+        });
+        assert_eq!(status(&snapshot, &input), "From plaa, receiving");
+        input.counters = None;
         // An entity of several outputs names the one, as listeners are.
         input.bound = Some((EntityId(3), 1));
         input.info = Some(info(

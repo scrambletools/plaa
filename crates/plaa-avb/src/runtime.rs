@@ -46,6 +46,13 @@ enum Step {
 /// The longest the thread waits without looking at its timers.
 const MOST_WAIT: Duration = Duration::from_millis(250);
 
+/// How often the inputs the windows detail are asked how they stand.
+const CHOSEN_EVERY: Duration = Duration::from_secs(1);
+
+/// How often the next listener in turn is read again, while the windows
+/// list them.
+const LISTED_EVERY: Duration = Duration::from_millis(500);
+
 /// The longest wait while the Mac's own entity owes answers, which come
 /// through the framework, not the socket.
 #[cfg(target_os = "macos")]
@@ -81,6 +88,11 @@ pub(crate) enum Input {
     /// given, or the talker's.
     Connect(End, End, Option<StreamFormat>),
     Disconnect((EntityId, u16)),
+    /// What the windows show: the listeners, and the inputs detailed.
+    Watch {
+        listed: bool,
+        chosen: Vec<End>,
+    },
     /// What plays arrives at another rate.
     SoundRate,
     Stop,
@@ -182,6 +194,7 @@ pub(crate) fn start(
         host: None,
         talker: TalkerState::Off,
         failure: None,
+        watch: Watch::default(),
         inputs,
         snapshot,
         changed,
@@ -212,6 +225,20 @@ pub(crate) fn start(
     Ok((sender, thread))
 }
 
+/// What the windows show of the network, asked for again as it can
+/// change unannounced: some entities send no notifications, and changes
+/// other controllers make then reach plaa no other way.
+#[derive(Default)]
+struct Watch {
+    listed: bool,
+    chosen: Vec<End>,
+    /// When the chosen inputs, and the last listener in turn, were asked.
+    chosen_at: Option<Duration>,
+    listed_at: Option<Duration>,
+    /// Counts the listeners asked, to take the next in turn.
+    turn: usize,
+}
+
 struct Runtime {
     start: std::time::Instant,
     mac: MacAddress,
@@ -236,6 +263,7 @@ struct Runtime {
     /// The talker's state where there is no entity to ask.
     talker: TalkerState,
     failure: Option<String>,
+    watch: Watch,
     inputs: Receiver<Input>,
     snapshot: Arc<Mutex<Snapshot>>,
     changed: Box<dyn Fn() + Send>,
@@ -356,6 +384,14 @@ impl Runtime {
                 self.failure = None;
                 self.controller.disconnect(now, listener);
             }
+            Input::Watch { listed, chosen } => {
+                // Newly chosen inputs are asked at once.
+                if chosen != self.watch.chosen {
+                    self.watch.chosen_at = None;
+                }
+                self.watch.listed = listed;
+                self.watch.chosen = chosen;
+            }
             Input::SoundRate => {
                 #[cfg(target_os = "linux")]
                 if let Some(own) = &mut self.own {
@@ -449,6 +485,7 @@ impl Runtime {
         #[cfg(target_os = "macos")]
         self.take_local();
         self.controller.handle_timeout(now);
+        self.refresh(now, since);
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         let talker_before = self.talker_state();
         #[cfg(target_os = "linux")]
@@ -609,14 +646,69 @@ impl Runtime {
         self.talker.clone()
     }
 
-    /// Lays out what the controller read for the app, and tells it.
-    fn publish(&mut self) {
+    /// Asks again for what the windows show: every second how the chosen
+    /// inputs take their streams, and in turn one listener's name and its
+    /// inputs' formats.
+    fn refresh(&mut self, now: Instant, since: Duration) {
+        let due = |at: Option<Duration>, every: Duration| at.is_none_or(|at| since >= at + every);
+        if !self.watch.chosen.is_empty() && due(self.watch.chosen_at, CHOSEN_EVERY) {
+            self.watch.chosen_at = Some(since);
+            for &(entity, input) in &self.watch.chosen {
+                let stream = (entity, DescriptorType::STREAM_INPUT, input);
+                self.controller
+                    .refresh_stream(now, stream.0, stream.1, stream.2);
+                self.controller
+                    .refresh_descriptor(now, stream.0, stream.1, stream.2);
+            }
+        }
+        if !self.watch.listed || !due(self.watch.listed_at, LISTED_EVERY) {
+            return;
+        }
+        self.watch.listed_at = Some(since);
+        let own = self.own_entity();
+        let listeners: Vec<(EntityId, Vec<u16>)> = self
+            .controller
+            .entities()
+            .map(|discovered| discovered.entity_id())
+            .filter(|&id| Some(id) != own)
+            .filter_map(|id| {
+                let inputs: Vec<u16> = self
+                    .controller
+                    .model(id)?
+                    .streams(true)
+                    .filter(|stream| !stream.is_media_clock())
+                    .map(|stream| stream.index)
+                    .collect();
+                (!inputs.is_empty()).then_some((id, inputs))
+            })
+            .collect();
+        if listeners.is_empty() {
+            return;
+        }
+        let (entity, inputs) = &listeners[self.watch.turn % listeners.len()];
+        self.watch.turn = self.watch.turn.wrapping_add(1);
+        self.controller
+            .refresh_descriptor(now, *entity, DescriptorType::ENTITY, 0);
+        for &input in inputs {
+            self.controller
+                .refresh_descriptor(now, *entity, DescriptorType::STREAM_INPUT, input);
+        }
+    }
+
+    /// plaa's own entity, where it has one.
+    fn own_entity(&self) -> Option<EntityId> {
         #[cfg(target_os = "linux")]
         let own = self.own.as_ref().map(Own::entity_id);
         #[cfg(target_os = "macos")]
         let own = self.host.as_ref().and_then(Host::entity_id);
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         let own: Option<EntityId> = None;
+        own
+    }
+
+    /// Lays out what the controller read for the app, and tells it.
+    fn publish(&mut self) {
+        let own = self.own_entity();
         let mut entities: Vec<Found> = self
             .controller
             .entities()

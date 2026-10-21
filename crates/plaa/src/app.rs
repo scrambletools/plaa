@@ -112,6 +112,9 @@ pub struct Plaa {
     /// The window whose sound plaa's talker sends, and its player's
     /// surface, as a window's player changes when its list moves on.
     avb_feeding: Option<(window::Id, u64)>,
+    /// What the windows were last said to show of the network: whether
+    /// any lists the listeners, and those chosen there.
+    avb_watched: (bool, Vec<(plaa_avb::EntityId, u16)>),
     /// The wired interfaces, as when Settings last opened.
     pub(crate) avb_interfaces: Vec<plaa_avb::Interface>,
     /// What is kept awake while something plays, and the hold on it when
@@ -342,6 +345,7 @@ impl Plaa {
             avb_error: None,
             avb_snapshot: std::sync::Arc::default(),
             avb_feeding: None,
+            avb_watched: (false, Vec::new()),
             avb_interfaces: Vec::new(),
             awake: None,
             media_window: None,
@@ -818,6 +822,7 @@ impl Plaa {
         let task = self.handle(message);
         self.keep_awake();
         self.tell_desktop();
+        self.watch_avb();
         task
     }
 
