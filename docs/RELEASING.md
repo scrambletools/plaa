@@ -11,7 +11,7 @@ Everything a release ships is built from this repository:
 | `scripts/dist-install.sh` | Installs a build of plaa and plaa-netraw and the files above into a system layout; the Linux packages use it |
 | `packaging/linux/` | Debian and RPM packages, each built by `build.sh` in a container of the release it is for and made with nfpm (`packaging/nfpm.yaml`); they grant `plaa-netraw` `CAP_NET_RAW` as they install and run `avb-check` |
 | `packaging/arch/plaa/` | AUR package, whose install script does the same |
-| `packaging/windows/` | Windows MSI (WiX 5) and zip, made by `build.ps1`, carrying FFmpeg's DLLs |
+| `packaging/windows/` | Windows MSI (WiX 5) and zip, made by `build.ps1`, carrying FFmpeg's DLLs and libass's, which `libass.ps1` builds with vcpkg; `ffmpeg-sources.sh` gathers the sources of the FFmpeg build |
 | `packaging/macos/` | plaa.app, carrying FFmpeg and libass, and its installer package, made by `bundle.sh --pkg` around `distribution.xml`, signed and notarized as [macOS signing](#macos-signing) says, with the BPF access helper |
 | `.github/workflows/release.yml` | Builds all of them for a tag and drafts the GitHub release once the installer tests pass |
 | `packaging/tests/` | The installer tests: each package installed, upgraded, run, made to play a video and removed in a clean system, as [Installer tests](#installer-tests) says |
@@ -71,16 +71,32 @@ are development builds, which keep their own.
   AVB Ethernet port.
 - **Windows:** FFmpeg's DLLs, BtbN's shared GPL build
   (https://github.com/BtbN/FFmpeg-Builds), beside plaa.exe, with
-  FFmpeg's license. The MSI installs for the current user, with no
-  administrator prompt, adds plaa to the Start menu, and offers it in
-  Open With for video and audio files without taking them over.
-  libass is not carried yet, so ASS subtitles show as plain text there.
+  FFmpeg's license, and libass with the libraries it needs (FreeType,
+  HarfBuzz, FriBidi and theirs), built as DLLs by vcpkg at the commit
+  the workflow pins, each with its license in `licenses`. They use the
+  Visual C++ runtime, whose DLLs a clean Windows lacks, so those go
+  beside them too, keeping Microsoft's signatures. The MSI installs for
+  the current user, with no administrator prompt, adds plaa to the
+  Start menu, and offers it in Open With for video and audio files
+  without taking them over.
 
-Before the first public release, check the codecs the macOS and Windows
-builds carry against patents (`docs/PLAN.md`, Risks), and that each
-release offers the corresponding source of everything GPL it carries:
-the macOS job attaches the sources Homebrew built from; for the Windows
-DLLs, pin a BtbN build and attach the sources it names.
+The release offers the corresponding source of everything GPL it
+carries: the macOS job attaches the sources Homebrew built from; the
+Windows jobs attach the source archives vcpkg built from
+(`*-windows-library-sources.zip`) and, for FFmpeg, FFmpeg's source at
+the commit of the build, BtbN's scripts at theirs and each library
+they build for x64 and ARM64, fetched as the scripts fetch them
+(`*-windows-ffmpeg-sources.tar`).
+
+The FFmpeg build is pinned by its tag, version and SHA-256 in
+`release.yml` and `ci.yml`. BtbN keeps daily builds for 14 days and
+each month's last build for two years, so pin a month's last build. To
+move to a newer one, take its tag from BtbN's releases, the FFmpeg
+version from its file names, FFmpeg's commit from that version's hash,
+and the scripts' commit as the one BtbN tagged; then update the
+SHA-256 of both zips. Before the first public release, check the
+codecs the macOS and Windows builds carry against patents
+(`docs/PLAN.md`, Risks).
 
 ## Steps
 
@@ -125,7 +141,7 @@ window.
 |---|---|---|
 | .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
 | Arch | A fresh Arch container | `build-arch.sh` builds the PKGBUILD from this tree, then the same test |
-| MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa and FFmpeg import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, the version line, the window and the clip played; then that uninstalling leaves nothing |
+| MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa, FFmpeg and libass import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, the version line and the FFmpeg and libass it names, the window and the clip played; then that uninstalling leaves nothing |
 | MSI, x64 | A Windows Server 2022 container, which has nothing installed | The same, without the window and the clip |
 | .pkg | Fresh macOS 14, 15 and 26 runners | `packaging/tests/macos/test-pkg.sh`: Gatekeeper's verdict on a downloaded copy, that plaa and every library it carries link only macOS's own libraries and each other, look nowhere outside the app, and run on the oldest macOS the app claims, then installs and checks the app, the version line, the BPF launch daemon and access for the user, the window and the clip played; then that the uninstall script leaves nothing |
 

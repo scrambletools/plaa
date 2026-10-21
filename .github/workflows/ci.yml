@@ -57,8 +57,11 @@ jobs:
     env:
       # bindgen reads FFmpeg's headers through the runner's LLVM.
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
-      # A shared FFmpeg build, its headers, import libraries and DLLs.
-      FFMPEG_BUILD: ffmpeg-n9.0-latest-win64-gpl-shared-9.0
+      # A shared FFmpeg build, its headers, import libraries and DLLs, the
+      # one the Release workflow pins.
+      FFMPEG_BUILDS_TAG: autobuild-2026-09-30-13-08
+      FFMPEG_BUILD: ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-shared-9.0
+      FFMPEG_SHA256: 3da6c7b60bb9ccd73ec5b5e815ba804a0879eb362ba0e3beebce50174c022696
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -68,8 +71,10 @@ jobs:
       - name: FFmpeg
         shell: pwsh
         run: |
-          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/$env:FFMPEG_BUILD.zip"
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/$env:FFMPEG_BUILDS_TAG/$env:FFMPEG_BUILD.zip"
           Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          $hash = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
+          if ($hash -ne $env:FFMPEG_SHA256) { throw "$env:FFMPEG_BUILD.zip has SHA-256 $hash, not the one pinned" }
           Expand-Archive ffmpeg.zip -DestinationPath $env:RUNNER_TEMP
           $dir = Join-Path $env:RUNNER_TEMP $env:FFMPEG_BUILD
           "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append

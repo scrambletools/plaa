@@ -1,10 +1,11 @@
 # Packages a Windows build of plaa: the MSI installer and a portable zip,
-# each with the FFmpeg DLLs plaa.exe loads beside it, and FFmpeg's
-# license.
+# each with the DLLs plaa.exe loads beside it, FFmpeg's and libass's with
+# what they need, and their licenses.
 #
 #   packaging\windows\build.ps1 -Version 0.1.0 -Source dist -Out out [-Arch arm64] [-Icon plaa.ico]
 #
-# Source holds plaa.exe, the DLLs, and FFmpeg's LICENSE.txt. Needs WiX 5
+# Source holds plaa.exe, the DLLs, FFmpeg's LICENSE.txt, and the other
+# libraries' licenses in licenses\*.txt (libass.ps1). Needs WiX 5
 # and its UI and Util extensions:
 #   dotnet tool install --global wix --version 5.0.2
 #   wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
@@ -25,7 +26,8 @@ New-Item -ItemType Directory -Force $Out | Out-Null
 # and a major upgrade removes the old ones before the new go in.
 $dlls = @(Get-ChildItem (Join-Path $Source '*.dll'))
 if ($dlls.Count -eq 0) { throw "no DLLs in $Source" }
-$files = ($dlls | ForEach-Object { "        <File Source=`"$($_.FullName)`" />" }) -join "`n"
+$licenses = @(Get-ChildItem (Join-Path $Source 'licenses\*.txt') -ErrorAction SilentlyContinue)
+$files = (@($dlls) + @($licenses) | ForEach-Object { "        <File Source=`"$($_.FullName)`" />" }) -join "`n"
 $libraries = Join-Path ([System.IO.Path]::GetTempPath()) "plaa-libraries-$PID.wxs"
 @"
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
@@ -56,6 +58,7 @@ Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $stage | Out-Null
 Copy-Item (Join-Path $Source 'plaa.exe') $stage
 $dlls | Copy-Item -Destination $stage
+$licenses | Copy-Item -Destination $stage
 Copy-Item (Join-Path $Source 'LICENSE.txt') (Join-Path $stage 'FFmpeg-LICENSE.txt')
 Copy-Item (Join-Path $root 'LICENSE'), (Join-Path $root 'README.md') $stage
 New-Item -ItemType Directory (Join-Path $stage 'fonts') | Out-Null

@@ -19,7 +19,7 @@ const NAMES: &[&str] = if cfg!(target_os = "macos") {
         "libass.dylib",
     ]
 } else if cfg!(windows) {
-    &["libass-9.dll", "ass.dll", "libass.dll"]
+    &["libass-9.dll", "ass-9.dll", "ass.dll", "libass.dll"]
 } else {
     &["libass.so.9", "libass.so"]
 };

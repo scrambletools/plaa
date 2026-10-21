@@ -18,9 +18,17 @@ env:
   CARGO_TERM_COLOR: always
   NFPM_VERSION: 2.43.0
   # A shared FFmpeg build for Windows, its headers, import libraries and
-  # DLLs, as CI builds with.
-  FFMPEG_RELEASE: n9.0-latest
+  # DLLs, as CI builds with: BtbN's last build of September 2026, which
+  # BtbN keeps for two years, as it does each month's last; FFmpeg's
+  # commit and that of BtbN's build scripts, which pin each library's,
+  # give the sources the release carries.
+  FFMPEG_BUILDS_TAG: autobuild-2026-09-30-13-08
+  FFMPEG_BUILDS_COMMIT: 6c9aec5fc9a72ec3abedd1fa84db141fa18cf52b
+  FFMPEG_VERSION: n9.0.2-17-g2a571b6068
+  FFMPEG_COMMIT: 2a571b606854520cf89804d8030c8b328e621689
   FFMPEG_SERIES: '9.0'
+  # The vcpkg that builds libass and the libraries it needs for Windows.
+  VCPKG_COMMIT: 857036234d15fbed8f30fed66e898d7725446c0c
 
 jobs:
   linux:
@@ -92,9 +100,11 @@ jobs:
           - arch: x64
             runner: windows-2025
             ffmpeg: win64
+            ffmpeg_sha256: 3da6c7b60bb9ccd73ec5b5e815ba804a0879eb362ba0e3beebce50174c022696
           - arch: arm64
             runner: windows-11-arm
             ffmpeg: winarm64
+            ffmpeg_sha256: 92460cf103340012d41413b557669902538f040e0c953abc1d719750dcd5f8a8
     runs-on: ${{ matrix.runner }}
     env:
       SIGNING: ${{ vars.AZURE_SIGNING_ACCOUNT != '' }}
@@ -113,8 +123,10 @@ jobs:
       - name: FFmpeg
         shell: pwsh
         run: |
-          $build = "ffmpeg-$env:FFMPEG_RELEASE-${{ matrix.ffmpeg }}-gpl-shared-$env:FFMPEG_SERIES"
-          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/$build.zip" -OutFile ffmpeg.zip
+          $build = "ffmpeg-$env:FFMPEG_VERSION-${{ matrix.ffmpeg }}-gpl-shared-$env:FFMPEG_SERIES"
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/$env:FFMPEG_BUILDS_TAG/$build.zip" -OutFile ffmpeg.zip
+          $hash = (Get-FileHash -Algorithm SHA256 ffmpeg.zip).Hash.ToLower()
+          if ($hash -ne '${{ matrix.ffmpeg_sha256 }}') { throw "$build.zip has SHA-256 $hash, not the one pinned" }
           Expand-Archive ffmpeg.zip -DestinationPath $env:RUNNER_TEMP
           $dir = Join-Path $env:RUNNER_TEMP $build
           "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -139,6 +151,12 @@ jobs:
           Copy-Item target\release\plaa.exe dist\
           Copy-Item (Join-Path $env:FFMPEG_DIR 'bin\*.dll') dist\
           Copy-Item (Join-Path $env:FFMPEG_DIR 'LICENSE.txt') dist\
+      # libass for ASS subtitles, and the libraries it needs, as DLLs
+      # vcpkg builds, with their licenses and the sources they come from;
+      # the Visual C++ runtime DLLs they use join them after signing.
+      - name: libass
+        shell: pwsh
+        run: packaging\windows\libass.ps1 -Arch ${{ matrix.arch }} -Out dist -Runtime runtime -Sources library-sources -Commit $env:VCPKG_COMMIT
       - if: env.SIGNING == 'true'
         uses: azure/login@v2
         with:
@@ -167,7 +185,10 @@ jobs:
           dotnet tool install --global wix --version 5.0.2
           wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
+          Copy-Item runtime\*.dll dist\
           packaging\windows\build.ps1 -Version $version -Source dist -Out packages -Arch ${{ matrix.arch }} -Icon packaging\windows\plaa.ico
+          # The libraries' sources, beside the installer they went into.
+          Compress-Archive -Path library-sources\* -DestinationPath "packages\plaa-$version-${{ matrix.arch }}-windows-library-sources.zip"
       - if: env.SIGNING == 'true'
         uses: azure/artifact-signing-action@v2
         with:
@@ -197,6 +218,30 @@ jobs:
         with:
           name: windows-${{ matrix.arch }}
           path: packages/*
+
+  windows-ffmpeg-sources:
+    # The sources of the FFmpeg build the Windows packages carry, as its
+    # GPL asks: FFmpeg's at its commit, BtbN's build scripts at theirs, and
+    # each library those scripts build for x64 and arm64, fetched as the
+    # scripts fetch them.
+    runs-on: ubuntu-24.04
+    if: ${{ !inputs.only || inputs.only == 'all' || inputs.only == 'windows' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools the scripts fetch with
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q subversion autoconf automake libtool
+      - name: Sources
+        run: |
+          packaging/windows/ffmpeg-sources.sh sources
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          mkdir -p dist
+          tar -cf "dist/plaa-$version-windows-ffmpeg-sources.tar" -C sources .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-ffmpeg-sources
+          path: dist/*
 
   macos:
     # plaa.app in an installer package for Apple Silicon, carrying
@@ -486,7 +531,7 @@ jobs:
 
   release:
     if: github.ref_type == 'tag'
-    needs: [linux, aur, windows, macos, linux-install, arch-install, windows-install, windows-clean, macos-install]
+    needs: [linux, aur, windows, windows-ffmpeg-sources, macos, linux-install, arch-install, windows-install, windows-clean, macos-install]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

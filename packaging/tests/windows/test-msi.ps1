@@ -206,11 +206,13 @@ foreach ($extension in @('.mkv', '.mp4', '.webm', '.flac', '.mp3')) {
 }
 Write-Host 'all there'
 
-# Its version line names the FFmpeg it found, so FFmpeg's DLLs load.
+# Its version line names the FFmpeg and the libass it found, so their
+# DLLs, and those they need, load.
 Section 'plaa'
 $printed = Get-Printed (Join-Path $folder 'plaa.exe') '--version'
 Write-Host $printed
 if ($printed -notmatch "^plaa $([regex]::Escape($version)) \(.*\), FFmpeg \d") { Fail "plaa --version printed '$printed'" }
+if ($printed -notmatch ', libass \d') { Fail "plaa found no libass for ASS subtitles: '$printed'" }
 
 if (-not $NoWindow) {
     # Plain GDI, as System.Drawing's assemblies differ between Windows
