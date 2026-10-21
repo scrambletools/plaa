@@ -5,17 +5,17 @@
 //!
 //! cargo run -p plaa-avb --example avb -- list <interface>
 //! cargo run -p plaa-avb --example avb -- talk <interface> <seconds> [--tone]
-//! cargo run -p plaa-avb --example avb -- connect <interface> <talker>:<output> <listener>:<input>
+//! cargo run -p plaa-avb --example avb -- connect <interface> <talker>:<output> <listener>:<input> [format]
 //! cargo run -p plaa-avb --example avb -- disconnect <interface> <listener>:<input>
 
 use std::time::{Duration, Instant};
 
-use plaa_avb::{Config, EntityId, Network, Snapshot};
+use plaa_avb::{Config, EntityId, Network, Snapshot, StreamFormat};
 
 fn usage() -> ! {
     eprintln!(
         "usage: avb list <interface> | talk <interface> <seconds> [--tone] | \
-         connect <interface> <talker>:<output> <listener>:<input> | \
+         connect <interface> <talker>:<output> <listener>:<input> [format] | \
          disconnect <interface> <listener>:<input>"
     );
     std::process::exit(2);
@@ -110,13 +110,23 @@ fn main() {
             }
             print(&network.snapshot());
         }
-        ["connect", interface, talker, listener] => {
+        ["connect", interface, talker, listener, rest @ ..] => {
             let (Some(talker), Some(listener)) = (end(talker), end(listener)) else {
                 usage();
             };
+            // The format both ends take, in hex as describe prints it; the
+            // talker's own where none is given.
+            let format = match rest {
+                [] => None,
+                [format] => Some(StreamFormat(
+                    u64::from_str_radix(format.trim_start_matches("0x"), 16)
+                        .unwrap_or_else(|_| usage()),
+                )),
+                _ => usage(),
+            };
             let network = open(interface, false);
             std::thread::sleep(Duration::from_secs(5));
-            network.connect(talker, listener, None);
+            network.connect(talker, listener, format);
             std::thread::sleep(Duration::from_secs(3));
             print(&network.snapshot());
         }
