@@ -150,6 +150,10 @@ pub(crate) struct Own {
     /// to the entity.
     sent: Sent,
     counted_at: Duration,
+    /// Where the stream's address is kept between runs, and the one kept,
+    /// in use until MAAP has claimed the stream's address anew.
+    address_file: Option<std::path::PathBuf>,
+    kept: Option<MacAddress>,
 }
 
 impl Own {
@@ -242,6 +246,11 @@ impl Own {
             refused: None,
             sent: Sent::default(),
             counted_at: Duration::ZERO,
+            kept: config
+                .address_file
+                .as_deref()
+                .and_then(|file| kept_address(file, &config.interface)),
+            address_file: config.address_file.clone(),
         })
     }
 
@@ -268,6 +277,21 @@ impl Own {
             reservation.begin(since);
         }
         self.maap.start(now);
+        // The address the stream had last time, plaa's moments ago as a
+        // rule, goes out at once rather than after MAAP's three probes:
+        // listeners hear plaa again within a fraction of a second. MAAP
+        // claims an address meanwhile, and the stream moves to it if it
+        // is another.
+        if let Some(address) = self.kept {
+            self.entity.set_output_destination(0, address);
+            self.declare_at = Some(self.redeclare_at(since));
+        }
+    }
+
+    /// Whether the stream has an address: MAAP's, or the one kept from
+    /// the last run until MAAP has claimed one.
+    fn addressed(&self) -> bool {
+        self.maap.address(0).is_some() || self.kept.is_some()
     }
 
     pub(crate) fn state(&self) -> TalkerState {
@@ -370,7 +394,7 @@ impl Own {
             self.begin(now, since);
         } else if self.declared {
             self.declare(since);
-        } else if self.maap.address(0).is_some() && self.declare_at.is_none() {
+        } else if self.addressed() && self.declare_at.is_none() {
             self.declare_at = Some(self.redeclare_at(since));
         }
         true
@@ -424,7 +448,7 @@ impl Own {
             Ok(mut own) => {
                 own.begin(since);
                 self.reservation = Some(own);
-                if self.maap.address(0).is_some() {
+                if self.addressed() {
                     self.declare_at = Some(self.redeclare_at(since));
                 }
             }
@@ -461,7 +485,7 @@ impl Own {
                 self.ready = false;
             }
             Heard::Available => {
-                if self.maap.address(0).is_some() && !self.declared {
+                if self.addressed() && !self.declared {
                     self.declare_at = Some(self.redeclare_at(since));
                 }
             }
@@ -534,10 +558,24 @@ impl Own {
         while let Some(event) = self.maap.poll_event() {
             match event {
                 MaapEvent::Acquired(_) => {
-                    if let Some(address) = self.maap.address(0) {
-                        self.entity.set_output_destination(0, address);
-                        self.declare_at = Some(self.redeclare_at(since));
+                    let Some(address) = self.maap.address(0) else {
+                        continue;
+                    };
+                    if let Some(file) = &self.address_file {
+                        keep_address(file, &self.interface, address);
                     }
+                    let kept = self.kept.take();
+                    if kept == Some(address) {
+                        // In use already.
+                        continue;
+                    }
+                    if kept.is_some() {
+                        // The kept one was not to be had: the stream moves.
+                        self.stop_talker();
+                        self.withdraw(since);
+                    }
+                    self.entity.set_output_destination(0, address);
+                    self.declare_at = Some(self.redeclare_at(since));
                 }
                 MaapEvent::Lost => {
                     self.stop_talker();
@@ -746,6 +784,23 @@ impl Own {
     }
 }
 
+/// The stream's address kept in `file` for `interface`, where it is one
+/// of MAAP's.
+fn kept_address(file: &std::path::Path, interface: &str) -> Option<MacAddress> {
+    let text = std::fs::read_to_string(file).ok()?;
+    let (kept_for, address) = text.trim().split_once(' ')?;
+    let address: MacAddress = address.parse().ok()?;
+    (kept_for == interface && address.0[..4] == [0x91, 0xe0, 0xf0, 0x00]).then_some(address)
+}
+
+/// Keeps the stream's address in `file` for the next run on `interface`.
+fn keep_address(file: &std::path::Path, interface: &str, address: MacAddress) {
+    if let Some(folder) = file.parent() {
+        let _ = std::fs::create_dir_all(folder);
+    }
+    let _ = std::fs::write(file, format!("{interface} {address}\n"));
+}
+
 /// The MAAP block's destination, to listen for MAAP on.
 pub(crate) const MAAP_DESTINATION: MacAddress = maap::DESTINATION;
 
@@ -759,6 +814,22 @@ mod tests {
         // Beside triib's first endpoint on the same interface,
         // 0xa010a3ff00a51726.
         assert_eq!(entity_id(mac), EntityId(0xa010_a3ff_70a5_1726));
+    }
+
+    /// The stream's address is kept between runs, for its interface alone,
+    /// and only one of MAAP's.
+    #[test]
+    fn its_address_is_kept_between_runs() {
+        let folder = std::env::temp_dir().join(format!("plaa-address-{}", std::process::id()));
+        let file = folder.join("avb-address");
+        let address = MacAddress([0x91, 0xe0, 0xf0, 0x00, 0x63, 0x26]);
+        assert_eq!(kept_address(&file, "enp2s0"), None);
+        keep_address(&file, "enp2s0", address);
+        assert_eq!(kept_address(&file, "enp2s0"), Some(address));
+        assert_eq!(kept_address(&file, "eth1"), None);
+        std::fs::write(&file, "enp2s0 01:80:c2:00:00:0e\n").unwrap();
+        assert_eq!(kept_address(&file, "enp2s0"), None);
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     /// Its counters add up every talker that ran, the running one too.

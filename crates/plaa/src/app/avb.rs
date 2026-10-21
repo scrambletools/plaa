@@ -28,6 +28,7 @@ impl Plaa {
             interface: interface.clone(),
             talker: self.settings.avb_talker,
             name: self.avb_name(),
+            address_file: plaa_store::paths::state_dir().map(|dir| dir.join("avb-address")),
         };
         match Network::start(config, || crate::post(External::Avb)) {
             Ok(network) => self.avb = Some(network),

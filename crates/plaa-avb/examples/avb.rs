@@ -60,6 +60,7 @@ fn open(interface: &str, talker: bool) -> Network {
         interface: interface.to_owned(),
         talker,
         name: "plaa test".into(),
+        address_file: None,
     };
     Network::start(config, || {}).unwrap_or_else(|error| {
         eprintln!("could not start on {interface}: {error}");

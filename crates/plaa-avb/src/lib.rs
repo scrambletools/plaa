@@ -44,6 +44,9 @@ pub struct Config {
     pub talker: bool,
     /// The entity's name, as controllers show it.
     pub name: String,
+    /// Where plaa keeps its stream's address between runs, to send to it
+    /// again at once while MAAP claims it anew.
+    pub address_file: Option<std::path::PathBuf>,
 }
 
 /// A stream output or input of an entity on the network.
