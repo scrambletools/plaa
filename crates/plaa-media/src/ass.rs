@@ -46,6 +46,7 @@ type Message = unsafe extern "C" fn(c_int, *const c_char, *mut c_void, *mut c_vo
 /// libass's functions, as loaded.
 struct Functions {
     _library: libloading::Library,
+    library_version: unsafe extern "C" fn() -> c_int,
     library_init: unsafe extern "C" fn() -> *mut c_void,
     library_done: unsafe extern "C" fn(*mut c_void),
     set_message_cb: unsafe extern "C" fn(*mut c_void, Option<Message>, *mut c_void),
@@ -83,6 +84,26 @@ pub fn available() -> bool {
     functions().is_some()
 }
 
+/// libass's version, such as "0.17.3", where it is there.
+pub fn version() -> Option<String> {
+    let functions = functions()?;
+    // SAFETY: ass_library_version takes nothing and returns a number.
+    let number = unsafe { (functions.library_version)() } as u32;
+    Some(version_name(number))
+}
+
+/// A version as libass numbers it, 0x01703000 for 0.17.3: the major in
+/// the top four bits, then the minor and the patch in two hexadecimal
+/// digits each that read as decimal ones.
+fn version_name(number: u32) -> String {
+    format!(
+        "{}.{:x}.{:x}",
+        number >> 28,
+        (number >> 20) & 0xff,
+        (number >> 12) & 0xff
+    )
+}
+
 fn load() -> Option<Functions> {
     NAMES.iter().find_map(|name| {
         // SAFETY: loading libass runs its initializers, which do nothing
@@ -96,6 +117,7 @@ fn load() -> Option<Functions> {
                 };
             }
             Some(Functions {
+                library_version: symbol!("ass_library_version"),
                 library_init: symbol!("ass_library_init"),
                 library_done: symbol!("ass_library_done"),
                 set_message_cb: symbol!("ass_set_message_cb"),
@@ -388,6 +410,13 @@ fn composite(layers: &[Layer], canvas: (u32, u32)) -> Option<SubtitlePicture> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn versions_read_as_libass_writes_them() {
+        assert_eq!(version_name(0x0170_3000), "0.17.3");
+        assert_eq!(version_name(0x0160_0000), "0.16.0");
+        assert_eq!(version_name(0x0140_1000), "0.14.1");
+    }
 
     #[test]
     fn bitmaps_lay_over_one_another_in_their_colors() {

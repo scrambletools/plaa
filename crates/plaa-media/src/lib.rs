@@ -46,6 +46,12 @@ pub fn init() {
     });
 }
 
+/// libass's version, such as "0.17.3", where it is there to draw ASS
+/// subtitles, for `--version`.
+pub fn libass_version() -> Option<String> {
+    ass::version()
+}
+
 /// FFmpeg's version, such as "9.0.1", for Settings and `--version`.
 pub fn ffmpeg_version() -> String {
     let release = ffi::version();

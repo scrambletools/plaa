@@ -122,8 +122,11 @@ fn version() -> String {
             " UTC)"
         )
     };
+    let libass = plaa_media::libass_version()
+        .map(|version| format!(", libass {version}"))
+        .unwrap_or_default();
     format!(
-        "plaa {}{build}, FFmpeg {}",
+        "plaa {}{build}, FFmpeg {}{libass}",
         env!("CARGO_PKG_VERSION"),
         plaa_media::ffmpeg_version()
     )
