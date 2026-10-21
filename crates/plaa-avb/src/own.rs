@@ -4,7 +4,10 @@
 //! it to on the sound output. MAAP claims the stream's multicast address;
 //! MSRP advertises it and hears listeners, and declares the input's
 //! listener, MVRP joins its VLAN, as triib's endpoints do, in triib's
-//! entity service's participant where it runs on the port.
+//! entity service's participant where it runs on the port. There, while
+//! the port runs AVB Lite, the service declares them by CVU SRP in the
+//! entity's name, and the stream goes as a copy to each listener it
+//! admits, as it says.
 
 use std::io;
 use std::sync::Arc;
@@ -17,11 +20,12 @@ use atdecc::entity::{
     EndpointModel, Entity, EntityEvent, InputReservation, OutputReservation, ProbedStream,
     StreamModel, UNADDRESSED,
 };
+use atdecc::lite::{FallbackReason, LiteFlags, LiteStatus, PtpProfile};
 use atdecc::maap::{self, Maap, MaapEvent};
 use atdecc::stream_format::StreamFormat;
 use atdecc::{ClockIdentity, EntityId, EntityModelId, Instant, MacAddress, StreamId};
 use avb_mrp::msrp::{ListenerState, TalkerDeclaration};
-use avb_mrp::sharing::Notice;
+use avb_mrp::sharing::{Mode, Notice};
 use avb_stream::audio::{Sink, Source};
 use avb_stream::media::Media;
 use avb_stream::{Listener, ListenerConfig, MediaClock, Talker, TalkerConfig, TalkerStats};
@@ -61,6 +65,13 @@ const FORMATS: [StreamFormat; 4] = [
 
 /// The priority of class A streams.
 const PRIORITY: u8 = 3;
+
+/// The priority of AVB Lite's streams (AVB Lite profile, 7).
+const LITE_PRIORITY: u8 = 5;
+
+/// A talker's destination in AVB Lite while its stream comes unicast, to
+/// each listener's own address (profile 6).
+const UNICAST: MacAddress = MacAddress([0; 6]);
 
 /// The latency the talker adds to the stream's path, in nanoseconds.
 const TALKER_LATENCY: u32 = 125_000;
@@ -142,7 +153,7 @@ struct Listening {
     refused: bool,
     receiver: Option<Listener>,
     /// The stream it takes, and where it comes to.
-    receiving: Option<(u64, MacAddress)>,
+    receiving: Option<(u64, Vec<MacAddress>)>,
     /// The input's counters, kept as the receivers come and go.
     counters: [u32; 32],
 }
@@ -162,6 +173,18 @@ pub(crate) struct Own {
     clock: Arc<MediaClock>,
     sound: Arc<Sound>,
     talker: Option<Talker>,
+    /// The VLAN tag the running talker sends with, priority and VLAN.
+    talker_tag: u16,
+    /// The port's mode, as the program sharing its participant says it.
+    mode: Option<Mode>,
+    /// Where the stream goes while the port runs AVB Lite, and with which
+    /// tag, as that program says: none until it says, and the stream goes
+    /// nowhere meanwhile.
+    copies: Option<(u16, Vec<MacAddress>)>,
+    /// The link's speed in Mb/s, as of the last mode, for GET_LITE_STATUS.
+    link_speed: u32,
+    /// What ptp4l last said of the interface.
+    gptp: Option<gptp::Status>,
     interface: String,
     mac: MacAddress,
     own_clock: ClockIdentity,
@@ -216,7 +239,13 @@ impl Own {
         let clock = Arc::new(MediaClock::open(Some(phc))?);
         let generation = 1;
         let mut blocked = None;
-        let reservation = match Reservation::share(&interface, sender, generation, Duration::ZERO) {
+        let reservation = match Reservation::share(
+            &interface,
+            sender,
+            generation,
+            Duration::ZERO,
+            entity_id(mac).0,
+        ) {
             Some(shared) => Some(shared),
             None => match reservation::taken(&interface) {
                 Some(why) => {
@@ -278,6 +307,11 @@ impl Own {
             clock,
             sound,
             talker: None,
+            talker_tag: 0,
+            mode: None,
+            copies: None,
+            link_speed: found.speed.unwrap_or(0),
+            gptp: None,
             interface,
             mac,
             own_clock,
@@ -428,7 +462,9 @@ impl Own {
     /// where it had stepped aside. Whether it does.
     fn share(&mut self, now: Instant, since: Duration) -> bool {
         let generation = self.generation + 1;
-        let Some(shared) = Reservation::share(&self.interface, &self.sender, generation, since)
+        let entity = self.entity.entity_id().0;
+        let Some(shared) =
+            Reservation::share(&self.interface, &self.sender, generation, since, entity)
         else {
             return false;
         };
@@ -452,6 +488,8 @@ impl Own {
     pub(crate) fn handle_shared(&mut self, since: Duration, notice: Notice) {
         let ours = self.entity.output_stream(0).map(|(id, _)| id.0);
         let listened = self.listened();
+        // It said whether it takes Listen.
+        let hello = matches!(notice, Notice::Hello(_));
         if let Some(heard) = self
             .reservation
             .as_mut()
@@ -459,8 +497,7 @@ impl Own {
         {
             self.heard(since, heard);
         }
-        // It said whether it takes Listen.
-        if matches!(notice, Notice::Hello(_)) {
+        if hello {
             self.ask_to_listen(since);
         }
     }
@@ -489,6 +526,9 @@ impl Own {
     /// The participant plaa declared its listener in went, and with it
     /// what it registered: plaa listens again once it has another.
     fn lost_participant(&mut self, since: Duration) {
+        self.mode = None;
+        self.copies = None;
+        self.update_lite_status();
         self.listening.talker = None;
         self.listening.asked = false;
         self.listening.declared = None;
@@ -572,6 +612,29 @@ impl Own {
                 self.update_listener(since);
                 return;
             }
+            Heard::Mode(mode) => {
+                // Into AVB Lite, the stream waits to be told where to go;
+                // back in AVB, it goes as declared.
+                let lite = mode.lite.is_some();
+                if self.mode.map(|before| before.lite.is_some()) != Some(lite) {
+                    self.copies = None;
+                }
+                self.mode = Some(mode);
+                if let Some(found) = avb_net::interfaces()
+                    .into_iter()
+                    .find(|found| found.name == self.interface)
+                {
+                    self.link_speed = found.speed.unwrap_or(0);
+                }
+                self.follow_copies();
+                self.update_lite_status();
+                self.update_listener(since);
+            }
+            Heard::Copies { tag, destinations } => {
+                self.copies = Some((tag, destinations));
+                self.follow_copies();
+                self.update_lite_status();
+            }
             Heard::Declared => self.refused = None,
             Heard::Taken => {
                 // Another talker here has its ID, as while the program has
@@ -612,8 +675,13 @@ impl Own {
             (None, true) => Ptp::Elsewhere,
             (None, false) => self.missing_ptp(),
         };
-        let gptp = ours.map(|status| status.gptp).unwrap_or_default();
+        let gptp = ours
+            .as_ref()
+            .map(|status| status.gptp.clone())
+            .unwrap_or_default();
         self.entity.set_gptp(now, gptp);
+        self.gptp = ours;
+        self.update_lite_status();
     }
 
     /// No ptp4l answers: plaa starts its service, once, where it is
@@ -732,6 +800,14 @@ impl Own {
                 }
                 EntityEvent::MaxTransitTimeChanged { .. } if self.talker.is_some() => {
                     self.start_talker();
+                }
+                EntityEvent::LiteConfigChanged { escalation_allowed } => {
+                    // The port's to decide, for every talker on it: the
+                    // program sharing its participant takes it, and says
+                    // the Mode that follows.
+                    if let Some(reservation) = &mut self.reservation {
+                        reservation.escalate(escalation_allowed);
+                    }
                 }
                 EntityEvent::InputSettled { index: 0, stream } => self.settled(since, stream),
                 EntityEvent::InputUnsettled { index: 0 }
@@ -870,18 +946,23 @@ impl Own {
         // Where the stream goes, as its talker declares it now: the probe
         // can have answered before the talker moved it.
         let destination = talker.map_or(stream.destination, |talker| talker.destination);
+        let lite = self.mode.is_some_and(|mode| mode.lite.is_some());
+        let destinations = receive_at(lite, self.mac, destination, stream.destination);
         if state == Some(ListenerState::Ready) || cannot_listen {
-            if self.listening.receiving != Some((stream_id, destination)) {
-                self.start_receiver(stream_id, destination);
+            let receiving = Some((stream_id, destinations));
+            if self.listening.receiving != receiving
+                && let Some((stream_id, destinations)) = receiving
+            {
+                self.start_receiver(stream_id, destinations);
             }
         } else {
             self.stop_receiver();
         }
     }
 
-    /// Plays the stream `stream_id`, sent to `destination`, on the sound
+    /// Plays the stream `stream_id`, sent to `destinations`, on the sound
     /// output, or nowhere where there is none.
-    fn start_receiver(&mut self, stream_id: u64, destination: MacAddress) {
+    fn start_receiver(&mut self, stream_id: u64, destinations: Vec<MacAddress>) {
         self.stop_receiver();
         let Some(format) = self
             .entity
@@ -895,7 +976,7 @@ impl Own {
         let config = ListenerConfig {
             interface: self.interface.clone(),
             stream_id,
-            destinations: vec![destination],
+            destinations: destinations.clone(),
             format,
             sink: Sink::Device {
                 name: None,
@@ -921,7 +1002,7 @@ impl Own {
         match started {
             Ok(receiver) => {
                 self.listening.receiver = Some(receiver);
-                self.listening.receiving = Some((stream_id, destination));
+                self.listening.receiving = Some((stream_id, destinations));
             }
             Err(error) => eprintln!("plaa: could not listen to the AVB stream: {error}"),
         }
@@ -1087,6 +1168,86 @@ impl Own {
         }
     }
 
+    /// Where the stream goes now, and the VLAN tag it goes with: as
+    /// declared, or while the port runs AVB Lite where its copies go,
+    /// nowhere until plaa is told.
+    fn sending(&self, destination: MacAddress) -> (Vec<MacAddress>, u16) {
+        let tag = |priority: u8, vlan: u16| (u16::from(priority) << 13) | vlan;
+        match (self.mode, &self.copies) {
+            (Some(Mode { lite: Some(_), .. }), Some((copies_tag, copies))) => {
+                (copies.clone(), *copies_tag)
+            }
+            (Some(mode @ Mode { lite: Some(_), .. }), None) => {
+                (Vec::new(), tag(LITE_PRIORITY, mode.media_vlan))
+            }
+            _ => (vec![destination], tag(PRIORITY, VLAN)),
+        }
+    }
+
+    /// Sends the running stream where it goes now: to its new
+    /// destinations from its next frame, or started again with its new
+    /// tag.
+    fn follow_copies(&mut self) {
+        let (Some(talker), Some((_, destination))) = (&self.talker, self.entity.output_stream(0))
+        else {
+            return;
+        };
+        let (destinations, tag) = self.sending(destination);
+        if tag == self.talker_tag {
+            talker.set_destinations(destinations);
+        } else {
+            self.start_talker();
+        }
+    }
+
+    /// What GET_LITE_STATUS answers, as triib's entities answer it: once
+    /// the program sharing its participant said the port's mode, which
+    /// plaa's own participants never do, as they run AVB alone.
+    fn update_lite_status(&mut self) {
+        if self.mode.is_none() && self.entity.lite_status().is_none() {
+            return;
+        }
+        let ptp = self.gptp.as_ref();
+        let offset = ptp.and_then(|status| status.offset);
+        let lite = self.mode.and_then(|mode| mode.lite);
+        let mut flags = LiteFlags::empty();
+        if let Some(mode) = self.mode {
+            flags = LiteFlags::CAPABLE | LiteFlags::EGRESS_VALID;
+            flags.set(LiteFlags::ACTIVE, lite.is_some());
+            flags.set(LiteFlags::ESCALATION_ALLOWED, mode.escalation);
+        }
+        flags.set(LiteFlags::OFFSET_VALID, offset.is_some());
+        // kb/s, each copy counted.
+        let egress = match (&self.copies, self.declaration()) {
+            (Some((_, copies)), Some(declaration)) if lite.is_some() => {
+                copies.len() as u64 * declaration.bandwidth(8000) / 1000
+            }
+            _ => 0,
+        };
+        self.entity.set_lite_status(LiteStatus {
+            interface: 0,
+            flags,
+            fallback_reason: FallbackReason(lite.unwrap_or(0)),
+            // ptp4l still in gPTP keeps the profile gPTP, fallen back or
+            // not.
+            ptp_profile: if lite.is_some() && ptp.is_some_and(|status| status.end_to_end) {
+                PtpProfile::AVB_LITE_PTP
+            } else {
+                PtpProfile::GPTP
+            },
+            ptp_domain: ptp.map_or(0, |status| status.gptp.domain),
+            media_vlan_id: self.mode.map_or(0, |mode| mode.media_vlan),
+            unicast_fanout_limit: self.mode.map_or(0, |mode| mode.unicast_fanout),
+            link_speed: self.link_speed,
+            committed_egress: egress.min(u64::from(u32::MAX)) as u32,
+            grandmaster: ptp.map_or(ClockIdentity(0), |status| status.gptp.grandmaster),
+            offset_from_grandmaster: offset
+                .unwrap_or(0)
+                .clamp(i64::from(i32::MIN), i64::from(i32::MAX))
+                as i32,
+        });
+    }
+
     fn start_talker(&mut self) {
         self.stop_talker();
         let Some((stream_id, destination)) = self.entity.output_stream(0) else {
@@ -1105,13 +1266,14 @@ impl Own {
         // The sound in the stream's first two channels, the rest silent.
         self.sound
             .set_channels(format.channels().unwrap_or(CHANNELS));
+        let (destinations, tag) = self.sending(destination);
         let config = TalkerConfig {
             interface: self.interface.clone(),
             mac: self.mac,
             stream_id: stream_id.0,
-            destinations: vec![destination],
-            vlan_id: VLAN,
-            priority: PRIORITY,
+            destinations,
+            vlan_id: tag & 0x0fff,
+            priority: (tag >> 13) as u8,
             format,
             max_transit_time: Duration::from_nanos(u64::from(transit)),
             source: Source::Shared(self.sound.buffer()),
@@ -1119,11 +1281,32 @@ impl Own {
         match Talker::start(config, self.clock.clone()) {
             Ok(talker) => {
                 self.talker = Some(talker);
+                self.talker_tag = tag;
                 self.sent.starts = self.sent.starts.wrapping_add(1);
             }
             Err(error) => eprintln!("plaa: the AVB stream did not start: {error}"),
         }
     }
+}
+
+/// Where the input takes its stream: where its talker sends it, as it
+/// declares, `declared`, or as the probe found, `probed`. In AVB Lite
+/// that is this computer's own address, `own`, while the stream comes
+/// unicast, and the multicast address once it escalates: plaa takes both,
+/// as the talker moves between them before it says.
+fn receive_at(
+    lite: bool,
+    own: MacAddress,
+    declared: MacAddress,
+    probed: MacAddress,
+) -> Vec<MacAddress> {
+    if !lite && declared != UNICAST {
+        return vec![declared];
+    }
+    let multicast = [declared, probed]
+        .into_iter()
+        .find(|address| address.0[0] & 1 == 1);
+    std::iter::once(own).chain(multicast).collect()
 }
 
 /// The stream's address kept in `file` for `interface`, where it is one
@@ -1206,6 +1389,21 @@ mod tests {
             assert_eq!(&logo[16..24], &[0, 0, 0, 128, 0, 0, 0, 128]);
             assert!(logo.len() < 64 * 1024);
         }
+    }
+
+    /// In AVB Lite the input takes its stream at this computer's address
+    /// and, once known, at the multicast one it escalates to.
+    #[test]
+    fn avb_lite_streams_come_here_or_to_their_group() {
+        let own = MacAddress([0xa0, 0x10, 0xa3, 0xa5, 0x17, 0x26]);
+        let group = MacAddress([0x91, 0xe0, 0xf0, 0x00, 0x63, 0x26]);
+        let other = MacAddress([0x91, 0xe0, 0xf0, 0x00, 0x63, 0x27]);
+        assert_eq!(receive_at(false, own, group, other), vec![group]);
+        assert_eq!(receive_at(true, own, UNICAST, group), vec![own, group]);
+        assert_eq!(receive_at(true, own, other, group), vec![own, other]);
+        // A talker unicast to a probe that found none.
+        assert_eq!(receive_at(true, own, UNICAST, UNICAST), vec![own]);
+        assert_eq!(receive_at(false, own, UNICAST, group), vec![own, group]);
     }
 
     #[test]

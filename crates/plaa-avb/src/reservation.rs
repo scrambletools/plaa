@@ -3,7 +3,8 @@
 //! MVRP, where no other program here declares on the port; else through
 //! the one that does, which shares its participant (`avb_mrp::sharing`),
 //! as two on one port withdraw each other's declarations. triib's entity
-//! service shares its own.
+//! service shares its own, and keeps plaa's declarations while the port
+//! runs AVB Lite, telling plaa where to send each copy of its stream.
 
 use std::io;
 use std::os::unix::net::UnixStream;
@@ -13,7 +14,7 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 
 use avb_mrp::msrp::{self, Domain, ListenerState, TalkerDeclaration};
-use avb_mrp::sharing::{self, Hello, Notice, Refusal, Request, feature};
+use avb_mrp::sharing::{self, Hello, Mode, Notice, Refusal, Request, feature};
 use avb_mrp::{Participant, Registration, mvrp};
 use avb_net::{MacAddress, Socket};
 
@@ -23,7 +24,7 @@ use crate::runtime::{Input, read_into};
 pub(crate) const VLAN: u16 = 2;
 
 /// What the port says of plaa's stream.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Heard {
     /// The listeners for it: their state, or none once they left.
     Listener(Option<ListenerState>),
@@ -45,6 +46,15 @@ pub(crate) enum Heard {
     /// The program sharing its participant cannot declare listeners now,
     /// as while the port runs AVB Lite.
     ListenRefused,
+    /// The port's mode, AVB or AVB Lite, as the program sharing its
+    /// participant says it once plaa named its entity, and as it changes.
+    Mode(Mode),
+    /// Where plaa's stream goes while the port runs AVB Lite, a copy to
+    /// each address, and with which VLAN tag.
+    Copies {
+        tag: u16,
+        destinations: Vec<MacAddress>,
+    },
 }
 
 /// Why plaa cannot declare on `interface`: triib's entity service runs on
@@ -91,6 +101,12 @@ pub(crate) struct SharedParticipant {
     /// and version 0, which says nothing, once plaa waited in vain.
     hello: Option<Hello>,
     connected: Duration,
+    /// It said Unavailable before its hello, as it does to a program that
+    /// connects while the port runs AVB Lite, not knowing yet whether the
+    /// program takes it: plaa holds that until the hello says.
+    held: bool,
+    /// What plaa heard as it gave up waiting for the hello.
+    pending: Option<Heard>,
 }
 
 impl OwnParticipants {
@@ -111,6 +127,19 @@ impl OwnParticipants {
     }
 }
 
+impl SharedParticipant {
+    /// The participant said hello: the Unavailable it said before stands
+    /// where it takes no AVB Lite. One that does says Available once plaa
+    /// names its entity, so that one was a moment's.
+    fn hello_heard(&mut self) -> Option<Heard> {
+        let lite = self.hello.is_some_and(|hello| hello.has(feature::AVB_LITE));
+        (std::mem::take(&mut self.held) && !lite).then(|| {
+            self.available = false;
+            Heard::Unavailable
+        })
+    }
+}
+
 impl Drop for OwnParticipants {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
@@ -126,14 +155,16 @@ impl Drop for SharedParticipant {
 
 impl Reservation {
     /// The participant of the program serving `interface`'s, shared, if
-    /// one does, its notices read into `sender` as of `generation`.
+    /// one does, its notices read into `sender` as of `generation`, with
+    /// plaa's entity `entity`, which AVB Lite declares in the name of.
     pub(crate) fn share(
         interface: &str,
         sender: &Sender<Input>,
         generation: u64,
         since: Duration,
+        entity: u64,
     ) -> Option<Self> {
-        shared(connect(interface)?, sender, generation, since).ok()
+        shared(connect(interface)?, sender, generation, since, entity).ok()
     }
 
     /// plaa's own participants.
@@ -234,6 +265,19 @@ impl Reservation {
         }
     }
 
+    /// Tells the program sharing its participant whether streams may
+    /// escalate to multicast in AVB Lite, as a controller set it on plaa's
+    /// entity: it decides that for every talker on the port.
+    pub(crate) fn escalate(&mut self, allowed: bool) {
+        if let Self::Shared(shared) = self
+            && shared
+                .hello
+                .is_some_and(|hello| hello.has(feature::AVB_LITE))
+        {
+            let _ = sharing::write_request(&mut shared.writer, &Request::Escalation(allowed));
+        }
+    }
+
     /// Joins VLAN 2 and class A and B's domains, which a program sharing
     /// its participant has done already.
     pub(crate) fn begin(&mut self, since: Duration) {
@@ -299,8 +343,18 @@ impl Reservation {
         match notice {
             Notice::Hello(hello) => {
                 shared.hello = Some(hello);
+                shared.hello_heard()
+            }
+            Notice::Unavailable if shared.hello.is_none() => {
+                shared.held = true;
                 None
             }
+            Notice::Mode(mode) => Some(Heard::Mode(mode)),
+            Notice::Copies {
+                stream_id,
+                tag,
+                destinations,
+            } if Some(stream_id) == ours => Some(Heard::Copies { tag, destinations }),
             Notice::Talker { stream_id, talker } if Some(stream_id) == listened => {
                 Some(Heard::Talker(talker))
             }
@@ -318,6 +372,7 @@ impl Reservation {
                 Some(Heard::Unavailable)
             }
             Notice::Available => {
+                shared.held = false;
                 shared.available = true;
                 Some(Heard::Available)
             }
@@ -349,16 +404,19 @@ impl Reservation {
                         version: 0,
                         features: 0,
                     });
+                    shared.pending = shared.hello_heard();
                 }
             }
         }
     }
 
     /// What plaa's own participants registered for `ours`, and for the
-    /// stream plaa listens to, `listened`: its talker as it is now.
+    /// stream plaa listens to, `listened`: its talker as it is now. Of a
+    /// shared one, what plaa took as it gave up waiting for its hello.
     pub(crate) fn poll_heard(&mut self, ours: Option<u64>, listened: Option<u64>) -> Option<Heard> {
-        let Self::Own(own) = self else {
-            return None;
+        let own = match self {
+            Self::Own(own) => own,
+            Self::Shared(shared) => return shared.pending.take(),
         };
         while own.mvrp.poll_event().is_some() {}
         while let Some(registration) = own.msrp.poll_event() {
@@ -449,18 +507,22 @@ fn own(interface: &str, mac: MacAddress, sender: &Sender<Input>) -> io::Result<R
 }
 
 /// Shares the participant `stream` reaches, its notices read into `sender`
-/// on a thread of their own, saying hello first.
+/// on a thread of their own, saying hello first, then naming plaa's
+/// entity, `entity`, before anything is declared.
 fn shared(
     mut stream: UnixStream,
     sender: &Sender<Input>,
     generation: u64,
     since: Duration,
+    entity: u64,
 ) -> io::Result<Reservation> {
     let hello = Hello {
         version: sharing::VERSION,
-        features: 0,
+        features: feature::AVB_LITE,
     };
     sharing::write_request(&mut stream, &Request::Hello(hello))?;
+    // A participant without AVB Lite skips it.
+    sharing::write_request(&mut stream, &Request::Entity(entity))?;
     let mut reader = stream.try_clone()?;
     let sender = sender.clone();
     std::thread::Builder::new()
@@ -479,6 +541,8 @@ fn shared(
         generation,
         hello: None,
         connected: since,
+        held: false,
+        pending: None,
     }))
 }
 
@@ -490,6 +554,24 @@ fn stream_of(value: &[u8]) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// plaa's entity, as it names it to the participant.
+    const ENTITY: u64 = 0xa010_a3ff_70a5_1726;
+
+    /// The hello plaa says and the entity it names, as it connects.
+    fn connected(theirs: &mut UnixStream) {
+        assert_eq!(
+            sharing::read_request(theirs).unwrap(),
+            Request::Hello(Hello {
+                version: sharing::VERSION,
+                features: feature::AVB_LITE,
+            })
+        );
+        assert_eq!(
+            sharing::read_request(theirs).unwrap(),
+            Request::Entity(ENTITY)
+        );
+    }
 
     #[test]
     fn stream_ids_are_read_from_attributes() {
@@ -504,15 +586,9 @@ mod tests {
     fn a_shared_participant_declares_and_tells() {
         let (ours, mut theirs) = UnixStream::pair().unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
-        let mut reservation = shared(ours, &sender, 1, Duration::ZERO).unwrap();
+        let mut reservation = shared(ours, &sender, 1, Duration::ZERO, ENTITY).unwrap();
         assert!(reservation.is_shared());
-        assert_eq!(
-            sharing::read_request(&mut theirs).unwrap(),
-            Request::Hello(Hello {
-                version: sharing::VERSION,
-                features: 0
-            })
-        );
+        connected(&mut theirs);
         let declaration = TalkerDeclaration {
             stream_id: 0x77,
             destination: MacAddress([0x91, 0xe0, 0xf0, 0, 0, 1]),
@@ -539,7 +615,7 @@ mod tests {
             panic!("no notice");
         };
         assert_eq!(
-            reservation.handle_notice(heard, Some(0x77), None),
+            reservation.handle_notice(heard.clone(), Some(0x77), None),
             Some(Heard::Listener(Some(ListenerState::Ready)))
         );
         // Another stream's listeners are not plaa's.
@@ -557,8 +633,8 @@ mod tests {
     fn a_shared_participant_says_hello_and_answers() {
         let (ours, mut theirs) = UnixStream::pair().unwrap();
         let (sender, _receiver) = std::sync::mpsc::channel();
-        let mut reservation = shared(ours, &sender, 1, Duration::ZERO).unwrap();
-        sharing::read_request(&mut theirs).unwrap();
+        let mut reservation = shared(ours, &sender, 1, Duration::ZERO, ENTITY).unwrap();
+        connected(&mut theirs);
         // Waiting for its hello, plaa takes it for one that serves this
         // computer's listeners.
         assert!(reservation.reaches_local());
@@ -598,15 +674,15 @@ mod tests {
         // One that says no hello in time is of version 0, which counts
         // only the network's listeners.
         let (ours, mut theirs) = UnixStream::pair().unwrap();
-        let mut old = shared(ours, &sender, 2, Duration::from_secs(10)).unwrap();
-        sharing::read_request(&mut theirs).unwrap();
+        let mut old = shared(ours, &sender, 2, Duration::from_secs(10), ENTITY).unwrap();
+        connected(&mut theirs);
         old.handle_timeout(Duration::from_secs(10) + sharing::HELLO_WAIT / 2);
         assert!(old.reaches_local());
         old.handle_timeout(Duration::from_secs(10) + sharing::HELLO_WAIT);
         assert!(!old.reaches_local());
         // A version 1 one without the feature, too.
         let (ours, _theirs) = UnixStream::pair().unwrap();
-        let mut plain = shared(ours, &sender, 3, Duration::ZERO).unwrap();
+        let mut plain = shared(ours, &sender, 3, Duration::ZERO, ENTITY).unwrap();
         let hello = Hello {
             version: 1,
             features: 0,
@@ -621,8 +697,8 @@ mod tests {
     fn a_shared_participant_listens_for_plaa() {
         let (ours, mut theirs) = UnixStream::pair().unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
-        let mut reservation = shared(ours, &sender, 1, Duration::ZERO).unwrap();
-        sharing::read_request(&mut theirs).unwrap();
+        let mut reservation = shared(ours, &sender, 1, Duration::ZERO, ENTITY).unwrap();
+        connected(&mut theirs);
         // Not known until it says hello.
         assert_eq!(reservation.listens(), None);
         let hello = Hello {
@@ -657,7 +733,7 @@ mod tests {
             panic!("no notice");
         };
         assert_eq!(
-            reservation.handle_notice(heard, Some(7), Some(0x99)),
+            reservation.handle_notice(heard.clone(), Some(7), Some(0x99)),
             Some(Heard::Talker(Some(talker)))
         );
         // Another stream's talker is not the one plaa listens to.
@@ -677,12 +753,132 @@ mod tests {
         );
         // One of version 1 cannot listen for plaa.
         let (ours, _theirs) = UnixStream::pair().unwrap();
-        let mut old = shared(ours, &sender, 2, Duration::ZERO).unwrap();
+        let mut old = shared(ours, &sender, 2, Duration::ZERO, ENTITY).unwrap();
         let hello = Hello {
             version: 1,
             features: feature::LOCAL_LISTENERS,
         };
         old.handle_notice(Notice::Hello(hello), Some(7), None);
         assert_eq!(old.listens(), Some(false));
+    }
+
+    /// Connecting while the port runs AVB Lite, plaa hears Unavailable
+    /// before the participant's hello: one that takes AVB Lite says Mode
+    /// and Available next, so plaa holds it; one that does not, or says
+    /// no hello, leaves it standing.
+    #[test]
+    fn an_unavailable_before_the_hello_waits_for_it() {
+        let (sender, _receiver) = std::sync::mpsc::channel();
+        let lite = Hello {
+            version: 2,
+            features: feature::LOCAL_LISTENERS | feature::LISTENERS | feature::AVB_LITE,
+        };
+        let (ours, _theirs) = UnixStream::pair().unwrap();
+        let mut reservation = shared(ours, &sender, 1, Duration::ZERO, ENTITY).unwrap();
+        assert_eq!(
+            reservation.handle_notice(Notice::Unavailable, Some(7), None),
+            None
+        );
+        assert_eq!(
+            reservation.handle_notice(Notice::Hello(lite), Some(7), None),
+            None
+        );
+        assert!(reservation.available());
+        assert_eq!(
+            reservation.handle_notice(Notice::Available, Some(7), None),
+            Some(Heard::Available)
+        );
+
+        let (ours, _theirs) = UnixStream::pair().unwrap();
+        let mut plain = shared(ours, &sender, 2, Duration::ZERO, ENTITY).unwrap();
+        plain.handle_notice(Notice::Unavailable, Some(7), None);
+        let hello = Hello {
+            version: 2,
+            features: feature::LOCAL_LISTENERS | feature::LISTENERS,
+        };
+        assert_eq!(
+            plain.handle_notice(Notice::Hello(hello), Some(7), None),
+            Some(Heard::Unavailable)
+        );
+        assert!(!plain.available());
+        // Once it said hello, Unavailable is heard at once.
+        let (ours, _theirs) = UnixStream::pair().unwrap();
+        let mut later = shared(ours, &sender, 3, Duration::ZERO, ENTITY).unwrap();
+        later.handle_notice(Notice::Hello(lite), Some(7), None);
+        assert_eq!(
+            later.handle_notice(Notice::Unavailable, Some(7), None),
+            Some(Heard::Unavailable)
+        );
+
+        let (ours, _theirs) = UnixStream::pair().unwrap();
+        let mut silent = shared(ours, &sender, 4, Duration::ZERO, ENTITY).unwrap();
+        silent.handle_notice(Notice::Unavailable, Some(7), None);
+        assert_eq!(silent.poll_heard(Some(7), None), None);
+        silent.handle_timeout(sharing::HELLO_WAIT);
+        assert_eq!(silent.poll_heard(Some(7), None), Some(Heard::Unavailable));
+        assert_eq!(silent.poll_heard(Some(7), None), None);
+        assert!(!silent.available());
+    }
+
+    /// In AVB Lite plaa hears the port's mode and where its stream's
+    /// copies go, and passes a controller's escalation on.
+    #[test]
+    fn a_shared_participant_runs_avb_lite() {
+        let (ours, mut theirs) = UnixStream::pair().unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut reservation = shared(ours, &sender, 1, Duration::ZERO, ENTITY).unwrap();
+        connected(&mut theirs);
+        // Not before the participant says it takes AVB Lite.
+        reservation.escalate(true);
+        let hello = Hello {
+            version: 2,
+            features: feature::LISTENERS | feature::AVB_LITE,
+        };
+        reservation.handle_notice(Notice::Hello(hello), Some(7), None);
+        reservation.escalate(false);
+        assert_eq!(
+            sharing::read_request(&mut theirs).unwrap(),
+            Request::Escalation(false)
+        );
+        let mode = sharing::Mode {
+            lite: Some(2),
+            media_vlan: 2,
+            unicast_fanout: 2,
+            escalation: false,
+        };
+        let listener = MacAddress([0xe8, 0xf6, 0x0a, 0xe0, 0x92, 0x20]);
+        for notice in [
+            Notice::Mode(mode),
+            Notice::Copies {
+                stream_id: 8,
+                tag: (5 << 13) | 2,
+                destinations: vec![listener],
+            },
+            Notice::Copies {
+                stream_id: 7,
+                tag: (5 << 13) | 2,
+                destinations: vec![listener],
+            },
+        ] {
+            sharing::write_notice(&mut theirs, &notice).unwrap();
+        }
+        let mut heard = Vec::new();
+        for _ in 0..3 {
+            let Ok(Input::Shared(notice)) = receiver.recv_timeout(Duration::from_secs(2)) else {
+                panic!("no notice");
+            };
+            heard.extend(reservation.handle_notice(notice, Some(7), None));
+        }
+        // Another stream's copies are not plaa's.
+        assert_eq!(
+            heard,
+            [
+                Heard::Mode(mode),
+                Heard::Copies {
+                    tag: (5 << 13) | 2,
+                    destinations: vec![listener],
+                },
+            ]
+        );
     }
 }

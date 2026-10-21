@@ -91,8 +91,10 @@ trimming and splitting, and Intel Macs.
 6. **Visualizer** (done): a spectrum of what is heard and the file's
    waveform under a sound file's cover, a scene in three dimensions
    filling the window, or the cover alone.
-7. **AVB and Milan**: the entity and talker, and a controller to connect
-   talkers and listeners (done); the listener and AVB Lite next.
+7. **AVB and Milan**: the entity, its talker and listener, and a
+   controller to connect talkers and listeners (done); AVB Lite through
+   triib's entity service (made, not yet tried on a network), then on
+   plaa's own participants.
 8. **Casting** (done): DLNA/UPnP renderers and Chromecasts.
 9. **Assistant and MCP** (done): the MCP server, `plaa --mcp`, with
    prev's consent prompts, and the assistant panel, both on one tool
@@ -471,11 +473,19 @@ Two MRP participants on one port withdraw each other's declarations, so
 where triib's entity service runs on the interface, the entity reserves
 its stream in the service's participant (`avb_mrp::sharing`, a socket in
 the user's runtime folder): the service declares the stream and tells
-plaa its listeners, and that it cannot while the port runs AVB Lite;
-from version 2 of the protocol it also listens for plaa, declaring
-plaa's listener merged with its own and telling plaa the stream's
-talker. Beside an older service, plaa plays what reaches the port
-anyway, and says to update triib.
+plaa its listeners; from version 2 of the protocol it also listens for
+plaa, declaring plaa's listener merged with its own and telling plaa the
+stream's talker. While the port runs AVB Lite, the service keeps both,
+declaring them by CVU SRP in the name of plaa's entity, which plaa names
+as it connects: it admits listeners for every talker on the computer and
+tells plaa where to send each copy of its stream, and with which VLAN
+tag, and plaa takes a stream sent to this computer's own address or the
+multicast address it escalates to. plaa's entity answers GET_LITE_STATUS
+from what the service says and ptp4l, and passes a controller's
+SET_LITE_CONFIG on to the service, which decides escalation for the
+port. Beside an older service, plaa plays what reaches the port anyway,
+and says to update triib; one without AVB Lite stops plaa's stream while
+the port runs it.
 When the service goes, plaa runs its own participants a moment later,
 and shares the service's again when it is back. Beside an older service,
 which does not share it, or another program declaring MRP from this
