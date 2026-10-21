@@ -80,6 +80,7 @@ action-exit-full-screen = Quitter le plein écran
 action-quality = Qualité
 action-visualizer = Visualiseur
 action-network = Audio en réseau
+action-cast = Caster
 
 ## What a sound file shows under its cover
 
@@ -271,6 +272,16 @@ network-failed = Connexion impossible : { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Mettez triib à jour pour lire ici.
 network-choose = Choisissez un listener pour voir comment il reçoit son flux.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Écouter ici
+network-no-talkers = Aucun talker du réseau n’envoie dans un format que plaa peut lire.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Écouter { $talker }
+network-listen-stop = Arrêter d’écouter { $talker }
+network-listen-frames = Trames reçues : { $frames }
+network-listen-update-triib = Mettez triib à jour pour écouter ici : plaa ne lit que ce qui parvient de toute façon à cet ordinateur.
+network-listen-lite = Le port utilise AVB Lite, qui ne réserve aucun flux : plaa ne lit que ce qui parvient de toute façon à cet ordinateur.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -537,3 +548,13 @@ agent-ask-play = Autoriser { $agent } à contrôler la lecture ici ?
 agent-ask-open = Autoriser { $agent } à ouvrir ou fermer une fenêtre ?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } demande à utiliser « { $tool } ». Dans les Réglages, vous choisissez ce que plaa demande.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Recherche de téléviseurs et d’enceintes…
+cast-none = Aucun téléviseur ni aucune enceinte compatible DLNA n’a été trouvé.
+# $renderer is the TV's or speaker's name.
+cast-stop = Arrêter la lecture sur { $renderer }
+notice-casting = Lecture sur { $renderer }.
+notice-cast-failed = Impossible de lire sur { $renderer } : { $reason }
+cast-web-page = Les pages web ne peuvent pas encore être castées : ouvrez plutôt l’adresse de la vidéo elle-même.

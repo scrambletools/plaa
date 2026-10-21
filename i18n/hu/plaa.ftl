@@ -74,6 +74,7 @@ action-exit-full-screen = Kilépés a teljes képernyőből
 action-quality = Minőség
 action-visualizer = Vizualizáció
 action-network = Hálózati hang
+action-cast = Átküldés
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = Nem sikerült kapcsolódni: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Az itteni lejátszáshoz frissítse a triib alkalmazást.
 network-choose = Válasszon egy vevőt, hogy lássa, hogyan fogadja az adatfolyamát.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Hallgatás itt
+network-no-talkers = A hálózaton egyetlen adó sem küld olyan formátumban, amelyet a plaa le tud játszani.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Hallgatás: { $talker }
+network-listen-stop = Hallgatás leállítása: { $talker }
+network-listen-frames = Fogadott keretek: { $frames }
+network-listen-update-triib = Az itteni hallgatáshoz frissítse a triib alkalmazást: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
+network-listen-lite = A port AVB Lite módban fut, amely nem foglal adatfolyamokat: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -525,3 +536,13 @@ agent-ask-play = Engedélyezi, hogy { $agent } vezérelje az itteni lejátszást
 agent-ask-open = Engedélyezi, hogy { $agent } megnyisson vagy bezárjon egy ablakot?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } szeretné használni ezt: „{ $tool }”. A Beállításokban választhatja ki, mire kérdez rá a plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Tévék és hangszórók keresése…
+cast-none = Nem található DLNA-t támogató tévé vagy hangszóró.
+# $renderer is the TV's or speaker's name.
+cast-stop = Lejátszás leállítása itt: { $renderer }
+notice-casting = Lejátszás itt: { $renderer }.
+notice-cast-failed = A(z) { $renderer } eszközön nem sikerült a lejátszás: { $reason }
+cast-web-page = Weboldalakat még nem lehet átküldeni: inkább a videó saját címét nyissa meg.

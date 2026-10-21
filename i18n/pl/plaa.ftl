@@ -84,6 +84,7 @@ action-exit-full-screen = Wyłącz pełny ekran
 action-quality = Jakość
 action-visualizer = Wizualizacja
 action-network = Dźwięk sieciowy
+action-cast = Przesyłaj
 
 ## What a sound file shows under its cover
 
@@ -275,6 +276,16 @@ network-failed = Nie można nawiązać połączenia: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Zaktualizuj triib, aby odtwarzać tutaj.
 network-choose = Wybierz odbiornik, aby zobaczyć, jak odbiera strumień.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Słuchaj tutaj
+network-no-talkers = Żaden nadajnik w sieci nie wysyła w formacie, który plaa może odtworzyć.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Słuchaj nadajnika { $talker }
+network-listen-stop = Przestań słuchać nadajnika { $talker }
+network-listen-frames = Odebrane ramki: { $frames }
+network-listen-update-triib = Zaktualizuj triib, aby słuchać tutaj: plaa odtwarza tylko to, co i tak dociera do tego komputera.
+network-listen-lite = Port działa w trybie AVB Lite, który nie rezerwuje strumieni: plaa odtwarza tylko to, co i tak dociera do tego komputera.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -545,3 +556,13 @@ agent-ask-play = Zezwolić agentowi { $agent } na sterowanie odtwarzaniem tutaj?
 agent-ask-open = Zezwolić agentowi { $agent } na otwarcie lub zamknięcie okna?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } prosi o użycie narzędzia „{ $tool }”. W Ustawieniach wybierzesz, o co pyta plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Wyszukiwanie telewizorów i głośników…
+cast-none = Nie znaleziono telewizora ani głośnika obsługującego DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Zatrzymaj odtwarzanie na { $renderer }
+notice-casting = Odtwarzanie na { $renderer }.
+notice-cast-failed = Nie można odtwarzać na { $renderer }: { $reason }
+cast-web-page = Stron internetowych nie można jeszcze przesyłać: otwórz zamiast tego adres samego filmu.

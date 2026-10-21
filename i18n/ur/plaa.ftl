@@ -74,6 +74,7 @@ action-exit-full-screen = پوری اسکرین سے باہر نکلیں
 action-quality = معیار
 action-visualizer = ویژولائزر
 action-network = نیٹ ورک آڈیو
+action-cast = کاسٹ کریں
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = کنکشن نہیں ہو سکا: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = یہاں چلانے کے لیے triib اپ ڈیٹ کریں۔
 network-choose = کوئی لسنر منتخب کریں تاکہ دیکھ سکیں کہ وہ اپنی اسٹریم کیسے لیتا ہے۔
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = یہاں سنیں
+network-no-talkers = نیٹ ورک پر کوئی ٹاکر ایسے فارمیٹ میں نہیں بھیج رہا جو plaa چلا سکے۔
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = { $talker } کو سنیں
+network-listen-stop = { $talker } کو سننا بند کریں
+network-listen-frames = موصول ہونے والے فریمز: { $frames }
+network-listen-update-triib = یہاں سننے کے لیے triib اپ ڈیٹ کریں: plaa صرف وہی چلاتا ہے جو ویسے بھی اس کمپیوٹر تک پہنچتا ہے۔
+network-listen-lite = پورٹ AVB Lite پر چل رہا ہے، جو کوئی اسٹریم ریزرو نہیں کرتا: plaa صرف وہی چلاتا ہے جو ویسے بھی اس کمپیوٹر تک پہنچتا ہے۔
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -528,3 +539,13 @@ agent-ask-play = کیا { $agent } کو یہاں پلے بیک کنٹرول کر
 agent-ask-open = کیا { $agent } کو ونڈو کھولنے یا بند کرنے دیں؟
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } “{ $tool }” استعمال کرنا چاہتا ہے۔ plaa کن باتوں پر پوچھے، یہ ترتیبات میں منتخب کیا جاتا ہے۔
+
+## Casting to a TV or speaker on the network
+
+cast-looking = ٹی وی اور اسپیکرز تلاش کیے جا رہے ہیں…
+cast-none = DLNA چلانے والا کوئی ٹی وی یا اسپیکر نہیں ملا۔
+# $renderer is the TV's or speaker's name.
+cast-stop = { $renderer } پر چلانا بند کریں
+notice-casting = { $renderer } پر چل رہا ہے۔
+notice-cast-failed = { $renderer } پر نہیں چلایا جا سکا: { $reason }
+cast-web-page = ویب صفحات ابھی کاسٹ نہیں کیے جا سکتے: اس کے بجائے ویڈیو کا اپنا پتہ کھولیں۔

@@ -74,6 +74,7 @@ action-exit-full-screen = Tam Ekrandan Çık
 action-quality = Kalite
 action-visualizer = Görselleştirici
 action-network = Ağ Sesi
+action-cast = Yayınla
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = Bağlanılamadı: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Burada oynatmak için triib'i güncelleyin.
 network-choose = Akışını nasıl aldığını görmek için bir dinleyici seçin.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Burada dinle
+network-no-talkers = Ağda plaa'nın oynatabileceği bir biçimde gönderen konuşmacı yok.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = { $talker } konuşmacısını dinle
+network-listen-stop = { $talker } konuşmacısını dinlemeyi durdur
+network-listen-frames = Alınan çerçeveler: { $frames }
+network-listen-update-triib = Burada dinlemek için triib'i güncelleyin: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
+network-listen-lite = Bağlantı noktası, hiçbir akışı rezerve etmeyen AVB Lite ile çalışıyor: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -525,3 +536,13 @@ agent-ask-play = { $agent } buradaki oynatmayı denetleyebilsin mi?
 agent-ask-open = { $agent } bir pencere açabilsin veya kapatabilsin mi?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent }, “{ $tool }” aracını kullanmak istiyor. plaa'nın neleri soracağını Ayarlar'dan seçebilirsiniz.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = TV'ler ve hoparlörler aranıyor…
+cast-none = DLNA destekli TV veya hoparlör bulunamadı.
+# $renderer is the TV's or speaker's name.
+cast-stop = { $renderer } üzerinde oynatmayı durdur
+notice-casting = { $renderer } üzerinde oynatılıyor.
+notice-cast-failed = { $renderer } üzerinde oynatılamadı: { $reason }
+cast-web-page = Web sayfaları henüz yayınlanamıyor: bunun yerine videonun kendi adresini açın.

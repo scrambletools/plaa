@@ -74,6 +74,7 @@ action-exit-full-screen = Thoát chế độ toàn màn hình
 action-quality = Chất lượng
 action-visualizer = Hiệu ứng hình ảnh
 action-network = Âm thanh qua mạng
+action-cast = Truyền
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = Không thể kết nối: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Hãy cập nhật triib để phát ở đây.
 network-choose = Chọn một Listener để xem cách nó nhận luồng.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Nghe tại đây
+network-no-talkers = Không có Talker nào trên mạng gửi ở định dạng mà plaa có thể phát.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Nghe { $talker }
+network-listen-stop = Dừng nghe { $talker }
+network-listen-frames = Đã nhận { $frames } khung
+network-listen-update-triib = Hãy cập nhật triib để nghe ở đây: plaa chỉ phát những gì vốn đã đến được máy tính này.
+network-listen-lite = Cổng đang chạy AVB Lite, không đặt trước luồng nào: plaa chỉ phát những gì vốn đã đến được máy tính này.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -525,3 +536,13 @@ agent-ask-play = Cho phép { $agent } điều khiển việc phát ở đây?
 agent-ask-open = Cho phép { $agent } mở hoặc đóng cửa sổ?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } yêu cầu dùng “{ $tool }”. Bạn có thể chọn những gì plaa sẽ hỏi trong Cài đặt.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Đang tìm TV và loa…
+cast-none = Không tìm thấy TV hay loa nào phát được DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Dừng phát trên { $renderer }
+notice-casting = Đang phát trên { $renderer }.
+notice-cast-failed = Không thể phát trên { $renderer }: { $reason }
+cast-web-page = Chưa thể truyền trang web: hãy mở địa chỉ riêng của video.

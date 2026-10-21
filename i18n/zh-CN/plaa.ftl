@@ -73,6 +73,7 @@ action-exit-full-screen = 退出全屏幕
 action-quality = 画质
 action-visualizer = 可视化效果
 action-network = 网络音频
+action-cast = 投放
 
 ## What a sound file shows under its cover
 
@@ -264,6 +265,16 @@ network-failed = 无法连接：{ $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = 请更新 triib 以在此播放。
 network-choose = 选择一个接收端，查看它如何接收流。
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = 在此收听
+network-no-talkers = 网络上没有以 plaa 能播放的格式发送的发送端。
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = 收听 { $talker }
+network-listen-stop = 停止收听 { $talker }
+network-listen-frames = 已接收 { $frames } 帧
+network-listen-update-triib = 请更新 triib 以在此收听：plaa 只会播放本来就到达这台电脑的内容。
+network-listen-lite = 该端口运行 AVB Lite，不预留任何流：plaa 只会播放本来就到达这台电脑的内容。
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -524,3 +535,13 @@ agent-ask-play = 允许 { $agent } 控制这里的播放？
 agent-ask-open = 允许 { $agent } 打开或关闭窗口？
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } 请求使用“{ $tool }”。你可以在“设置”中选择 plaa 询问哪些操作。
+
+## Casting to a TV or speaker on the network
+
+cast-looking = 正在查找电视和音箱…
+cast-none = 未找到支持 DLNA 的电视或音箱。
+# $renderer is the TV's or speaker's name.
+cast-stop = 停止在 { $renderer } 上播放
+notice-casting = 正在 { $renderer } 上播放。
+notice-cast-failed = 无法在 { $renderer } 上播放：{ $reason }
+cast-web-page = 暂时无法投放网页：请改为打开视频本身的地址。

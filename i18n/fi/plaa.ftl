@@ -81,6 +81,7 @@ action-exit-full-screen = Poistu koko näytön tilasta
 action-quality = Laatu
 action-visualizer = Visualisointi
 action-network = Verkkoääni
+action-cast = Suoratoista
 
 ## What a sound file shows under its cover
 
@@ -272,6 +273,16 @@ network-failed = Yhdistäminen epäonnistui: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Päivitä triib, niin voit toistaa tässä.
 network-choose = Valitse vastaanotin nähdäksesi, miten se ottaa virtansa vastaan.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Kuuntele tässä
+network-no-talkers = Mikään verkon lähetin ei lähetä muodossa, jota plaa pystyy toistamaan.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Kuuntele lähetintä { $talker }
+network-listen-stop = Lopeta lähettimen { $talker } kuuntelu
+network-listen-frames = Vastaanotetut kehykset: { $frames }
+network-listen-update-triib = Päivitä triib, niin voit kuunnella tässä: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
+network-listen-lite = Portissa on käytössä AVB Lite, joka ei varaa virtoja: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -538,3 +549,13 @@ agent-ask-play = Saako { $agent } ohjata toistoa täällä?
 agent-ask-open = Saako { $agent } avata tai sulkea ikkunan?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } pyytää käyttää toimintoa ”{ $tool }”. Asetuksissa valitset, mistä plaa kysyy.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Etsitään televisioita ja kaiuttimia…
+cast-none = DLNA-toistoa tukevaa televisiota tai kaiutinta ei löytynyt.
+# $renderer is the TV's or speaker's name.
+cast-stop = Lopeta toisto laitteella { $renderer }
+notice-casting = Toistetaan laitteella { $renderer }.
+notice-cast-failed = Toisto laitteella { $renderer } epäonnistui: { $reason }
+cast-web-page = Verkkosivuja ei voi vielä suoratoistaa: avaa sen sijaan videon oma osoite.

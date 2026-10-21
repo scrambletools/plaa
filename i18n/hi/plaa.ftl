@@ -74,6 +74,7 @@ action-exit-full-screen = पूर्ण स्क्रीन से बाह
 action-quality = गुणवत्ता
 action-visualizer = विज़ुअलाइज़र
 action-network = नेटवर्क ऑडियो
+action-cast = कास्ट करें
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = कनेक्ट नहीं किया जा सका: 
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = यहाँ चलाने के लिए triib अपडेट करें।
 network-choose = कोई Listener चुनें, यह देखने के लिए कि वह अपनी stream कैसे लेता है।
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = यहाँ सुनें
+network-no-talkers = नेटवर्क पर कोई भी Talker ऐसे फ़ॉर्मेट में नहीं भेज रहा, जिसे plaa चला सके।
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = { $talker } को सुनें
+network-listen-stop = { $talker } को सुनना बंद करें
+network-listen-frames = प्राप्त frames: { $frames }
+network-listen-update-triib = यहाँ सुनने के लिए triib अपडेट करें: plaa केवल वही चलाता है जो वैसे भी इस कंप्यूटर तक पहुँचता है।
+network-listen-lite = पोर्ट AVB Lite पर चल रहा है, जो कोई stream reserve नहीं करता: plaa केवल वही चलाता है जो वैसे भी इस कंप्यूटर तक पहुँचता है।
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -528,3 +539,13 @@ agent-ask-play = { $agent } को यहाँ प्लेबैक निय�
 agent-ask-open = { $agent } को विंडो खोलने या बंद करने दें?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } “{ $tool }” का उपयोग करना चाहता है। plaa किन बातों पर पूछे, यह सेटिंग्स में चुना जाता है।
+
+## Casting to a TV or speaker on the network
+
+cast-looking = टीवी और स्पीकर ढूँढे जा रहे हैं…
+cast-none = DLNA चलाने वाला कोई टीवी या स्पीकर नहीं मिला।
+# $renderer is the TV's or speaker's name.
+cast-stop = { $renderer } पर चलाना बंद करें
+notice-casting = { $renderer } पर चल रहा है।
+notice-cast-failed = { $renderer } पर नहीं चलाया जा सका: { $reason }
+cast-web-page = वेब पेज अभी कास्ट नहीं किए जा सकते: इसके बजाय वीडियो का अपना पता खोलें।

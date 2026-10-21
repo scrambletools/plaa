@@ -88,6 +88,7 @@ action-exit-full-screen = الخروج من ملء الشاشة
 action-quality = الجودة
 action-visualizer = المؤثرات المرئية
 action-network = الصوت عبر الشبكة
+action-cast = إرسال
 
 ## What a sound file shows under its cover
 
@@ -279,6 +280,16 @@ network-failed = تعذّر الاتصال: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = حدّث triib للتشغيل هنا.
 network-choose = اختر مستقبِلًا لترى كيف يستقبل تدفقه.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = الاستماع هنا
+network-no-talkers = لا يوجد على الشبكة مُرسِل يرسل بتنسيق يمكن لـ plaa تشغيله.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = الاستماع إلى { $talker }
+network-listen-stop = إيقاف الاستماع إلى { $talker }
+network-listen-frames = الإطارات المستلمة: { $frames }
+network-listen-update-triib = حدّث triib للاستماع هنا: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
+network-listen-lite = يعمل المنفذ بنظام AVB Lite الذي لا يحجز أي تدفقات: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -553,3 +564,13 @@ agent-ask-play = هل تسمح لـ { $agent } بالتحكم في التشغي�
 agent-ask-open = هل تسمح لـ { $agent } بفتح نافذة أو إغلاقها؟
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = يطلب { $agent } استخدام “{ $tool }”. تحدد الإعدادات ما يسأل عنه plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = جارٍ البحث عن أجهزة تلفزيون ومكبّرات صوت…
+cast-none = لم يُعثر على تلفزيون أو مكبّر صوت يدعم DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = إيقاف التشغيل على { $renderer }
+notice-casting = جارٍ التشغيل على { $renderer }.
+notice-cast-failed = تعذّر التشغيل على { $renderer }: { $reason }
+cast-web-page = لا يمكن إرسال صفحات الويب بعد: افتح عنوان الفيديو نفسه بدلًا من ذلك.

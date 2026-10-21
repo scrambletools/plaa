@@ -75,6 +75,7 @@ action-exit-full-screen = Toka kwenye Skrini Nzima
 action-quality = Ubora
 action-visualizer = Taswira ya Sauti
 action-network = Sauti ya Mtandao
+action-cast = Tuma
 
 ## What a sound file shows under its cover
 
@@ -266,6 +267,16 @@ network-failed = Imeshindwa kuunganisha: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Sasisha triib ili kucheza hapa.
 network-choose = Chagua listener ili kuona jinsi inavyopokea mtiririko wake.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Sikiliza hapa
+network-no-talkers = Hakuna talker kwenye mtandao inayotuma katika umbizo ambalo plaa inaweza kucheza.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Sikiliza { $talker }
+network-listen-stop = Acha kusikiliza { $talker }
+network-listen-frames = Fremu zilizopokelewa: { $frames }
+network-listen-update-triib = Sasisha triib ili kusikiliza hapa: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
+network-listen-lite = Mlango unatumia AVB Lite, ambayo haihifadhi mitiririko: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -529,3 +540,13 @@ agent-ask-play = Ruhusu { $agent } kudhibiti uchezaji hapa?
 agent-ask-open = Ruhusu { $agent } kufungua au kufunga dirisha?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } anaomba kutumia “{ $tool }”. Katika Mipangilio unachagua mambo ambayo plaa huuliza.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Inatafuta TV na spika…
+cast-none = Hakuna TV au spika inayocheza DLNA iliyopatikana.
+# $renderer is the TV's or speaker's name.
+cast-stop = Acha kucheza kwenye { $renderer }
+notice-casting = Inacheza kwenye { $renderer }.
+notice-cast-failed = Imeshindwa kucheza kwenye { $renderer }: { $reason }
+cast-web-page = Kurasa za wavuti haziwezi kutumwa bado: badala yake fungua anwani ya video yenyewe.

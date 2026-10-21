@@ -81,6 +81,7 @@ action-exit-full-screen = Stop schermvullende weergave
 action-quality = Kwaliteit
 action-visualizer = Visualisatie
 action-network = Netwerkaudio
+action-cast = Casten
 
 ## What a sound file shows under its cover
 
@@ -272,6 +273,16 @@ network-failed = Kan geen verbinding maken: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Werk triib bij om hier af te spelen.
 network-choose = Kies een ontvanger om te zien hoe die zijn stream ontvangt.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Hier luisteren
+network-no-talkers = Geen enkele zender op het netwerk verstuurt in een formaat dat plaa kan afspelen.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Luisteren naar { $talker }
+network-listen-stop = Stoppen met luisteren naar { $talker }
+network-listen-frames = Ontvangen frames: { $frames }
+network-listen-update-triib = Werk triib bij om hier te luisteren: plaa speelt alleen af wat deze computer hoe dan ook bereikt.
+network-listen-lite = De poort gebruikt AVB Lite, dat geen streams reserveert: plaa speelt alleen af wat deze computer hoe dan ook bereikt.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -535,3 +546,13 @@ agent-ask-play = { $agent } toestaan het afspelen hier te besturen?
 agent-ask-open = { $agent } toestaan een venster te openen of te sluiten?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } vraagt om ‘{ $tool }’ te gebruiken. In Instellingen kies je waarnaar plaa vraagt.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Tv's en speakers zoeken…
+cast-none = Er is geen tv of speaker met DLNA gevonden.
+# $renderer is the TV's or speaker's name.
+cast-stop = Stoppen met afspelen op { $renderer }
+notice-casting = Afspelen op { $renderer }.
+notice-cast-failed = Kan niet afspelen op { $renderer }: { $reason }
+cast-web-page = Webpagina's kunnen nog niet worden gecast: open in plaats daarvan het eigen adres van de video.

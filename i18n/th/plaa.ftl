@@ -74,6 +74,7 @@ action-exit-full-screen = ออกจากโหมดเต็มหน้า
 action-quality = คุณภาพ
 action-visualizer = การแสดงภาพเสียง
 action-network = เสียงผ่านเครือข่าย
+action-cast = แคสต์
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = เชื่อมต่อไม่ได้: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = อัปเดต triib เพื่อเล่นที่นี่
 network-choose = เลือก Listener เพื่อดูว่ารับสตรีมอย่างไร
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = ฟังที่นี่
+network-no-talkers = ไม่มี Talker บนเครือข่ายที่ส่งในรูปแบบที่ plaa เล่นได้
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = ฟัง { $talker }
+network-listen-stop = หยุดฟัง { $talker }
+network-listen-frames = ได้รับ { $frames } เฟรม
+network-listen-update-triib = อัปเดต triib เพื่อฟังที่นี่: plaa เล่นเฉพาะสิ่งที่มาถึงคอมพิวเตอร์เครื่องนี้อยู่แล้ว
+network-listen-lite = พอร์ตใช้ AVB Lite ซึ่งไม่จองสตรีม: plaa เล่นเฉพาะสิ่งที่มาถึงคอมพิวเตอร์เครื่องนี้อยู่แล้ว
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -525,3 +536,13 @@ agent-ask-play = อนุญาตให้ { $agent } ควบคุมกา
 agent-ask-open = อนุญาตให้ { $agent } เปิดหรือปิดหน้าต่างหรือไม่
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } ขอใช้ “{ $tool }” คุณเลือกได้ในการตั้งค่าว่าจะให้ plaa ถามเรื่องใดบ้าง
+
+## Casting to a TV or speaker on the network
+
+cast-looking = กำลังค้นหาทีวีและลำโพง…
+cast-none = ไม่พบทีวีหรือลำโพงที่เล่น DLNA ได้
+# $renderer is the TV's or speaker's name.
+cast-stop = หยุดเล่นบน { $renderer }
+notice-casting = กำลังเล่นบน { $renderer }
+notice-cast-failed = เล่นบน { $renderer } ไม่ได้: { $reason }
+cast-web-page = ยังแคสต์หน้าเว็บไม่ได้: ให้เปิดที่อยู่ของวิดีโอนั้นโดยตรงแทน

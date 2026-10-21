@@ -80,6 +80,7 @@ action-exit-full-screen = Avsluta helskärm
 action-quality = Kvalitet
 action-visualizer = Visualisering
 action-network = Nätverksljud
+action-cast = Casta
 
 ## What a sound file shows under its cover
 
@@ -271,6 +272,16 @@ network-failed = Det gick inte att ansluta: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Uppdatera triib för att spela upp här.
 network-choose = Välj en mottagare för att se hur den tar emot sin ström.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Lyssna här
+network-no-talkers = Ingen sändare på nätverket skickar i ett format som plaa kan spela upp.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Lyssna på { $talker }
+network-listen-stop = Sluta lyssna på { $talker }
+network-listen-frames = Mottagna ramar: { $frames }
+network-listen-update-triib = Uppdatera triib för att lyssna här: plaa spelar bara upp det som ändå når den här datorn.
+network-listen-lite = Porten kör AVB Lite, som inte reserverar några strömmar: plaa spelar bara upp det som ändå når den här datorn.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -537,3 +548,13 @@ agent-ask-play = Vill du låta { $agent } styra uppspelningen här?
 agent-ask-open = Vill du låta { $agent } öppna eller stänga ett fönster?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } ber om att få använda ”{ $tool }”. I Inställningar väljer du vad plaa frågar om.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Söker efter tv-apparater och högtalare…
+cast-none = Ingen tv eller högtalare som spelar upp via DLNA hittades.
+# $renderer is the TV's or speaker's name.
+cast-stop = Sluta spela upp på { $renderer }
+notice-casting = Spelar upp på { $renderer }.
+notice-cast-failed = Det gick inte att spela upp på { $renderer }: { $reason }
+cast-web-page = Webbsidor kan inte castas än: öppna videons egen adress i stället.

@@ -84,6 +84,7 @@ action-exit-full-screen = Вийти з повноекранного режим�
 action-quality = Якість
 action-visualizer = Візуалізація
 action-network = Мережеве аудіо
+action-cast = Транслювати
 
 ## What a sound file shows under its cover
 
@@ -275,6 +276,16 @@ network-failed = Не вдалося підключитися: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Оновіть triib, щоб відтворювати тут.
 network-choose = Виберіть приймач, щоб побачити, як він отримує потік.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Слухати тут
+network-no-talkers = У мережі немає передавача, що надсилає у форматі, який може відтворити plaa.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Слухати передавач { $talker }
+network-listen-stop = Перестати слухати передавач { $talker }
+network-listen-frames = Отримано кадрів: { $frames }
+network-listen-update-triib = Оновіть triib, щоб слухати тут: plaa відтворює лише те, що й так доходить до цього комп’ютера.
+network-listen-lite = Порт працює в режимі AVB Lite, який не резервує потоків: plaa відтворює лише те, що й так доходить до цього комп’ютера.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -545,3 +556,13 @@ agent-ask-play = Дозволити агентові { $agent } керувати
 agent-ask-open = Дозволити агентові { $agent } відкрити або закрити вікно?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } просить використати «{ $tool }». У параметрах можна вибрати, про що питає plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Пошук телевізорів і колонок…
+cast-none = Не знайдено телевізора чи колонки з підтримкою DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Зупинити відтворення на пристрої { $renderer }
+notice-casting = Відтворення на пристрої { $renderer }.
+notice-cast-failed = Не вдалося відтворити на пристрої { $renderer }: { $reason }
+cast-web-page = Вебсторінки поки не можна транслювати: натомість відкрийте адресу самого відео.

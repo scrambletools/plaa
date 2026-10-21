@@ -84,6 +84,7 @@ action-exit-full-screen = Ukončit režim celé obrazovky
 action-quality = Kvalita
 action-visualizer = Vizualizace
 action-network = Síťový zvuk
+action-cast = Odeslat
 
 ## What a sound file shows under its cover
 
@@ -275,6 +276,16 @@ network-failed = Nepodařilo se připojit: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Chcete-li přehrávat zde, aktualizujte triib.
 network-choose = Vyberte přijímač a uvidíte, jak přijímá svůj stream.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Poslouchat zde
+network-no-talkers = Žádný vysílač v síti neodesílá ve formátu, který plaa dokáže přehrát.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Poslouchat vysílač { $talker }
+network-listen-stop = Přestat poslouchat vysílač { $talker }
+network-listen-frames = Přijaté rámce: { $frames }
+network-listen-update-triib = Chcete-li poslouchat zde, aktualizujte triib: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
+network-listen-lite = Port používá AVB Lite, který nerezervuje žádné streamy: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -545,3 +556,13 @@ agent-ask-play = Povolit agentovi { $agent } ovládat zde přehrávání?
 agent-ask-open = Povolit agentovi { $agent } otevřít nebo zavřít okno?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } žádá o použití nástroje „{ $tool }“. V Nastavení zvolíte, na co se plaa ptá.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Hledání televizorů a reproduktorů…
+cast-none = Nebyl nalezen žádný televizor ani reproduktor s podporou DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Zastavit přehrávání na zařízení { $renderer }
+notice-casting = Přehrávání na zařízení { $renderer }.
+notice-cast-failed = Na zařízení { $renderer } se nepodařilo přehrát: { $reason }
+cast-web-page = Webové stránky zatím nelze odesílat: otevřete místo toho vlastní adresu videa.

@@ -80,6 +80,7 @@ action-exit-full-screen = Esci da schermo intero
 action-quality = Qualità
 action-visualizer = Visualizzatore
 action-network = Audio in rete
+action-cast = Trasmetti
 
 ## What a sound file shows under its cover
 
@@ -271,6 +272,16 @@ network-failed = Impossibile collegarsi: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Aggiorna triib per riprodurre qui.
 network-choose = Scegli un listener per vedere come riceve il suo stream.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Ascolta qui
+network-no-talkers = Nessun talker in rete invia in un formato che plaa possa riprodurre.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Ascolta { $talker }
+network-listen-stop = Smetti di ascoltare { $talker }
+network-listen-frames = Frame ricevuti: { $frames }
+network-listen-update-triib = Aggiorna triib per ascoltare qui: plaa riproduce solo ciò che arriva comunque a questo computer.
+network-listen-lite = La porta usa AVB Lite, che non prenota stream: plaa riproduce solo ciò che arriva comunque a questo computer.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -537,3 +548,13 @@ agent-ask-play = Consentire a { $agent } di controllare la riproduzione qui?
 agent-ask-open = Consentire a { $agent } di aprire o chiudere una finestra?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } chiede di usare “{ $tool }”. In Impostazioni scegli su cosa chiede plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Ricerca di TV e altoparlanti…
+cast-none = Non sono stati trovati TV o altoparlanti compatibili con DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Interrompi la riproduzione su { $renderer }
+notice-casting = Riproduzione su { $renderer }.
+notice-cast-failed = Impossibile riprodurre su { $renderer }: { $reason }
+cast-web-page = Non è ancora possibile trasmettere le pagine web: apri invece l'indirizzo del video stesso.

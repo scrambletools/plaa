@@ -74,6 +74,7 @@ action-exit-full-screen = フルスクリーンを解除
 action-quality = 画質
 action-visualizer = ビジュアライザ
 action-network = ネットワークオーディオ
+action-cast = キャスト
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = 接続できませんでした：{ $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = ここで再生するには、triibをアップデートしてください。
 network-choose = リスナーを選ぶと、ストリームの受け取り状況が表示されます。
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = ここで聴く
+network-no-talkers = ネットワーク上に、plaaで再生できるフォーマットで送信しているトーカーがありません。
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = { $talker }を聴く
+network-listen-stop = { $talker }を聴くのを停止
+network-listen-frames = { $frames }フレームを受信
+network-listen-update-triib = ここで聴くには、triibをアップデートしてください：plaaは、もともとこのコンピュータに届くものだけを再生します。
+network-listen-lite = このポートは、ストリームを予約しないAVB Liteで動作しています：plaaは、もともとこのコンピュータに届くものだけを再生します。
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -525,3 +536,13 @@ agent-ask-play = { $agent }に、ここでの再生の操作を許可します�
 agent-ask-open = { $agent }に、ウインドウを開いたり閉じたりすることを許可しますか？
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent }が「{ $tool }」を使おうとしています。plaaが確認する操作は「設定」で選べます。
+
+## Casting to a TV or speaker on the network
+
+cast-looking = テレビとスピーカーを探しています…
+cast-none = DLNAで再生できるテレビやスピーカーが見つかりませんでした。
+# $renderer is the TV's or speaker's name.
+cast-stop = { $renderer }での再生を停止
+notice-casting = { $renderer }で再生しています。
+notice-cast-failed = { $renderer }で再生できませんでした：{ $reason }
+cast-web-page = Webページはまだキャストできません：代わりに、動画そのもののアドレスを開いてください。

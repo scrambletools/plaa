@@ -84,6 +84,7 @@ action-exit-full-screen = Выйти из полноэкранного режи�
 action-quality = Качество
 action-visualizer = Визуализация
 action-network = Сетевое аудио
+action-cast = Трансляция
 
 ## What a sound file shows under its cover
 
@@ -275,6 +276,16 @@ network-failed = Не удалось подключиться: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Обновите triib, чтобы воспроизводить здесь.
 network-choose = Выберите приёмник, чтобы увидеть, как он принимает поток.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Слушать здесь
+network-no-talkers = В сети нет передатчиков с форматом, который может воспроизвести plaa.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Слушать передатчик { $talker }
+network-listen-stop = Перестать слушать передатчик { $talker }
+network-listen-frames = Получено кадров: { $frames }
+network-listen-update-triib = Обновите triib, чтобы слушать здесь: plaa воспроизводит только то, что и так доходит до этого компьютера.
+network-listen-lite = Порт работает в режиме AVB Lite, который не резервирует потоки: plaa воспроизводит только то, что и так доходит до этого компьютера.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -545,3 +556,13 @@ agent-ask-play = Разрешить агенту { $agent } управлять �
 agent-ask-open = Разрешить агенту { $agent } открыть или закрыть окно?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } просит использовать «{ $tool }». В настройках можно выбрать, о чём спрашивает plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Поиск телевизоров и колонок…
+cast-none = Не найдено телевизоров и колонок с поддержкой DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Остановить воспроизведение на устройстве { $renderer }
+notice-casting = Воспроизведение на устройстве { $renderer }.
+notice-cast-failed = Не удалось воспроизвести на устройстве { $renderer }: { $reason }
+cast-web-page = Веб-страницы пока нельзя транслировать: вместо этого откройте адрес самого видео.

@@ -75,6 +75,7 @@ action-exit-full-screen = Keluar Skrin Penuh
 action-quality = Kualiti
 action-visualizer = Pengvisualan
 action-network = Audio Rangkaian
+action-cast = Hantar
 
 ## What a sound file shows under its cover
 
@@ -266,6 +267,16 @@ network-failed = Tidak dapat menyambung: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Kemas kini triib untuk bermain di sini.
 network-choose = Pilih listener untuk melihat cara ia menerima strimnya.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Dengar di sini
+network-no-talkers = Tiada talker pada rangkaian yang menghantar dalam format yang dapat dimainkan oleh plaa.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Dengar { $talker }
+network-listen-stop = Henti mendengar { $talker }
+network-listen-frames = { $frames } bingkai diterima
+network-listen-update-triib = Kemas kini triib untuk mendengar di sini: plaa hanya memainkan apa yang memang sampai ke komputer ini.
+network-listen-lite = Port menjalankan AVB Lite, yang tidak menempah strim: plaa hanya memainkan apa yang memang sampai ke komputer ini.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -526,3 +537,13 @@ agent-ask-play = Benarkan { $agent } mengawal main balik di sini?
 agent-ask-open = Benarkan { $agent } membuka atau menutup tetingkap?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } meminta untuk menggunakan “{ $tool }”. Tetapan menentukan perkara yang ditanya oleh plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Mencari TV dan pembesar suara…
+cast-none = Tiada TV atau pembesar suara yang menyokong DLNA ditemui.
+# $renderer is the TV's or speaker's name.
+cast-stop = Henti bermain pada { $renderer }
+notice-casting = Memainkan pada { $renderer }.
+notice-cast-failed = Tidak dapat memainkan pada { $renderer }: { $reason }
+cast-web-page = Halaman web belum boleh dihantar: buka alamat video itu sendiri.

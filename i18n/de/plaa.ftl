@@ -81,6 +81,7 @@ action-exit-full-screen = Vollbild beenden
 action-quality = Qualität
 action-visualizer = Visualisierung
 action-network = Netzwerk-Audio
+action-cast = Streamen
 
 ## What a sound file shows under its cover
 
@@ -272,6 +273,16 @@ network-failed = Verbindung fehlgeschlagen: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Aktualisieren Sie triib, um hier abzuspielen.
 network-choose = Wählen Sie einen Listener, um zu sehen, wie er seinen Stream empfängt.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Hier hören
+network-no-talkers = Kein Talker im Netzwerk sendet in einem Format, das plaa abspielen kann.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = { $talker } hören
+network-listen-stop = { $talker } nicht mehr hören
+network-listen-frames = Empfangene Frames: { $frames }
+network-listen-update-triib = Aktualisieren Sie triib, um hier zu hören: plaa spielt nur ab, was ohnehin bei diesem Computer ankommt.
+network-listen-lite = Der Port nutzt AVB Lite, das keine Streams reserviert: plaa spielt nur ab, was ohnehin bei diesem Computer ankommt.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -535,3 +546,13 @@ agent-ask-play = { $agent } erlauben, die Wiedergabe hier zu steuern?
 agent-ask-open = { $agent } erlauben, ein Fenster zu öffnen oder zu schließen?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } möchte „{ $tool }“ verwenden. In den Einstellungen legen Sie fest, wonach plaa fragt.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Fernseher und Lautsprecher werden gesucht …
+cast-none = Es wurde kein Fernseher oder Lautsprecher gefunden, der über DLNA abspielt.
+# $renderer is the TV's or speaker's name.
+cast-stop = Wiedergabe auf { $renderer } beenden
+notice-casting = Wiedergabe auf { $renderer }.
+notice-cast-failed = Wiedergabe auf { $renderer } fehlgeschlagen: { $reason }
+cast-web-page = Webseiten lassen sich noch nicht streamen: Öffnen Sie stattdessen die Adresse des Videos selbst.

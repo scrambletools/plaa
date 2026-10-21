@@ -81,6 +81,7 @@ action-exit-full-screen = முழுத்திரையிலிருந்
 action-quality = தரம்
 action-visualizer = காட்சிப்படுத்தி
 action-network = நெட்வொர்க் ஆடியோ
+action-cast = அனுப்பு
 
 ## What a sound file shows under its cover
 
@@ -272,6 +273,16 @@ network-failed = இணைக்க முடியவில்லை: { $reason
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = இங்கே இயக்க triib-ஐப் புதுப்பிக்கவும்.
 network-choose = ஒரு Listener தன் stream-ஐ எப்படிப் பெறுகிறது என்பதைப் பார்க்க, அதைத் தேர்ந்தெடுக்கவும்.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = இங்கே கேள்
+network-no-talkers = plaa இயக்கக்கூடிய format-இல் அனுப்பும் Talker எதுவும் நெட்வொர்க்கில் இல்லை.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = { $talker }-ஐக் கேள்
+network-listen-stop = { $talker }-ஐக் கேட்பதை நிறுத்து
+network-listen-frames = பெற்ற frames: { $frames }
+network-listen-update-triib = இங்கே கேட்க triib-ஐப் புதுப்பிக்கவும்: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
+network-listen-lite = இந்த port AVB Lite-இல் இயங்குகிறது, அது எந்த stream-ஐயும் reserve செய்வதில்லை: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -535,3 +546,13 @@ agent-ask-play = இங்கே இயக்கத்தைக் கட்ட�
 agent-ask-open = சாளரத்தைத் திறக்க அல்லது மூட { $agent } முகவரை அனுமதிக்கவா?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = “{ $tool }” என்பதைப் பயன்படுத்த { $agent } கேட்கிறது. plaa எவற்றைப் பற்றிக் கேட்கும் என்பதை அமைப்புகளில் தேர்ந்தெடுக்கலாம்.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = டிவிகளையும் ஸ்பீக்கர்களையும் தேடுகிறது…
+cast-none = DLNA-வை இயக்கும் டிவியோ ஸ்பீக்கரோ எதுவும் கிடைக்கவில்லை.
+# $renderer is the TV's or speaker's name.
+cast-stop = { $renderer }-இல் இயக்குவதை நிறுத்து
+notice-casting = { $renderer }-இல் இயங்குகிறது.
+notice-cast-failed = { $renderer }-இல் இயக்க முடியவில்லை: { $reason }
+cast-web-page = இணையப் பக்கங்களை இன்னும் அனுப்ப முடியாது: அதற்குப் பதிலாக வீடியோவின் சொந்த முகவரியைத் திறக்கவும்.

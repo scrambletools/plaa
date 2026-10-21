@@ -74,6 +74,7 @@ action-exit-full-screen = خروج از حالت تمام‌صفحه
 action-quality = کیفیت
 action-visualizer = نمایش بصری
 action-network = صدای شبکه
+action-cast = ارسال محتوا
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = اتصال ممکن نشد: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = برای پخش در اینجا، triib را به‌روز کنید.
 network-choose = یک گیرنده انتخاب کنید تا ببینید جریانش را چگونه دریافت می‌کند.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = گوش دادن در اینجا
+network-no-talkers = هیچ فرستنده‌ای روی شبکه با قالبی که plaa بتواند پخش کند ارسال نمی‌کند.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = گوش دادن به { $talker }
+network-listen-stop = توقف گوش دادن به { $talker }
+network-listen-frames = فریم‌های دریافت‌شده: { $frames }
+network-listen-update-triib = برای گوش دادن در اینجا، triib را به‌روز کنید: plaa فقط چیزی را پخش می‌کند که در هر صورت به این رایانه می‌رسد.
+network-listen-lite = درگاه با AVB Lite کار می‌کند که هیچ جریانی را رزرو نمی‌کند: plaa فقط چیزی را پخش می‌کند که در هر صورت به این رایانه می‌رسد.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -525,3 +536,13 @@ agent-ask-play = به { $agent } اجازهٔ کنترل پخش در اینجا 
 agent-ask-open = به { $agent } اجازهٔ باز کردن یا بستن پنجره داده شود؟
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } می‌خواهد از «{ $tool }» استفاده کند. در تنظیمات انتخاب می‌کنید plaa دربارهٔ چه چیزهایی بپرسد.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = در حال جستجوی تلویزیون‌ها و بلندگوها…
+cast-none = هیچ تلویزیون یا بلندگویی که از DLNA پشتیبانی کند پیدا نشد.
+# $renderer is the TV's or speaker's name.
+cast-stop = توقف پخش روی { $renderer }
+notice-casting = در حال پخش روی { $renderer }.
+notice-cast-failed = پخش روی { $renderer } ممکن نشد: { $reason }
+cast-web-page = ارسال محتوای صفحه‌های وب هنوز ممکن نیست: به‌جای آن نشانی خود ویدیو را باز کنید.

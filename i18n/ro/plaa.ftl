@@ -82,6 +82,7 @@ action-exit-full-screen = Ieși din modul ecran complet
 action-quality = Calitate
 action-visualizer = Vizualizator
 action-network = Audio în rețea
+action-cast = Proiectează
 
 ## What a sound file shows under its cover
 
@@ -273,6 +274,16 @@ network-failed = Nu s-a putut conecta: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Actualizează triib pentru a reda aici.
 network-choose = Alege un receptor pentru a vedea cum își primește fluxul.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Ascultă aici
+network-no-talkers = Niciun emițător din rețea nu trimite într-un format pe care plaa îl poate reda.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Ascultă { $talker }
+network-listen-stop = Nu mai asculta { $talker }
+network-listen-frames = Cadre primite: { $frames }
+network-listen-update-triib = Actualizează triib pentru a asculta aici: plaa redă doar ce ajunge oricum la acest computer.
+network-listen-lite = Portul folosește AVB Lite, care nu rezervă fluxuri: plaa redă doar ce ajunge oricum la acest computer.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -545,3 +556,13 @@ agent-ask-play = Permiți ca { $agent } să controleze redarea aici?
 agent-ask-open = Permiți ca { $agent } să deschidă sau să închidă o fereastră?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } cere să folosească „{ $tool }”. În Configurări alegi despre ce întreabă plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Se caută televizoare și difuzoare…
+cast-none = Nu s-a găsit niciun televizor sau difuzor compatibil cu DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Oprește redarea pe { $renderer }
+notice-casting = Se redă pe { $renderer }.
+notice-cast-failed = Nu s-a putut reda pe { $renderer }: { $reason }
+cast-web-page = Paginile web nu pot fi încă proiectate: deschide în schimb chiar adresa videoclipului.

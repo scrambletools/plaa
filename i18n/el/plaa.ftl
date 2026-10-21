@@ -80,6 +80,7 @@ action-exit-full-screen = Έξοδος από πλήρη οθόνη
 action-quality = Ποιότητα
 action-visualizer = Οπτικοποίηση
 action-network = Ήχος δικτύου
+action-cast = Μετάδοση
 
 ## What a sound file shows under its cover
 
@@ -271,6 +272,16 @@ network-failed = Δεν ήταν δυνατή η σύνδεση: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Ενημερώστε το triib για αναπαραγωγή εδώ.
 network-choose = Επιλέξτε έναν δέκτη για να δείτε πώς λαμβάνει τη ροή του.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Ακρόαση εδώ
+network-no-talkers = Κανένας πομπός στο δίκτυο δεν στέλνει σε μορφή που μπορεί να αναπαράγει το plaa.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Ακρόαση του { $talker }
+network-listen-stop = Διακοπή ακρόασης του { $talker }
+network-listen-frames = Πλαίσια που ελήφθησαν: { $frames }
+network-listen-update-triib = Ενημερώστε το triib για ακρόαση εδώ: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
+network-listen-lite = Η θύρα λειτουργεί με AVB Lite, που δεν κάνει κράτηση ροών: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -537,3 +548,13 @@ agent-ask-play = Να επιτραπεί στο { $agent } να ελέγχει �
 agent-ask-open = Να επιτραπεί στο { $agent } να ανοίξει ή να κλείσει ένα παράθυρο;
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = Το { $agent } ζητά να χρησιμοποιήσει το «{ $tool }». Στις Ρυθμίσεις επιλέγετε για τι ρωτά το plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Αναζήτηση τηλεοράσεων και ηχείων…
+cast-none = Δεν βρέθηκε τηλεόραση ή ηχείο που να υποστηρίζει DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Διακοπή αναπαραγωγής στο { $renderer }
+notice-casting = Αναπαραγωγή στο { $renderer }.
+notice-cast-failed = Δεν ήταν δυνατή η αναπαραγωγή στο { $renderer }: { $reason }
+cast-web-page = Δεν είναι ακόμη δυνατή η μετάδοση ιστοσελίδων: ανοίξτε καλύτερα τη διεύθυνση του ίδιου του βίντεο.

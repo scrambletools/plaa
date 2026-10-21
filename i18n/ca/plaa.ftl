@@ -80,6 +80,7 @@ action-exit-full-screen = Surt de la pantalla completa
 action-quality = Qualitat
 action-visualizer = Visualitzador
 action-network = Àudio en xarxa
+action-cast = Emet
 
 ## What a sound file shows under its cover
 
@@ -271,6 +272,16 @@ network-failed = No s'ha pogut connectar: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Actualitza el triib per reproduir aquí.
 network-choose = Tria un receptor per veure com rep el flux.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Escolta aquí
+network-no-talkers = Cap emissor de la xarxa no envia en un format que el plaa pugui reproduir.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Escolta { $talker }
+network-listen-stop = Deixa d'escoltar { $talker }
+network-listen-frames = Trames rebudes: { $frames }
+network-listen-update-triib = Actualitza el triib per escoltar aquí: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
+network-listen-lite = El port fa servir AVB Lite, que no reserva fluxos: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -537,3 +548,13 @@ agent-ask-play = Vols permetre que { $agent } controli la reproducció aquí?
 agent-ask-open = Vols permetre que { $agent } obri o tanqui una finestra?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } demana fer servir «{ $tool }». A Configuració pots triar què pregunta el plaa.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = S'estan cercant televisors i altaveus…
+cast-none = No s'ha trobat cap televisor ni altaveu compatible amb DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Deixa de reproduir a { $renderer }
+notice-casting = Es reprodueix a { $renderer }.
+notice-cast-failed = No s'ha pogut reproduir a { $renderer }: { $reason }
+cast-web-page = Encara no es poden emetre pàgines web: obre en lloc d'això l'adreça del mateix vídeo.

@@ -74,6 +74,7 @@ action-exit-full-screen = পূর্ণ স্ক্রিন থেকে ব
 action-quality = গুণমান
 action-visualizer = ভিজ্যুয়ালাইজার
 action-network = নেটওয়ার্ক অডিও
+action-cast = কাস্ট করুন
 
 ## What a sound file shows under its cover
 
@@ -265,6 +266,16 @@ network-failed = সংযোগ করা যায়নি: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = এখানে চালাতে triib আপডেট করুন।
 network-choose = কোনো Listener কীভাবে তার স্ট্রিম নেয় তা দেখতে সেটি বেছে নিন।
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = এখানে শুনুন
+network-no-talkers = নেটওয়ার্কের কোনো Talker এমন ফরম্যাটে পাঠায় না যা plaa চালাতে পারে।
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = { $talker } শুনুন
+network-listen-stop = { $talker } শোনা বন্ধ করুন
+network-listen-frames = প্রাপ্ত frames: { $frames }
+network-listen-update-triib = এখানে শুনতে triib আপডেট করুন: plaa শুধু সেটুকুই চালায় যা এমনিতেই এই কম্পিউটারে পৌঁছায়।
+network-listen-lite = পোর্টটি AVB Lite-এ চলছে, যা কোনো স্ট্রিম reserve করে না: plaa শুধু সেটুকুই চালায় যা এমনিতেই এই কম্পিউটারে পৌঁছায়।
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -525,3 +536,13 @@ agent-ask-play = { $agent }-কে এখানে প্লেব্যাক �
 agent-ask-open = { $agent }-কে কোনো উইন্ডো খুলতে বা বন্ধ করতে দেবেন?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } “{ $tool }” ব্যবহার করতে চায়। plaa কোন বিষয়ে জিজ্ঞাসা করবে, তা সেটিংসে বেছে নেওয়া যায়।
+
+## Casting to a TV or speaker on the network
+
+cast-looking = টিভি ও স্পিকার খোঁজা হচ্ছে…
+cast-none = DLNA চালাতে পারে এমন কোনো টিভি বা স্পিকার পাওয়া যায়নি।
+# $renderer is the TV's or speaker's name.
+cast-stop = { $renderer }-এ চালানো বন্ধ করুন
+notice-casting = { $renderer }-এ চলছে।
+notice-cast-failed = { $renderer }-এ চালানো যায়নি: { $reason }
+cast-web-page = ওয়েব পেজ এখনও কাস্ট করা যায় না: এর বদলে ভিডিওর নিজস্ব ঠিকানা খুলুন।

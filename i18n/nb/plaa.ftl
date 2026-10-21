@@ -80,6 +80,7 @@ action-exit-full-screen = Avslutt fullskjerm
 action-quality = Kvalitet
 action-visualizer = Visualisering
 action-network = Nettverkslyd
+action-cast = Cast
 
 ## What a sound file shows under its cover
 
@@ -271,6 +272,16 @@ network-failed = Kunne ikke koble til: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Oppdater triib for å spille av her.
 network-choose = Velg en mottaker for å se hvordan den tar imot strømmen sin.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Lytt her
+network-no-talkers = Ingen sender på nettverket sender i et format plaa kan spille av.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Lytt til { $talker }
+network-listen-stop = Slutt å lytte til { $talker }
+network-listen-frames = Mottatte rammer: { $frames }
+network-listen-update-triib = Oppdater triib for å lytte her: plaa spiller bare av det som uansett når denne datamaskinen.
+network-listen-lite = Porten kjører AVB Lite, som ikke reserverer strømmer: plaa spiller bare av det som uansett når denne datamaskinen.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.
@@ -534,3 +545,13 @@ agent-ask-play = Vil du la { $agent } styre avspillingen her?
 agent-ask-open = Vil du la { $agent } åpne eller lukke et vindu?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } ber om å bruke «{ $tool }». I Innstillinger velger du hva plaa spør om.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Ser etter TV-er og høyttalere…
+cast-none = Fant ingen TV eller høyttaler som spiller av via DLNA.
+# $renderer is the TV's or speaker's name.
+cast-stop = Slutt å spille av på { $renderer }
+notice-casting = Spiller av på { $renderer }.
+notice-cast-failed = Kunne ikke spille av på { $renderer }: { $reason }
+cast-web-page = Nettsider kan ikke castes ennå: åpne videoens egen adresse i stedet.
