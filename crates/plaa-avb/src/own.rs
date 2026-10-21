@@ -194,6 +194,8 @@ pub(crate) struct Own {
     link_speed: u32,
     /// What ptp4l last said of the interface.
     gptp: Option<gptp::Status>,
+    /// The interface's link and grandmaster, counted for controllers.
+    link: Link,
     interface: String,
     mac: MacAddress,
     own_clock: ClockIdentity,
@@ -322,6 +324,7 @@ impl Own {
             copies: None,
             link_speed: found.speed.unwrap_or(0),
             gptp: None,
+            link: Link::default(),
             interface,
             mac,
             own_clock,
@@ -701,6 +704,9 @@ impl Own {
             .map(|status| status.gptp.clone())
             .unwrap_or_default();
         self.entity.set_gptp(now, gptp);
+        if let Some(status) = &ours {
+            self.link.grandmaster(status.gptp.grandmaster);
+        }
         self.gptp = ours;
         self.update_lite_status();
     }
@@ -770,6 +776,9 @@ impl Own {
             self.entity
                 .set_counters(DescriptorType::STREAM_OUTPUT, 0, counters);
             self.count_received();
+            self.link.link(link_up(&self.interface));
+            self.entity
+                .set_counters(DescriptorType::AVB_INTERFACE, 0, self.link.counters());
         }
         self.maap.handle_timeout(now);
         while let Some(event) = self.maap.poll_event() {
@@ -1310,6 +1319,52 @@ impl Own {
     }
 }
 
+/// What the interface's counters count (Milan 1.3, 5.4.2.25): its link
+/// going up and down, the first look at an up link counted as one going
+/// up, and its grandmaster changing.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct Link {
+    up: Option<bool>,
+    ups: u32,
+    downs: u32,
+    grandmaster: Option<ClockIdentity>,
+    grandmaster_changes: u32,
+}
+
+impl Link {
+    fn link(&mut self, up: bool) {
+        match (self.up, up) {
+            (Some(before), _) if before == up => return,
+            (_, true) => self.ups = self.ups.wrapping_add(1),
+            (Some(_), false) => self.downs = self.downs.wrapping_add(1),
+            (None, false) => {}
+        }
+        self.up = Some(up);
+    }
+
+    fn grandmaster(&mut self, grandmaster: ClockIdentity) {
+        if self.grandmaster.is_some_and(|before| before != grandmaster) {
+            self.grandmaster_changes = self.grandmaster_changes.wrapping_add(1);
+        }
+        self.grandmaster = Some(grandmaster);
+    }
+
+    /// In GET_COUNTERS' places: LINK_UP, LINK_DOWN and GPTP_GM_CHANGED.
+    fn counters(self) -> [u32; 32] {
+        let mut counters = [0; 32];
+        counters[0] = self.ups;
+        counters[1] = self.downs;
+        counters[5] = self.grandmaster_changes;
+        counters
+    }
+}
+
+/// Whether `interface`'s link is up: it has a carrier.
+fn link_up(interface: &str) -> bool {
+    std::fs::read_to_string(format!("/sys/class/net/{interface}/carrier"))
+        .is_ok_and(|carrier| carrier.trim() == "1")
+}
+
 /// What plaa does where no program serves the port's participant.
 #[derive(Debug, PartialEq, Eq)]
 enum Alone {
@@ -1437,6 +1492,27 @@ mod tests {
             assert_eq!(&logo[16..24], &[0, 0, 0, 128, 0, 0, 0, 128]);
             assert!(logo.len() < 64 * 1024);
         }
+    }
+
+    /// The link counts each time it goes up, the first look too, and down;
+    /// the grandmaster each time it changes.
+    #[test]
+    fn its_interface_counts_links_and_grandmasters() {
+        let mut link = Link::default();
+        link.link(true);
+        link.link(true);
+        link.link(false);
+        link.link(true);
+        let first = ClockIdentity(0x0001_f2ff_feff_3b14);
+        link.grandmaster(first);
+        link.grandmaster(first);
+        link.grandmaster(ClockIdentity(0xe8f6_0aff_fee0_9220));
+        assert_eq!(&link.counters()[..6], &[2, 1, 0, 0, 0, 1]);
+        // A link down at the first look went down for no one.
+        let mut down = Link::default();
+        down.link(false);
+        assert_eq!(&down.counters()[..2], &[0, 0]);
+        assert!(!link_up("no-such-interface-here"));
     }
 
     /// plaa runs its own participants only once a program that served the
