@@ -5,7 +5,7 @@
 //! On a Mac, commands to the Mac's own entity, plaa's talker there, go
 //! through Apple's AVB framework, which answers them.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -16,8 +16,9 @@ use std::time::Duration;
 use atdecc::controller::{self, CommandId, Controller, Event, Outcome};
 use atdecc::descriptor::DescriptorType;
 use atdecc::model::EntityModel;
+use atdecc::pdu::{self, Pdu};
 use atdecc::stream_format::StreamFormat;
-use atdecc::{ADP_ACMP_MULTICAST, EntityId, Instant, MacAddress};
+use atdecc::{ADP_ACMP_MULTICAST, AecpMessageType, EntityId, Instant, MacAddress};
 use avb_net::Socket;
 
 #[cfg(target_os = "linux")]
@@ -49,9 +50,13 @@ const MOST_WAIT: Duration = Duration::from_millis(250);
 /// How often the inputs the windows detail are asked how they stand.
 const CHOSEN_EVERY: Duration = Duration::from_secs(1);
 
-/// How often the next listener in turn is read again, while the windows
-/// list them.
-const LISTED_EVERY: Duration = Duration::from_millis(500);
+/// How often each listener that sends no notifications is read again at
+/// most, while the windows list them, one in turn.
+const LISTED_EVERY: Duration = Duration::from_secs(3);
+
+/// The shortest wait between two listeners read in turn, so many take
+/// longer each.
+const LISTED_STEP: Duration = Duration::from_millis(500);
 
 /// The longest wait while the Mac's own entity owes answers, which come
 /// through the framework, not the socket.
@@ -227,11 +232,15 @@ pub(crate) fn start(
 
 /// What the windows show of the network, asked for again as it can
 /// change unannounced: some entities send no notifications, and changes
-/// other controllers make then reach plaa no other way.
+/// other controllers make then reach plaa no other way. Those that sent
+/// plaa's controller one are asked nothing again.
 #[derive(Default)]
 struct Watch {
     listed: bool,
     chosen: Vec<End>,
+    /// The entities that sent the controller notifications, until they
+    /// go or restart and must be registered with again.
+    notifying: HashSet<EntityId>,
     /// When the chosen inputs, and the last listener in turn, were asked.
     chosen_at: Option<Duration>,
     listed_at: Option<Duration>,
@@ -410,6 +419,9 @@ impl Runtime {
     /// which the socket does not bring back: each hears the other.
     fn heard(&mut self, now: Instant, source: MacAddress, bytes: &[u8]) {
         if bytes.first() != Some(&atdecc::avtp::subtype::MAAP) {
+            if let Some(entity) = notifier(bytes, self.controller.entity_id()) {
+                self.watch.notifying.insert(entity);
+            }
             let _ = self.controller.handle_frame(now, source, bytes);
         }
         #[cfg(target_os = "linux")]
@@ -520,6 +532,9 @@ impl Runtime {
 
     /// Acts on what the controller says; whether the network changed.
     fn controller_event(&mut self, now: Instant, event: Event) -> bool {
+        if let Event::EntityRestarted(entity) | Event::EntityOffline(entity, _) = event {
+            self.watch.notifying.remove(&entity);
+        }
         match event {
             Event::CommandFinished(command, outcome) => {
                 if let Some(steps) = self.pending.remove(&command) {
@@ -655,14 +670,16 @@ impl Runtime {
         self.talker.clone()
     }
 
-    /// Asks again for what the windows show: every second how the chosen
-    /// inputs take their streams, and in turn one listener's name and its
-    /// inputs' formats.
+    /// Asks again for what the windows show, of the entities that send
+    /// no notifications: every second how the chosen inputs take their
+    /// streams, and in turn one listener's name and its inputs' formats.
     fn refresh(&mut self, now: Instant, since: Duration) {
         let due = |at: Option<Duration>, every: Duration| at.is_none_or(|at| since >= at + every);
         if !self.watch.chosen.is_empty() && due(self.watch.chosen_at, CHOSEN_EVERY) {
             self.watch.chosen_at = Some(since);
-            for &(entity, input) in &self.watch.chosen {
+            let notifying = &self.watch.notifying;
+            let chosen = self.watch.chosen.iter();
+            for &(entity, input) in chosen.filter(|(entity, _)| !notifying.contains(entity)) {
                 let stream = (entity, DescriptorType::STREAM_INPUT, input);
                 self.controller
                     .refresh_stream(now, stream.0, stream.1, stream.2);
@@ -670,16 +687,15 @@ impl Runtime {
                     .refresh_descriptor(now, stream.0, stream.1, stream.2);
             }
         }
-        if !self.watch.listed || !due(self.watch.listed_at, LISTED_EVERY) {
+        if !self.watch.listed || !due(self.watch.listed_at, LISTED_STEP) {
             return;
         }
-        self.watch.listed_at = Some(since);
         let own = self.own_entity();
         let listeners: Vec<(EntityId, Vec<u16>)> = self
             .controller
             .entities()
             .map(|discovered| discovered.entity_id())
-            .filter(|&id| Some(id) != own)
+            .filter(|&id| Some(id) != own && !self.watch.notifying.contains(&id))
             .filter_map(|id| {
                 let inputs: Vec<u16> = self
                     .controller
@@ -691,9 +707,17 @@ impl Runtime {
                 (!inputs.is_empty()).then_some((id, inputs))
             })
             .collect();
-        if listeners.is_empty() {
+        // However few, each is read again only so often.
+        let count = u32::try_from(listeners.len()).unwrap_or(u32::MAX);
+        if count == 0
+            || !due(
+                self.watch.listed_at,
+                (LISTED_EVERY / count).max(LISTED_STEP),
+            )
+        {
             return;
         }
+        self.watch.listed_at = Some(since);
         let (entity, inputs) = &listeners[self.watch.turn % listeners.len()];
         self.watch.turn = self.watch.turn.wrapping_add(1);
         self.controller
@@ -749,6 +773,18 @@ impl Runtime {
     }
 }
 
+/// The entity that sent `bytes` to `controller` as a notification, which
+/// tells the controller what changes on it from then on.
+fn notifier(bytes: &[u8], controller: EntityId) -> Option<EntityId> {
+    let Ok(Pdu::Aem(aem)) = pdu::decode(bytes) else {
+        return None;
+    };
+    (aem.unsolicited
+        && aem.header.message_type == AecpMessageType::AEM_RESPONSE
+        && aem.header.controller_entity_id == controller)
+        .then_some(aem.header.target_entity_id)
+}
+
 /// An entity as the app shows it, from what the controller read: its
 /// audio streams, media clocks left out.
 fn found(id: EntityId, model: &EntityModel, own: bool, here: bool) -> Found {
@@ -792,5 +828,62 @@ fn found(id: EntityId, model: &EntityModel, own: bool, here: bool) -> Found {
         here,
         outputs: streams(false),
         inputs: streams(true),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use atdecc::aecp::AemPdu;
+    use atdecc::{AecpHeader, AemCommandType, AemStatus};
+
+    const CONTROLLER: EntityId = EntityId(0xa010_a3ff_fca5_1726);
+    const AMP: EntityId = EntityId(0xe8f6_0ae0_9721_0000);
+
+    fn frame(message_type: AecpMessageType, unsolicited: bool, to: EntityId) -> Vec<u8> {
+        let pdu = AemPdu {
+            header: AecpHeader {
+                message_type,
+                status: AemStatus::SUCCESS.0,
+                target_entity_id: AMP,
+                controller_entity_id: to,
+                sequence_id: 7,
+            },
+            unsolicited,
+            controller_request: false,
+            command_type: AemCommandType::GET_COUNTERS,
+            payload: &[0, 5, 0, 0],
+        };
+        let mut out = [0; 128];
+        let length = pdu.encode(&mut out).unwrap();
+        out[..length].to_vec()
+    }
+
+    /// Only a notification an entity sends plaa's controller shows that it
+    /// tells it what changes.
+    #[test]
+    fn a_notification_to_plaa_shows_an_entity_notifies() {
+        let response = AecpMessageType::AEM_RESPONSE;
+        assert_eq!(
+            notifier(&frame(response, true, CONTROLLER), CONTROLLER),
+            Some(AMP)
+        );
+        // A response to a command, plaa's or overheard.
+        assert_eq!(
+            notifier(&frame(response, false, CONTROLLER), CONTROLLER),
+            None
+        );
+        // A notification to another controller.
+        assert_eq!(
+            notifier(&frame(response, true, EntityId(1)), CONTROLLER),
+            None
+        );
+        let command = AecpMessageType::AEM_COMMAND;
+        assert_eq!(
+            notifier(&frame(command, true, CONTROLLER), CONTROLLER),
+            None
+        );
+        assert_eq!(notifier(&[0xfa, 0], CONTROLLER), None);
     }
 }
