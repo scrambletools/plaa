@@ -104,9 +104,16 @@ for file in \
     "/usr/share/icons/hicolor/scalable/apps/$id.svg" \
     /usr/share/licenses/plaa/LICENSE \
     /usr/share/licenses/plaa/fonts/OFL.txt \
-    /usr/share/licenses/plaa/fonts/LICENSE-MaterialSymbols.txt; do
+    /usr/share/licenses/plaa/fonts/LICENSE-MaterialSymbols.txt \
+    /usr/share/plaa/ptp4l-gptp.cfg \
+    "/usr/lib/systemd/system/plaa-ptp4l@.service" \
+    /usr/share/polkit-1/rules.d/50-plaa-ptp4l.rules; do
     [ -f "$file" ] || fail "$file is missing"
 done
+# The service runs ptp4l with the configuration the package brings.
+grep -q '^ExecStart=ptp4l -f /usr/share/plaa/ptp4l-gptp.cfg -i %i$' \
+    "/usr/lib/systemd/system/plaa-ptp4l@.service" ||
+    fail "plaa-ptp4l@.service does not run ptp4l with plaa's configuration"
 echo "all there"
 
 # Only the helper holds the capability; plaa gets its raw sockets from
@@ -252,7 +259,8 @@ section Remove
 remove_package
 leftovers=()
 for path in /usr/bin/plaa /usr/lib/plaa "/usr/share/applications/$id.desktop" \
-    "/usr/share/metainfo/$id.metainfo.xml" /usr/share/licenses/plaa; do
+    "/usr/share/metainfo/$id.metainfo.xml" /usr/share/licenses/plaa /usr/share/plaa \
+    "/usr/lib/systemd/system/plaa-ptp4l@.service" /usr/share/polkit-1/rules.d/50-plaa-ptp4l.rules; do
     [ -e "$path" ] && leftovers+=("$path")
 done
 [ ${#leftovers[@]} -eq 0 ] || fail "removing left ${leftovers[*]}"

@@ -428,7 +428,8 @@ channels at 48 kHz, AAF in 32 or 24 bits, six samples a frame (class A),
 its entity ID the interface address with 0xff70 in the middle, beside
 triib's 0xff00 and up. MAAP claims its multicast address; MSRP declares
 it on VLAN 2 with class A and B's domains, as MVRP joins the VLAN; gPTP
-comes from ptp4l through pmc, and the stream's presentation times from
+comes from ptp4l through pmc, plaa starting its own ptp4l service where
+none runs, and the stream's presentation times from
 the interface's PTP hardware clock. When MSRP says a listener is ready,
 the talker starts and stops again when none is. It sends what the media
 window plays: plaa's audio output hands a copy of each chunk it gives

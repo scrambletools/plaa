@@ -2,8 +2,10 @@
 # Installs a built plaa and plaa-netraw and their data files into a
 # system layout, for packages: plaa, plaa-netraw beside it in plaa's
 # library folder, the one program granted CAP_NET_RAW, the desktop entry,
-# icons, AppStream metadata and licenses, and the check the packages run
-# as they install for an interface that can send AVB streams.
+# icons, AppStream metadata and licenses, the check the packages run as
+# they install for an interface that can send AVB streams, and plaa's
+# ptp4l service, its gPTP configuration and the polkit rule letting the
+# person at the computer start it.
 #
 #   scripts/dist-install.sh BINARY_DIR [DESTDIR] [PREFIX]
 #
@@ -35,3 +37,7 @@ for font_license in OFL.txt LICENSE-MaterialSymbols.txt; do
         "$share/licenses/plaa/fonts/$font_license"
 done
 install -Dm644 "$root/README.md" "$share/doc/plaa/README.md"
+ptp4l=$root/packaging/linux/ptp4l
+install -Dm644 "$ptp4l/ptp4l-gptp.cfg" "$share/plaa/ptp4l-gptp.cfg"
+install -Dm644 "$ptp4l/plaa-ptp4l@.service" "$destdir$prefix/lib/systemd/system/plaa-ptp4l@.service"
+install -Dm644 "$ptp4l/50-plaa-ptp4l.rules" "$share/polkit-1/rules.d/50-plaa-ptp4l.rules"

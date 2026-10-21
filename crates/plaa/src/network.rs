@@ -9,7 +9,7 @@ use std::sync::Arc;
 use iced::widget::{container, text};
 use iced::{Center, Element, Fill, Length};
 use plaa_avb::{
-    EntityId, Found, Snapshot, Stream, StreamFormat, StreamInfo, StreamInfoFlags, TalkerState,
+    EntityId, Found, Ptp, Snapshot, Stream, StreamFormat, StreamInfo, StreamInfoFlags, TalkerState,
 };
 use scramble_ui::dropdown::{self, Entry};
 use scramble_ui::{Icon, Type, button, column, component, row, style};
@@ -81,6 +81,17 @@ fn name(entity: &Found, stream: &Stream, several: bool) -> String {
     }
 }
 
+/// What is wrong with ptp4l, where something is.
+fn ptp_note(ptp: &Ptp) -> Option<String> {
+    Some(match ptp {
+        Ptp::Unknown | Ptp::Running => return None,
+        Ptp::Starting => crate::fl!("network-ptp-starting"),
+        Ptp::Elsewhere => crate::fl!("network-ptp-elsewhere"),
+        Ptp::Missing(None) => crate::fl!("network-ptp-missing"),
+        Ptp::Missing(Some(why)) => crate::fl!("network-ptp-failed", reason = why.clone()),
+    })
+}
+
 /// The sheet, `chosen` being the listener whose stream it details.
 pub fn sheet<'a>(
     snapshot: Arc<Snapshot>,
@@ -90,6 +101,12 @@ pub fn sheet<'a>(
     let mut content = column![].spacing(4).width(Fill);
     let own = snapshot.entities.iter().find(|entity| entity.own);
     let ours = own.and_then(|own| Some(((own.id, 0), own.outputs.first()?)));
+    // Without ptp4l the stream keeps no network time, which listeners
+    // need to play it.
+    let sending = !matches!(snapshot.talker, TalkerState::Off | TalkerState::Blocked(_));
+    if let (true, Some(problem)) = (sending, ptp_note(&snapshot.ptp)) {
+        content = content.push(scramble_ui::aligned(text(problem).style(style::error_text)));
+    }
     match (&snapshot.talker, ours) {
         (TalkerState::Off, _) => content = content.push(note(crate::fl!("network-off"))),
         (TalkerState::Blocked(why), _) => {
@@ -518,5 +535,19 @@ mod tests {
         assert_eq!(media_locked(&input), Some(false));
         input.counters = Some(counters(Some(1), None));
         assert_eq!(media_locked(&input), Some(true));
+    }
+
+    #[test]
+    fn ptp4l_is_mentioned_only_when_it_keeps_no_time() {
+        assert_eq!(ptp_note(&Ptp::Unknown), None);
+        assert_eq!(ptp_note(&Ptp::Running), None);
+        assert!(ptp_note(&Ptp::Missing(None)).unwrap().contains("linuxptp"));
+        let failed = ptp_note(&Ptp::Missing(Some("access denied".into()))).unwrap();
+        assert!(failed.ends_with("access denied"));
+        assert!(
+            ptp_note(&Ptp::Elsewhere)
+                .unwrap()
+                .contains("another interface")
+        );
     }
 }

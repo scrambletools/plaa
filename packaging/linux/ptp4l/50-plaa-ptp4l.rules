@@ -1,0 +1,16 @@
+// Lets the person at the computer start and stop plaa's ptp4l service,
+// as plaa does where no ptp4l runs on the interface it sends AVB streams
+// from.
+polkit.addRule(function (action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units" ||
+        !subject.local || !subject.active) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var unit = action.lookup("unit") || "";
+    var verb = action.lookup("verb");
+    if (/^plaa-ptp4l@[A-Za-z0-9_.-]+\.service$/.test(unit) &&
+        (verb === "start" || verb === "stop" || verb === "restart")) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

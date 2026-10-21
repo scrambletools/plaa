@@ -28,7 +28,7 @@ use crate::host::Host;
 #[cfg(target_os = "linux")]
 use crate::own::{self, Own};
 use crate::sound::Sound;
-use crate::{Config, Found, Snapshot, Stream, TalkerState};
+use crate::{Config, Found, Ptp, Snapshot, Stream, TalkerState};
 
 /// The middle of plaa's controller's ID, after the interface address's
 /// first half; triib's controller has 0xfd there.
@@ -500,7 +500,7 @@ impl Runtime {
         self.controller.handle_timeout(now);
         self.refresh(now, since);
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        let talker_before = (self.talker_state(), self.local_unserved());
+        let talker_before = (self.talker_state(), self.local_unserved(), self.ptp());
         #[cfg(target_os = "linux")]
         if let Some(own) = &mut self.own {
             own.turn(now, since);
@@ -524,7 +524,7 @@ impl Runtime {
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
-            changed |= (self.talker_state(), self.local_unserved()) != talker_before;
+            changed |= (self.talker_state(), self.local_unserved(), self.ptp()) != talker_before;
         }
         if changed {
             self.publish();
@@ -650,6 +650,16 @@ impl Runtime {
         })
     }
 
+    /// How ptp4l stands on the interface, where plaa keeps the stream's
+    /// time.
+    fn ptp(&self) -> Ptp {
+        #[cfg(target_os = "linux")]
+        if let Some(own) = &self.own {
+            return own.ptp();
+        }
+        Ptp::Unknown
+    }
+
     /// Whether listeners on this computer go without plaa's stream.
     fn local_unserved(&self) -> bool {
         #[cfg(target_os = "linux")]
@@ -764,6 +774,7 @@ impl Runtime {
             talker: self.talker_state(),
             failure: self.failure.clone(),
             local_unserved: self.local_unserved(),
+            ptp: self.ptp(),
         };
         let mut shared = self.snapshot.lock().unwrap_or_else(PoisonError::into_inner);
         if *shared != snapshot {

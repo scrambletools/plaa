@@ -219,7 +219,11 @@ desktop's portals keep answering it: a tiny helper built beside it,
 them to plaa. Grant it after each build with `sudo setcap cap_net_raw+ep
 target/release/plaa-netraw` (packages will). Sending
 also needs ptp4l running gPTP on the interface, which must have a PTP
-hardware clock, as triib's units run it. Where triib's entity service
+hardware clock, as triib's units run it. Where none runs, plaa starts
+its own, `plaa-ptp4l@<interface>`, which its packages install with a
+polkit rule letting the person at the computer start it, and which
+gives way to triib's; Network Audio says when ptp4l keeps no time for
+plaa's stream, and why. Where triib's entity service
 runs on the interface, plaa reserves its stream in the service's MRP
 participant, which the service shares, as two on one port withdraw each
 other's declarations; beside an older service, which does not share it,

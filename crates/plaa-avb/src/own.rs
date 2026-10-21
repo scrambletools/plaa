@@ -26,7 +26,7 @@ use avb_stream::{MediaClock, Talker, TalkerConfig, TalkerStats};
 use crate::reservation::{self, Heard, Reservation, VLAN};
 use crate::runtime::Input;
 use crate::sound::{CHANNELS, Sound};
-use crate::{Config, TalkerState, gptp};
+use crate::{Config, Ptp, TalkerState, gptp, ptp};
 
 /// The middle of plaa's entity ID, after the interface address's first
 /// half: triib's endpoints count up from 0 there.
@@ -67,6 +67,9 @@ const REDECLARE: Duration = Duration::from_secs(2);
 /// How often the stream's counters go to the entity, as Milan allows its
 /// notifications of them at most.
 const COUNT_EVERY: Duration = Duration::from_secs(1);
+
+/// How long ptp4l may take to answer once its service starts.
+const PTP_PATIENCE: Duration = Duration::from_secs(15);
 
 /// How often it looks whether another program serves the port's
 /// participant, to share it, while it runs its own or none.
@@ -154,6 +157,11 @@ pub(crate) struct Own {
     /// in use until MAAP has claimed the stream's address anew.
     address_file: Option<std::path::PathBuf>,
     kept: Option<MacAddress>,
+    /// How ptp4l stands on the interface, and whether plaa tried to start
+    /// its service there, which it does once.
+    ptp: Ptp,
+    ptp_tried: bool,
+    ptp_started: Option<std::time::Instant>,
 }
 
 impl Own {
@@ -251,6 +259,9 @@ impl Own {
                 .as_deref()
                 .and_then(|file| kept_address(file, &config.interface)),
             address_file: config.address_file.clone(),
+            ptp: Ptp::Unknown,
+            ptp_tried: false,
+            ptp_started: None,
         })
     }
 
@@ -521,12 +532,47 @@ impl Own {
     }
 
     pub(crate) fn handle_gptp(&mut self, now: Instant, status: Option<gptp::Status>) {
+        let answered = status.is_some();
         // ptp4l on another interface says nothing of this one.
-        let gptp = status
-            .filter(|status| status.own_clock == self.own_clock)
-            .map(|status| status.gptp)
-            .unwrap_or_default();
+        let ours = status.filter(|status| status.own_clock == self.own_clock);
+        self.ptp = match (&ours, answered) {
+            (Some(_), _) => Ptp::Running,
+            (None, true) => Ptp::Elsewhere,
+            (None, false) => self.missing_ptp(),
+        };
+        let gptp = ours.map(|status| status.gptp).unwrap_or_default();
         self.entity.set_gptp(now, gptp);
+    }
+
+    /// No ptp4l answers: plaa starts its service, once, where it is
+    /// installed and no ptp4l runs on the interface that might answer
+    /// in a moment.
+    fn missing_ptp(&mut self) -> Ptp {
+        if self.ptp_tried {
+            return match &self.ptp {
+                Ptp::Starting | Ptp::Missing(_) => self.ptp.clone(),
+                _ => Ptp::Missing(None),
+            };
+        }
+        if ptp::running_on(&self.interface) {
+            return Ptp::Starting;
+        }
+        if !ptp::installed() {
+            return Ptp::Missing(None);
+        }
+        self.ptp_tried = true;
+        match ptp::start(&self.interface) {
+            Ok(()) => {
+                self.ptp_started = Some(std::time::Instant::now());
+                Ptp::Starting
+            }
+            Err(why) => Ptp::Missing(Some(why)),
+        }
+    }
+
+    /// How ptp4l stands on the interface.
+    pub(crate) fn ptp(&self) -> Ptp {
+        self.ptp.clone()
     }
 
     /// The output's rate changed: the stream takes the new buffer.
@@ -540,6 +586,15 @@ impl Own {
     pub(crate) fn turn(&mut self, now: Instant, since: Duration) {
         if since >= self.look_at {
             self.look(now, since);
+        }
+        if self.ptp == Ptp::Starting
+            && self
+                .ptp_started
+                .is_some_and(|started| started.elapsed() >= PTP_PATIENCE)
+        {
+            self.ptp = Ptp::Missing(Some(
+                "its service started, but ptp4l does not answer".into(),
+            ));
         }
         if self.blocked.is_some() {
             return;

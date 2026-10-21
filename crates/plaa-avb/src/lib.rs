@@ -19,6 +19,8 @@ mod host;
 #[cfg(target_os = "linux")]
 mod own;
 #[cfg(target_os = "linux")]
+mod ptp;
+#[cfg(target_os = "linux")]
 mod reservation;
 mod runtime;
 mod sound;
@@ -92,6 +94,25 @@ pub enum TalkerState {
     Streaming,
 }
 
+/// How ptp4l, which keeps the time plaa's stream is sent by, stands on
+/// the interface.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Ptp {
+    /// Not known yet, or not plaa's to keep: it sends no stream of its
+    /// own, or the Mac keeps the time.
+    #[default]
+    Unknown,
+    /// ptp4l answers for the interface.
+    Running,
+    /// ptp4l answers, for another interface.
+    Elsewhere,
+    /// plaa started its ptp4l service, which has yet to answer.
+    Starting,
+    /// No ptp4l runs on the interface: plaa's service is not installed,
+    /// or could not start, and why.
+    Missing(Option<String>),
+}
+
 /// What the network looks like now.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Snapshot {
@@ -104,6 +125,7 @@ pub struct Snapshot {
     /// participant plaa shares tells it only the network's listeners, as
     /// triib's entity service did before it said hello.
     pub local_unserved: bool,
+    pub ptp: Ptp,
 }
 
 /// plaa on one interface. Dropping it says goodbye to the network: the

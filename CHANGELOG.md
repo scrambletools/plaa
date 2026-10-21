@@ -80,6 +80,9 @@ The first build.
   stream's starts, stops and frames for them. Started again, plaa sends
   to the address its stream had last time at once, while MAAP claims
   one anew, so listeners hear it again within a fraction of a second.
+  Where no ptp4l runs, plaa starts its own, `plaa-ptp4l@<interface>`,
+  which the packages bring, and Network Audio says when ptp4l keeps no
+  time for its stream.
 - On a Mac, plaa sends through the Mac's own AVB entity, turned on in
   Audio MIDI Setup, as triib uses it: its controller reaches the entity
   through Apple's AVB framework, and plaa plays into the Core Audio

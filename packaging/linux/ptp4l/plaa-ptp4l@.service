@@ -1,0 +1,16 @@
+[Unit]
+Description=ptp4l running gPTP on %i for plaa
+Documentation=man:ptp4l(8)
+After=network.target
+# plaa starts it where no ptp4l runs on the interface it sends AVB streams
+# from. triib's ptp4l serves plaa as well: where one of triib's starts,
+# this one stops.
+Conflicts=triib-ptp4l-gptp@%i.service triib-ptp4l-lite@%i.service
+
+[Service]
+ExecStart=ptp4l -f /usr/share/plaa/ptp4l-gptp.cfg -i %i
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
