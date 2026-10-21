@@ -72,7 +72,9 @@ The first build.
   listing the listeners that can play it, with the chosen one's status,
   format, stream and counters under them, kept up to date as other
   controllers change them, by asking again where entities send no
-  notifications.
+  notifications. plaa and triib's entity service greet each other as
+  they share the port's reservations, and listeners on this computer
+  say when triib must be updated to play there.
 - On a Mac, plaa sends through the Mac's own AVB entity, turned on in
   Audio MIDI Setup, as triib uses it: its controller reaches the entity
   through Apple's AVB framework, and plaa plays into the Core Audio

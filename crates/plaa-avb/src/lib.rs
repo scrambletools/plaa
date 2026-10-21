@@ -69,6 +69,8 @@ pub struct Found {
     pub name: String,
     /// plaa's own.
     pub own: bool,
+    /// On this computer, as triib's entities are.
+    pub here: bool,
     /// Its audio stream outputs and inputs, media clocks left out.
     pub outputs: Vec<Stream>,
     pub inputs: Vec<Stream>,
@@ -95,6 +97,10 @@ pub struct Snapshot {
     pub talker: TalkerState,
     /// The last command that failed, and why.
     pub failure: Option<String>,
+    /// Listeners on this computer get no stream from plaa: the
+    /// participant plaa shares tells it only the network's listeners, as
+    /// triib's entity service did before it said hello.
+    pub local_unserved: bool,
 }
 
 /// plaa on one interface. Dropping it says goodbye to the network: the

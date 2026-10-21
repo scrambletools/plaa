@@ -32,6 +32,8 @@ struct Listener<'s> {
     name: String,
     input: &'s Stream,
     shared: Vec<StreamFormat>,
+    /// On this computer.
+    here: bool,
 }
 
 /// The inputs that can take one of plaa's formats, named by their entity,
@@ -60,6 +62,7 @@ fn listeners<'s>(snapshot: &'s Snapshot, ours: &Stream) -> Vec<Listener<'s>> {
                     .copied()
                     .filter(|format| input.formats.contains(format))
                     .collect(),
+                here: entity.here,
             });
         }
     }
@@ -100,7 +103,15 @@ pub fn sheet<'a>(
             }
             for listener in &found {
                 let picked = chosen == Some(listener.end);
-                content = content.push(row_for(listener, plaa, output.format, menu, picked));
+                let unserved = listener.here && snapshot.local_unserved;
+                content = content.push(row_for(
+                    listener,
+                    plaa,
+                    output.format,
+                    menu,
+                    picked,
+                    unserved,
+                ));
             }
             match found.iter().find(|listener| chosen == Some(listener.end)) {
                 Some(listener) => content = content.push(details(&snapshot, listener)),
@@ -125,13 +136,15 @@ pub fn sheet<'a>(
 }
 
 /// A listener's row: its name, and stop, play, or the formats to play in,
-/// chosen to see its details when pressed.
+/// chosen to see its details when pressed; and, where it is on this
+/// computer and `unserved` by the participant plaa shares, what to do.
 fn row_for<'a>(
     listener: &Listener<'_>,
     plaa: End,
     format: StreamFormat,
     menu: Option<Menu>,
     chosen: bool,
+    unserved: bool,
 ) -> Element<'a, Control> {
     let end = listener.end;
     let action: Element<'a, Control> = if listener.input.bound == Some(plaa) {
@@ -168,16 +181,20 @@ fn row_for<'a>(
             })
             .into()
     };
-    let content = row![
-        container(scramble_ui::aligned(scramble_ui::styled(
-            listener.name.clone(),
-            Type::BodyLarge
-        )))
-        .width(Fill),
-        action,
-    ]
-    .spacing(12)
-    .align_y(Center);
+    let mut label = column![scramble_ui::aligned(scramble_ui::styled(
+        listener.name.clone(),
+        Type::BodyLarge
+    ))]
+    .spacing(2);
+    if unserved {
+        label = label.push(scramble_ui::aligned(scramble_ui::styled(
+            crate::fl!("network-update-triib"),
+            Type::BodyMedium,
+        )));
+    }
+    let content = row![container(label).width(Fill), action]
+        .spacing(12)
+        .align_y(Center);
     iced::widget::button(content)
         .padding(scramble_ui::dir::padding(4.0, 4.0, 4.0, 16.0))
         .width(Fill)
@@ -377,6 +394,7 @@ mod tests {
             id: EntityId(id),
             name: name.into(),
             own: false,
+            here: false,
             outputs: Vec::new(),
             inputs,
         }

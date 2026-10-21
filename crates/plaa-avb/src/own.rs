@@ -95,6 +95,9 @@ pub(crate) struct Own {
     /// Why it stopped: another program declares streams on the port, and
     /// does not share its participant.
     blocked: Option<String>,
+    /// Why the program sharing its participant would not declare the
+    /// stream, until it does.
+    refused: Option<String>,
 }
 
 impl Own {
@@ -120,7 +123,7 @@ impl Own {
         let clock = Arc::new(MediaClock::open(Some(phc))?);
         let generation = 1;
         let mut blocked = None;
-        let reservation = match Reservation::share(&interface, sender, generation) {
+        let reservation = match Reservation::share(&interface, sender, generation, Duration::ZERO) {
             Some(shared) => Some(shared),
             None => match reservation::taken(&interface) {
                 Some(why) => {
@@ -182,11 +185,20 @@ impl Own {
             declare_at: None,
             withdrawn_at: None,
             blocked,
+            refused: None,
         })
     }
 
     pub(crate) fn entity_id(&self) -> EntityId {
         self.entity.entity_id()
+    }
+
+    /// Whether listeners on this computer go without plaa's stream, as
+    /// the participant plaa shares tells only the network's.
+    pub(crate) fn local_unserved(&self) -> bool {
+        self.reservation
+            .as_ref()
+            .is_some_and(|reservation| !reservation.reaches_local())
     }
 
     /// Starts advertising, joins VLAN 2 and class A and B's domains, and
@@ -210,6 +222,9 @@ impl Own {
                     "triib's entity service runs {} as AVB Lite, which reserves no streams",
                     self.interface
                 ))
+            }
+            (None, _, _) if self.refused.is_some() => {
+                TalkerState::Blocked(self.refused.clone().unwrap_or_default())
             }
             (None, _, Some(_)) => TalkerState::Streaming,
             (None, _, None) => TalkerState::Waiting,
@@ -286,10 +301,12 @@ impl Own {
     /// where it had stepped aside. Whether it does.
     fn share(&mut self, now: Instant, since: Duration) -> bool {
         let generation = self.generation + 1;
-        let Some(shared) = Reservation::share(&self.interface, &self.sender, generation) else {
+        let Some(shared) = Reservation::share(&self.interface, &self.sender, generation, since)
+        else {
             return false;
         };
         self.generation = generation;
+        self.refused = None;
         // plaa's own participants go without a word, as the stream they
         // declared is declared again in the shared one.
         self.reservation = Some(shared);
@@ -391,6 +408,33 @@ impl Own {
                 if self.maap.address(0).is_some() && !self.declared {
                     self.declare_at = Some(self.redeclare_at(since));
                 }
+            }
+            Heard::Declared => self.refused = None,
+            Heard::Taken => {
+                // Another talker here has its ID, as while the program has
+                // yet to see plaa's earlier connection close.
+                self.talker = None;
+                self.ready = false;
+                if self.declared {
+                    self.declared = false;
+                    self.withdrawn_at = Some(since);
+                }
+                self.declare_at = Some(self.redeclare_at(since));
+            }
+            Heard::Refused(refusal) => {
+                eprintln!(
+                    "plaa: the program sharing {}'s participant refused the stream: {refusal:?}",
+                    self.interface
+                );
+                self.talker = None;
+                self.ready = false;
+                self.declared = false;
+                self.declare_at = None;
+                self.refused = Some(format!(
+                    "triib's entity service on {} could not declare plaa's stream; update \
+                     plaa and triib",
+                    self.interface
+                ));
             }
         }
         self.update_talker();

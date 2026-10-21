@@ -252,6 +252,9 @@ network-play-on = Play on { $listener }
 network-stop-on = Stop playing on { $listener }
 network-choose-format = Choose a format to play on { $listener } in
 network-failed = Could not connect: { $reason }
+# Under a listener on this computer, such as one of triib's entities, while
+# triib's entity service is too old to pass plaa's stream to it.
+network-update-triib = Update triib to play here.
 network-choose = Choose a listener to see how it takes its stream.
 
 # The listener chosen: how its input takes its stream. A reservation is

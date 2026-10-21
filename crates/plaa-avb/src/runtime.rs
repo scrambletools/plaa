@@ -487,7 +487,7 @@ impl Runtime {
         self.controller.handle_timeout(now);
         self.refresh(now, since);
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        let talker_before = self.talker_state();
+        let talker_before = (self.talker_state(), self.local_unserved());
         #[cfg(target_os = "linux")]
         if let Some(own) = &mut self.own {
             own.turn(now, since);
@@ -511,7 +511,7 @@ impl Runtime {
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
-            changed |= self.talker_state() != talker_before;
+            changed |= (self.talker_state(), self.local_unserved()) != talker_before;
         }
         if changed {
             self.publish();
@@ -634,6 +634,15 @@ impl Runtime {
         })
     }
 
+    /// Whether listeners on this computer go without plaa's stream.
+    fn local_unserved(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        if let Some(own) = &self.own {
+            return own.local_unserved();
+        }
+        false
+    }
+
     fn talker_state(&self) -> TalkerState {
         #[cfg(target_os = "linux")]
         if let Some(own) = &self.own {
@@ -715,7 +724,11 @@ impl Runtime {
             .map(|discovered| discovered.entity_id())
             .filter_map(|id| {
                 let model = self.controller.model(id)?;
-                Some(found(id, model, own == Some(id)))
+                let here = self
+                    .controller
+                    .entity(id)
+                    .is_some_and(|entity| entity.mac == self.mac);
+                Some(found(id, model, own == Some(id), here))
             })
             .collect();
         entities.sort_by(|left, right| {
@@ -725,6 +738,7 @@ impl Runtime {
             entities,
             talker: self.talker_state(),
             failure: self.failure.clone(),
+            local_unserved: self.local_unserved(),
         };
         let mut shared = self.snapshot.lock().unwrap_or_else(PoisonError::into_inner);
         if *shared != snapshot {
@@ -737,7 +751,7 @@ impl Runtime {
 
 /// An entity as the app shows it, from what the controller read: its
 /// audio streams, media clocks left out.
-fn found(id: EntityId, model: &EntityModel, own: bool) -> Found {
+fn found(id: EntityId, model: &EntityModel, own: bool, here: bool) -> Found {
     let streams = |input: bool| {
         model
             .streams(input)
@@ -775,6 +789,7 @@ fn found(id: EntityId, model: &EntityModel, own: bool) -> Found {
             .filter(|name| !name.is_empty())
             .map_or_else(|| format!("{id}"), str::to_owned),
         own,
+        here,
         outputs: streams(false),
         inputs: streams(true),
     }
