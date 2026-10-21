@@ -20,6 +20,8 @@ mod mpris;
 mod network;
 #[cfg(target_os = "macos")]
 mod now_playing_macos;
+#[cfg(target_os = "macos")]
+mod open_macos;
 mod playlist;
 mod prism;
 mod recorder;
@@ -250,6 +252,11 @@ fn main() -> iced::Result {
     {
         menu_macos::leave_out_system_full_screen();
         menu_macos::set_handler(|action| post(External::Menu(action)));
+        open_macos::install(|files| {
+            post(External::OpenSources(
+                files.into_iter().map(Source::File).collect(),
+            ));
+        });
     }
 
     let omarchy_dir = omarchy::current_theme_dir();

@@ -954,7 +954,12 @@ impl Plaa {
                 if self.stop_hidden() && sources.is_empty() {
                     return Task::none();
                 }
-                self.open_sources(sources, None)
+                // The start window plaa opened to, alone, takes them.
+                let start = match self.windows.iter().collect::<Vec<_>>().as_slice() {
+                    [(id, window)] if matches!(window.content, Content::Start) => Some(**id),
+                    _ => None,
+                };
+                self.open_sources(sources, start)
             }
             Message::External(External::StopHidden) => {
                 self.stop_hidden();

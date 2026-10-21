@@ -224,6 +224,61 @@ cat > "$app/Contents/Info.plist" <<PLIST
     <key>NSCameraUsageDescription</key><string>plaa records the camera when you ask it to.</string>
     <key>NSAudioCaptureUsageDescription</key><string>plaa records what the Mac plays when you record the screen with its sound.</string>
     <key>NSHumanReadableCopyright</key><string>GPL-3.0-or-later</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>Video</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.movie</string>
+                <string>org.matroska.mkv</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>Audio</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.audio</string>
+                <string>org.matroska.mka</string>
+            </array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>Playlist</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.m3u-playlist</string>
+            </array>
+        </dict>
+    </array>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>org.matroska.mkv</string>
+            <key>UTTypeDescription</key><string>Matroska video</string>
+            <key>UTTypeConformsTo</key><array><string>public.movie</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key><array><string>mkv</string><string>mk3d</string></array>
+                <key>public.mime-type</key><array><string>video/x-matroska</string></array>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key><string>org.matroska.mka</string>
+            <key>UTTypeDescription</key><string>Matroska audio</string>
+            <key>UTTypeConformsTo</key><array><string>public.audio</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key><array><string>mka</string></array>
+                <key>public.mime-type</key><array><string>audio/x-matroska</string></array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST
