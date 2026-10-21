@@ -252,6 +252,64 @@ network-play-on = Play on { $listener }
 network-stop-on = Stop playing on { $listener }
 network-choose-format = Choose a format to play on { $listener } in
 network-failed = Could not connect: { $reason }
+network-choose = Choose a listener to see how it takes its stream.
+
+# The listener chosen: how its input takes its stream. A reservation is
+# the bandwidth the network sets aside for a stream.
+network-status = Status
+network-not-connected = Not connected
+network-from = From { $stream }
+network-from-receiving = From { $stream }, receiving
+network-from-waiting = From { $stream }, waiting for the talker
+network-from-failed = From { $stream }, the talker's reservation failed: { $reason }
+# Whether the listener's media clock follows the stream's.
+network-media-clock = Media clock
+network-locked = Locked to the stream
+network-not-locked = Not locked
+network-format = Format
+# The formats both the listener and plaa's stream can be in.
+network-formats = Formats it can take from plaa
+# A stream's ID, as in 0xd111e597f5440000.
+network-stream-id = Stream ID
+# The MAC address the stream is sent to.
+network-destination = Destination
+# How long the stream's frames take to reach the listener, as the
+# switches on the way add it up.
+network-latency = Latency
+network-microseconds = { $time } µs
+network-frames = Frames received
+# Frames that came with a sequence number other than the next, as when
+# some were lost.
+network-out-of-sequence = Frames out of sequence
+# How often the stream stopped coming while it was taken.
+network-interrupted = Interruptions
+network-entity-id = Entity ID
+
+# Why a stream's reservation failed, by the MSRP failure codes of IEEE
+# 802.1Q (35.2.2.8.7). A bridge is an AVB switch; the egress port is the
+# port a stream leaves a bridge by.
+msrp-failure-1 = insufficient bandwidth
+msrp-failure-2 = insufficient bridge resources
+msrp-failure-3 = insufficient bandwidth for the traffic class
+msrp-failure-4 = stream ID in use by another talker
+msrp-failure-5 = destination address already in use
+msrp-failure-6 = pre-empted by a stream of higher rank
+msrp-failure-7 = reported latency has changed
+msrp-failure-8 = egress port is not AVB capable
+msrp-failure-9 = use a different destination address
+msrp-failure-10 = out of MSRP resources
+msrp-failure-11 = out of MMRP resources
+msrp-failure-12 = cannot store the destination address
+msrp-failure-13 = priority is not an SR class priority
+msrp-failure-14 = frames too large for the medium
+msrp-failure-15 = fan-in port limit reached
+msrp-failure-16 = first value changed for a registered stream
+msrp-failure-17 = VLAN blocked on the egress port
+msrp-failure-18 = VLAN tagging disabled on the egress port
+msrp-failure-19 = SR class priority mismatch
+msrp-failure-unknown = unknown reason
+# $bridge is the MAC address of the bridge reporting the failure.
+msrp-failure-at = { $reason }, at the bridge { $bridge }
 
 ## The macOS menu bar
 

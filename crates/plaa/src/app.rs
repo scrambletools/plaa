@@ -1997,6 +1997,7 @@ impl Plaa {
             Control::ToggleInspector => player.toggle_sheet(Sheet::Inspector),
             Control::TogglePlaylist => player.toggle_sheet(Sheet::Playlist),
             Control::ToggleNetwork => player.toggle_sheet(Sheet::Network),
+            Control::AvbChoose(listener) => player.listener = Some(listener),
             Control::ToggleLoop => player.looping = !player.looping,
             Control::Activity => {}
             _ => {}

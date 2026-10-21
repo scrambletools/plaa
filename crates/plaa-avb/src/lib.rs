@@ -29,8 +29,9 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::JoinHandle;
 
-pub use atdecc::EntityId;
+pub use atdecc::aem::{StreamInfo, StreamInfoFlags, StreamInputCounters};
 pub use atdecc::stream_format::StreamFormat;
+pub use atdecc::{EntityId, MacAddress};
 pub use sound::Sound;
 
 use runtime::Input;
@@ -55,6 +56,10 @@ pub struct Stream {
     pub formats: Vec<StreamFormat>,
     /// For an input, the talker's output it is bound to.
     pub bound: Option<(EntityId, u16)>,
+    /// What the entity last said the stream is doing, once read.
+    pub info: Option<StreamInfo>,
+    /// For an input, how it has taken its streams, once read.
+    pub counters: Option<StreamInputCounters>,
 }
 
 /// An entity on the network, as the controller read it.

@@ -147,11 +147,11 @@ pub(crate) fn start(
         f,
     ]));
     let mut controller_config = controller::Config::new(controller_id);
-    // Names, streams, formats and bindings are all plaa shows.
+    // Names, streams, formats, bindings and how the streams fare, by
+    // their info and counters, are all plaa shows.
     controller_config.network_info = false;
     controller_config.read_mappings = false;
     controller_config.media_clock_info = false;
-    controller_config.read_counters = false;
     controller_config.read_transit_times = false;
     controller_config.read_configurations = false;
     controller_config.read_talker_state = false;
@@ -667,6 +667,10 @@ fn found(id: EntityId, model: &EntityModel, own: bool) -> Found {
                     formats: stream.formats().collect(),
                     bound: input
                         .then(|| model.binding(stream.index)?.talker_stream())
+                        .flatten(),
+                    info: model.stream_info(descriptor_type, stream.index).copied(),
+                    counters: input
+                        .then(|| model.stream_input_counters(stream.index))
                         .flatten(),
                 }
             })

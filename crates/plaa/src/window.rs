@@ -125,6 +125,8 @@ pub struct PlayerWindow {
     pub overlay_shown: bool,
     pub menu: Option<Menu>,
     pub sheet: Option<Sheet>,
+    /// The listener chosen in the Network Audio sheet, which it details.
+    pub listener: Option<(plaa_avb::EntityId, u16)>,
     pub looping: bool,
     /// What the window plays, the player's source being the current item.
     pub playlist: Playlist,
@@ -182,6 +184,7 @@ impl PlayerWindow {
             overlay_shown: true,
             menu: None,
             sheet: None,
+            listener: None,
             looping: false,
             playlist,
             fit_window: true,
@@ -401,6 +404,8 @@ pub enum Control {
     ),
     /// Unbinds a listener's input.
     AvbDisconnect((plaa_avb::EntityId, u16)),
+    /// Chooses a listener in the Network Audio sheet, to see its details.
+    AvbChoose((plaa_avb::EntityId, u16)),
     TogglePip,
     /// Plays the list's item at this index.
     PlayItem(usize),
@@ -1455,7 +1460,11 @@ fn sheet<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, 
     match window.sheet? {
         Sheet::Inspector => Some(inspector(window)),
         Sheet::Playlist => Some(playlist_sheet(window)),
-        Sheet::Network => Some(crate::network::sheet(context.avb.clone()?, window.menu)),
+        Sheet::Network => Some(crate::network::sheet(
+            context.avb.clone()?,
+            window.menu,
+            window.listener,
+        )),
     }
 }
 
