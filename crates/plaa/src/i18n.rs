@@ -153,8 +153,7 @@ mod tests {
 
     #[test]
     fn norwegian_asks_for_bokmal() {
-        let asked: Vec<LanguageIdentifier> =
-            vec!["no-NO".parse().unwrap(), "en".parse().unwrap()];
+        let asked: Vec<LanguageIdentifier> = vec!["no-NO".parse().unwrap(), "en".parse().unwrap()];
         let tags: Vec<String> = with_aliases(asked)
             .iter()
             .map(ToString::to_string)
@@ -186,14 +185,14 @@ mod tests {
         let mut messages: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut current: Option<String> = None;
         for line in text.lines() {
-            let starts_message = line
-                .split_once('=')
-                .map(|(key, _)| key.trim_end())
-                .filter(|key| {
-                    !line.starts_with([' ', '\t', '#', '.'])
-                        && key.chars().next().is_some_and(|c| c.is_ascii_lowercase())
-                        && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
-                });
+            let starts_message =
+                line.split_once('=')
+                    .map(|(key, _)| key.trim_end())
+                    .filter(|key| {
+                        !line.starts_with([' ', '\t', '#', '.'])
+                            && key.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+                            && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+                    });
             if let Some(key) = starts_message {
                 assert!(
                     !messages.contains_key(key),

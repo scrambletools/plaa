@@ -144,6 +144,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   floating controls, the graphics card, resuming, streams' quality,
   track languages and folders, saved in `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml` on
   Windows, `~/Library/Application Support/plaa/plaa.toml` on macOS).
+- **38 languages**, the system's or the one chosen in Settings, right to
+  left for Arabic, Hebrew, Persian and Urdu.
 - **One window per file** and one running plaa: files opened again, from
   the file manager or the command line, go to the running one.
 - **AI agents**: `plaa --mcp` serves plaa's tools over MCP, so Claude
@@ -155,8 +157,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Listening to AVB streams and AVB Lite, casting, the assistant panel,
-and translations. The [plan](docs/PLAN.md) has the order.
+Listening to AVB streams and AVB Lite, casting, and the assistant panel.
+The [plan](docs/PLAN.md) has the order.
 
 ## Packages
 

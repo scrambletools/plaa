@@ -39,7 +39,7 @@ look follows Material Design 3, as in prev.
 | Export | Re-encoded through FFmpeg: NVENC, AMF or Quick Sync where they open, VAAPI on Linux, VideoToolbox on macOS, else x264, x265 and SVT-AV1, in MP4 with AAC sound (Apple's encoder on macOS); sound alone as AAC, MP3 or Opus at a bit rate chosen, or FLAC, ALAC or WAV in 16 or 24 bits |
 | Web pages | yt-dlp, run as a program of its own when it is installed, not bundled: it follows the sites' changes faster than plaa could; its JSON names the streams, which FFmpeg plays |
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
-| Interface languages | Fluent files in `i18n/`, English first; the 38 languages prev has once the interface settles |
+| Interface languages | Fluent files in `i18n/`, English first, and the 38 languages prev has |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
 | AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb pinned by revision: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
 | Distribution | As prev, once the features settle: .deb, .rpm, AppImage, tarball, Flatpak, PKGBUILD, MSI and zip, disk image |
@@ -97,7 +97,8 @@ trimming and splitting, and Intel Macs.
 9. **Assistant and MCP**: the MCP server, `plaa --mcp`, with prev's
    consent prompts (done); the assistant panel next.
 10. **Release**: packages (made, with installer tests on each system,
-    `docs/RELEASING.md`), translations, signing, the website.
+    `docs/RELEASING.md`), translations (done, 38 languages), signing,
+    the website.
 
 ## Architecture
 
