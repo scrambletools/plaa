@@ -12,6 +12,7 @@ repository = "https://github.com/scrambletools/plaa"
 
 [workspace.dependencies]
 plaa-avb = { path = "crates/plaa-avb", version = "0.1.0" }
+plaa-cast = { path = "crates/plaa-cast", version = "0.1.0" }
 plaa-media = { path = "crates/plaa-media", version = "0.1.0" }
 plaa-store = { path = "crates/plaa-store", version = "0.1.0" }
 # The AVB crates, shared with triib, pinned by revision. A git-ignored

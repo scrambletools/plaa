@@ -3315,6 +3315,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "objc2-media-player",
  "plaa-avb",
+ "plaa-cast",
  "plaa-media",
  "plaa-store",
  "png",
@@ -3345,6 +3346,13 @@ dependencies = [
  "avb-stream",
  "objc2-core-audio",
  "objc2-core-foundation",
+]
+
+[[package]]
+name = "plaa-cast"
+version = "0.1.0"
+dependencies = [
+ "roxmltree",
 ]
 
 [[package]]

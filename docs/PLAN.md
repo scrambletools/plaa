@@ -93,7 +93,7 @@ trimming and splitting, and Intel Macs.
    filling the window, or the cover alone.
 7. **AVB and Milan**: the entity and talker, and a controller to connect
    talkers and listeners (done); the listener and AVB Lite next.
-8. **Casting**: Chromecast and DLNA/UPnP.
+8. **Casting**: DLNA/UPnP renderers (done); Chromecast next.
 9. **Assistant and MCP**: the MCP server, `plaa --mcp`, with prev's
    consent prompts (done); the assistant panel next.
 10. **Release**: packages (made, with installer tests on each system,
@@ -113,7 +113,9 @@ crates/
   plaa-store/    settings, where files were left off, atomic writes
 ```
 
-Later crates: `plaa-avb` (the Milan entity), `plaa-cast`, `plaa-assist`.
+Then `plaa-avb` (AVB and Milan) and `plaa-cast` (casting to DLNA and
+UPnP renderers: SSDP to find them, a small HTTP server for the file,
+AVTransport and RenderingControl over SOAP); later `plaa-assist`.
 
 ### Engine
 

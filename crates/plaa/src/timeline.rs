@@ -69,6 +69,9 @@ pub struct Timeline<'a, Message> {
     thumbnail: Option<(image::Handle, f32)>,
     /// Marks how far ahead the source has been read, as for streams.
     buffered: bool,
+    /// Where it is, as given, rather than as the player moves: what a
+    /// renderer cast to says.
+    fixed: Option<f64>,
 }
 
 impl<'a, Message> Timeline<'a, Message> {
@@ -96,7 +99,15 @@ impl<'a, Message> Timeline<'a, Message> {
             on_hover: None,
             thumbnail: None,
             buffered: false,
+            fixed: None,
         }
+    }
+
+    /// Shows the handle at `seconds`, where given, rather than where the
+    /// player is.
+    pub fn at(mut self, seconds: Option<f64>) -> Self {
+        self.fixed = seconds;
+        self
     }
 
     /// Sends the seconds pointed at as the pointer moves over the
@@ -160,7 +171,9 @@ impl<'a, Message> Timeline<'a, Message> {
 
     /// Where the player is, in seconds along the timeline.
     fn live(&self) -> f64 {
-        self.player.position().as_secs_f64().min(self.duration)
+        self.fixed
+            .unwrap_or_else(|| self.player.position().as_secs_f64())
+            .min(self.duration)
     }
 
     /// The seconds under `x`, the handle's centre following the pointer.
@@ -173,7 +186,11 @@ impl<'a, Message> Timeline<'a, Message> {
     /// When the handle next lands on another of the screen's pixels as
     /// the player moves on: quads snap to the nearest pixel.
     fn next_move(&self, bounds: Rectangle, handle: f32) -> Option<Instant> {
-        let pace = self.player.pace();
+        let pace = if self.fixed.is_some() {
+            0.0
+        } else {
+            self.player.pace()
+        };
         let position = self.live();
         if pace <= 0.0 || self.duration <= 0.0 || position >= self.duration {
             return None;

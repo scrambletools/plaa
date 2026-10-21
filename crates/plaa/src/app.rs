@@ -24,11 +24,12 @@ use crate::playlist::{self, Playlist};
 use crate::settings_view::{self, SettingsMessage, SettingsTab};
 use crate::shortcuts::{self, Action};
 use crate::window::{
-    self as player_window, Control, Menu, PlayerWindow, QualityChoice, SPEEDS, Sheet,
+    self as player_window, Casting, Control, Menu, PlayerWindow, QualityChoice, SPEEDS, Sheet,
 };
 
 mod agents;
 mod avb;
+mod cast;
 mod edits;
 mod export;
 mod recording;
@@ -131,6 +132,12 @@ pub struct Plaa {
     focused: Option<window::Id>,
     /// Agents waiting for the user to allow them or their tools.
     agents: agents::Agents,
+    /// The renderers to cast to, as last found, and whether a search for
+    /// them runs.
+    renderers: Option<std::sync::Arc<Vec<plaa_cast::Renderer>>>,
+    cast_looking: bool,
+    /// Counts the casts, to tell a cast's events from an earlier one's.
+    next_cast: u64,
     next_surface: u64,
 }
 
@@ -365,6 +372,9 @@ impl Plaa {
             }),
             focused: None,
             agents: agents::Agents::default(),
+            renderers: None,
+            cast_looking: false,
+            next_cast: 0,
             next_surface: 1,
         };
         plaa.apply_looks();
@@ -910,6 +920,25 @@ impl Plaa {
         let Some(id) = self.media_window() else {
             return Task::none();
         };
+        // A window that casts plays on the renderer.
+        if let Some(playing) = self
+            .player_mut(id)
+            .and_then(|player| player.casting.as_ref())
+            .map(Casting::playing)
+        {
+            let control = match command {
+                Command::PlayPause => Some(Control::TogglePlay),
+                Command::Play if !playing => Some(Control::TogglePlay),
+                Command::Pause if playing => Some(Control::TogglePlay),
+                Command::Stop => Some(Control::StopCasting),
+                Command::SeekBy(seconds) => Some(Control::SkipBy(seconds)),
+                Command::SeekTo(seconds) => Some(Control::SeekTo(seconds)),
+                _ => None,
+            };
+            if let Some(control) = control {
+                return self.control(id, control);
+            }
+        }
         match command {
             Command::Next => return self.next(id),
             Command::Previous => return self.previous(id),
@@ -1123,6 +1152,13 @@ impl Plaa {
                 Task::none()
             }
             Message::External(External::Control(call)) => self.control_call(call),
+            Message::External(External::CastFound(found)) => {
+                self.renderers_found(found);
+                Task::none()
+            }
+            Message::External(External::Cast(id, generation, event)) => {
+                self.cast_event(id, generation, event)
+            }
             Message::AgentAnswered(allow) => self.agent_answered(allow),
             Message::RunAnswered(id, allow) => self.run_answered(id, allow),
             Message::AgentPromptReady => Task::none(),
@@ -1855,7 +1891,14 @@ impl Plaa {
             player.menu = None;
         }
         let delay = self.settings.overlay_delay();
+        // A window that casts plays on the renderer.
+        if self.cast_control(id, &control) {
+            return Task::none();
+        }
         match control {
+            Control::CastTo(renderer) => return self.cast_to(id, &renderer),
+            Control::StopCasting => return self.stop_casting(id),
+            Control::Menu(Menu::Cast, true) => self.look_for_renderers(),
             Control::Open => return self.perform(id, Action::Open),
             Control::Settings => return self.perform(id, Action::Settings),
             Control::Close => return window::close(id),
@@ -2154,6 +2197,7 @@ impl Plaa {
                     scale: window.scale,
                     close_button,
                     avb: self.avb.as_ref().map(|_| self.avb_snapshot.clone()),
+                    renderers: self.renderers.clone(),
                 },
             )
             .map(move |control| Message::Control(id, control)),

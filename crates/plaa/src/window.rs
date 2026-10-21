@@ -57,6 +57,32 @@ pub enum Menu {
     Visualizer,
     /// The formats a listener and plaa share, to play there in.
     AvbFormats((plaa_avb::EntityId, u16)),
+    /// The renderers to cast to.
+    Cast,
+}
+
+/// What a window casts to a renderer on the network, and how the renderer
+/// last said it stands.
+pub struct Casting {
+    /// The renderer, by its id and name.
+    pub id: String,
+    pub name: String,
+    pub session: plaa_cast::Session,
+    pub status: Option<plaa_cast::Status>,
+    /// Tells this cast's events from those of one before it.
+    pub generation: u64,
+}
+
+impl Casting {
+    /// Whether the renderer plays, or is about to.
+    pub fn playing(&self) -> bool {
+        self.status.is_none_or(|status| {
+            matches!(
+                status.state,
+                plaa_cast::State::Playing | plaa_cast::State::Transitioning
+            )
+        })
+    }
 }
 
 /// What the quality menu offers.
@@ -125,6 +151,9 @@ pub struct PlayerWindow {
     pub overlay_shown: bool,
     pub menu: Option<Menu>,
     pub sheet: Option<Sheet>,
+    /// The renderer the window casts to, whose playback its controls
+    /// drive and its timeline shows while it does.
+    pub casting: Option<Casting>,
     /// The listener chosen in the Network Audio sheet, which it details.
     pub listener: Option<(plaa_avb::EntityId, u16)>,
     pub looping: bool,
@@ -205,6 +234,7 @@ impl PlayerWindow {
             waveform: None,
             shape: None,
             visualizer: Visualizer::default(),
+            casting: None,
         }
     }
 
@@ -353,6 +383,22 @@ impl PlayerWindow {
     pub fn refresh(&mut self) {
         self.status = self.player.status();
         self.subtitle = self.player.subtitle();
+        // While casting, the renderer's playback shows.
+        if let Some(casting) = &self.casting {
+            self.status.paused = !casting.playing();
+            self.status.ended = false;
+            self.status.buffering = casting
+                .status
+                .is_some_and(|status| status.state == plaa_cast::State::Transitioning);
+            if let Some(status) = casting.status {
+                if let Some(position) = status.position {
+                    self.status.position = Duration::from_secs_f64(position.max(0.0));
+                }
+                if self.status.duration.is_none() {
+                    self.status.duration = status.duration.map(Duration::from_secs_f64);
+                }
+            }
+        }
     }
 
     /// Whether the player is waiting for its source: opening it, or for a
@@ -406,6 +452,9 @@ pub enum Control {
     AvbDisconnect((plaa_avb::EntityId, u16)),
     /// Chooses a listener in the Network Audio sheet, to see its details.
     AvbChoose((plaa_avb::EntityId, u16)),
+    /// Casts to the renderer with this id.
+    CastTo(String),
+    StopCasting,
     TogglePip,
     /// Plays the list's item at this index.
     PlayItem(usize),
@@ -455,6 +504,8 @@ pub struct Context {
     pub close_button: bool,
     /// The AVB network, while plaa is on one.
     pub avb: Option<Arc<plaa_avb::Snapshot>>,
+    /// The renderers on the network, once looked for.
+    pub renderers: Option<Arc<Vec<plaa_cast::Renderer>>>,
 }
 
 /// The window: the picture with bars over it or around it, or for sound,
@@ -585,6 +636,7 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             Control::TogglePlaylist,
         ));
     }
+    tools.push(cast_menu(window, context));
     if context.avb.is_some() {
         tools.push(component::toggle_tool(
             Icon::Lan,
@@ -674,7 +726,11 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
         .chapters(&window.chapters)
         .cuts(window.editor.cuts())
         .ab_loop(window.ab_loop)
-        .buffered(window.source().is_url())
+        .at(window
+            .casting
+            .as_ref()
+            .map(|_| window.status.position.as_secs_f64()))
+        .buffered(window.source().is_url() && window.casting.is_none())
         .on_hover(Control::Hover)
         .thumbnail(window.thumbnail.clone())
         .height(style::SLIDER_HEIGHT)
@@ -971,6 +1027,51 @@ fn visualizer_menu(window: &PlayerWindow) -> Element<'_, Control> {
         .tip(crate::fl!("action-visualizer"))
         .open(window.menu == Some(Menu::Visualizer), |open| {
             Control::Menu(Menu::Visualizer, open)
+        })
+        .into()
+}
+
+/// The renderers on the network to cast to, the one cast to checked, and
+/// stopping; found as the menu opens.
+fn cast_menu<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
+    let mut entries = Vec::new();
+    if let Some(casting) = &window.casting {
+        entries.push(
+            Entry::item(
+                crate::fl!("cast-stop", renderer = casting.name.clone()),
+                Control::StopCasting,
+            )
+            .icon(Icon::Stop),
+        );
+        entries.push(Entry::divider());
+    }
+    match context.renderers.as_deref().map(Vec::as_slice) {
+        None => entries.push(Entry::note(crate::fl!("cast-looking"))),
+        Some([]) => entries.push(Entry::note(crate::fl!("cast-none"))),
+        Some(renderers) => {
+            for renderer in renderers {
+                let current = window
+                    .casting
+                    .as_ref()
+                    .is_some_and(|casting| casting.id == renderer.id);
+                entries.push(
+                    Entry::item(renderer.name.clone(), Control::CastTo(renderer.id.clone()))
+                        .checked(current),
+                );
+            }
+        }
+    }
+    let glyph = if window.casting.is_some() {
+        Icon::CastConnected
+    } else {
+        Icon::Cast
+    };
+    dropdown::icon_menu(glyph, entries)
+        .size(button::Size::Small)
+        .tip(crate::fl!("action-cast"))
+        .selected(window.casting.is_some())
+        .open(window.menu == Some(Menu::Cast), |open| {
+            Control::Menu(Menu::Cast, open)
         })
         .into()
 }

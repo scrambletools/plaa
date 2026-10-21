@@ -339,7 +339,7 @@ static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
             "Says how a window plays: playing, paused, ended or failed, the position and \
              length in seconds, the speed, the volume (0 to 100, the same in every window) \
              and whether it is muted, whether it loops, the sound and subtitle streams chosen, \
-             and the item it plays of its list.",
+             the item it plays of its list, and the TV or speaker it casts to, if it does.",
             |app, on: On, answer| {
                 let status = app.player_window(on.window).map(|(id, player)| {
                     let window = &app.windows[&id];
@@ -787,13 +787,27 @@ fn playing(app: &mut Plaa, window: Option<u64>, answer: &Answer, play: bool) {
         }
     };
     app.media_window = Some(id);
-    if let Some(player) = app.player_mut(id) {
-        if play {
-            player.player.play();
-        } else {
-            player.player.pause();
+    // A window that casts plays or pauses the renderer.
+    let casting = app
+        .player_mut(id)
+        .and_then(|player| player.casting.as_ref())
+        .map(crate::window::Casting::playing);
+    match casting {
+        Some(playing) => {
+            if playing != play {
+                app.cast_control(id, &Control::TogglePlay);
+            }
         }
-        player.refresh();
+        None => {
+            if let Some(player) = app.player_mut(id) {
+                if play {
+                    player.player.play();
+                } else {
+                    player.player.pause();
+                }
+                player.refresh();
+            }
+        }
     }
     answer.send(Ok(Output::Text(format!(
         "Window {} {}.",
@@ -833,6 +847,7 @@ fn status(id: window::Id, player: &PlayerWindow, fullscreen: bool) -> Value {
         "subtitle_stream": status.subtitles,
         "item": player.playlist.current() + 1,
         "items": player.playlist.items().len(),
+        "casting_to": player.casting.as_ref().map(|casting| casting.name.clone()),
     })
 }
 

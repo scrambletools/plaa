@@ -136,6 +136,12 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   The one chosen shows how it takes its stream: from which talker, its
   media clock lock, format, stream ID, destination, latency and counters,
   kept up to date as other controllers, such as triib's, change them.
+  Under them, the talkers plaa can listen to, playing their stream here.
+- **Cast** to a TV, speaker or program that plays DLNA (UPnP AV), found
+  on the network as the Cast menu opens: plaa serves the file to it, or
+  hands it a stream's address, and its controls and timeline play,
+  pause and seek there until casting stops, when the window goes on
+  from where it got to.
 - **Loop**, **resume where you left off**, and **save the frame** shown as
   a PNG.
 - **Inspector** (Ctrl+I) with the file's format, streams, codecs, frame
@@ -157,8 +163,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Listening to AVB streams and AVB Lite, casting, and the assistant panel.
-The [plan](docs/PLAN.md) has the order.
+AVB Lite, casting to Chromecast, and the assistant panel. The
+[plan](docs/PLAN.md) has the order.
 
 ## Packages
 

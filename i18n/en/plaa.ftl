@@ -74,6 +74,7 @@ action-exit-full-screen = Exit Full Screen
 action-quality = Quality
 action-visualizer = Visualizer
 action-network = Network Audio
+action-cast = Cast
 
 ## What a sound file shows under its cover
 
@@ -535,3 +536,13 @@ agent-ask-play = Let { $agent } control playback here?
 agent-ask-open = Let { $agent } open or close a window?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } asks to use “{ $tool }”. Settings chooses what plaa asks about.
+
+## Casting to a TV or speaker on the network
+
+cast-looking = Looking for TVs and speakers…
+cast-none = No TV or speaker that plays DLNA was found.
+# $renderer is the TV's or speaker's name.
+cast-stop = Stop playing on { $renderer }
+notice-casting = Playing on { $renderer }.
+notice-cast-failed = Could not play on { $renderer }: { $reason }
+cast-web-page = Web pages cannot be cast yet: open the video's own address instead.

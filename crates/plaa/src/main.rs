@@ -96,6 +96,10 @@ pub enum External {
     /// A request on the control channel, from `plaa --mcp` or another
     /// program.
     Control(control::Call),
+    /// The renderers on the network, as a search found them.
+    CastFound(Vec<plaa_cast::Renderer>),
+    /// What a window's cast, of this generation, tells.
+    Cast(iced::window::Id, u64, plaa_cast::Event),
 }
 
 static EXTERNAL_EVENTS: Mutex<Option<UnboundedReceiver<External>>> = Mutex::new(None);
