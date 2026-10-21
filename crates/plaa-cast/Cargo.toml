@@ -13,3 +13,7 @@ workspace = true
 [dependencies]
 # The renderers' descriptions and SOAP answers, small XML documents.
 roxmltree = "0.20"
+# A Chromecast's protocol: JSON over TLS, with the rustls the assistant
+# brings already.
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
+serde_json = "1"

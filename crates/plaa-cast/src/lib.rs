@@ -1,15 +1,18 @@
 //! plaa casting what a window plays to a renderer on the network: DLNA and
-//! UPnP AV media renderers, such as TVs, speakers and Kodi, found by SSDP.
-//! A file is served to the renderer over HTTP from this computer while it
-//! plays there; a stream's address is handed over as it is.
+//! UPnP AV media renderers, such as TVs, speakers and Kodi, found by SSDP,
+//! and Chromecasts, found by mDNS. A file is served to the renderer over
+//! HTTP from this computer while it plays there; a stream's address is
+//! handed over as it is.
 //!
 //! A [`Session`] runs a cast on a thread of its own: it gives the
 //! renderer the media, plays it from where the window was, carries out
 //! play, pause, seek and volume, and tells how the renderer stands every
 //! second until it is dropped, which stops the renderer.
 
+mod castv2;
 mod discovery;
 mod http;
+mod mdns;
 mod serve;
 mod upnp;
 
@@ -90,8 +93,11 @@ impl Session {
                     events(Event::Failed(why));
                 }
                 // The renderer stops as the cast ends, as it would otherwise
-                // go on with a file no longer served.
-                let _ = upnp::stop(&renderer);
+                // go on with a file no longer served; a Chromecast's session
+                // stops itself.
+                if let discovery::Kind::Dlna(dlna) = &renderer.kind {
+                    let _ = upnp::stop(dlna);
+                }
             })
             .ok();
         Session {
@@ -149,12 +155,23 @@ fn run(
     let (_served, url, mime) = match media {
         Media::File(path) => {
             let mime = serve::mime(&path);
-            let ip = serve::address_toward(renderer.host()).map_err(failed)?;
+            let ip = serve::address_toward(&renderer.host()).map_err(failed)?;
             let served = serve::serve(path, mime, ip).map_err(failed)?;
             let url = served.url().to_owned();
             (Some(served), url, mime)
         }
-        Media::Url(url) => (None, url, "video/mp4"),
+        Media::Url(url) => {
+            let mime = stream_mime(&url);
+            (None, url, mime)
+        }
+    };
+    let renderer = match &renderer.kind {
+        discovery::Kind::Dlna(dlna) => dlna,
+        discovery::Kind::Chromecast(address) => {
+            return castv2::run(
+                *address, &url, mime, title, start, volume, &commands, events,
+            );
+        }
     };
     let metadata = upnp::metadata(&url, title, mime);
     // A renderer playing something else stops first, as some refuse a new
@@ -182,7 +199,7 @@ fn run(
                     Command::Volume(volume) => upnp::set_volume(renderer, volume),
                 };
                 if let Err(error) = done {
-                    eprintln!("plaa: the renderer {}: {error}", renderer.name);
+                    eprintln!("plaa: the renderer: {error}");
                 }
                 continue;
             }
@@ -209,5 +226,36 @@ fn run(
             events(Event::Ended);
             return Ok(());
         }
+    }
+}
+
+/// The type of a stream at `url`, by its address: HLS's and DASH's
+/// playlists, else MP4, which renderers take for most streams.
+fn stream_mime(url: &str) -> &'static str {
+    let path = url.split(['?', '#']).next().unwrap_or(url).to_lowercase();
+    if path.ends_with(".m3u8") {
+        "application/x-mpegurl"
+    } else if path.ends_with(".mpd") {
+        "application/dash+xml"
+    } else {
+        "video/mp4"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn streams_are_typed_by_their_address() {
+        assert_eq!(
+            stream_mime("https://a.example/live/index.m3u8?token=1"),
+            "application/x-mpegurl"
+        );
+        assert_eq!(
+            stream_mime("http://a.example/manifest.MPD"),
+            "application/dash+xml"
+        );
+        assert_eq!(stream_mime("rtsp://camera/stream"), "video/mp4");
     }
 }

@@ -542,7 +542,7 @@ agent-ask-body = { $agent } asks to use “{ $tool }”. Settings chooses what p
 ## Casting to a TV or speaker on the network
 
 cast-looking = Looking for TVs and speakers…
-cast-none = No TV or speaker that plays DLNA was found.
+cast-none = No TV, speaker or Chromecast was found.
 # $renderer is the TV's or speaker's name.
 cast-stop = Stop playing on { $renderer }
 notice-casting = Playing on { $renderer }.

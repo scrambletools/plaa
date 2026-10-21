@@ -4021,6 +4021,8 @@ name = "plaa-cast"
 version = "0.1.0"
 dependencies = [
  "roxmltree",
+ "rustls",
+ "serde_json",
 ]
 
 [[package]]

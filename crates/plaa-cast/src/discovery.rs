@@ -1,6 +1,7 @@
 //! Finding the renderers on the network: an SSDP search for UPnP media
 //! renderers, then each one's description, for its name and where its
-//! AVTransport and RenderingControl services take their calls.
+//! AVTransport and RenderingControl services take their calls; and, at
+//! the same time, an mDNS question for Chromecasts.
 
 use std::collections::BTreeSet;
 use std::io;
@@ -18,16 +19,30 @@ const RENDERER: &str = "urn:schemas-upnp-org:device:MediaRenderer:1";
 const AV_TRANSPORT: &str = "urn:schemas-upnp-org:service:AVTransport";
 const RENDERING_CONTROL: &str = "urn:schemas-upnp-org:service:RenderingControl";
 
-/// A renderer that can play what plaa sends it: a TV, a speaker, or a
-/// program such as Kodi.
+/// A renderer that can play what plaa sends it: a TV, a speaker, a
+/// program such as Kodi, or a Chromecast.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Renderer {
     /// Its name, as it gives it.
     pub name: String,
-    /// Its unique device name, which stays as it moves.
+    /// Its unique device name or Chromecast id, which stays as it moves.
     pub id: String,
-    pub(crate) av_transport: Service,
-    pub(crate) rendering_control: Option<Service>,
+    pub(crate) kind: Kind,
+}
+
+/// How plaa talks to a renderer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Kind {
+    Dlna(Dlna),
+    /// A Chromecast's CASTV2 address.
+    Chromecast(SocketAddr),
+}
+
+/// A DLNA renderer's services.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Dlna {
+    pub av_transport: Service,
+    pub rendering_control: Option<Service>,
 }
 
 /// A service of a renderer: its type, with its version, and where it takes
@@ -41,13 +56,33 @@ pub(crate) struct Service {
 impl Renderer {
     /// The renderer's network address, which a server for it listens on
     /// the computer's own address toward.
-    pub(crate) fn host(&self) -> &str {
-        &self.av_transport.control.host
+    pub(crate) fn host(&self) -> String {
+        match &self.kind {
+            Kind::Dlna(dlna) => dlna.av_transport.control.host.clone(),
+            Kind::Chromecast(address) => address.ip().to_string(),
+        }
     }
 }
 
-/// Searches for renderers for `wait`, and reads each one's description.
+/// Looks for renderers for `wait`: DLNA ones by SSDP, each one's
+/// description read, and Chromecasts by mDNS, side by side.
 pub fn discover(wait: Duration) -> io::Result<Vec<Renderer>> {
+    let chromecasts = std::thread::spawn(move || crate::mdns::discover(wait));
+    let mut found = discover_dlna(wait)?;
+    if let Ok(Ok(devices)) = chromecasts.join() {
+        found.extend(devices.into_iter().map(|device| Renderer {
+            name: device.name,
+            id: device.id,
+            kind: Kind::Chromecast(device.address),
+        }));
+    }
+    found.sort_by_key(|renderer| renderer.name.to_lowercase());
+    Ok(found)
+}
+
+/// Searches for DLNA renderers for `wait`, and reads each one's
+/// description.
+fn discover_dlna(wait: Duration) -> io::Result<Vec<Renderer>> {
     let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0))?;
     socket.set_multicast_ttl_v4(2)?;
     let search = format!(
@@ -166,8 +201,10 @@ pub(crate) fn parse_description(url: &Url, text: &str) -> Option<Renderer> {
             Some(Renderer {
                 name: child_text(device, "friendlyName").unwrap_or_else(|| url.host.clone()),
                 id: child_text(device, "UDN").unwrap_or_else(|| url.to_string()),
-                av_transport: find(AV_TRANSPORT)?,
-                rendering_control: find(RENDERING_CONTROL),
+                kind: Kind::Dlna(Dlna {
+                    av_transport: find(AV_TRANSPORT)?,
+                    rendering_control: find(RENDERING_CONTROL),
+                }),
             })
         })
 }
@@ -223,15 +260,18 @@ mod tests {
         let renderer = parse_description(&url, description).unwrap();
         assert_eq!(renderer.name, "Kitchen - Sonos One Media Renderer");
         assert_eq!(renderer.id, "uuid:RINCON_1_MR");
+        assert_eq!(renderer.host(), "10.0.0.5");
+        let Kind::Dlna(dlna) = renderer.kind else {
+            panic!("a DLNA renderer");
+        };
         assert_eq!(
-            renderer.av_transport.control.to_string(),
+            dlna.av_transport.control.to_string(),
             "http://10.0.0.5:1400/xml/MediaRenderer/AVTransport/Control"
         );
         assert_eq!(
-            renderer.rendering_control.as_ref().unwrap().control.path,
+            dlna.rendering_control.unwrap().control.path,
             "/MediaRenderer/RenderingControl/Control"
         );
-        assert_eq!(renderer.host(), "10.0.0.5");
         // A device with no AVTransport is no renderer.
         let server = description.replace("AVTransport", "ContentDirectory");
         assert!(parse_description(&url, &server).is_none());

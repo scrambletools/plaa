@@ -4,7 +4,7 @@
 
 use std::io;
 
-use crate::discovery::{Renderer, Service};
+use crate::discovery::{Dlna, Service};
 use crate::http;
 
 /// What the renderer is doing, as AVTransport says.
@@ -109,7 +109,7 @@ pub(crate) fn metadata(url: &str, title: &str, mime: &str) -> String {
     )
 }
 
-pub(crate) fn set_uri(renderer: &Renderer, url: &str, metadata: &str) -> io::Result<()> {
+pub(crate) fn set_uri(renderer: &Dlna, url: &str, metadata: &str) -> io::Result<()> {
     call(
         &renderer.av_transport,
         "SetAVTransportURI",
@@ -122,7 +122,7 @@ pub(crate) fn set_uri(renderer: &Renderer, url: &str, metadata: &str) -> io::Res
     .map(drop)
 }
 
-pub(crate) fn play(renderer: &Renderer) -> io::Result<()> {
+pub(crate) fn play(renderer: &Dlna) -> io::Result<()> {
     call(
         &renderer.av_transport,
         "Play",
@@ -131,15 +131,15 @@ pub(crate) fn play(renderer: &Renderer) -> io::Result<()> {
     .map(drop)
 }
 
-pub(crate) fn pause(renderer: &Renderer) -> io::Result<()> {
+pub(crate) fn pause(renderer: &Dlna) -> io::Result<()> {
     call(&renderer.av_transport, "Pause", &[instance()]).map(drop)
 }
 
-pub(crate) fn stop(renderer: &Renderer) -> io::Result<()> {
+pub(crate) fn stop(renderer: &Dlna) -> io::Result<()> {
     call(&renderer.av_transport, "Stop", &[instance()]).map(drop)
 }
 
-pub(crate) fn seek(renderer: &Renderer, seconds: f64) -> io::Result<()> {
+pub(crate) fn seek(renderer: &Dlna, seconds: f64) -> io::Result<()> {
     call(
         &renderer.av_transport,
         "Seek",
@@ -154,7 +154,7 @@ pub(crate) fn seek(renderer: &Renderer, seconds: f64) -> io::Result<()> {
 
 /// Where the renderer is in the media, and how long the media is, in
 /// seconds, where it says.
-pub(crate) fn position(renderer: &Renderer) -> io::Result<(Option<f64>, Option<f64>)> {
+pub(crate) fn position(renderer: &Dlna) -> io::Result<(Option<f64>, Option<f64>)> {
     let answer = call(&renderer.av_transport, "GetPositionInfo", &[instance()])?;
     Ok((
         value(&answer, "RelTime").as_deref().and_then(seconds),
@@ -162,7 +162,7 @@ pub(crate) fn position(renderer: &Renderer) -> io::Result<(Option<f64>, Option<f
     ))
 }
 
-pub(crate) fn state(renderer: &Renderer) -> io::Result<State> {
+pub(crate) fn state(renderer: &Dlna) -> io::Result<State> {
     let answer = call(&renderer.av_transport, "GetTransportInfo", &[instance()])?;
     Ok(State::parse(
         &value(&answer, "CurrentTransportState").unwrap_or_default(),
@@ -170,7 +170,7 @@ pub(crate) fn state(renderer: &Renderer) -> io::Result<State> {
 }
 
 /// Sets the renderer's volume, 0 to 100, where it has RenderingControl.
-pub(crate) fn set_volume(renderer: &Renderer, volume: u8) -> io::Result<()> {
+pub(crate) fn set_volume(renderer: &Dlna, volume: u8) -> io::Result<()> {
     let Some(service) = &renderer.rendering_control else {
         return Ok(());
     };
