@@ -1802,7 +1802,9 @@ fn check_ended(shared: &Shared) -> bool {
     if state.ended {
         return true;
     }
-    if !state.read_all || state.info.is_none() {
+    // A seek asked for and not yet made, as playing again from the end
+    // makes, leaves what was read there until it is: not the end.
+    if !state.read_all || state.info.is_none() || shared.seeks.load(Ordering::Relaxed) > 0 {
         return false;
     }
     let video_done = !state.has_video || {
