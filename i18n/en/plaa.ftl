@@ -75,6 +75,7 @@ action-quality = Quality
 action-visualizer = Visualizer
 action-network = Network Audio
 action-cast = Cast
+action-assistant = Assistant
 
 ## What a sound file shows under its cover
 
@@ -169,6 +170,7 @@ settings-tab-playback = Playback
 settings-tab-network = Network
 settings-tab-language = Language
 settings-tab-agents = Agents
+settings-tab-assistant = Assistant
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (dev build, { $build })
 settings-choose = Choose…
@@ -546,3 +548,95 @@ cast-stop = Stop playing on { $renderer }
 notice-casting = Playing on { $renderer }.
 notice-cast-failed = Could not play on { $renderer }: { $reason }
 cast-web-page = Web pages cannot be cast yet: open the video's own address instead.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Add a model…
+assistant-add-model = The assistant needs a model: a cloud model with its API key, or a local model.
+assistant-ask = Ask about what plays
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = The chat was getting too long for { $model } to read at once, so its earlier part was summarized. The assistant may look again at what it saw.
+assistant-compacting = Summarizing the earlier chat
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } on this computer
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } at { $host }
+assistant-new-chat = New chat
+assistant-no-model = Add a model in Settings first.
+assistant-open-settings = Add a model
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = The conversation no longer fits in what { $model } can read at once. Start a new chat, or choose a model that can read more.
+assistant-problem-credit = { $provider } says the account has no credit. A new account needs some bought on { $provider }'s site before its key works; then try again.
+assistant-problem-key = { $provider } turned down the API key. Check it in Settings.
+assistant-problem-model = { $provider } has no model named { $model }. Check its name in Settings.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } did not answer: { $message }
+assistant-problem-rate = { $provider } asks to slow down. Try again in a moment.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } asks to slow down: { $message }
+assistant-problem-refused = { $model } declined to answer.
+assistant-problem-unavailable = { $provider } is busy or having trouble. Try again in a moment.
+assistant-problem-unreachable = plaa could not reach { $provider }. Check your connection, or that the server is running.
+assistant-running = Running…
+assistant-send = Send
+assistant-shortened = The chat was too long for { $model } to read at once, so earlier tool results were left out. The assistant may look again at what it saw.
+assistant-stop = Stop
+assistant-stopped = Stopped.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Now talking to { $model }.
+assistant-thinking = Thinking…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Thoughts
+assistant-title = Assistant
+settings-assistant-add = Add a model
+settings-assistant-add-button = Add
+# $model is the model's name.
+settings-assistant-added = { $model } answered and is added.
+settings-assistant-added-tag = Added
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Address, such as { $example }
+settings-assistant-change-key = Change key
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = OpenAI-compatible server
+# The menu of how much a local model reads at once.
+settings-assistant-context = Context
+settings-assistant-context-note = More lets the assistant keep more of a chat in mind, but the model takes more memory and may answer more slowly.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K tokens
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Open the page
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } is running at { $address }.
+settings-assistant-found-none = { $provider } has no models yet. Download one with it, then look again.
+settings-assistant-get-key = Get an API key
+settings-assistant-get-server = Get { $provider }
+settings-assistant-in-use = In use
+settings-assistant-key = API key
+# $error is what the keychain said.
+settings-assistant-key-failed = The key could not be kept in the keychain: { $error }
+settings-assistant-key-kept = Your { $provider } key is kept in the system's keychain.
+settings-assistant-key-needed = This model needs an API key.
+settings-assistant-key-refused = { $provider } turned down this key. Check that it was copied whole, from the right account.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Make a key on { $provider }'s site and paste it here.
+settings-assistant-look-again = Look again
+settings-assistant-looking = Looking for models…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Model, such as { $example }
+settings-assistant-no-server = plaa found no { $provider } running on this computer. Start it, or give its address below.
+settings-assistant-no-tools = Can't use tools, which the assistant needs
+settings-assistant-none = No models yet. Add one below: a local model, such as Ollama's, stays on this computer; a cloud model needs an API key from its provider.
+settings-assistant-note = The models the assistant panel can talk to. Keys are kept in the system's keychain.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Use another address
+settings-assistant-recommended = Recommended
+settings-assistant-remove = Remove
+settings-assistant-sees = Sees pictures
+settings-assistant-trying = Trying…
+settings-assistant-use = Use
+settings-assistant-use-key = Continue
+settings-assistant-uses-tools = Uses tools

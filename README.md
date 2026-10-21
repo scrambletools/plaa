@@ -154,6 +154,12 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   left for Arabic, Hebrew, Persian and Urdu.
 - **One window per file** and one running plaa: files opened again, from
   the file manager or the command line, go to the running one.
+- **An assistant beside what plays**: ask about it in a chat panel, and
+  the assistant looks with plaa's own tools, at the status, the file's
+  streams or the picture shown, and plays, pauses, seeks or changes the
+  sound for you. Use a local model that stays on your computer, such as
+  Ollama's, or a cloud model from Anthropic, OpenAI or Google with your
+  own key, kept in the system's keychain.
 - **AI agents**: `plaa --mcp` serves plaa's tools over MCP, so Claude
   Code or a local model in an MCP client can see what plays in the plaa
   you are using, and play, pause, seek, loop, change the volume and
@@ -163,8 +169,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-AVB Lite, casting to Chromecast, and the assistant panel. The
-[plan](docs/PLAN.md) has the order.
+AVB Lite and casting to Chromecast. The [plan](docs/PLAN.md) has the
+order.
 
 ## Packages
 

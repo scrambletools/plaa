@@ -22,6 +22,7 @@ pub enum SettingsTab {
     Network,
     Language,
     Agents,
+    Assistant,
 }
 
 /// The folders Settings chooses.
@@ -67,6 +68,8 @@ pub enum SettingsMessage {
     /// The allowed agents are asked about again.
     ForgetAgents,
     AskBefore(crate::app::tools::Kind, bool),
+    /// What the Assistant tab asks of the models.
+    Model(crate::app::assistant::ModelMessage),
 }
 
 /// The colors offered when the system's accent is not used.
@@ -98,6 +101,8 @@ pub fn chosen_accent(settings: &Settings) -> Color {
 
 /// How tall the dialog is at most, so it keeps one height across tabs.
 const DIALOG_HEIGHT: f32 = 640.0;
+/// How wide it is, room for its six tabs.
+const DIALOG_WIDTH: f32 = 600.0;
 
 fn note<'a>(text: String) -> Element<'a, SettingsMessage> {
     scramble_ui::aligned(
@@ -229,6 +234,7 @@ impl Plaa {
             tab(crate::fl!("settings-tab-network"), SettingsTab::Network),
             tab(crate::fl!("settings-tab-language"), SettingsTab::Language),
             tab(crate::fl!("settings-tab-agents"), SettingsTab::Agents),
+            tab(crate::fl!("settings-tab-assistant"), SettingsTab::Assistant),
         ]);
         let header = column![
             row![
@@ -251,6 +257,7 @@ impl Plaa {
             SettingsTab::Network => self.network_settings(),
             SettingsTab::Language => self.language_settings(),
             SettingsTab::Agents => self.agent_settings(),
+            SettingsTab::Assistant => self.assistant_settings(),
         };
         if let Some(error) = &self.settings_error {
             content = content.push(scramble_ui::aligned(
@@ -309,7 +316,7 @@ impl Plaa {
             .height(Fill),
             footer,
         ])
-        .width(Length::Fixed(520.0))
+        .width(Length::Fixed(DIALOG_WIDTH))
         .height(Length::Fixed(height))
         .style(style::dialog);
         // A click on the dimmed window around the dialog closes it.
@@ -734,6 +741,450 @@ impl Plaa {
         content.push(asks)
     }
 
+    /// The models the assistant panel can use, and adding one.
+    fn assistant_settings(&self) -> iced::widget::Column<'_, SettingsMessage> {
+        use crate::app::assistant::{
+            ContextSize, Found, ModelMessage, ProviderChoice, choice_of, context_sizes,
+            provider_label, shown_name,
+        };
+        let send = |message: ModelMessage| SettingsMessage::Model(message);
+        let note = |text: String| {
+            scramble_ui::aligned(
+                scramble_ui::styled(text, Type::BodyMedium).style(style::on_surface_variant),
+            )
+        };
+        let small = |text: String| {
+            scramble_ui::aligned(
+                scramble_ui::styled(text, Type::BodySmall).style(style::on_surface_variant),
+            )
+        };
+        let context_menu = |size: u32, on_pick: Box<dyn Fn(ContextSize) -> SettingsMessage>| {
+            scramble_ui::dropdown::pick(context_sizes(), Some(ContextSize(size)), on_pick)
+                .size(button::Size::ExtraSmall)
+        };
+        let mut models = column![note(crate::fl!("settings-assistant-note"))].spacing(8);
+        if self.settings.assistant_models.is_empty() {
+            models = models.push(note(crate::fl!("settings-assistant-none")));
+        }
+        for model in &self.settings.assistant_models {
+            let used = self.settings.assistant_model.as_deref() == Some(model.id.as_str());
+            let choice = choice_of(model);
+            let provider = choice.as_ref().map_or_else(
+                || model.provider.clone(),
+                |choice| provider_label(choice.provider),
+            );
+            let detail = match &model.address {
+                Some(address) => format!("{provider} · {address}"),
+                None => provider,
+            };
+            let context: Element<'_, SettingsMessage> = match &choice {
+                Some(choice) if choice.provider.sets_context() => {
+                    let id = model.id.clone();
+                    component::tip(
+                        context_menu(
+                            model.context.unwrap_or(plaa_assist::DEFAULT_CONTEXT),
+                            Box::new(move |size| send(ModelMessage::Context(id.clone(), size))),
+                        ),
+                        crate::fl!("settings-assistant-context"),
+                    )
+                }
+                _ => space().into(),
+            };
+            let action: Element<'_, SettingsMessage> = if used {
+                scramble_ui::styled(crate::fl!("settings-assistant-in-use"), Type::LabelLarge)
+                    .style(style::on_surface_variant)
+                    .into()
+            } else {
+                scramble_ui::button(Kind::Text, crate::fl!("settings-assistant-use"))
+                    .on_press(send(ModelMessage::Use(model.id.clone())))
+                    .into()
+            };
+            // One width, so the context menus line up.
+            let action = container(action)
+                .width(72)
+                .align_x(iced::alignment::Horizontal::Center);
+            models = models.push(
+                row![
+                    column![
+                        scramble_ui::styled(shown_name(model), Type::BodyLarge),
+                        scramble_ui::styled(detail, Type::BodyMedium)
+                            .style(style::on_surface_variant),
+                    ]
+                    .spacing(2)
+                    .width(Fill),
+                    context,
+                    action,
+                    component::tip(
+                        scramble_ui::icon_button(Icon::Delete)
+                            .on_press(send(ModelMessage::Remove(model.id.clone()))),
+                        crate::fl!("settings-assistant-remove")
+                    ),
+                ]
+                .spacing(8)
+                .align_y(Center),
+            );
+        }
+
+        let form = &self.model_form;
+        let provider = form.provider;
+        let label = provider_label(provider);
+        let provider_menu = scramble_ui::dropdown::pick(
+            plaa_assist::Provider::ALL.map(ProviderChoice),
+            Some(ProviderChoice(provider)),
+            |choice| SettingsMessage::Model(ModelMessage::Provider(choice)),
+        )
+        .width(Fill);
+        let mut add = column![
+            component::section(crate::fl!("settings-assistant-add")),
+            provider_menu,
+        ]
+        .spacing(12);
+
+        // How plaa reaches the provider: its key, or its server.
+        if provider.needs_key() {
+            if form.asks_for_key() {
+                add = add.push(
+                    row![
+                        container(component::text_field(
+                            crate::fl!("settings-assistant-key"),
+                            &form.key,
+                            Backdrop::ContainerHigh,
+                            |input| {
+                                input
+                                    .secure(true)
+                                    .on_input(move |key| send(ModelMessage::Key(key)))
+                                    .on_submit(send(ModelMessage::UseKey))
+                            },
+                        ))
+                        .width(Fill),
+                        component::beside_field(
+                            scramble_ui::button(
+                                Kind::Filled,
+                                crate::fl!("settings-assistant-use-key")
+                            )
+                            .on_press(send(ModelMessage::UseKey))
+                        ),
+                    ]
+                    .spacing(8)
+                    .align_y(Center),
+                );
+                if let Some(page) = plaa_assist::key_page(provider) {
+                    add = add.push(
+                        row![
+                            container(small(crate::fl!(
+                                "settings-assistant-key-where",
+                                provider = label.clone()
+                            )))
+                            .width(Fill),
+                            scramble_ui::button(
+                                Kind::Text,
+                                crate::fl!("settings-assistant-get-key")
+                            )
+                            .on_press(send(ModelMessage::OpenLink(page))),
+                        ]
+                        .spacing(8)
+                        .align_y(Center),
+                    );
+                }
+            } else if form.key_kept == Some(true) {
+                add = add.push(
+                    row![
+                        container(note(crate::fl!(
+                            "settings-assistant-key-kept",
+                            provider = label.clone()
+                        )))
+                        .width(Fill),
+                        scramble_ui::button(
+                            Kind::Text,
+                            crate::fl!("settings-assistant-change-key")
+                        )
+                        .on_press(send(ModelMessage::ChangeKey)),
+                    ]
+                    .spacing(8)
+                    .align_y(Center),
+                );
+            }
+        } else {
+            // The address field shows when no server answered, or one was
+            // found at the address typed; it has its own Look again.
+            let found = matches!(form.found, Found::Models(..) | Found::Looking);
+            let field_shown = !(found && form.address.is_empty()) || form.other_address;
+            let server: Element<'_, SettingsMessage> = match &form.found {
+                Found::Models(Some(address), _) => {
+                    let mut line = row![
+                        container(small(crate::fl!(
+                            "settings-assistant-found-at",
+                            provider = label.clone(),
+                            // Without the scheme, which would wrap alone.
+                            address = address
+                                .split_once("://")
+                                .map_or(address.as_str(), |(_, rest)| rest)
+                                .to_owned()
+                        )))
+                        .width(Fill),
+                    ]
+                    .spacing(8)
+                    .align_y(Center);
+                    if !field_shown {
+                        line = line
+                            .push(
+                                scramble_ui::button(
+                                    Kind::Text,
+                                    crate::fl!("settings-assistant-other-address"),
+                                )
+                                .on_press(send(ModelMessage::OtherAddress)),
+                            )
+                            .push(
+                                scramble_ui::button(
+                                    Kind::Text,
+                                    crate::fl!("settings-assistant-look-again"),
+                                )
+                                .on_press(send(ModelMessage::Search)),
+                            );
+                    }
+                    line.into()
+                }
+                Found::NoServer => {
+                    let mut lines = column![note(crate::fl!(
+                        "settings-assistant-no-server",
+                        provider = label.clone()
+                    ))]
+                    .spacing(8);
+                    if let Some(page) = plaa_assist::server_page(provider) {
+                        lines = lines.push(
+                            scramble_ui::button(
+                                Kind::Tonal,
+                                crate::fl!(
+                                    "settings-assistant-get-server",
+                                    provider = label.clone()
+                                ),
+                            )
+                            .on_press(send(ModelMessage::OpenLink(page))),
+                        );
+                    }
+                    lines.into()
+                }
+                _ => space().into(),
+            };
+            add = add.push(server);
+            if field_shown {
+                add = add.push(
+                    row![
+                        container(component::text_field(
+                            crate::fl!(
+                                "settings-assistant-address",
+                                example = provider.default_address().unwrap_or_default()
+                            ),
+                            &form.address,
+                            Backdrop::ContainerHigh,
+                            |input| {
+                                input
+                                    .on_input(move |address| send(ModelMessage::Address(address)))
+                                    .on_submit(send(ModelMessage::Search))
+                            },
+                        ))
+                        .width(Fill),
+                        component::beside_field(
+                            scramble_ui::button(
+                                Kind::Text,
+                                crate::fl!("settings-assistant-look-again")
+                            )
+                            .on_press_maybe(
+                                (!matches!(form.found, Found::Looking))
+                                    .then_some(send(ModelMessage::Search)),
+                            )
+                        ),
+                    ]
+                    .spacing(8)
+                    .align_y(Center),
+                );
+            }
+        }
+        if provider.sets_context() && matches!(form.found, Found::Models(..)) {
+            add = add.push(
+                column![
+                    row![
+                        container(scramble_ui::aligned(scramble_ui::styled(
+                            crate::fl!("settings-assistant-context"),
+                            Type::BodyLarge
+                        )))
+                        .width(Fill),
+                        context_menu(
+                            form.context,
+                            Box::new(move |size| send(ModelMessage::FormContext(size))),
+                        ),
+                    ]
+                    .spacing(8)
+                    .align_y(Center),
+                    small(crate::fl!("settings-assistant-context-note")),
+                ]
+                .spacing(4),
+            );
+        }
+
+        // The models found, to add with one click.
+        match &form.found {
+            Found::Looking => add = add.push(note(crate::fl!("settings-assistant-looking"))),
+            Found::Failed(problem) => {
+                add = add.push(scramble_ui::aligned(
+                    scramble_ui::styled(problem.clone(), Type::BodyMedium).style(style::error_text),
+                ));
+            }
+            Found::Models(address, found) => {
+                if found.is_empty() {
+                    add = add.push(note(crate::fl!(
+                        "settings-assistant-found-none",
+                        provider = label.clone()
+                    )));
+                }
+                for info in found {
+                    // Ollama answers to a name with or without `:latest`.
+                    let bare = info.id.strip_suffix(":latest").unwrap_or(&info.id);
+                    let added = self.settings.assistant_models.iter().any(|model| {
+                        let saved = model.model.strip_suffix(":latest").unwrap_or(&model.model);
+                        saved == bare
+                            && choice_of(model).is_some_and(|choice| choice.provider == provider)
+                            && (model.address == *address
+                                || model.address.is_none()
+                                    && address.as_deref() == provider.default_address())
+                    });
+                    let mut tags = Vec::new();
+                    if info.recommended {
+                        tags.push(crate::fl!("settings-assistant-recommended"));
+                    }
+                    match info.tools {
+                        Some(false) => tags.push(crate::fl!("settings-assistant-no-tools")),
+                        Some(true) if !provider.needs_key() => {
+                            tags.push(crate::fl!("settings-assistant-uses-tools"));
+                        }
+                        _ => {}
+                    }
+                    if info.vision == Some(true) && !provider.needs_key() {
+                        tags.push(crate::fl!("settings-assistant-sees"));
+                    }
+                    let mut detail = info.id.clone();
+                    if !tags.is_empty() {
+                        detail = format!("{detail} · {}", tags.join(" · "));
+                    }
+                    let usable = info.tools != Some(false);
+                    let button: Element<'_, SettingsMessage> = if added {
+                        scramble_ui::styled(
+                            crate::fl!("settings-assistant-added-tag"),
+                            Type::LabelLarge,
+                        )
+                        .style(style::on_surface_variant)
+                        .into()
+                    } else if form.adding.as_deref() == Some(info.id.as_str()) {
+                        scramble_ui::styled(
+                            crate::fl!("settings-assistant-trying"),
+                            Type::LabelLarge,
+                        )
+                        .style(style::on_surface_variant)
+                        .into()
+                    } else {
+                        scramble_ui::button(
+                            Kind::Tonal,
+                            crate::fl!("settings-assistant-add-button"),
+                        )
+                        .on_press_maybe(
+                            (usable && form.adding.is_none())
+                                .then(|| send(ModelMessage::Add(info.id.clone()))),
+                        )
+                        .into()
+                    };
+                    let name = scramble_ui::styled(info.name.clone(), Type::BodyLarge);
+                    let name = if usable {
+                        name
+                    } else {
+                        name.style(style::on_surface_variant)
+                    };
+                    add = add.push(
+                        row![column![name, small(detail)].spacing(2).width(Fill), button,]
+                            .spacing(8)
+                            .align_y(Center),
+                    );
+                    // Why its trial failed, on the row tried.
+                    if let Some((_, why, help)) =
+                        form.failed.as_ref().filter(|(id, ..)| *id == info.id)
+                    {
+                        let mut line = row![
+                            container(scramble_ui::aligned(
+                                scramble_ui::styled(why.clone(), Type::BodySmall)
+                                    .style(style::error_text)
+                                    .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+                            ))
+                            .width(Fill)
+                        ]
+                        .spacing(8)
+                        .align_y(Center);
+                        if let Some(page) = help {
+                            line = line.push(
+                                scramble_ui::button(
+                                    Kind::Text,
+                                    crate::fl!("settings-assistant-fix-it"),
+                                )
+                                .on_press(send(ModelMessage::OpenLink(page))),
+                            );
+                        }
+                        add = add.push(line);
+                    }
+                }
+            }
+            Found::Nothing | Found::NoServer => {}
+        }
+
+        // A model the provider does not list, by its name.
+        let reachable = match &form.found {
+            Found::Models(..) => true,
+            Found::NoServer | Found::Looking => false,
+            Found::Nothing | Found::Failed(_) => {
+                !provider.needs_key() || form.key_kept == Some(true)
+            }
+        };
+        if reachable {
+            add = add.push(
+                row![
+                    container(component::text_field(
+                        crate::fl!(
+                            "settings-assistant-model",
+                            example = plaa_assist::example_model(provider)
+                        ),
+                        &form.typed,
+                        Backdrop::ContainerHigh,
+                        |input| {
+                            input
+                                .on_input(move |name| send(ModelMessage::Typed(name)))
+                                .on_submit(send(ModelMessage::Add(form.typed.clone())))
+                        },
+                    ))
+                    .width(Fill),
+                    component::beside_field(
+                        scramble_ui::button(
+                            Kind::Text,
+                            crate::fl!("settings-assistant-add-button")
+                        )
+                        .on_press_maybe(
+                            (!form.typed.trim().is_empty() && form.adding.is_none())
+                                .then(|| send(ModelMessage::Add(form.typed.clone()))),
+                        )
+                    ),
+                ]
+                .spacing(8)
+                .align_y(Center),
+            );
+        }
+        match &form.status {
+            Some(Ok(done)) => add = add.push(note(done.clone())),
+            Some(Err(problem)) => {
+                add = add.push(scramble_ui::aligned(
+                    scramble_ui::styled(problem.clone(), Type::BodyMedium).style(style::error_text),
+                ));
+            }
+            None => {}
+        }
+        column![models, add].spacing(20)
+    }
+
     pub(crate) fn settings_update(&mut self, message: SettingsMessage) -> Task<Message> {
         match message {
             SettingsMessage::Close(id) => {
@@ -744,8 +1195,9 @@ impl Plaa {
             }
             SettingsMessage::Tab(tab) => {
                 self.settings_tab = tab;
-                return Task::none();
+                return self.assistant_tab_shown();
             }
+            SettingsMessage::Model(message) => return self.model_settings(message),
             SettingsMessage::Appearance(appearance) => {
                 self.settings.appearance = appearance;
                 self.refresh_theme();

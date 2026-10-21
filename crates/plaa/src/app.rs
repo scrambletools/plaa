@@ -28,6 +28,7 @@ use crate::window::{
 };
 
 mod agents;
+pub(crate) mod assistant;
 mod avb;
 mod cast;
 mod edits;
@@ -138,6 +139,8 @@ pub struct Plaa {
     cast_looking: bool,
     /// Counts the casts, to tell a cast's events from an earlier one's.
     next_cast: u64,
+    /// The model being added in Settings' Assistant tab.
+    pub(crate) model_form: assistant::ModelForm,
     next_surface: u64,
 }
 
@@ -208,6 +211,8 @@ pub(crate) struct Window {
     /// fills; zero in full screen.
     #[cfg(target_os = "macos")]
     title_bar: f32,
+    /// The assistant's chat beside the window, kept while it is closed.
+    assistant: Option<assistant::Panel>,
 }
 
 enum Content {
@@ -289,6 +294,9 @@ pub enum Message {
     AgentPromptReady,
     /// A tool's answer, once what it waited on is done.
     ToolAnswer(tools::Answer, Result<tools::Output, crate::control::Error>),
+    /// What a window's assistant panel asks for.
+    Assistant(window::Id, assistant::PanelMessage),
+    ToggleAssistant(window::Id),
 }
 
 fn window_icon() -> Option<window::Icon> {
@@ -375,6 +383,7 @@ impl Plaa {
             renderers: None,
             cast_looking: false,
             next_cast: 0,
+            model_form: assistant::ModelForm::default(),
             next_surface: 1,
         };
         plaa.apply_looks();
@@ -717,6 +726,7 @@ impl Plaa {
                 export: None,
                 exporting: None,
                 closing: None,
+                assistant: None,
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
                 surface: None,
                 #[cfg(target_os = "macos")]
@@ -1152,6 +1162,9 @@ impl Plaa {
                 Task::none()
             }
             Message::External(External::Control(call)) => self.control_call(call),
+            Message::Assistant(id, message) => self.panel_update(id, message),
+            Message::ToggleAssistant(id) => self.toggle_assistant(id),
+            Message::External(External::Assistant(id, heard)) => self.panel_heard(id, heard),
             Message::External(External::CastFound(found)) => {
                 self.renderers_found(found);
                 Task::none()
@@ -1896,6 +1909,7 @@ impl Plaa {
             return Task::none();
         }
         match control {
+            Control::ToggleAssistant => return self.toggle_assistant(id),
             Control::CastTo(renderer) => return self.cast_to(id, &renderer),
             Control::StopCasting => return self.stop_casting(id),
             Control::Menu(Menu::Cast, true) => self.look_for_renderers(),
@@ -2198,6 +2212,7 @@ impl Plaa {
                     close_button,
                     avb: self.avb.as_ref().map(|_| self.avb_snapshot.clone()),
                     renderers: self.renderers.clone(),
+                    assistant_open: window.assistant.as_ref().is_some_and(|panel| panel.open),
                 },
             )
             .map(move |control| Message::Control(id, control)),
@@ -2277,6 +2292,11 @@ impl Plaa {
             .into()
         } else {
             body
+        };
+        // The assistant's panel beside what plays, when open.
+        let body: Element<'_, Message> = match self.panel_view(id) {
+            Some(panel) => iced::widget::row![body, panel].into(),
+            None => body,
         };
         let prompt = self.agent_prompt(id).unwrap_or_else(full);
         scramble_ui::smooth::smooth(stack![

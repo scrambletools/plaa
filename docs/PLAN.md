@@ -94,8 +94,9 @@ trimming and splitting, and Intel Macs.
 7. **AVB and Milan**: the entity and talker, and a controller to connect
    talkers and listeners (done); the listener and AVB Lite next.
 8. **Casting**: DLNA/UPnP renderers (done); Chromecast next.
-9. **Assistant and MCP**: the MCP server, `plaa --mcp`, with prev's
-   consent prompts (done); the assistant panel next.
+9. **Assistant and MCP** (done): the MCP server, `plaa --mcp`, with
+   prev's consent prompts, and the assistant panel, both on one tool
+   registry.
 10. **Release**: packages (made, with installer tests on each system,
     `docs/RELEASING.md`), translations (done, 38 languages), signing,
     the website.
@@ -113,9 +114,10 @@ crates/
   plaa-store/    settings, where files were left off, atomic writes
 ```
 
-Then `plaa-avb` (AVB and Milan) and `plaa-cast` (casting to DLNA and
-UPnP renderers: SSDP to find them, a small HTTP server for the file,
-AVTransport and RenderingControl over SOAP); later `plaa-assist`.
+Then `plaa-avb` (AVB and Milan), `plaa-cast` (casting to DLNA and UPnP
+renderers: SSDP to find them, a small HTTP server for the file,
+AVTransport and RenderingControl over SOAP) and `plaa-assist` (the
+assistant's chats with a language model, through rig, as prev's).
 
 ### Engine
 

@@ -121,6 +121,11 @@ pub struct Settings {
     pub allowed_agents: Vec<String>,
     /// What plaa asks about before an agent's tool runs.
     pub ask_before: AskBefore,
+    /// The models the assistant panel can use. Their keys are in the
+    /// system keychain, not here.
+    pub assistant_models: Vec<AssistantModel>,
+    /// The id of the model the panel uses.
+    pub assistant_model: Option<String>,
     /// How much louder each input is taken, in decibels, by the id the
     /// system gives it; "" for the system's default.
     pub input_gains: BTreeMap<String, f32>,
@@ -173,9 +178,34 @@ impl Default for Settings {
             outside_control: true,
             allowed_agents: Vec::new(),
             ask_before: AskBefore::default(),
+            assistant_models: Vec::new(),
+            assistant_model: None,
             keys: toml::Table::new(),
         }
     }
+}
+
+/// A model the assistant panel can use.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct AssistantModel {
+    /// Names the model's key in the keychain, and the model here.
+    pub id: String,
+    /// `anthropic`, `open-ai`, `gemini`, `ollama` or `open-ai-compatible`.
+    pub provider: String,
+    pub model: String,
+    /// The server's address, for a local or compatible server.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
+    /// How much a local model reads at once, in tokens, when plaa sets it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<u32>,
+    /// The provider's name for the model, when it gives one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Whether the model sees pictures, when the provider said.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vision: Option<bool>,
 }
 
 /// Whether plaa asks before an agent's tool of each kind runs. Nothing

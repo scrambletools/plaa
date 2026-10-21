@@ -11,9 +11,10 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-iced = { version = "0.14", features = ["advanced", "image-without-codecs"] }
+iced = { version = "0.14", features = ["advanced", "image-without-codecs", "markdown"] }
 png = "0.18"
 scramble-ui.workspace = true
+plaa-assist.workspace = true
 plaa-avb.workspace = true
 plaa-cast.workspace = true
 plaa-media.workspace = true
@@ -41,7 +42,7 @@ base64 = "0.22"
 # The file dialogs and screen sharing: the XDG desktop portal on Linux,
 # the system's own dialogs elsewhere, as prev has them.
 [target.'cfg(target_os = "linux")'.dependencies]
-ashpd = { version = "0.13", default-features = false, features = ["async-io", "file_chooser", "screencast"] }
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "file_chooser", "open_uri", "screencast"] }
 # MPRIS, which media keys and panels play and pause through: the same
 # D-Bus library as the portal's.
 zbus = "5"

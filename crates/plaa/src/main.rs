@@ -100,6 +100,8 @@ pub enum External {
     CastFound(Vec<plaa_cast::Renderer>),
     /// What a window's cast, of this generation, tells.
     Cast(iced::window::Id, u64, plaa_cast::Event),
+    /// What a window's assistant chat, or a tool it called, says.
+    Assistant(iced::window::Id, app::assistant::Heard),
 }
 
 static EXTERNAL_EVENTS: Mutex<Option<UnboundedReceiver<External>>> = Mutex::new(None);

@@ -986,7 +986,7 @@ async fn encode(picture: plaa_media::Picture, side: u32) -> Result<Vec<u8>, Erro
 }
 
 /// `picture`, averaged down to fit `side` pixels each way.
-fn shrunk(picture: plaa_media::Picture, side: u32) -> plaa_media::Picture {
+pub(super) fn shrunk(picture: plaa_media::Picture, side: u32) -> plaa_media::Picture {
     let longest = picture.width.max(picture.height);
     if longest <= side || picture.width == 0 || picture.height == 0 {
         return picture;
@@ -1072,6 +1072,80 @@ pub(super) fn list(ask: &AskBefore) -> Value {
         .collect()
 }
 
+/// The tools as the assistant panel's chat gets them.
+fn specs(ask: &AskBefore) -> Vec<plaa_assist::ToolSpec> {
+    list(ask)
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|tool| plaa_assist::ToolSpec {
+            name: tool["name"].as_str().unwrap_or_default().to_owned(),
+            description: tool["description"].as_str().unwrap_or_default().to_owned(),
+            schema: tool["inputSchema"].clone(),
+        })
+        .collect()
+}
+
+/// The tools the assistant gets: the window tools only
+/// when there are windows to choose between, so a model reads fewer tool
+/// definitions on every turn.
+pub(super) fn assistant_specs(app: &Plaa) -> Vec<plaa_assist::ToolSpec> {
+    let several = app.windows.len() > 1;
+    specs(&AskBefore::default())
+        .into_iter()
+        .filter(|tool| several || !matches!(tool.name.as_str(), "list_windows" | "focus_window"))
+        .map(|mut tool| {
+            // With one window, the chat fills in its number itself.
+            if !several && let Some(properties) = tool.schema["properties"].as_object_mut() {
+                properties.remove("window");
+            }
+            tool
+        })
+        .collect()
+}
+
+/// What window `id` plays, for the assistant's instructions: facts that
+/// stay put while a chat goes on, so it need not ask for them first.
+pub(super) fn summary(app: &Plaa, id: window::Id) -> Option<String> {
+    let player = app.windows.get(&id)?.player()?;
+    let kind = match player.info.as_deref() {
+        Some(info) if info.has_video() => "a video",
+        Some(_) => "a sound file",
+        None => "a file still opening",
+    };
+    let length = player
+        .status
+        .duration
+        .map(|duration| format!(", {:.0} seconds long", duration.as_secs_f64()))
+        .unwrap_or_default();
+    Some(format!(
+        "\"{}\" ({}), {kind}{length}",
+        player.title(),
+        source_text(player.source())
+    ))
+}
+
+/// Where window `id` is and how it plays as the user writes, sent with
+/// each of their messages, as it changes while they watch.
+pub(super) fn view_note(app: &Plaa, id: window::Id) -> Option<String> {
+    let player = app.windows.get(&id)?.player()?;
+    let state = status(id, player, false);
+    let position = player.status.position.as_secs_f64();
+    let mut note = format!(
+        "At {position:.1} seconds, {}",
+        state["state"].as_str().unwrap_or("playing")
+    );
+    if let Some(casting) = &player.casting {
+        note.push_str(&format!(", on {}", casting.name));
+    }
+    Some(note)
+}
+
+/// Whether the tool named `name` takes a window number.
+pub(super) fn takes_window(name: &str) -> bool {
+    find(name).is_some_and(|tool| !(tool.schema)()["properties"]["window"].is_null())
+}
+
 /// MCP's hints for clients: what only reads.
 fn annotations(kind: Kind) -> Value {
     match kind {
@@ -1109,13 +1183,23 @@ impl Plaa {
     /// the user allows it when its kind asks first. `agent` is the name
     /// the user knows the agent by.
     pub(super) fn run_tool(&mut self, call: Call, agent: String) -> Task<Message> {
+        self.run_tool_asking(call, agent, true)
+    }
+
+    /// Runs the tool for the assistant, which acts on what the user asks
+    /// it in the chat: the switches for outside agents do not apply.
+    pub(super) fn run_tool_for_user(&mut self, call: Call, agent: String) -> Task<Message> {
+        self.run_tool_asking(call, agent, false)
+    }
+
+    fn run_tool_asking(&mut self, call: Call, agent: String, outside: bool) -> Task<Message> {
         let name = call.params["name"].as_str().unwrap_or_default().to_owned();
         let arguments = match &call.params["arguments"] {
             Value::Null => json!({}),
             arguments => arguments.clone(),
         };
         match find(&name) {
-            Some(tool) if tool.kind.asks(&self.settings.ask_before) => {
+            Some(tool) if outside && tool.kind.asks(&self.settings.ask_before) => {
                 // A window that cannot be found is the tool's to report.
                 match self.tool_window(arguments["window"].as_u64()) {
                     Ok(id) => self.ask_to_run(id, agent, tool, arguments, Answer(call)),

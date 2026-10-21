@@ -1,5 +1,6 @@
 //! File dialogs, to open and to save: through the XDG desktop portal on
-//! Linux, and the system's own dialogs (through rfd) elsewhere.
+//! Linux, and the system's own dialogs (through rfd) elsewhere. Links open
+//! in the browser the same ways.
 
 #[cfg(target_os = "linux")]
 use std::path::PathBuf;
@@ -204,6 +205,32 @@ pub fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
         }
     }
     Some(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
+}
+
+/// Opens `uri`, such as a link in the assistant's answer, in the browser
+/// or the program the system has for it.
+pub async fn open_link(uri: String) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        let parsed = ashpd::Uri::parse(&uri).map_err(|error| error.to_string())?;
+        ashpd::desktop::open_uri::OpenFileRequest::default()
+            .send_uri(&parsed)
+            .await
+            .map(drop)
+            .map_err(|error| error.to_string())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        #[cfg(windows)]
+        let mut command = std::process::Command::new("rundll32");
+        #[cfg(windows)]
+        command.args(["url.dll,FileProtocolHandler", &uri]);
+        #[cfg(not(windows))]
+        let mut command = std::process::Command::new("open");
+        #[cfg(not(windows))]
+        command.arg(&uri);
+        command.spawn().map(drop).map_err(|error| error.to_string())
+    }
 }
 
 #[cfg(all(test, target_os = "linux"))]

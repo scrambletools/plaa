@@ -452,6 +452,8 @@ pub enum Control {
     AvbDisconnect((plaa_avb::EntityId, u16)),
     /// Chooses a listener in the Network Audio sheet, to see its details.
     AvbChoose((plaa_avb::EntityId, u16)),
+    /// Opens or closes the assistant's panel.
+    ToggleAssistant,
     /// Casts to the renderer with this id.
     CastTo(String),
     StopCasting,
@@ -506,6 +508,8 @@ pub struct Context {
     pub avb: Option<Arc<plaa_avb::Snapshot>>,
     /// The renderers on the network, once looked for.
     pub renderers: Option<Arc<Vec<plaa_cast::Renderer>>>,
+    /// The assistant's panel is open beside the window.
+    pub assistant_open: bool,
 }
 
 /// The window: the picture with bars over it or around it, or for sound,
@@ -645,6 +649,12 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             Control::ToggleNetwork,
         ));
     }
+    tools.push(component::toggle_tool(
+        Icon::ChatBubble,
+        crate::fl!("action-assistant"),
+        context.assistant_open,
+        Control::ToggleAssistant,
+    ));
     tools.push(component::toggle_tool(
         Icon::Info,
         crate::fl!("action-info"),
