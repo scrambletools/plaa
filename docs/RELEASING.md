@@ -19,9 +19,12 @@ Everything a release ships is built from this repository:
 
 The Linux packages are built for x86_64 and ARM64 on GitHub's runners of
 that architecture, the Windows ones for x64 and ARM64; the macOS package
-is built for Apple Silicon only. Unlike triib's, there is no RISC-V
-package yet: plaa would have to be cross-compiled against each release's
-FFmpeg.
+is built for Apple Silicon only. GitHub has no RISC-V runners, so the
+RISC-V .debs, for Debian 13 and Ubuntu 24.04 and 26.04, are built on
+x86_64 against each release's riscv64 libraries installed beside its own
+(`PLAA_CROSS=riscv64 packaging/linux/build.sh IMAGE OUT`), and tested
+under QEMU, which leaves out raw Ethernet and the window. Fedora has no
+RISC-V release to build for.
 
 Packages are built with `PLAA_PRODUCTION=1`, which makes the installed
 copy: settings in `plaa.toml` (`~/.config` on Linux, `%APPDATA%\plaa` on
@@ -139,7 +142,7 @@ window.
 
 | Package | Where | What |
 |---|---|---|
-| .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
+| .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, and of the Debian and Ubuntu releases for RISC-V under QEMU, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
 | Arch | A fresh Arch container | `build-arch.sh` builds the PKGBUILD from this tree, then the same test |
 | MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa, FFmpeg and libass import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, the version line and the FFmpeg and libass it names, the window and the clip played; then that uninstalling leaves nothing |
 | MSI, x64 | A Windows Server 2022 container, which has nothing installed | The same, without the window and the clip |

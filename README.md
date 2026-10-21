@@ -163,10 +163,10 @@ The [plan](docs/PLAN.md) has the order.
 ## Packages
 
 Each release has packages for Debian 13, Ubuntu 24.04 and 26.04,
-Fedora 44 and Arch (x86_64 and ARM64), Windows (an MSI and a zip, x64 and
-ARM64) and macOS (Apple Silicon, macOS 14 and later), each installed,
-upgraded, run, made to play a video and removed in a clean system before
-the release goes out. On Linux the packages use the system's FFmpeg, each
+Fedora 44 and Arch (x86_64 and ARM64, and RISC-V for Debian and Ubuntu),
+Windows (an MSI and a zip, x64 and ARM64) and macOS (Apple Silicon,
+macOS 14 and later), each installed, upgraded, run, made to play a video
+and removed in a clean system before the release goes out. On Linux the packages use the system's FFmpeg, each
 built for its release; on Windows and macOS they carry their own.
 [Releasing](docs/RELEASING.md) says how they are made and checked.
 

@@ -11,10 +11,14 @@
 # The source is this script's tree, which may be read-only. Builds go to
 # CARGO_TARGET_DIR, /target by default. VERSION_SUFFIX, such as
 # ~debian13, names the release in the package's version; it defaults to
-# one made from /etc/os-release.
+# one made from /etc/os-release. PLAA_CROSS, a Debian architecture such
+# as riscv64, builds a .deb for it on this one, with that architecture's
+# libraries installed beside this one's, where no computer of its kind
+# builds; its programs run here through QEMU, as binfmt_misc lets them.
 set -euo pipefail
 
 out=${1:?usage: build-package.sh OUT}
+cross=${PLAA_CROSS:-}
 root=$(cd "$(dirname "$0")/../.." && pwd)
 nfpm_version=${NFPM_VERSION:-2.43.0}
 export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-/target}
@@ -26,14 +30,32 @@ debian | ubuntu)
     kind=deb
     suffix=${VERSION_SUFFIX:-~$ID$VERSION_ID}
     export DEBIAN_FRONTEND=noninteractive
+    libraries=(libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libavdevice-dev
+        libswscale-dev libswresample-dev libpipewire-0.3-dev libasound2-dev
+        libfontconfig1-dev libfreetype-dev libxkbcommon-dev libwayland-dev)
+    tools=(build-essential clang libclang-dev pkg-config curl ca-certificates git file dpkg-dev)
+    if [ -n "$cross" ]; then
+        dpkg --add-architecture "$cross"
+        if [ "$ID" = ubuntu ]; then
+            # Ubuntu keeps architectures other than amd64 and i386 on its
+            # ports archive.
+            native=$(dpkg --print-architecture)
+            sed -i "/^Types:/a Architectures: $native" /etc/apt/sources.list.d/ubuntu.sources
+            suites="$VERSION_CODENAME $VERSION_CODENAME-updates $VERSION_CODENAME-security"
+            printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports\nSuites: %s\nComponents: main universe\nArchitectures: %s\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+                "$suites" "$cross" >/etc/apt/sources.list.d/ports.sources
+        fi
+        libraries=("${libraries[@]/%/:$cross}")
+        tools+=("crossbuild-essential-$cross")
+    fi
     apt-get update -q
-    apt-get install -y --no-install-recommends \
-        build-essential clang libclang-dev pkg-config curl ca-certificates git file dpkg-dev \
-        libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libavdevice-dev \
-        libswscale-dev libswresample-dev libpipewire-0.3-dev libasound2-dev \
-        libfontconfig1-dev libfreetype-dev libxkbcommon-dev libwayland-dev
+    apt-get install -y --no-install-recommends "${tools[@]}" "${libraries[@]}"
     ;;
 fedora)
+    if [ -n "$cross" ]; then
+        echo "build-package.sh: PLAA_CROSS builds only .deb packages" >&2
+        exit 2
+    fi
     kind=rpm
     suffix=${VERSION_SUFFIX:-.fc$VERSION_ID}
     dnf install -y --setopt=install_weak_deps=False \
@@ -59,17 +81,55 @@ fi
 git config --global --add safe.directory '*'
 
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1)
-case $(uname -m) in
-x86_64) deb_arch=amd64 rpm_arch=x86_64 ;;
-aarch64) deb_arch=arm64 rpm_arch=aarch64 ;;
-riscv64) deb_arch=riscv64 rpm_arch=riscv64 ;;
-*) echo "build-package.sh: unknown architecture $(uname -m)" >&2; exit 2 ;;
+case ${cross:-$(uname -m)} in
+x86_64 | amd64) deb_arch=amd64 rpm_arch=x86_64 rust_arch=x86_64 ;;
+aarch64 | arm64) deb_arch=arm64 rpm_arch=aarch64 rust_arch=aarch64 ;;
+riscv64) deb_arch=riscv64 rpm_arch=riscv64 rust_arch=riscv64gc ;;
+*) echo "build-package.sh: unknown architecture ${cross:-$(uname -m)}" >&2; exit 2 ;;
 esac
+
+binaries=$CARGO_TARGET_DIR/release
+targeting=()
+if [ -n "$cross" ]; then
+    # The other architecture's compilers, libraries and headers, for Rust,
+    # the C its crates build, pkg-config and bindgen alike.
+    gnu=$(dpkg-architecture -a"$cross" -qDEB_HOST_GNU_TYPE 2>/dev/null)
+    target=$rust_arch-unknown-linux-gnu
+    rustup target add "$target"
+    target_variable=$(tr 'a-z-' 'A-Z_' <<<"$target")
+    export "CARGO_TARGET_${target_variable}_LINKER=$gnu-gcc"
+    export "CC_${target//-/_}=$gnu-gcc" "CXX_${target//-/_}=$gnu-g++"
+    export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_LIBDIR=/usr/lib/$gnu/pkgconfig:/usr/share/pkgconfig
+    export BINDGEN_EXTRA_CLANG_ARGS="--target=$gnu -I/usr/include/$gnu"
+    # ffmpeg-sys-next compiles a check of FFmpeg's version for this
+    # computer with the other architecture's include folder, whose C
+    # library headers this one's compiler cannot take: it looks there
+    # last, past its own.
+    cat >/usr/local/bin/plaa-host-cc <<SCRIPT
+#!/bin/bash
+arguments=()
+while [ \$# -gt 0 ]; do
+    if [ "\$1" = -I ] && [ "\$2" = /usr/include/$gnu ]; then
+        arguments+=(-idirafter "\$2")
+        shift 2
+        continue
+    fi
+    arguments+=("\$1")
+    shift
+done
+exec cc "\${arguments[@]}"
+SCRIPT
+    chmod +x /usr/local/bin/plaa-host-cc
+    host=$(rustc -vV | sed -n 's/^host: //p')
+    export "CC_${host//-/_}=plaa-host-cc"
+    export DEB_HOST_ARCH=$cross
+    targeting=(--target "$target")
+    binaries=$CARGO_TARGET_DIR/$target/release
+fi
 
 # The installed copy, with its own settings and cache, not a dev build.
 PLAA_PRODUCTION=1 cargo build --release --locked --manifest-path "$root/Cargo.toml" \
-    -p plaa -p plaa-avb --bin plaa --bin plaa-netraw
-binaries=$CARGO_TARGET_DIR/release
+    -p plaa -p plaa-avb --bin plaa --bin plaa-netraw "${targeting[@]}"
 "$binaries/plaa" --version
 
 work=$(mktemp -d)

@@ -51,6 +51,21 @@ jobs:
             runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
+          # RISC-V .debs, for the releases that have the architecture,
+          # built on x86_64 with its libraries beside, for want of RISC-V
+          # runners (PLAA_CROSS), and tested under QEMU.
+          - arch: riscv64
+            image: 'debian:13'
+            runner: ubuntu-24.04
+            cross: riscv64
+          - arch: riscv64
+            image: 'ubuntu:24.04'
+            runner: ubuntu-24.04
+            cross: riscv64
+          - arch: riscv64
+            image: 'ubuntu:26.04'
+            runner: ubuntu-24.04
+            cross: riscv64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +91,7 @@ jobs:
         run: packaging/linux/build.sh "$IMAGE" dist
         env:
           IMAGE: ${{ matrix.image }}
+          PLAA_CROSS: ${{ matrix.cross }}
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ steps.name.outputs.name }}-${{ matrix.arch }}
@@ -374,6 +390,21 @@ jobs:
             runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
+          # RISC-V .debs, for the releases that have the architecture,
+          # built on x86_64 with its libraries beside, for want of RISC-V
+          # runners (PLAA_CROSS), and tested under QEMU.
+          - arch: riscv64
+            image: 'debian:13'
+            runner: ubuntu-24.04
+            cross: riscv64
+          - arch: riscv64
+            image: 'ubuntu:24.04'
+            runner: ubuntu-24.04
+            cross: riscv64
+          - arch: riscv64
+            image: 'ubuntu:26.04'
+            runner: ubuntu-24.04
+            cross: riscv64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -386,6 +417,10 @@ jobs:
         with:
           name: linux-${{ steps.name.outputs.name }}-${{ matrix.arch }}
           path: packages
+      - if: matrix.cross
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.cross }}
       - name: Install, upgrade, run, play and remove
         run: |
           package=$(ls packages/*.deb packages/*.rpm 2>/dev/null | head -1)
