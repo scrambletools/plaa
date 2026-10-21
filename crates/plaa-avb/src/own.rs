@@ -21,7 +21,7 @@ use avb_mrp::msrp::{ListenerState, TalkerDeclaration};
 use avb_mrp::sharing::Notice;
 use avb_stream::audio::Source;
 use avb_stream::media::Media;
-use avb_stream::{MediaClock, Talker, TalkerConfig};
+use avb_stream::{MediaClock, Talker, TalkerConfig, TalkerStats};
 
 use crate::reservation::{self, Heard, Reservation, VLAN};
 use crate::runtime::Input;
@@ -64,6 +64,10 @@ const TALKER_LATENCY: u32 = 125_000;
 /// bridge has let the old declaration go.
 const REDECLARE: Duration = Duration::from_secs(2);
 
+/// How often the stream's counters go to the entity, as Milan allows its
+/// notifications of them at most.
+const COUNT_EVERY: Duration = Duration::from_secs(1);
+
 /// How often it looks whether another program serves the port's
 /// participant, to share it, while it runs its own or none.
 const LOOK: Duration = Duration::from_secs(2);
@@ -75,6 +79,41 @@ const PTP4L_SOCKET: &str = "/var/run/ptp4lro";
 pub(crate) fn entity_id(mac: MacAddress) -> EntityId {
     let [a, b, c, d, e, f] = mac.0;
     EntityId(u64::from_be_bytes([a, b, c, 0xff, INSTANCE, d, e, f]))
+}
+
+/// What the stream sent over the entity's life, for its counters: the
+/// talkers that ran, and with [`Sent::counters`] the one running.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Sent {
+    starts: u32,
+    stops: u32,
+    frames: u64,
+    media_resets: u64,
+}
+
+impl Sent {
+    /// The talker that stopped, with what it sent.
+    fn stopped(&mut self, stats: TalkerStats) {
+        self.stops = self.stops.wrapping_add(1);
+        self.frames += stats.frames_sent;
+        self.media_resets += stats.media_resets;
+    }
+
+    /// The stream output's counters in GET_COUNTERS' places (IEEE
+    /// 1722.1-2021, 7.4.42.2; Milan 1.3, 5.4.2.25), with `running` counted
+    /// in. Each wraps as the counters do.
+    fn counters(self, running: Option<TalkerStats>) -> [u32; 32] {
+        let frames = self.frames + running.map_or(0, |stats| stats.frames_sent);
+        let resets = self.media_resets + running.map_or(0, |stats| stats.media_resets);
+        let mut counters = [0; 32];
+        counters[0] = self.starts;
+        counters[1] = self.stops;
+        counters[3] = resets as u32;
+        // Every frame carries a valid timestamp.
+        counters[5] = frames as u32;
+        counters[7] = frames as u32;
+        counters
+    }
 }
 
 pub(crate) struct Own {
@@ -107,6 +146,10 @@ pub(crate) struct Own {
     /// Why the program sharing its participant would not declare the
     /// stream, until it does.
     refused: Option<String>,
+    /// What the stream sent, for its counters, and when they last went
+    /// to the entity.
+    sent: Sent,
+    counted_at: Duration,
 }
 
 impl Own {
@@ -197,6 +240,8 @@ impl Own {
             withdrawn_at: None,
             blocked,
             refused: None,
+            sent: Sent::default(),
+            counted_at: Duration::ZERO,
         })
     }
 
@@ -300,7 +345,7 @@ impl Own {
             self.interface
         ));
         self.reservation = None;
-        self.talker = None;
+        self.stop_talker();
         self.declared = false;
         self.ready = false;
         self.declare_at = None;
@@ -352,7 +397,7 @@ impl Own {
             return;
         }
         self.reservation = None;
-        self.talker = None;
+        self.stop_talker();
         if self.declared {
             self.declared = false;
             self.withdrawn_at = Some(since);
@@ -407,7 +452,7 @@ impl Own {
             Heard::Unavailable => {
                 // Withdrawn by the program sharing its participant, or
                 // not declared.
-                self.talker = None;
+                self.stop_talker();
                 self.declare_at = None;
                 if self.declared {
                     self.declared = false;
@@ -424,7 +469,7 @@ impl Own {
             Heard::Taken => {
                 // Another talker here has its ID, as while the program has
                 // yet to see plaa's earlier connection close.
-                self.talker = None;
+                self.stop_talker();
                 self.ready = false;
                 if self.declared {
                     self.declared = false;
@@ -437,7 +482,7 @@ impl Own {
                     "plaa: the program sharing {}'s participant refused the stream: {refusal:?}",
                     self.interface
                 );
-                self.talker = None;
+                self.stop_talker();
                 self.ready = false;
                 self.declared = false;
                 self.declare_at = None;
@@ -479,6 +524,12 @@ impl Own {
         if let Some(reservation) = &mut self.reservation {
             reservation.handle_timeout(since);
         }
+        if since >= self.counted_at + COUNT_EVERY {
+            self.counted_at = since;
+            let counters = self.sent.counters(self.talker.as_ref().map(Talker::stats));
+            self.entity
+                .set_counters(DescriptorType::STREAM_OUTPUT, 0, counters);
+        }
         self.maap.handle_timeout(now);
         while let Some(event) = self.maap.poll_event() {
             match event {
@@ -489,7 +540,7 @@ impl Own {
                     }
                 }
                 MaapEvent::Lost => {
-                    self.talker = None;
+                    self.stop_talker();
                     self.declare_at = None;
                     self.withdraw(since);
                 }
@@ -508,7 +559,7 @@ impl Own {
                     // Its frames' size changed: declared again, and sent
                     // anew.
                     if self.declared {
-                        self.talker = None;
+                        self.stop_talker();
                         self.withdraw(since);
                         self.declare_at = Some(since + REDECLARE);
                     }
@@ -573,7 +624,7 @@ impl Own {
         if self.blocked.is_some() {
             return;
         }
-        self.talker = None;
+        self.stop_talker();
         self.withdraw(since);
         if let Some(reservation) = &mut self.reservation {
             reservation.handle_timeout(since);
@@ -645,12 +696,19 @@ impl Own {
         if self.ready && self.declared && self.talker.is_none() {
             self.start_talker();
         } else if !(self.ready && self.declared) {
-            self.talker = None;
+            self.stop_talker();
+        }
+    }
+
+    /// Stops the stream, counting what it sent.
+    fn stop_talker(&mut self) {
+        if let Some(talker) = self.talker.take() {
+            self.sent.stopped(talker.stats());
         }
     }
 
     fn start_talker(&mut self) {
-        self.talker = None;
+        self.stop_talker();
         let Some((stream_id, destination)) = self.entity.output_stream(0) else {
             return;
         };
@@ -679,7 +737,10 @@ impl Own {
             source: Source::Shared(self.sound.buffer()),
         };
         match Talker::start(config, self.clock.clone()) {
-            Ok(talker) => self.talker = Some(talker),
+            Ok(talker) => {
+                self.talker = Some(talker);
+                self.sent.starts = self.sent.starts.wrapping_add(1);
+            }
             Err(error) => eprintln!("plaa: the AVB stream did not start: {error}"),
         }
     }
@@ -698,6 +759,27 @@ mod tests {
         // Beside triib's first endpoint on the same interface,
         // 0xa010a3ff00a51726.
         assert_eq!(entity_id(mac), EntityId(0xa010_a3ff_70a5_1726));
+    }
+
+    /// Its counters add up every talker that ran, the running one too.
+    #[test]
+    fn its_counters_count_every_run() {
+        let ran = |frames_sent, media_resets| TalkerStats {
+            frames_sent,
+            media_resets,
+            ..TalkerStats::default()
+        };
+        let mut sent = Sent {
+            starts: 2,
+            ..Sent::default()
+        };
+        sent.stopped(ran(8000, 1));
+        let counters = sent.counters(Some(ran(400, 0)));
+        assert_eq!(&counters[..8], &[2, 1, 0, 1, 0, 8400, 0, 8400]);
+        assert_eq!(sent.counters(None)[7], 8000);
+        // They wrap, as counters do.
+        sent.stopped(ran(u64::from(u32::MAX), 0));
+        assert_eq!(sent.counters(None)[7], 7999);
     }
 
     /// Its logo is the app's icon and its vendor's Scramble Tools', PNGs

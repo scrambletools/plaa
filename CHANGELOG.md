@@ -76,7 +76,8 @@ The first build.
   they share the port's reservations, and listeners on this computer
   say when triib must be updated to play there. plaa's entity shows
   controllers its app icon, and Scramble Tools' logo as its vendor's,
-  PNG memory objects read through Address Access.
+  PNG memory objects read through Address Access, and counts its
+  stream's starts, stops and frames for them.
 - On a Mac, plaa sends through the Mac's own AVB entity, turned on in
   Audio MIDI Setup, as triib uses it: its controller reaches the entity
   through Apple's AVB framework, and plaa plays into the Core Audio
