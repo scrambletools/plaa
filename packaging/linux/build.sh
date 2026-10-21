@@ -10,7 +10,9 @@
 # tag last pulled. Cargo's downloads and the build stay in Docker volumes
 # named for the image, so a second build is quicker. PLAA_AVB_CHECKOUT,
 # a checkout of scrambletools/avb, stands in for GitHub's, as for a
-# revision not pushed yet.
+# revision not pushed yet. PLAA_DOCKER_CPUS, such as 4, limits the
+# processors the build takes, leaving room on a computer keeping
+# network time with ptp4l.
 set -euo pipefail
 
 image=${1:?usage: build.sh IMAGE OUT}
@@ -27,6 +29,9 @@ if [ -n "${PLAA_AVB_CHECKOUT:-}" ]; then
         -e GIT_CONFIG_VALUE_0=https://github.com/scrambletools/avb
         -e GIT_CONFIG_KEY_1=safe.directory -e GIT_CONFIG_VALUE_1='*'
         -e CARGO_NET_GIT_FETCH_WITH_CLI=true)
+fi
+if [ -n "${PLAA_DOCKER_CPUS:-}" ]; then
+    options+=(--cpus "$PLAA_DOCKER_CPUS")
 fi
 # The packages belong to whoever built them, not to the container's root.
 docker run "${options[@]}" "$image" bash -c \
