@@ -75,6 +75,7 @@ action-quality = Minőség
 action-visualizer = Vizualizáció
 action-network = Hálózati hang
 action-cast = Átküldés
+action-assistant = Asszisztens
 
 ## What a sound file shows under its cover
 
@@ -169,6 +170,7 @@ settings-tab-playback = Lejátszás
 settings-tab-network = Hálózat
 settings-tab-language = Nyelv
 settings-tab-agents = Ügynökök
+settings-tab-assistant = Asszisztens
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (fejlesztői változat, { $build })
 settings-choose = Tallózás…
@@ -540,9 +542,101 @@ agent-ask-body = { $agent } szeretné használni ezt: „{ $tool }”. A Beáll�
 ## Casting to a TV or speaker on the network
 
 cast-looking = Tévék és hangszórók keresése…
-cast-none = Nem található DLNA-t támogató tévé vagy hangszóró.
+cast-none = Nem található tévé, hangszóró vagy Chromecast.
 # $renderer is the TV's or speaker's name.
 cast-stop = Lejátszás leállítása itt: { $renderer }
 notice-casting = Lejátszás itt: { $renderer }.
 notice-cast-failed = A(z) { $renderer } eszközön nem sikerült a lejátszás: { $reason }
 cast-web-page = Weboldalakat még nem lehet átküldeni: inkább a videó saját címét nyissa meg.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Modell hozzáadása…
+assistant-add-model = Az asszisztensnek modell kell: felhőalapú modell az API-kulcsával, vagy helyi modell.
+assistant-ask = Kérdezzen a lejátszott tartalomról
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = A beszélgetés túl hosszú kezdett lenni ahhoz, hogy a(z) { $model } egyszerre elolvassa, ezért a korábbi részét összefoglaltuk. Az asszisztens talán újra megnézi, amit látott.
+assistant-compacting = A korábbi beszélgetés összefoglalása
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } ezen a számítógépen
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } itt: { $host }
+assistant-new-chat = Új csevegés
+assistant-no-model = Előbb adjon hozzá egy modellt a Beállításokban.
+assistant-open-settings = Modell hozzáadása
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = A beszélgetés már nem fér bele abba, amit { $model } egyszerre el tud olvasni. Kezdjen új csevegést, vagy válasszon olyan modellt, amely többet tud olvasni.
+assistant-problem-credit = { $provider } szerint a fióknak nincs kreditje. Új fiók esetén előbb kreditet kell vásárolni a szolgáltató webhelyén ({ $provider }), csak utána működik a kulcs; ezután próbálja újra.
+assistant-problem-key = { $provider } elutasította az API-kulcsot. Ellenőrizze a Beállításokban.
+assistant-problem-model = { $provider } nem ismer { $model } nevű modellt. Ellenőrizze a nevét a Beállításokban.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } nem válaszolt: { $message }
+assistant-problem-rate = { $provider } lassítást kér. Próbálja újra egy kis idő múlva.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } lassítást kér: { $message }
+assistant-problem-refused = { $model } nem volt hajlandó válaszolni.
+assistant-problem-unavailable = { $provider } túlterhelt, vagy problémái vannak. Próbálja újra egy kis idő múlva.
+assistant-problem-unreachable = A plaa nem tudott kapcsolódni a szolgáltatóhoz: { $provider }. Ellenőrizze a kapcsolatot, vagy hogy fut-e a kiszolgáló.
+assistant-running = Fut…
+assistant-send = Küldés
+assistant-shortened = A beszélgetés túl hosszú volt ahhoz, hogy a(z) { $model } egyszerre elolvassa, ezért a korábbi eszközeredmények kimaradtak. Az asszisztens talán újra megnézi, amit látott.
+assistant-stop = Leállítás
+assistant-stopped = Leállítva.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Most ezzel a modellel beszélget: { $model }.
+assistant-thinking = Gondolkodik…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Gondolatok
+assistant-title = Asszisztens
+settings-assistant-add = Modell hozzáadása
+settings-assistant-add-button = Hozzáadás
+# $model is the model's name.
+settings-assistant-added = { $model } válaszolt, és hozzá lett adva.
+settings-assistant-added-tag = Hozzáadva
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Cím, például { $example }
+settings-assistant-change-key = Kulcs módosítása
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = OpenAI-kompatibilis kiszolgáló
+# The menu of how much a local model reads at once.
+settings-assistant-context = Kontextus
+settings-assistant-context-note = Nagyobb kontextussal az asszisztens egy csevegésből többet tarthat észben, de a modell több memóriát foglal, és lassabban válaszolhat.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands } ezer token
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Oldal megnyitása
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } fut ezen a címen: { $address }.
+settings-assistant-found-none = { $provider }: még nincs modell. Töltsön le vele egyet, majd keressen újra.
+settings-assistant-get-key = API-kulcs beszerzése
+settings-assistant-get-server = { $provider } letöltése
+settings-assistant-in-use = Használatban
+settings-assistant-key = API-kulcs
+# $error is what the keychain said.
+settings-assistant-key-failed = A kulcsot nem sikerült a kulcstartóba menteni: { $error }
+settings-assistant-key-kept = A kulcsát ({ $provider }) a rendszer kulcstartója őrzi.
+settings-assistant-key-needed = Ehhez a modellhez API-kulcs kell.
+settings-assistant-key-refused = { $provider } elutasította ezt a kulcsot. Ellenőrizze, hogy teljes egészében és a megfelelő fiókból másolta-e ki.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Hozzon létre egy kulcsot a szolgáltató webhelyén ({ $provider }), és illessze be ide.
+settings-assistant-look-again = Keresés újra
+settings-assistant-looking = Modellek keresése…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Modell, például { $example }
+settings-assistant-no-server = A plaa nem talált futó { $provider }-kiszolgálót ezen a számítógépen. Indítsa el, vagy adja meg lent a címét.
+settings-assistant-no-tools = Nem tud eszközöket használni, pedig az asszisztensnek erre szüksége van
+settings-assistant-none = Még nincs modell. Adjon hozzá egyet lent: a helyi modell, például egy Ollama-modell, ezen a számítógépen marad; a felhőalapú modellhez API-kulcs kell a szolgáltatójától.
+settings-assistant-note = Azok a modellek, amelyekkel az asszisztenspanel beszélgethet. A kulcsokat a rendszer kulcstartója őrzi.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Másik cím használata
+settings-assistant-recommended = Ajánlott
+settings-assistant-remove = Eltávolítás
+settings-assistant-sees = Képeket is lát
+settings-assistant-trying = Próba…
+settings-assistant-use = Használat
+settings-assistant-use-key = Tovább
+settings-assistant-uses-tools = Eszközöket használ

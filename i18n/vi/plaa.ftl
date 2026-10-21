@@ -75,6 +75,7 @@ action-quality = Chất lượng
 action-visualizer = Hiệu ứng hình ảnh
 action-network = Âm thanh qua mạng
 action-cast = Truyền
+action-assistant = Trợ lý
 
 ## What a sound file shows under its cover
 
@@ -169,6 +170,7 @@ settings-tab-playback = Phát lại
 settings-tab-network = Mạng
 settings-tab-language = Ngôn ngữ
 settings-tab-agents = Tác nhân
+settings-tab-assistant = Trợ lý
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (bản phát triển, { $build })
 settings-choose = Chọn…
@@ -540,9 +542,101 @@ agent-ask-body = { $agent } yêu cầu dùng “{ $tool }”. Bạn có thể ch
 ## Casting to a TV or speaker on the network
 
 cast-looking = Đang tìm TV và loa…
-cast-none = Không tìm thấy TV hay loa nào phát được DLNA.
+cast-none = Không tìm thấy TV, loa hay Chromecast nào.
 # $renderer is the TV's or speaker's name.
 cast-stop = Dừng phát trên { $renderer }
 notice-casting = Đang phát trên { $renderer }.
 notice-cast-failed = Không thể phát trên { $renderer }: { $reason }
 cast-web-page = Chưa thể truyền trang web: hãy mở địa chỉ riêng của video.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Thêm mô hình…
+assistant-add-model = Trợ lý cần một mô hình: mô hình đám mây kèm khóa API của nó, hoặc mô hình cục bộ.
+assistant-ask = Hỏi về nội dung đang phát
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = Cuộc trò chuyện đã quá dài để { $model } đọc một lần, nên phần trước đã được tóm tắt. Trợ lý có thể xem lại những gì đã thấy.
+assistant-compacting = Đang tóm tắt phần trò chuyện trước
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } trên máy tính này
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } tại { $host }
+assistant-new-chat = Cuộc trò chuyện mới
+assistant-no-model = Hãy thêm một mô hình trong Cài đặt trước.
+assistant-open-settings = Thêm mô hình
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = Cuộc trò chuyện đã vượt quá lượng nội dung mà { $model } có thể đọc cùng lúc. Hãy bắt đầu cuộc trò chuyện mới, hoặc chọn mô hình có thể đọc nhiều hơn.
+assistant-problem-credit = { $provider } cho biết tài khoản không còn số dư. Tài khoản mới cần nạp tiền trên trang web của { $provider } thì khóa mới hoạt động; sau đó hãy thử lại.
+assistant-problem-key = { $provider } đã từ chối khóa API. Hãy kiểm tra trong Cài đặt.
+assistant-problem-model = { $provider } không có mô hình nào tên { $model }. Hãy kiểm tra tên mô hình trong Cài đặt.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } không trả lời: { $message }
+assistant-problem-rate = { $provider } yêu cầu giảm tốc độ. Hãy thử lại sau giây lát.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } yêu cầu giảm tốc độ: { $message }
+assistant-problem-refused = { $model } đã từ chối trả lời.
+assistant-problem-unavailable = { $provider } đang bận hoặc gặp sự cố. Hãy thử lại sau giây lát.
+assistant-problem-unreachable = plaa không thể kết nối tới { $provider }. Hãy kiểm tra kết nối mạng, hoặc xem máy chủ có đang chạy không.
+assistant-running = Đang chạy…
+assistant-send = Gửi
+assistant-shortened = Cuộc trò chuyện quá dài để { $model } đọc một lần, nên các kết quả công cụ trước đó đã được bỏ bớt. Trợ lý có thể xem lại những gì đã thấy.
+assistant-stop = Dừng
+assistant-stopped = Đã dừng.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Đang trò chuyện với { $model }.
+assistant-thinking = Đang suy nghĩ…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Suy nghĩ
+assistant-title = Trợ lý
+settings-assistant-add = Thêm mô hình
+settings-assistant-add-button = Thêm
+# $model is the model's name.
+settings-assistant-added = { $model } đã trả lời và được thêm.
+settings-assistant-added-tag = Đã thêm
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Địa chỉ, ví dụ { $example }
+settings-assistant-change-key = Đổi khóa
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = Máy chủ tương thích với OpenAI
+# The menu of how much a local model reads at once.
+settings-assistant-context = Ngữ cảnh
+settings-assistant-context-note = Ngữ cảnh lớn hơn cho phép trợ lý ghi nhớ được nhiều phần hơn của một cuộc trò chuyện, nhưng mô hình sẽ dùng nhiều bộ nhớ hơn và có thể trả lời chậm hơn.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K token
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Mở trang
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } đang chạy tại { $address }.
+settings-assistant-found-none = { $provider } chưa có mô hình nào. Hãy tải một mô hình bằng { $provider }, rồi tìm lại.
+settings-assistant-get-key = Lấy khóa API
+settings-assistant-get-server = Tải { $provider }
+settings-assistant-in-use = Đang dùng
+settings-assistant-key = Khóa API
+# $error is what the keychain said.
+settings-assistant-key-failed = Không thể lưu khóa vào kho thông tin xác thực: { $error }
+settings-assistant-key-kept = Khóa { $provider } của bạn được lưu trong kho thông tin xác thực của hệ thống.
+settings-assistant-key-needed = Mô hình này cần khóa API.
+settings-assistant-key-refused = { $provider } đã từ chối khóa này. Hãy kiểm tra xem khóa đã được sao chép đầy đủ và từ đúng tài khoản chưa.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Tạo khóa trên trang web của { $provider } rồi dán vào đây.
+settings-assistant-look-again = Tìm lại
+settings-assistant-looking = Đang tìm mô hình…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Mô hình, ví dụ { $example }
+settings-assistant-no-server = plaa không tìm thấy { $provider } nào đang chạy trên máy tính này. Hãy khởi động nó, hoặc nhập địa chỉ của nó bên dưới.
+settings-assistant-no-tools = Không dùng được công cụ, điều mà trợ lý cần
+settings-assistant-none = Chưa có mô hình nào. Hãy thêm một mô hình bên dưới: mô hình cục bộ, như mô hình của Ollama, chỉ ở trên máy tính này; mô hình đám mây cần khóa API từ nhà cung cấp của nó.
+settings-assistant-note = Các mô hình mà bảng trợ lý có thể trò chuyện. Khóa được lưu trong kho thông tin xác thực của hệ thống.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Dùng địa chỉ khác
+settings-assistant-recommended = Đề xuất
+settings-assistant-remove = Xóa
+settings-assistant-sees = Xem được hình ảnh
+settings-assistant-trying = Đang thử…
+settings-assistant-use = Dùng
+settings-assistant-use-key = Tiếp tục
+settings-assistant-uses-tools = Dùng công cụ

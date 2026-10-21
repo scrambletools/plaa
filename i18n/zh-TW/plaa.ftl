@@ -74,6 +74,7 @@ action-quality = 畫質
 action-visualizer = 視覺化效果
 action-network = 網路音訊
 action-cast = 投放
+action-assistant = 助理
 
 ## What a sound file shows under its cover
 
@@ -168,6 +169,7 @@ settings-tab-playback = 播放
 settings-tab-network = 網路
 settings-tab-language = 語言
 settings-tab-agents = 代理程式
+settings-tab-assistant = 助理
 settings-version = plaa { $version }（{ $build }）
 settings-version-development = plaa { $version }（開發版，{ $build }）
 settings-choose = 選擇…
@@ -539,9 +541,101 @@ agent-ask-body = { $agent } 要求使用「{ $tool }」。你可以在「設定�
 ## Casting to a TV or speaker on the network
 
 cast-looking = 正在尋找電視和喇叭…
-cast-none = 找不到支援 DLNA 的電視或喇叭。
+cast-none = 找不到電視、喇叭或 Chromecast。
 # $renderer is the TV's or speaker's name.
 cast-stop = 停止在 { $renderer } 上播放
 notice-casting = 正在 { $renderer } 上播放。
 notice-cast-failed = 無法在 { $renderer } 上播放：{ $reason }
 cast-web-page = 目前還無法投放網頁：請改為開啟影片本身的位址。
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = 加入模型…
+assistant-add-model = 助理需要一個模型：附有 API 金鑰的雲端模型，或本機模型。
+assistant-ask = 就正在播放的內容提問
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = 對話越來越長，{ $model } 無法一次讀完，因此已將先前的部分做成摘要。助理可能會重新查看它看過的內容。
+assistant-compacting = 正在摘要先前的對話
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = 這部電腦上的 { $provider }
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $host } 上的 { $provider }
+assistant-new-chat = 新對話
+assistant-no-model = 請先在「設定」中加入模型。
+assistant-open-settings = 加入模型
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = 對話內容已超出 { $model } 一次能讀取的範圍。請開始新對話，或選擇能讀取更多內容的模型。
+assistant-problem-credit = { $provider } 表示帳號沒有餘額。新帳號需要先在 { $provider } 的網站上購買額度，金鑰才能使用；購買後請再試一次。
+assistant-problem-key = { $provider } 拒絕了 API 金鑰。請在「設定」中檢查。
+assistant-problem-model = { $provider } 沒有名為 { $model } 的模型。請在「設定」中檢查名稱。
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } 未回答：{ $message }
+assistant-problem-rate = { $provider } 要求降低請求頻率。請稍後再試。
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } 要求降低請求頻率：{ $message }
+assistant-problem-refused = { $model } 拒絕回答。
+assistant-problem-unavailable = { $provider } 忙碌中或發生問題。請稍後再試。
+assistant-problem-unreachable = plaa 無法連線到 { $provider }。請檢查網路連線，或確認伺服器正在執行。
+assistant-running = 正在執行…
+assistant-send = 傳送
+assistant-shortened = 對話太長，{ $model } 無法一次讀完，因此省略了先前的工具結果。助理可能會重新查看它看過的內容。
+assistant-stop = 停止
+assistant-stopped = 已停止。
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = 現在使用 { $model } 對話。
+assistant-thinking = 正在思考…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = 思考過程
+assistant-title = 助理
+settings-assistant-add = 加入模型
+settings-assistant-add-button = 加入
+# $model is the model's name.
+settings-assistant-added = { $model } 已回應，已加入。
+settings-assistant-added-tag = 已加入
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = 位址，例如 { $example }
+settings-assistant-change-key = 更改金鑰
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = 與 OpenAI 相容的伺服器
+# The menu of how much a local model reads at once.
+settings-assistant-context = 上下文
+settings-assistant-context-note = 調大後，助理可以記住對話中更多的內容，但模型會占用更多記憶體，回答也可能變慢。
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K Token
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = 開啟頁面
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } 正在 { $address } 執行。
+settings-assistant-found-none = { $provider } 尚未有模型。請先用它下載模型，然後重新尋找。
+settings-assistant-get-key = 取得 API 金鑰
+settings-assistant-get-server = 取得 { $provider }
+settings-assistant-in-use = 使用中
+settings-assistant-key = API 金鑰
+# $error is what the keychain said.
+settings-assistant-key-failed = 無法將金鑰保存到鑰匙圈：{ $error }
+settings-assistant-key-kept = 你的 { $provider } 金鑰保存在系統鑰匙圈中。
+settings-assistant-key-needed = 這個模型需要 API 金鑰。
+settings-assistant-key-refused = { $provider } 拒絕了這個金鑰。請檢查是否從正確的帳號完整複製了金鑰。
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = 在 { $provider } 的網站上建立金鑰，然後貼到這裡。
+settings-assistant-look-again = 重新尋找
+settings-assistant-looking = 正在尋找模型…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = 模型，例如 { $example }
+settings-assistant-no-server = plaa 在這部電腦上找不到正在執行的 { $provider }。請啟動它，或在下方輸入它的位址。
+settings-assistant-no-tools = 無法使用工具，而助理需要工具
+settings-assistant-none = 尚未有模型。請在下方加入：本機模型（例如 Ollama 的模型）只在這部電腦上執行；雲端模型需要其供應商的 API 金鑰。
+settings-assistant-note = 助理面板可以使用的模型。金鑰保存在系統鑰匙圈中。
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = 使用其他位址
+settings-assistant-recommended = 推薦
+settings-assistant-remove = 移除
+settings-assistant-sees = 可辨識圖片
+settings-assistant-trying = 正在嘗試…
+settings-assistant-use = 使用
+settings-assistant-use-key = 繼續
+settings-assistant-uses-tools = 可使用工具

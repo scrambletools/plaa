@@ -75,6 +75,7 @@ action-quality = 画質
 action-visualizer = ビジュアライザ
 action-network = ネットワークオーディオ
 action-cast = キャスト
+action-assistant = アシスタント
 
 ## What a sound file shows under its cover
 
@@ -169,6 +170,7 @@ settings-tab-playback = 再生
 settings-tab-network = ネットワーク
 settings-tab-language = 言語
 settings-tab-agents = エージェント
+settings-tab-assistant = アシスタント
 settings-version = plaa { $version }（{ $build }）
 settings-version-development = plaa { $version }（開発版、{ $build }）
 settings-choose = 選択…
@@ -540,9 +542,101 @@ agent-ask-body = { $agent }が「{ $tool }」を使おうとしています。pl
 ## Casting to a TV or speaker on the network
 
 cast-looking = テレビとスピーカーを探しています…
-cast-none = DLNAで再生できるテレビやスピーカーが見つかりませんでした。
+cast-none = テレビ、スピーカー、Chromecastが見つかりませんでした。
 # $renderer is the TV's or speaker's name.
 cast-stop = { $renderer }での再生を停止
 notice-casting = { $renderer }で再生しています。
 notice-cast-failed = { $renderer }で再生できませんでした：{ $reason }
 cast-web-page = Webページはまだキャストできません：代わりに、動画そのもののアドレスを開いてください。
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = モデルを追加…
+assistant-add-model = アシスタントにはモデルが必要です。APIキーを使うクラウドモデルか、ローカルモデルを追加してください。
+assistant-ask = 再生中の内容について質問
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = チャットが長くなり、{ $model }が一度に読める量を超えそうになったため、前半を要約しました。アシスタントが、一度見た内容を見直すことがあります。
+assistant-compacting = これまでのチャットを要約しています
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = このコンピュータの{ $provider }
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $host }の{ $provider }
+assistant-new-chat = 新規チャット
+assistant-no-model = まず「設定」でモデルを追加してください。
+assistant-open-settings = モデルを追加
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = 会話が、{ $model }が一度に読める量を超えました。新規チャットを開始するか、より多く読めるモデルを選んでください。
+assistant-problem-credit = { $provider }によると、アカウントにクレジットがありません。新しいアカウントのキーを使うには、先に{ $provider }のサイトでクレジットを購入する必要があります。購入後にもう一度お試しください。
+assistant-problem-key = { $provider }がAPIキーを拒否しました。「設定」で確認してください。
+assistant-problem-model = { $provider }に「{ $model }」という名前のモデルはありません。「設定」で名前を確認してください。
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model }から応答がありませんでした：{ $message }
+assistant-problem-rate = { $provider }から、リクエストのペースを落とすよう求められています。しばらくしてからもう一度お試しください。
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider }から、リクエストのペースを落とすよう求められています：{ $message }
+assistant-problem-refused = { $model }は回答を断りました。
+assistant-problem-unavailable = { $provider }が混雑しているか、問題が発生しています。しばらくしてからもう一度お試しください。
+assistant-problem-unreachable = prevは{ $provider }に接続できませんでした。ネットワーク接続を確認するか、サーバが動作しているか確認してください。
+assistant-running = 実行中…
+assistant-send = 送信
+assistant-shortened = チャットが{ $model }が一度に読める量を超えたため、以前のツールの結果を省きました。アシスタントが、一度見た内容を見直すことがあります。
+assistant-stop = 停止
+assistant-stopped = 停止しました。
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = { $model }と会話しています。
+assistant-thinking = 考え中…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = 思考
+assistant-title = アシスタント
+settings-assistant-add = モデルを追加
+settings-assistant-add-button = 追加
+# $model is the model's name.
+settings-assistant-added = { $model }が応答したため、追加しました。
+settings-assistant-added-tag = 追加済み
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = アドレス（例：{ $example }）
+settings-assistant-change-key = キーを変更
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = OpenAI互換サーバ
+# The menu of how much a local model reads at once.
+settings-assistant-context = コンテキスト
+settings-assistant-context-note = 大きくすると、アシスタントがチャットのより多くの部分を覚えておけるようになりますが、モデルが使うメモリが増え、応答が遅くなることがあります。
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }Kトークン
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = ページを開く
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider }が{ $address }で動作しています。
+settings-assistant-found-none = { $provider }にはまだモデルがありません。{ $provider }でモデルをダウンロードしてから、再検索してください。
+settings-assistant-get-key = APIキーを取得
+settings-assistant-get-server = { $provider }を入手
+settings-assistant-in-use = 使用中
+settings-assistant-key = APIキー
+# $error is what the keychain said.
+settings-assistant-key-failed = キーをキーチェーンに保管できませんでした：{ $error }
+settings-assistant-key-kept = { $provider }のキーはシステムのキーチェーンに保管されています。
+settings-assistant-key-needed = このモデルにはAPIキーが必要です。
+settings-assistant-key-refused = { $provider }がこのキーを拒否しました。正しいアカウントのキーを、最後まで正確にコピーしたか確認してください。
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = { $provider }のサイトでキーを作成し、ここに貼り付けてください。
+settings-assistant-look-again = 再検索
+settings-assistant-looking = モデルを探しています…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = モデル（例：{ $example }）
+settings-assistant-no-server = このコンピュータで動作している{ $provider }が見つかりませんでした。{ $provider }を起動するか、下にアドレスを入力してください。
+settings-assistant-no-tools = ツールを使用できません（アシスタントに必要です）
+settings-assistant-none = モデルはまだありません。下で追加してください。Ollamaなどのローカルモデルはこのコンピュータ内で動作し、クラウドモデルにはプロバイダのAPIキーが必要です。
+settings-assistant-note = アシスタントパネルが使えるモデルです。キーはシステムのキーチェーンに保管されます。
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = 別のアドレスを使用
+settings-assistant-recommended = おすすめ
+settings-assistant-remove = 削除
+settings-assistant-sees = 画像を認識
+settings-assistant-trying = テスト中…
+settings-assistant-use = 使用
+settings-assistant-use-key = 続ける
+settings-assistant-uses-tools = ツールを使用

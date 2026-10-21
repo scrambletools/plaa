@@ -75,6 +75,7 @@ action-quality = गुणवत्ता
 action-visualizer = विज़ुअलाइज़र
 action-network = नेटवर्क ऑडियो
 action-cast = कास्ट करें
+action-assistant = असिस्टेंट
 
 ## What a sound file shows under its cover
 
@@ -169,6 +170,7 @@ settings-tab-playback = प्लेबैक
 settings-tab-network = नेटवर्क
 settings-tab-language = भाषा
 settings-tab-agents = एजेंट
+settings-tab-assistant = असिस्टेंट
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (डेवलपमेंट बिल्ड, { $build })
 settings-choose = चुनें…
@@ -543,9 +545,101 @@ agent-ask-body = { $agent } “{ $tool }” का उपयोग करना 
 ## Casting to a TV or speaker on the network
 
 cast-looking = टीवी और स्पीकर ढूँढे जा रहे हैं…
-cast-none = DLNA चलाने वाला कोई टीवी या स्पीकर नहीं मिला।
+cast-none = कोई टीवी, स्पीकर या Chromecast नहीं मिला।
 # $renderer is the TV's or speaker's name.
 cast-stop = { $renderer } पर चलाना बंद करें
 notice-casting = { $renderer } पर चल रहा है।
 notice-cast-failed = { $renderer } पर नहीं चलाया जा सका: { $reason }
 cast-web-page = वेब पेज अभी कास्ट नहीं किए जा सकते: इसके बजाय वीडियो का अपना पता खोलें।
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = मॉडल जोड़ें…
+assistant-add-model = असिस्टेंट को एक मॉडल चाहिए: अपनी API कुंजी के साथ क्लाउड मॉडल, या स्थानीय मॉडल।
+assistant-ask = जो चल रहा है, उसके बारे में पूछें
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = चैट इतनी लंबी हो रही थी कि { $model } उसे एक बार में नहीं पढ़ सकता, इसलिए उसके पहले हिस्से का सारांश बनाया गया। असिस्टेंट जो देख चुका है, उसे फिर से देख सकता है।
+assistant-compacting = पिछली चैट का सारांश बनाया जा रहा है
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = इस कंप्यूटर पर { $provider }
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $host } पर { $provider }
+assistant-new-chat = नई चैट
+assistant-no-model = पहले सेटिंग्स में एक मॉडल जोड़ें।
+assistant-open-settings = मॉडल जोड़ें
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = बातचीत अब उससे बड़ी हो गई है जितना { $model } एक बार में पढ़ सकता है। नई चैट शुरू करें, या ऐसा मॉडल चुनें जो ज़्यादा पढ़ सके।
+assistant-problem-credit = { $provider } के अनुसार खाते में कोई क्रेडिट नहीं है। नए खाते की कुंजी काम करे, इससे पहले { $provider } की साइट पर कुछ क्रेडिट खरीदना ज़रूरी है; उसके बाद फिर से कोशिश करें।
+assistant-problem-key = { $provider } ने API कुंजी अस्वीकार कर दी। इसे सेटिंग्स में जाँचें।
+assistant-problem-model = { $provider } में { $model } नाम का कोई मॉडल नहीं है। सेटिंग्स में इसका नाम जाँचें।
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } ने जवाब नहीं दिया: { $message }
+assistant-problem-rate = { $provider } धीमा चलने को कह रहा है। थोड़ी देर में फिर से कोशिश करें।
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } धीमा चलने को कह रहा है: { $message }
+assistant-problem-refused = { $model } ने जवाब देने से मना कर दिया।
+assistant-problem-unavailable = { $provider } व्यस्त है या उसमें कोई समस्या है। थोड़ी देर में फिर से कोशिश करें।
+assistant-problem-unreachable = plaa { $provider } तक नहीं पहुँच सका। अपना कनेक्शन जाँचें, या देखें कि सर्वर चल रहा है।
+assistant-running = चल रहा है…
+assistant-send = भेजें
+assistant-shortened = चैट इतनी लंबी थी कि { $model } उसे एक बार में नहीं पढ़ सकता, इसलिए पहले के टूल परिणाम हटा दिए गए। असिस्टेंट जो देख चुका है, उसे फिर से देख सकता है।
+assistant-stop = रोकें
+assistant-stopped = रोक दिया गया।
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = अब { $model } से बात हो रही है।
+assistant-thinking = सोच रहा है…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = विचार
+assistant-title = असिस्टेंट
+settings-assistant-add = मॉडल जोड़ें
+settings-assistant-add-button = जोड़ें
+# $model is the model's name.
+settings-assistant-added = { $model } ने जवाब दिया और जोड़ दिया गया।
+settings-assistant-added-tag = जोड़ा गया
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = पता, जैसे { $example }
+settings-assistant-change-key = कुंजी बदलें
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = OpenAI के साथ संगत सर्वर
+# The menu of how much a local model reads at once.
+settings-assistant-context = संदर्भ
+settings-assistant-context-note = ज़्यादा होने पर असिस्टेंट एक चैट का ज़्यादा हिस्सा याद रख सकता है, लेकिन मॉडल ज़्यादा मेमोरी लेता है और धीरे जवाब दे सकता है।
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K टोकन
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = पेज खोलें
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } { $address } पर चल रहा है।
+settings-assistant-found-none = { $provider } में अभी कोई मॉडल नहीं है। उससे एक डाउनलोड करें, फिर से खोजें।
+settings-assistant-get-key = API कुंजी पाएँ
+settings-assistant-get-server = { $provider } पाएँ
+settings-assistant-in-use = उपयोग में
+settings-assistant-key = API कुंजी
+# $error is what the keychain said.
+settings-assistant-key-failed = कुंजी कीचेन में नहीं रखी जा सकी: { $error }
+settings-assistant-key-kept = आपकी { $provider } कुंजी सिस्टम के कीचेन में रखी गई है।
+settings-assistant-key-needed = इस मॉडल को API कुंजी चाहिए।
+settings-assistant-key-refused = { $provider } ने यह कुंजी अस्वीकार कर दी। जाँचें कि यह पूरी और सही खाते से कॉपी की गई है।
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = { $provider } की साइट पर एक कुंजी बनाएँ और उसे यहाँ पेस्ट करें।
+settings-assistant-look-again = फिर से खोजें
+settings-assistant-looking = मॉडल खोजे जा रहे हैं…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = मॉडल, जैसे { $example }
+settings-assistant-no-server = plaa को इस कंप्यूटर पर कोई चलता हुआ { $provider } नहीं मिला। इसे शुरू करें, या नीचे इसका पता दें।
+settings-assistant-no-tools = टूल का उपयोग नहीं कर सकता, जिनकी असिस्टेंट को ज़रूरत है
+settings-assistant-none = अभी कोई मॉडल नहीं है। नीचे एक जोड़ें: स्थानीय मॉडल, जैसे Ollama का, इसी कंप्यूटर पर रहता है; क्लाउड मॉडल को अपने प्रदाता से API कुंजी चाहिए।
+settings-assistant-note = वे मॉडल जिनसे असिस्टेंट पैनल बात कर सकता है। कुंजियाँ सिस्टम के कीचेन में रखी जाती हैं।
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = दूसरा पता उपयोग करें
+settings-assistant-recommended = सुझाया गया
+settings-assistant-remove = हटाएँ
+settings-assistant-sees = तस्वीरें देखता है
+settings-assistant-trying = आज़माया जा रहा है…
+settings-assistant-use = उपयोग करें
+settings-assistant-use-key = जारी रखें
+settings-assistant-uses-tools = टूल का उपयोग करता है

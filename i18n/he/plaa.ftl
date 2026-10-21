@@ -83,6 +83,7 @@ action-quality = איכות
 action-visualizer = ויזואליזציה
 action-network = שמע ברשת
 action-cast = העברה
+action-assistant = עוזר
 
 ## What a sound file shows under its cover
 
@@ -177,6 +178,7 @@ settings-tab-playback = ניגון
 settings-tab-network = רשת
 settings-tab-language = שפה
 settings-tab-agents = סוכנים
+settings-tab-assistant = עוזר
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (גרסת פיתוח, { $build })
 settings-choose = בחירה…
@@ -555,9 +557,101 @@ agent-ask-body = { $agent } מבקש להשתמש ב-"{ $tool }". בהגדרות
 ## Casting to a TV or speaker on the network
 
 cast-looking = מחפש טלוויזיות ורמקולים…
-cast-none = לא נמצאו טלוויזיות או רמקולים שתומכים ב-DLNA.
+cast-none = לא נמצאו טלוויזיות, רמקולים או מכשירי Chromecast.
 # $renderer is the TV's or speaker's name.
 cast-stop = הפסקת הניגון ב-{ $renderer }
 notice-casting = מתנגן ב-{ $renderer }.
 notice-cast-failed = לא ניתן לנגן ב-{ $renderer }: { $reason }
 cast-web-page = עדיין אי אפשר להעביר דפי אינטרנט: במקום זאת יש לפתוח את הכתובת של הסרטון עצמו.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = הוספת מודל…
+assistant-add-model = העוזר צריך מודל: מודל בענן עם מפתח ה-API שלו, או מודל מקומי.
+assistant-ask = שאלה על מה שמתנגן
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = השיחה התארכה מעבר למה ש-{ $model } יכול לקרוא בבת אחת, ולכן החלק המוקדם שלה סוכם. ייתכן שהעוזר יסתכל שוב על מה שראה.
+assistant-compacting = מסכם את תחילת השיחה
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } במחשב הזה
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } בכתובת { $host }
+assistant-new-chat = שיחה חדשה
+assistant-no-model = קודם צריך להוסיף מודל בהגדרות.
+assistant-open-settings = הוספת מודל
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = השיחה כבר גדולה ממה ש-{ $model } יכול לקרוא בבת אחת. אפשר להתחיל שיחה חדשה, או לבחור מודל שיכול לקרוא יותר.
+assistant-problem-credit = לפי { $provider }, אין בחשבון קרדיט. בחשבון חדש צריך לקנות קרדיט באתר של { $provider } לפני שהמפתח יעבוד; אחר כך אפשר לנסות שוב.
+assistant-problem-key = { $provider } דחה את מפתח ה-API. אפשר לבדוק אותו בהגדרות.
+assistant-problem-model = ל-{ $provider } אין מודל בשם { $model }. אפשר לבדוק את השם שלו בהגדרות.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } לא ענה: { $message }
+assistant-problem-rate = { $provider } מבקש להאט. אפשר לנסות שוב בעוד רגע.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } מבקש להאט: { $message }
+assistant-problem-refused = { $model } סירב לענות.
+assistant-problem-unavailable = { $provider } עמוס או שיש בו תקלה. אפשר לנסות שוב בעוד רגע.
+assistant-problem-unreachable = plaa לא הצליח להתחבר ל-{ $provider }. כדאי לבדוק את החיבור, או שהשרת פועל.
+assistant-running = פועל…
+assistant-send = שליחה
+assistant-shortened = השיחה הייתה ארוכה ממה ש-{ $model } יכול לקרוא בבת אחת, ולכן תוצאות קודמות של כלים הושמטו. ייתכן שהעוזר יסתכל שוב על מה שראה.
+assistant-stop = עצירה
+assistant-stopped = נעצר.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = השיחה עכשיו עם { $model }.
+assistant-thinking = חושב…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = מחשבות
+assistant-title = עוזר
+settings-assistant-add = הוספת מודל
+settings-assistant-add-button = הוספה
+# $model is the model's name.
+settings-assistant-added = { $model } ענה ונוסף.
+settings-assistant-added-tag = נוסף
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = כתובת, למשל { $example }
+settings-assistant-change-key = החלפת המפתח
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = שרת תואם OpenAI
+# The menu of how much a local model reads at once.
+settings-assistant-context = הקשר
+settings-assistant-context-note = ערך גבוה יותר מאפשר לעוזר לזכור חלק גדול יותר מהשיחה, אבל המודל צורך יותר זיכרון ועשוי לענות לאט יותר.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K טוקנים
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = פתיחת הדף
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } פועל בכתובת { $address }.
+settings-assistant-found-none = אין עדיין מודלים ב-{ $provider }. אפשר להוריד מודל דרכו ואז לחפש שוב.
+settings-assistant-get-key = קבלת מפתח API
+settings-assistant-get-server = הורדת { $provider }
+settings-assistant-in-use = בשימוש
+settings-assistant-key = מפתח API
+# $error is what the keychain said.
+settings-assistant-key-failed = לא ניתן לשמור את המפתח בצרור המפתחות: { $error }
+settings-assistant-key-kept = המפתח שלך ל-{ $provider } נשמר בצרור המפתחות של המערכת.
+settings-assistant-key-needed = המודל הזה צריך מפתח API.
+settings-assistant-key-refused = { $provider } דחה את המפתח הזה. כדאי לבדוק שהוא הועתק במלואו ומהחשבון הנכון.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = יש ליצור מפתח באתר של { $provider } ולהדביק אותו כאן.
+settings-assistant-look-again = חיפוש חוזר
+settings-assistant-looking = מחפש מודלים…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = מודל, למשל { $example }
+settings-assistant-no-server = plaa לא מצא { $provider } שפועל במחשב הזה. אפשר להפעיל אותו, או לתת את הכתובת שלו למטה.
+settings-assistant-no-tools = לא יכול להשתמש בכלים, והעוזר זקוק להם
+settings-assistant-none = אין עדיין מודלים. אפשר להוסיף אחד למטה: מודל מקומי, כמו של Ollama, נשאר במחשב הזה; מודל בענן צריך מפתח API מהספק שלו.
+settings-assistant-note = המודלים שחלונית העוזר יכולה לדבר איתם. המפתחות נשמרים בצרור המפתחות של המערכת.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = שימוש בכתובת אחרת
+settings-assistant-recommended = מומלץ
+settings-assistant-remove = הסרה
+settings-assistant-sees = רואה תמונות
+settings-assistant-trying = מנסה…
+settings-assistant-use = שימוש
+settings-assistant-use-key = המשך
+settings-assistant-uses-tools = משתמש בכלים

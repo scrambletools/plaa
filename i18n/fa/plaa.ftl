@@ -75,6 +75,7 @@ action-quality = کیفیت
 action-visualizer = نمایش بصری
 action-network = صدای شبکه
 action-cast = ارسال محتوا
+action-assistant = دستیار
 
 ## What a sound file shows under its cover
 
@@ -169,6 +170,7 @@ settings-tab-playback = پخش
 settings-tab-network = شبکه
 settings-tab-language = زبان
 settings-tab-agents = عامل‌ها
+settings-tab-assistant = دستیار
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (نسخهٔ توسعه، { $build })
 settings-choose = انتخاب…
@@ -540,9 +542,101 @@ agent-ask-body = { $agent } می‌خواهد از «{ $tool }» استفاده 
 ## Casting to a TV or speaker on the network
 
 cast-looking = در حال جستجوی تلویزیون‌ها و بلندگوها…
-cast-none = هیچ تلویزیون یا بلندگویی که از DLNA پشتیبانی کند پیدا نشد.
+cast-none = هیچ تلویزیون، بلندگو یا Chromecast پیدا نشد.
 # $renderer is the TV's or speaker's name.
 cast-stop = توقف پخش روی { $renderer }
 notice-casting = در حال پخش روی { $renderer }.
 notice-cast-failed = پخش روی { $renderer } ممکن نشد: { $reason }
 cast-web-page = ارسال محتوای صفحه‌های وب هنوز ممکن نیست: به‌جای آن نشانی خود ویدیو را باز کنید.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = افزودن مدل…
+assistant-add-model = دستیار به یک مدل نیاز دارد: مدلی ابری با کلید API آن، یا مدلی محلی.
+assistant-ask = دربارهٔ آنچه پخش می‌شود بپرسید
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = گفتگو برای اینکه { $model } یک‌جا بخواند بیش از حد طولانی می‌شد، پس بخش قبلی آن خلاصه شد. ممکن است دستیار دوباره به آنچه دیده نگاهی بیندازد.
+assistant-compacting = در حال خلاصه کردن بخش قبلی گفتگو
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } روی این رایانه
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } در { $host }
+assistant-new-chat = گفتگوی تازه
+assistant-no-model = اول در تنظیمات یک مدل اضافه کنید.
+assistant-open-settings = افزودن مدل
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = گفتگو از آنچه { $model } می‌تواند یک‌جا بخواند بزرگ‌تر شده است. گفتگوی تازه‌ای شروع کنید، یا مدلی را انتخاب کنید که بیشتر می‌خواند.
+assistant-problem-credit = { $provider } می‌گوید حساب اعتباری ندارد. برای حساب تازه باید پیش از کار کردن کلیدش مقداری اعتبار از سایت { $provider } خرید؛ سپس دوباره امتحان کنید.
+assistant-problem-key = { $provider } کلید API را نپذیرفت. آن را در تنظیمات بررسی کنید.
+assistant-problem-model = { $provider } مدلی به نام { $model } ندارد. نام آن را در تنظیمات بررسی کنید.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } پاسخ نداد: { $message }
+assistant-problem-rate = { $provider } می‌خواهد درخواست‌ها آهسته‌تر باشند. کمی بعد دوباره امتحان کنید.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } می‌خواهد درخواست‌ها آهسته‌تر باشند: { $message }
+assistant-problem-refused = { $model } از پاسخ دادن خودداری کرد.
+assistant-problem-unavailable = { $provider } مشغول است یا مشکلی دارد. کمی بعد دوباره امتحان کنید.
+assistant-problem-unreachable = plaa نتوانست به { $provider } دسترسی پیدا کند. اتصال خود را بررسی کنید، یا اینکه سرور در حال اجرا باشد.
+assistant-running = در حال اجرا…
+assistant-send = ارسال
+assistant-shortened = گفتگو برای اینکه { $model } یک‌جا بخواند بیش از حد طولانی بود، پس نتیجه‌های قبلی ابزارها کنار گذاشته شد. ممکن است دستیار دوباره به آنچه دیده نگاهی بیندازد.
+assistant-stop = توقف
+assistant-stopped = متوقف شد.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = اکنون در گفتگو با { $model }.
+assistant-thinking = در حال فکر کردن…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = افکار
+assistant-title = دستیار
+settings-assistant-add = افزودن مدل
+settings-assistant-add-button = افزودن
+# $model is the model's name.
+settings-assistant-added = { $model } پاسخ داد و افزوده شد.
+settings-assistant-added-tag = افزوده شد
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = نشانی، مانند { $example }
+settings-assistant-change-key = تغییر کلید
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = سرور سازگار با OpenAI
+# The menu of how much a local model reads at once.
+settings-assistant-context = زمینه
+settings-assistant-context-note = مقدار بیشتر به دستیار امکان می‌دهد بخش بیشتری از یک گفتگو را در ذهن نگه دارد، اما مدل حافظهٔ بیشتری می‌گیرد و ممکن است کندتر پاسخ دهد.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands } هزار توکن
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = باز کردن صفحه
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } در { $address } در حال اجراست.
+settings-assistant-found-none = { $provider } هنوز مدلی ندارد. با آن یک مدل بارگیری کنید، سپس دوباره جستجو کنید.
+settings-assistant-get-key = گرفتن کلید API
+settings-assistant-get-server = دریافت { $provider }
+settings-assistant-in-use = در حال استفاده
+settings-assistant-key = کلید API
+# $error is what the keychain said.
+settings-assistant-key-failed = کلید در جاکلیدی نگه داشته نشد: { $error }
+settings-assistant-key-kept = کلید { $provider } شما در جاکلیدی سیستم نگه داشته می‌شود.
+settings-assistant-key-needed = این مدل به کلید API نیاز دارد.
+settings-assistant-key-refused = { $provider } این کلید را نپذیرفت. بررسی کنید که کامل و از حساب درست کپی شده باشد.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = در سایت { $provider } یک کلید بسازید و آن را اینجا بچسبانید.
+settings-assistant-look-again = جستجوی دوباره
+settings-assistant-looking = در حال جستجوی مدل‌ها…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = مدل، مانند { $example }
+settings-assistant-no-server = plaa هیچ { $provider } در حال اجرایی روی این رایانه پیدا نکرد. آن را اجرا کنید، یا نشانی‌اش را در پایین وارد کنید.
+settings-assistant-no-tools = نمی‌تواند از ابزارها استفاده کند، که دستیار به آن‌ها نیاز دارد
+settings-assistant-none = هنوز مدلی نیست. یکی را در پایین اضافه کنید: مدل محلی، مانند مدل‌های Ollama، روی همین رایانه می‌ماند؛ مدل ابری به کلید API از ارائه‌دهندهٔ خود نیاز دارد.
+settings-assistant-note = مدل‌هایی که پنل دستیار می‌تواند با آن‌ها گفتگو کند. کلیدها در جاکلیدی سیستم نگه داشته می‌شوند.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = استفاده از نشانی دیگر
+settings-assistant-recommended = پیشنهادی
+settings-assistant-remove = حذف
+settings-assistant-sees = تصویر می‌بیند
+settings-assistant-trying = در حال امتحان…
+settings-assistant-use = استفاده
+settings-assistant-use-key = ادامه
+settings-assistant-uses-tools = از ابزارها استفاده می‌کند

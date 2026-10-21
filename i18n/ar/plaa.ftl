@@ -89,6 +89,7 @@ action-quality = الجودة
 action-visualizer = المؤثرات المرئية
 action-network = الصوت عبر الشبكة
 action-cast = إرسال
+action-assistant = المساعد
 
 ## What a sound file shows under its cover
 
@@ -183,6 +184,7 @@ settings-tab-playback = التشغيل
 settings-tab-network = الشبكة
 settings-tab-language = اللغة
 settings-tab-agents = الوكلاء
+settings-tab-assistant = المساعد
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (إصدار تطويري، { $build })
 settings-choose = اختيار…
@@ -568,9 +570,101 @@ agent-ask-body = يطلب { $agent } استخدام “{ $tool }”. تحدد ا
 ## Casting to a TV or speaker on the network
 
 cast-looking = جارٍ البحث عن أجهزة تلفزيون ومكبّرات صوت…
-cast-none = لم يُعثر على تلفزيون أو مكبّر صوت يدعم DLNA.
+cast-none = لم يُعثر على تلفزيون أو مكبّر صوت أو Chromecast.
 # $renderer is the TV's or speaker's name.
 cast-stop = إيقاف التشغيل على { $renderer }
 notice-casting = جارٍ التشغيل على { $renderer }.
 notice-cast-failed = تعذّر التشغيل على { $renderer }: { $reason }
 cast-web-page = لا يمكن إرسال صفحات الويب بعد: افتح عنوان الفيديو نفسه بدلًا من ذلك.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = إضافة نموذج…
+assistant-add-model = يحتاج المساعد إلى نموذج: نموذج سحابي مع مفتاح API الخاص به، أو نموذج محلي.
+assistant-ask = اسأل عمّا يُشغَّل
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = أصبحت المحادثة أطول من أن يقرأها { $model } دفعة واحدة، لذا لُخّص جزؤها الأول. قد يلقي المساعد نظرة أخرى على ما رآه.
+assistant-compacting = جارٍ تلخيص بداية المحادثة
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } على هذا الكمبيوتر
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } على { $host }
+assistant-new-chat = محادثة جديدة
+assistant-no-model = أضف نموذجًا في الإعدادات أولًا.
+assistant-open-settings = إضافة نموذج
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = أصبحت المحادثة أكبر مما يستطيع { $model } قراءته دفعة واحدة. ابدأ محادثة جديدة، أو اختر نموذجًا يستطيع قراءة المزيد.
+assistant-problem-credit = يقول { $provider } إن الحساب لا يحتوي على رصيد. يحتاج الحساب الجديد إلى شراء بعض الرصيد على موقع { $provider } قبل أن يعمل مفتاحه؛ ثم حاول مرة أخرى.
+assistant-problem-key = رفض { $provider } مفتاح API. تحقّق منه في الإعدادات.
+assistant-problem-model = لا يوجد لدى { $provider } نموذج باسم { $model }. تحقّق من اسمه في الإعدادات.
+# $message is what the provider said, untranslated.
+assistant-problem-other = لم يُجب { $model }: { $message }
+assistant-problem-rate = يطلب { $provider } الإبطاء. حاول مرة أخرى بعد لحظة.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = يطلب { $provider } الإبطاء: { $message }
+assistant-problem-refused = رفض { $model } الإجابة.
+assistant-problem-unavailable = { $provider } مشغول أو يواجه مشكلة. حاول مرة أخرى بعد لحظة.
+assistant-problem-unreachable = تعذّر على plaa الوصول إلى { $provider }. تحقّق من اتصالك، أو من أن الخادم يعمل.
+assistant-running = جارٍ التشغيل…
+assistant-send = إرسال
+assistant-shortened = كانت المحادثة أطول من أن يقرأها { $model } دفعة واحدة، لذا حُذفت نتائج الأدوات السابقة. قد يلقي المساعد نظرة أخرى على ما رآه.
+assistant-stop = إيقاف
+assistant-stopped = تم الإيقاف.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = المحادثة الآن مع { $model }.
+assistant-thinking = جارٍ التفكير…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = الأفكار
+assistant-title = المساعد
+settings-assistant-add = إضافة نموذج
+settings-assistant-add-button = إضافة
+# $model is the model's name.
+settings-assistant-added = أجاب { $model } وتمت إضافته.
+settings-assistant-added-tag = مُضاف
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = العنوان، مثل { $example }
+settings-assistant-change-key = تغيير المفتاح
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = خادم متوافق مع OpenAI
+# The menu of how much a local model reads at once.
+settings-assistant-context = السياق
+settings-assistant-context-note = يتيح الحجم الأكبر للمساعد أن يبقي في ذهنه جزءًا أكبر من المحادثة، لكن النموذج يستهلك ذاكرة أكثر وقد يجيب بشكل أبطأ.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands } ألف رمز مميز
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = فتح الصفحة
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } يعمل على { $address }.
+settings-assistant-found-none = لا توجد نماذج في { $provider } بعد. نزّل نموذجًا باستخدامه، ثم ابحث مرة أخرى.
+settings-assistant-get-key = الحصول على مفتاح API
+settings-assistant-get-server = الحصول على { $provider }
+settings-assistant-in-use = قيد الاستخدام
+settings-assistant-key = مفتاح API
+# $error is what the keychain said.
+settings-assistant-key-failed = تعذّر حفظ المفتاح في سلسلة المفاتيح: { $error }
+settings-assistant-key-kept = مفتاح { $provider } الخاص بك محفوظ في سلسلة مفاتيح النظام.
+settings-assistant-key-needed = يحتاج هذا النموذج إلى مفتاح API.
+settings-assistant-key-refused = رفض { $provider } هذا المفتاح. تحقّق من أنه نُسخ كاملًا ومن الحساب الصحيح.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = أنشئ مفتاحًا على موقع { $provider } والصقه هنا.
+settings-assistant-look-again = البحث مرة أخرى
+settings-assistant-looking = جارٍ البحث عن النماذج…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = النموذج، مثل { $example }
+settings-assistant-no-server = لم يجد plaa أي { $provider } يعمل على هذا الكمبيوتر. شغّله، أو أدخل عنوانه أدناه.
+settings-assistant-no-tools = لا يمكنه استخدام الأدوات، وهي ما يحتاج إليه المساعد
+settings-assistant-none = لا توجد نماذج بعد. أضف نموذجًا أدناه: النموذج المحلي، مثل نماذج Ollama، يبقى على هذا الكمبيوتر؛ والنموذج السحابي يحتاج إلى مفتاح API من مزوّده.
+settings-assistant-note = النماذج التي يمكن للوحة المساعد التحدث إليها. تُحفظ المفاتيح في سلسلة مفاتيح النظام.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = استخدام عنوان آخر
+settings-assistant-recommended = موصى به
+settings-assistant-remove = إزالة
+settings-assistant-sees = يرى الصور
+settings-assistant-trying = جارٍ التجربة…
+settings-assistant-use = استخدام
+settings-assistant-use-key = متابعة
+settings-assistant-uses-tools = يستخدم الأدوات

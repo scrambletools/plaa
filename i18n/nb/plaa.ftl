@@ -81,6 +81,7 @@ action-quality = Kvalitet
 action-visualizer = Visualisering
 action-network = Nettverkslyd
 action-cast = Cast
+action-assistant = Assistent
 
 ## What a sound file shows under its cover
 
@@ -175,6 +176,7 @@ settings-tab-playback = Avspilling
 settings-tab-network = Nettverk
 settings-tab-language = Språk
 settings-tab-agents = Agenter
+settings-tab-assistant = Assistent
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (utviklerversjon, { $build })
 settings-choose = Velg…
@@ -549,9 +551,101 @@ agent-ask-body = { $agent } ber om å bruke «{ $tool }». I Innstillinger velge
 ## Casting to a TV or speaker on the network
 
 cast-looking = Ser etter TV-er og høyttalere…
-cast-none = Fant ingen TV eller høyttaler som spiller av via DLNA.
+cast-none = Fant ingen TV, høyttaler eller Chromecast.
 # $renderer is the TV's or speaker's name.
 cast-stop = Slutt å spille av på { $renderer }
 notice-casting = Spiller av på { $renderer }.
 notice-cast-failed = Kunne ikke spille av på { $renderer }: { $reason }
 cast-web-page = Nettsider kan ikke castes ennå: åpne videoens egen adresse i stedet.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Legg til en modell…
+assistant-add-model = Assistenten trenger en modell: en skymodell med API-nøkkelen sin, eller en lokal modell.
+assistant-ask = Spør om det som spilles
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = Chatten begynte å bli for lang til at { $model } kan lese den på én gang, så den tidligere delen ble oppsummert. Assistenten ser kanskje på nytt på det den så.
+assistant-compacting = Oppsummerer den tidligere delen av chatten
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } på denne datamaskinen
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } på { $host }
+assistant-new-chat = Ny chat
+assistant-no-model = Legg til en modell i Innstillinger først.
+assistant-open-settings = Legg til en modell
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = Samtalen får ikke lenger plass i det { $model } kan lese på én gang. Start en ny chat, eller velg en modell som kan lese mer.
+assistant-problem-credit = { $provider } sier at kontoen ikke har noen saldo. For en ny konto må saldoen først fylles på via nettstedet til { $provider } før nøkkelen virker; prøv så igjen.
+assistant-problem-key = { $provider } avviste API-nøkkelen. Sjekk den i Innstillinger.
+assistant-problem-model = { $provider } har ingen modell som heter { $model }. Sjekk navnet i Innstillinger.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } svarte ikke: { $message }
+assistant-problem-rate = { $provider } ber deg om å ta det roligere. Prøv igjen om litt.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } ber deg om å ta det roligere: { $message }
+assistant-problem-refused = { $model } avslo å svare.
+assistant-problem-unavailable = { $provider } er opptatt eller har problemer. Prøv igjen om litt.
+assistant-problem-unreachable = plaa fikk ikke kontakt med { $provider }. Sjekk tilkoblingen, eller at serveren kjører.
+assistant-running = Kjører…
+assistant-send = Send
+assistant-shortened = Chatten var for lang til at { $model } kan lese den på én gang, så tidligere verktøyresultater ble utelatt. Assistenten ser kanskje på nytt på det den så.
+assistant-stop = Stopp
+assistant-stopped = Stoppet.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Snakker nå med { $model }.
+assistant-thinking = Tenker…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Tanker
+assistant-title = Assistent
+settings-assistant-add = Legg til en modell
+settings-assistant-add-button = Legg til
+# $model is the model's name.
+settings-assistant-added = { $model } svarte og er lagt til.
+settings-assistant-added-tag = Lagt til
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Adresse, for eksempel { $example }
+settings-assistant-change-key = Endre nøkkel
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = OpenAI-kompatibel server
+# The menu of how much a local model reads at once.
+settings-assistant-context = Kontekst
+settings-assistant-context-note = Mer lar assistenten huske mer av en chat, men modellen bruker mer minne og kan svare tregere.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K tokens
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Åpne siden
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } kjører på { $address }.
+settings-assistant-found-none = { $provider } har ingen modeller ennå. Last ned en med den, og søk så igjen.
+settings-assistant-get-key = Skaff en API-nøkkel
+settings-assistant-get-server = Last ned { $provider }
+settings-assistant-in-use = I bruk
+settings-assistant-key = API-nøkkel
+# $error is what the keychain said.
+settings-assistant-key-failed = Nøkkelen kunne ikke lagres i nøkkelringen: { $error }
+settings-assistant-key-kept = Nøkkelen din for { $provider } oppbevares i systemets nøkkelring.
+settings-assistant-key-needed = Denne modellen trenger en API-nøkkel.
+settings-assistant-key-refused = { $provider } avviste denne nøkkelen. Sjekk at den ble kopiert i sin helhet, fra riktig konto.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Lag en nøkkel på nettstedet til { $provider }, og lim den inn her.
+settings-assistant-look-again = Søk igjen
+settings-assistant-looking = Ser etter modeller…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Modell, for eksempel { $example }
+settings-assistant-no-server = plaa fant ingen { $provider } som kjører på denne datamaskinen. Start den, eller oppgi adressen nedenfor.
+settings-assistant-no-tools = Kan ikke bruke verktøy, som assistenten trenger
+settings-assistant-none = Ingen modeller ennå. Legg til en nedenfor: en lokal modell, som den fra Ollama, blir på denne datamaskinen; en skymodell trenger en API-nøkkel fra leverandøren.
+settings-assistant-note = Modellene assistenten kan snakke med. Nøkler oppbevares i systemets nøkkelring.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Bruk en annen adresse
+settings-assistant-recommended = Anbefalt
+settings-assistant-remove = Fjern
+settings-assistant-sees = Ser bilder
+settings-assistant-trying = Prøver…
+settings-assistant-use = Bruk
+settings-assistant-use-key = Fortsett
+settings-assistant-uses-tools = Bruker verktøy

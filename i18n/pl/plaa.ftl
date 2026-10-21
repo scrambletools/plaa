@@ -85,6 +85,7 @@ action-quality = Jakość
 action-visualizer = Wizualizacja
 action-network = Dźwięk sieciowy
 action-cast = Przesyłaj
+action-assistant = Asystent
 
 ## What a sound file shows under its cover
 
@@ -179,6 +180,7 @@ settings-tab-playback = Odtwarzanie
 settings-tab-network = Sieć
 settings-tab-language = Język
 settings-tab-agents = Agenci
+settings-tab-assistant = Asystent
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (wersja deweloperska, { $build })
 settings-choose = Wybierz…
@@ -560,9 +562,101 @@ agent-ask-body = { $agent } prosi o użycie narzędzia „{ $tool }”. W Ustawi
 ## Casting to a TV or speaker on the network
 
 cast-looking = Wyszukiwanie telewizorów i głośników…
-cast-none = Nie znaleziono telewizora ani głośnika obsługującego DLNA.
+cast-none = Nie znaleziono telewizora, głośnika ani urządzenia Chromecast.
 # $renderer is the TV's or speaker's name.
 cast-stop = Zatrzymaj odtwarzanie na { $renderer }
 notice-casting = Odtwarzanie na { $renderer }.
 notice-cast-failed = Nie można odtwarzać na { $renderer }: { $reason }
 cast-web-page = Stron internetowych nie można jeszcze przesyłać: otwórz zamiast tego adres samego filmu.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Dodaj model…
+assistant-add-model = Asystent potrzebuje modelu: modelu w chmurze z kluczem API albo modelu lokalnego.
+assistant-ask = Zapytaj o to, co jest odtwarzane
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = Czat robił się za długi, by { $model } mógł go przeczytać naraz, więc jego wcześniejsza część została podsumowana. Asystent może ponownie przyjrzeć się temu, co widział.
+assistant-compacting = Podsumowywanie wcześniejszej części czatu
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } na tym komputerze
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } pod adresem { $host }
+assistant-new-chat = Nowy czat
+assistant-no-model = Najpierw dodaj model w Ustawieniach.
+assistant-open-settings = Dodaj model
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = Rozmowa nie mieści się już w tym, co model { $model } może przeczytać naraz. Zacznij nowy czat albo wybierz model, który przeczyta więcej.
+assistant-problem-credit = Dostawca { $provider } informuje, że na koncie nie ma środków. Na nowym koncie trzeba najpierw doładować środki na stronie dostawcy { $provider }, zanim klucz zacznie działać; potem spróbuj ponownie.
+assistant-problem-key = Dostawca { $provider } odrzucił klucz API. Sprawdź go w Ustawieniach.
+assistant-problem-model = Dostawca { $provider } nie ma modelu o nazwie { $model }. Sprawdź jego nazwę w Ustawieniach.
+# $message is what the provider said, untranslated.
+assistant-problem-other = Model { $model } nie odpowiedział: { $message }
+assistant-problem-rate = Dostawca { $provider } prosi o zwolnienie tempa. Spróbuj ponownie za chwilę.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = Dostawca { $provider } prosi o zwolnienie tempa: { $message }
+assistant-problem-refused = Model { $model } odmówił odpowiedzi.
+assistant-problem-unavailable = Dostawca { $provider } jest przeciążony lub ma problemy. Spróbuj ponownie za chwilę.
+assistant-problem-unreachable = plaa nie może połączyć się z dostawcą { $provider }. Sprawdź połączenie lub to, czy serwer działa.
+assistant-running = Wykonywanie…
+assistant-send = Wyślij
+assistant-shortened = Czat był za długi, by { $model } mógł go przeczytać naraz, więc pominięto wcześniejsze wyniki narzędzi. Asystent może ponownie przyjrzeć się temu, co widział.
+assistant-stop = Zatrzymaj
+assistant-stopped = Zatrzymano.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Teraz rozmawiasz z modelem { $model }.
+assistant-thinking = Myślenie…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Przemyślenia
+assistant-title = Asystent
+settings-assistant-add = Dodaj model
+settings-assistant-add-button = Dodaj
+# $model is the model's name.
+settings-assistant-added = Model { $model } odpowiedział i został dodany.
+settings-assistant-added-tag = Dodany
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Adres, np. { $example }
+settings-assistant-change-key = Zmień klucz
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = Serwer zgodny z OpenAI
+# The menu of how much a local model reads at once.
+settings-assistant-context = Kontekst
+settings-assistant-context-note = Większy kontekst pozwala asystentowi mieć na uwadze większą część czatu, ale model zajmuje więcej pamięci i może odpowiadać wolniej.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands } tys. tokenów
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Otwórz stronę
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = Serwer { $provider } działa pod adresem { $address }.
+settings-assistant-found-none = Serwer { $provider } nie ma jeszcze modeli. Pobierz w nim jakiś model, a potem wyszukaj ponownie.
+settings-assistant-get-key = Uzyskaj klucz API
+settings-assistant-get-server = Pobierz { $provider }
+settings-assistant-in-use = W użyciu
+settings-assistant-key = Klucz API
+# $error is what the keychain said.
+settings-assistant-key-failed = Nie udało się zapisać klucza w pęku kluczy: { $error }
+settings-assistant-key-kept = Twój klucz dostawcy { $provider } jest przechowywany w systemowym pęku kluczy.
+settings-assistant-key-needed = Ten model wymaga klucza API.
+settings-assistant-key-refused = Dostawca { $provider } odrzucił ten klucz. Sprawdź, czy został skopiowany w całości i z właściwego konta.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Utwórz klucz na stronie dostawcy { $provider } i wklej go tutaj.
+settings-assistant-look-again = Szukaj ponownie
+settings-assistant-looking = Wyszukiwanie modeli…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Model, np. { $example }
+settings-assistant-no-server = Na tym komputerze nie znaleziono działającego serwera { $provider }. Uruchom go albo podaj jego adres poniżej.
+settings-assistant-no-tools = Nie umie używać narzędzi, których potrzebuje asystent
+settings-assistant-none = Nie ma jeszcze modeli. Dodaj model poniżej: model lokalny, na przykład w Ollama, pozostaje na tym komputerze; model w chmurze wymaga klucza API od swojego dostawcy.
+settings-assistant-note = Modele, z którymi może rozmawiać panel asystenta. Klucze są przechowywane w systemowym pęku kluczy.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Użyj innego adresu
+settings-assistant-recommended = Zalecany
+settings-assistant-remove = Usuń
+settings-assistant-sees = Rozpoznaje obrazy
+settings-assistant-trying = Sprawdzanie…
+settings-assistant-use = Użyj
+settings-assistant-use-key = Dalej
+settings-assistant-uses-tools = Używa narzędzi

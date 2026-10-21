@@ -82,6 +82,7 @@ action-quality = Kwaliteit
 action-visualizer = Visualisatie
 action-network = Netwerkaudio
 action-cast = Casten
+action-assistant = Assistent
 
 ## What a sound file shows under its cover
 
@@ -176,6 +177,7 @@ settings-tab-playback = Afspelen
 settings-tab-network = Netwerk
 settings-tab-language = Taal
 settings-tab-agents = Agents
+settings-tab-assistant = Assistent
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (ontwikkelversie, { $build })
 settings-choose = Kiezen…
@@ -550,9 +552,101 @@ agent-ask-body = { $agent } vraagt om ‘{ $tool }’ te gebruiken. In Instellin
 ## Casting to a TV or speaker on the network
 
 cast-looking = Tv's en speakers zoeken…
-cast-none = Er is geen tv of speaker met DLNA gevonden.
+cast-none = Er is geen tv, speaker of Chromecast gevonden.
 # $renderer is the TV's or speaker's name.
 cast-stop = Stoppen met afspelen op { $renderer }
 notice-casting = Afspelen op { $renderer }.
 notice-cast-failed = Kan niet afspelen op { $renderer }: { $reason }
 cast-web-page = Webpagina's kunnen nog niet worden gecast: open in plaats daarvan het eigen adres van de video.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Model toevoegen…
+assistant-add-model = De assistent heeft een model nodig: een cloudmodel met de bijbehorende API-sleutel, of een lokaal model.
+assistant-ask = Vraag iets over wat er speelt
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = De chat werd te lang voor { $model } om in één keer te lezen, dus het eerdere deel is samengevat. De assistent kijkt misschien nog eens naar wat hij heeft gezien.
+assistant-compacting = Het eerdere deel van de chat wordt samengevat
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } op deze computer
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } op { $host }
+assistant-new-chat = Nieuwe chat
+assistant-no-model = Voeg eerst een model toe in Instellingen.
+assistant-open-settings = Model toevoegen
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = Het gesprek past niet meer in wat { $model } in één keer kan lezen. Begin een nieuwe chat, of kies een model dat meer kan lezen.
+assistant-problem-credit = { $provider } meldt dat het account geen tegoed heeft. Voor een nieuw account moet je eerst tegoed kopen op de site van { $provider } voordat de sleutel werkt; probeer het daarna opnieuw.
+assistant-problem-key = { $provider } heeft de API-sleutel geweigerd. Controleer die in Instellingen.
+assistant-problem-model = { $provider } heeft geen model met de naam { $model }. Controleer de naam in Instellingen.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } heeft niet geantwoord: { $message }
+assistant-problem-rate = { $provider } vraagt om het rustiger aan te doen. Probeer het zo opnieuw.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } vraagt om het rustiger aan te doen: { $message }
+assistant-problem-refused = { $model } weigerde te antwoorden.
+assistant-problem-unavailable = { $provider } is bezet of heeft problemen. Probeer het zo opnieuw.
+assistant-problem-unreachable = plaa kon { $provider } niet bereiken. Controleer je verbinding, of dat de server draait.
+assistant-running = Bezig…
+assistant-send = Versturen
+assistant-shortened = De chat was te lang voor { $model } om in één keer te lezen, dus eerdere resultaten van tools zijn weggelaten. De assistent kijkt misschien nog eens naar wat hij heeft gezien.
+assistant-stop = Stoppen
+assistant-stopped = Gestopt.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Je praat nu met { $model }.
+assistant-thinking = Denkt na…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Gedachten
+assistant-title = Assistent
+settings-assistant-add = Model toevoegen
+settings-assistant-add-button = Toevoegen
+# $model is the model's name.
+settings-assistant-added = { $model } heeft geantwoord en is toegevoegd.
+settings-assistant-added-tag = Toegevoegd
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Adres, bijvoorbeeld { $example }
+settings-assistant-change-key = Sleutel wijzigen
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = OpenAI-compatibele server
+# The menu of how much a local model reads at once.
+settings-assistant-context = Context
+settings-assistant-context-note = Met meer kan de assistent meer van een chat in gedachten houden, maar het model gebruikt dan meer geheugen en antwoordt mogelijk trager.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K tokens
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Pagina openen
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } draait op { $address }.
+settings-assistant-found-none = { $provider } heeft nog geen modellen. Download er daarmee een en zoek dan opnieuw.
+settings-assistant-get-key = API-sleutel aanvragen
+settings-assistant-get-server = { $provider } downloaden
+settings-assistant-in-use = In gebruik
+settings-assistant-key = API-sleutel
+# $error is what the keychain said.
+settings-assistant-key-failed = De sleutel kon niet in de beveiligde opslag worden bewaard: { $error }
+settings-assistant-key-kept = Je sleutel voor { $provider } wordt bewaard in de beveiligde opslag van het systeem.
+settings-assistant-key-needed = Dit model heeft een API-sleutel nodig.
+settings-assistant-key-refused = { $provider } heeft deze sleutel geweigerd. Controleer of die volledig is gekopieerd, uit het juiste account.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Maak een sleutel aan op de site van { $provider } en plak die hier.
+settings-assistant-look-again = Opnieuw zoeken
+settings-assistant-looking = Modellen zoeken…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Model, bijvoorbeeld { $example }
+settings-assistant-no-server = plaa heeft op deze computer geen draaiende { $provider } gevonden. Start het, of geef hieronder het adres op.
+settings-assistant-no-tools = Kan geen tools gebruiken, en die heeft de assistent nodig
+settings-assistant-none = Nog geen modellen. Voeg er hieronder een toe: een lokaal model, zoals dat van Ollama, blijft op deze computer; een cloudmodel heeft een API-sleutel van de aanbieder nodig.
+settings-assistant-note = De modellen waarmee de assistent kan praten. Sleutels worden bewaard in de beveiligde opslag van het systeem.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Ander adres gebruiken
+settings-assistant-recommended = Aanbevolen
+settings-assistant-remove = Verwijderen
+settings-assistant-sees = Ziet afbeeldingen
+settings-assistant-trying = Proberen…
+settings-assistant-use = Gebruiken
+settings-assistant-use-key = Doorgaan
+settings-assistant-uses-tools = Gebruikt tools

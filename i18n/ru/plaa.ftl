@@ -85,6 +85,7 @@ action-quality = Качество
 action-visualizer = Визуализация
 action-network = Сетевое аудио
 action-cast = Трансляция
+action-assistant = Ассистент
 
 ## What a sound file shows under its cover
 
@@ -179,6 +180,7 @@ settings-tab-playback = Воспроизведение
 settings-tab-network = Сеть
 settings-tab-language = Язык
 settings-tab-agents = Агенты
+settings-tab-assistant = Ассистент
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (сборка для разработки, { $build })
 settings-choose = Выбрать…
@@ -560,9 +562,101 @@ agent-ask-body = { $agent } просит использовать «{ $tool }».
 ## Casting to a TV or speaker on the network
 
 cast-looking = Поиск телевизоров и колонок…
-cast-none = Не найдено телевизоров и колонок с поддержкой DLNA.
+cast-none = Не найдено телевизоров, колонок или устройств Chromecast.
 # $renderer is the TV's or speaker's name.
 cast-stop = Остановить воспроизведение на устройстве { $renderer }
 notice-casting = Воспроизведение на устройстве { $renderer }.
 notice-cast-failed = Не удалось воспроизвести на устройстве { $renderer }: { $reason }
 cast-web-page = Веб-страницы пока нельзя транслировать: вместо этого откройте адрес самого видео.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Добавить модель…
+assistant-add-model = Ассистенту нужна модель: облачная модель с ключом API или локальная модель.
+assistant-ask = Спросите о том, что воспроизводится
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = Чат становился слишком длинным, чтобы { $model } мог прочитать его целиком, поэтому его начало было кратко изложено. Ассистент может снова взглянуть на то, что видел.
+assistant-compacting = Подводится итог начала чата
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } на этом компьютере
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } по адресу { $host }
+assistant-new-chat = Новый чат
+assistant-no-model = Сначала добавьте модель в настройках.
+assistant-open-settings = Добавить модель
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = Разговор больше не помещается в объём, который модель { $model } может прочитать за раз. Начните новый чат или выберите модель, которая читает больше.
+assistant-problem-credit = Поставщик { $provider } сообщает, что на балансе учётной записи нет средств. Для новой учётной записи сначала нужно пополнить баланс на сайте поставщика { $provider }, только тогда ключ заработает; затем повторите попытку.
+assistant-problem-key = Поставщик { $provider } отклонил ключ API. Проверьте его в настройках.
+assistant-problem-model = У поставщика { $provider } нет модели с именем { $model }. Проверьте её имя в настройках.
+# $message is what the provider said, untranslated.
+assistant-problem-other = Модель { $model } не ответила: { $message }
+assistant-problem-rate = Поставщик { $provider } просит снизить частоту запросов. Повторите попытку чуть позже.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = Поставщик { $provider } просит снизить частоту запросов: { $message }
+assistant-problem-refused = Модель { $model } отказалась отвечать.
+assistant-problem-unavailable = Поставщик { $provider } перегружен или испытывает проблемы. Повторите попытку чуть позже.
+assistant-problem-unreachable = plaa не удалось связаться с поставщиком { $provider }. Проверьте подключение или работает ли сервер.
+assistant-running = Выполняется…
+assistant-send = Отправить
+assistant-shortened = Чат был слишком длинным, чтобы { $model } мог прочитать его целиком, поэтому прежние результаты инструментов опущены. Ассистент может снова взглянуть на то, что видел.
+assistant-stop = Остановить
+assistant-stopped = Остановлено.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Теперь вы общаетесь с моделью { $model }.
+assistant-thinking = Думает…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Размышления
+assistant-title = Ассистент
+settings-assistant-add = Добавить модель
+settings-assistant-add-button = Добавить
+# $model is the model's name.
+settings-assistant-added = Модель { $model } ответила и добавлена.
+settings-assistant-added-tag = Добавлена
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Адрес, например { $example }
+settings-assistant-change-key = Изменить ключ
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = Сервер, совместимый с OpenAI
+# The menu of how much a local model reads at once.
+settings-assistant-context = Контекст
+settings-assistant-context-note = Чем больше контекст, тем большую часть чата ассистент сможет учитывать, но модель займёт больше памяти и может отвечать медленнее.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands } тыс. токенов
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Открыть страницу
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = Сервер { $provider } работает по адресу { $address }.
+settings-assistant-found-none = На сервере { $provider } пока нет моделей. Скачайте модель с его помощью и поищите снова.
+settings-assistant-get-key = Получить ключ API
+settings-assistant-get-server = Скачать { $provider }
+settings-assistant-in-use = Используется
+settings-assistant-key = Ключ API
+# $error is what the keychain said.
+settings-assistant-key-failed = Не удалось сохранить ключ в связке ключей: { $error }
+settings-assistant-key-kept = Ваш ключ для поставщика { $provider } хранится в системной связке ключей.
+settings-assistant-key-needed = Этой модели нужен ключ API.
+settings-assistant-key-refused = Поставщик { $provider } отклонил этот ключ. Проверьте, что он скопирован целиком и из нужной учётной записи.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Создайте ключ на сайте поставщика { $provider } и вставьте его сюда.
+settings-assistant-look-again = Искать снова
+settings-assistant-looking = Поиск моделей…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Модель, например { $example }
+settings-assistant-no-server = На этом компьютере не найден работающий сервер { $provider }. Запустите его или укажите его адрес ниже.
+settings-assistant-no-tools = Не умеет использовать инструменты, нужные ассистенту
+settings-assistant-none = Моделей пока нет. Добавьте модель ниже: локальная модель, например в Ollama, остаётся на этом компьютере; облачной модели нужен ключ API от её поставщика.
+settings-assistant-note = Модели, с которыми может общаться панель ассистента. Ключи хранятся в системной связке ключей.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Использовать другой адрес
+settings-assistant-recommended = Рекомендуется
+settings-assistant-remove = Удалить
+settings-assistant-sees = Видит изображения
+settings-assistant-trying = Проверка…
+settings-assistant-use = Использовать
+settings-assistant-use-key = Продолжить
+settings-assistant-uses-tools = Использует инструменты

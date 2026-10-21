@@ -83,6 +83,7 @@ action-quality = Calitate
 action-visualizer = Vizualizator
 action-network = Audio în rețea
 action-cast = Proiectează
+action-assistant = Asistent
 
 ## What a sound file shows under its cover
 
@@ -177,6 +178,7 @@ settings-tab-playback = Redare
 settings-tab-network = Rețea
 settings-tab-language = Limbă
 settings-tab-agents = Agenți
+settings-tab-assistant = Asistent
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (versiune de dezvoltare, { $build })
 settings-choose = Alege…
@@ -560,9 +562,101 @@ agent-ask-body = { $agent } cere să folosească „{ $tool }”. În Configură
 ## Casting to a TV or speaker on the network
 
 cast-looking = Se caută televizoare și difuzoare…
-cast-none = Nu s-a găsit niciun televizor sau difuzor compatibil cu DLNA.
+cast-none = Nu s-a găsit niciun televizor, difuzor sau Chromecast.
 # $renderer is the TV's or speaker's name.
 cast-stop = Oprește redarea pe { $renderer }
 notice-casting = Se redă pe { $renderer }.
 notice-cast-failed = Nu s-a putut reda pe { $renderer }: { $reason }
 cast-web-page = Paginile web nu pot fi încă proiectate: deschide în schimb chiar adresa videoclipului.
+
+## The assistant panel, and its models in Settings
+
+assistant-add-another = Adaugă un model…
+assistant-add-model = Asistentul are nevoie de un model: un model în cloud, cu cheia sa API, sau un model local.
+assistant-ask = Întreabă despre ce se redă
+# $model is the model's name, as in assistant-problem-context.
+assistant-compacted = Conversația devenea prea lungă pentru ca { $model } s-o citească dintr-odată, așa că partea ei anterioară a fost rezumată. Asistentul se poate uita din nou la ce a văzut.
+assistant-compacting = Se rezumă partea anterioară a conversației
+# A heading in the model menu for models on this computer; $provider is
+# the server, such as Ollama.
+assistant-group-local = { $provider } pe acest computer
+# A heading for models on another computer; $host is its address, such
+# as 192.168.4.61.
+assistant-group-remote = { $provider } la { $host }
+assistant-new-chat = Conversație nouă
+assistant-no-model = Adaugă mai întâi un model în Configurări.
+assistant-open-settings = Adaugă un model
+# Why the assistant's model did not answer. $model is the model's name,
+# such as qwen3.8; $provider is who serves it, such as Anthropic or Ollama.
+assistant-problem-context = Conversația nu mai încape în cât poate citi { $model } deodată. Începe o conversație nouă sau alege un model care poate citi mai mult.
+assistant-problem-credit = { $provider } spune că acest cont nu are credit. Un cont nou are nevoie de credit cumpărat pe site-ul { $provider } înainte ca cheia sa să funcționeze; apoi încearcă din nou.
+assistant-problem-key = { $provider } a respins cheia API. Verific-o în Configurări.
+assistant-problem-model = { $provider } nu are niciun model numit { $model }. Verifică-i numele în Configurări.
+# $message is what the provider said, untranslated.
+assistant-problem-other = { $model } nu a răspuns: { $message }
+assistant-problem-rate = { $provider } cere să încetinești. Încearcă din nou peste câteva momente.
+# $message is the provider's own words, untranslated, such as which limit
+# was reached and when to try again.
+assistant-problem-rate-said = { $provider } cere să încetinești: { $message }
+assistant-problem-refused = { $model } a refuzat să răspundă.
+assistant-problem-unavailable = { $provider } este ocupat sau are probleme. Încearcă din nou peste câteva momente.
+assistant-problem-unreachable = plaa nu a putut contacta { $provider }. Verifică-ți conexiunea sau dacă serverul rulează.
+assistant-running = Rulează…
+assistant-send = Trimite
+assistant-shortened = Conversația era prea lungă pentru ca { $model } s-o citească dintr-odată, așa că rezultatele anterioare ale instrumentelor au fost omise. Asistentul se poate uita din nou la ce a văzut.
+assistant-stop = Oprește
+assistant-stopped = Oprit.
+# $model is the model's name, such as claude-sonnet-5.
+assistant-switched = Acum vorbești cu { $model }.
+assistant-thinking = Se gândește…
+# Folded away above a reply: what the model thought before it.
+assistant-thoughts = Gânduri
+assistant-title = Asistent
+settings-assistant-add = Adaugă un model
+settings-assistant-add-button = Adaugă
+# $model is the model's name.
+settings-assistant-added = { $model } a răspuns și a fost adăugat.
+settings-assistant-added-tag = Adăugat
+# $example is an address, such as http://localhost:11434.
+settings-assistant-address = Adresă, de exemplu { $example }
+settings-assistant-change-key = Schimbă cheia
+# The menu entry for a server that speaks OpenAI's API.
+settings-assistant-compatible = Server compatibil cu OpenAI
+# The menu of how much a local model reads at once.
+settings-assistant-context = Context
+settings-assistant-context-note = Un context mai mare îi permite asistentului să țină minte mai mult dintr-o conversație, dar modelul ocupă mai multă memorie și poate răspunde mai încet.
+# $thousands is the size in thousands of tokens, such as 32.
+settings-assistant-context-size = { $thousands }K tokeni
+# Opens the provider's page that fixes the problem shown, such as billing.
+settings-assistant-fix-it = Deschide pagina
+# $provider is a local server, such as Ollama; $address is where it answered.
+settings-assistant-found-at = { $provider } rulează la { $address }.
+settings-assistant-found-none = { $provider } nu are încă modele. Descarcă unul cu el, apoi caută din nou.
+settings-assistant-get-key = Obține o cheie API
+settings-assistant-get-server = Obține { $provider }
+settings-assistant-in-use = În uz
+settings-assistant-key = Cheie API
+# $error is what the keychain said.
+settings-assistant-key-failed = Cheia nu a putut fi păstrată în depozitul de chei: { $error }
+settings-assistant-key-kept = Cheia ta { $provider } este păstrată în depozitul de chei al sistemului.
+settings-assistant-key-needed = Acest model are nevoie de o cheie API.
+settings-assistant-key-refused = { $provider } a respins această cheie. Verifică dacă a fost copiată întreagă, din contul potrivit.
+# $provider is a cloud provider, such as Anthropic.
+settings-assistant-key-where = Creează o cheie pe site-ul { $provider } și lipește-o aici.
+settings-assistant-look-again = Caută din nou
+settings-assistant-looking = Se caută modele…
+# $example is a model name, such as claude-sonnet-5-5.
+settings-assistant-model = Model, de exemplu { $example }
+settings-assistant-no-server = plaa nu a găsit { $provider } pornit pe acest computer. Pornește-l sau introdu mai jos adresa lui.
+settings-assistant-no-tools = Nu poate folosi instrumente, de care asistentul are nevoie
+settings-assistant-none = Încă nu există modele. Adaugă unul mai jos: un model local, precum cel din Ollama, rămâne pe acest computer; un model în cloud are nevoie de o cheie API de la furnizorul său.
+settings-assistant-note = Modelele cu care poate vorbi panoul asistentului. Cheile sunt păstrate în depozitul de chei al sistemului.
+# Shows the address field, to use a server on another computer.
+settings-assistant-other-address = Folosește altă adresă
+settings-assistant-recommended = Recomandat
+settings-assistant-remove = Elimină
+settings-assistant-sees = Vede imagini
+settings-assistant-trying = Se încearcă…
+settings-assistant-use = Folosește
+settings-assistant-use-key = Continuă
+settings-assistant-uses-tools = Folosește instrumente
