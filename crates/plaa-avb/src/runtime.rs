@@ -500,7 +500,12 @@ impl Runtime {
         self.controller.handle_timeout(now);
         self.refresh(now, since);
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        let talker_before = (self.talker_state(), self.local_unserved(), self.ptp());
+        let talker_before = (
+            self.talker_state(),
+            self.local_unserved(),
+            self.ptp(),
+            self.listen_blocked(),
+        );
         #[cfg(target_os = "linux")]
         if let Some(own) = &mut self.own {
             own.turn(now, since);
@@ -524,7 +529,12 @@ impl Runtime {
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
-            changed |= (self.talker_state(), self.local_unserved(), self.ptp()) != talker_before;
+            changed |= (
+                self.talker_state(),
+                self.local_unserved(),
+                self.ptp(),
+                self.listen_blocked(),
+            ) != talker_before;
         }
         if changed {
             self.publish();
@@ -660,6 +670,15 @@ impl Runtime {
         Ptp::Unknown
     }
 
+    /// Why plaa's input cannot reserve its stream, where it cannot.
+    fn listen_blocked(&self) -> Option<crate::ListenBlocked> {
+        #[cfg(target_os = "linux")]
+        if let Some(own) = &self.own {
+            return own.listen_blocked();
+        }
+        None
+    }
+
     /// Whether listeners on this computer go without plaa's stream.
     fn local_unserved(&self) -> bool {
         #[cfg(target_os = "linux")]
@@ -775,6 +794,7 @@ impl Runtime {
             failure: self.failure.clone(),
             local_unserved: self.local_unserved(),
             ptp: self.ptp(),
+            listen_blocked: self.listen_blocked(),
         };
         let mut shared = self.snapshot.lock().unwrap_or_else(PoisonError::into_inner);
         if *shared != snapshot {

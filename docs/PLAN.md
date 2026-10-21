@@ -438,6 +438,13 @@ window plays: plaa's audio output hands a copy of each chunk it gives
 its device, in stereo after the volume, to a buffer the talker drains on
 gPTP time, resampling between the two clocks by how full it keeps.
 
+The entity also has one stream input, "Listen", in the same formats,
+which the Network Audio sheet binds to a talker's output, as any Milan
+controller can. Once the probe finds the talker's stream, plaa declares
+its listener in MSRP, Ready or Asking Failed as the talker's
+declaration is registered, and plays the stream on the sound output
+through `avb-stream`'s listener, with Milan's input counters.
+
 plaa holds no capability: a program holding one runs as one other
 programs may not look into, and the desktop portal then refuses it file
 dialogs and screen sharing. `plaa-netraw`, built beside it, is the one
@@ -459,7 +466,11 @@ Two MRP participants on one port withdraw each other's declarations, so
 where triib's entity service runs on the interface, the entity reserves
 its stream in the service's participant (`avb_mrp::sharing`, a socket in
 the user's runtime folder): the service declares the stream and tells
-plaa its listeners, and that it cannot while the port runs AVB Lite.
+plaa its listeners, and that it cannot while the port runs AVB Lite;
+from version 2 of the protocol it also listens for plaa, declaring
+plaa's listener merged with its own and telling plaa the stream's
+talker. Beside an older service, plaa plays what reaches the port
+anyway, and says to update triib.
 When the service goes, plaa runs its own participants a moment later,
 and shares the service's again when it is back. Beside an older service,
 which does not share it, or another program declaring MRP from this

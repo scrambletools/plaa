@@ -1,8 +1,9 @@
-//! How plaa's talker reserves its stream on the port: with MRP
-//! participants of its own, MSRP and MVRP, where no other program here
-//! declares on the port; else through the one that does, which shares its
-//! participant (`avb_mrp::sharing`), as two on one port withdraw each
-//! other's declarations. triib's entity service shares its own.
+//! How plaa's talker reserves its stream on the port, and its listener
+//! the stream it listens to: with MRP participants of its own, MSRP and
+//! MVRP, where no other program here declares on the port; else through
+//! the one that does, which shares its participant (`avb_mrp::sharing`),
+//! as two on one port withdraw each other's declarations. triib's entity
+//! service shares its own.
 
 use std::io;
 use std::os::unix::net::UnixStream;
@@ -38,6 +39,12 @@ pub(crate) enum Heard {
     Taken,
     /// It could not declare the stream, for a reason plaa cannot mend.
     Refused(Refusal),
+    /// The talker of the stream plaa listens to, as it declares it, or
+    /// none while no talker does.
+    Talker(Option<TalkerDeclaration>),
+    /// The program sharing its participant cannot declare listeners now,
+    /// as while the port runs AVB Lite.
+    ListenRefused,
 }
 
 /// Why plaa cannot declare on `interface`: triib's entity service runs on
@@ -84,6 +91,24 @@ pub(crate) struct SharedParticipant {
     /// and version 0, which says nothing, once plaa waited in vain.
     hello: Option<Hello>,
     connected: Duration,
+}
+
+impl OwnParticipants {
+    /// The talker the port registered for `stream_id`: its Talker
+    /// Advertise, else its Talker Failed, as one gives way to the other.
+    fn talker(&self, stream_id: u64) -> Option<TalkerDeclaration> {
+        let find = |wanted: u8| {
+            self.msrp
+                .registered()
+                .find(|(attribute_type, value, _)| {
+                    *attribute_type == wanted && stream_of(value) == Some(stream_id)
+                })
+                .and_then(|(attribute_type, value, _)| {
+                    msrp::decode_talker(attribute_type, value, avb_mrp::Event::New)
+                })
+        };
+        find(msrp::attribute::TALKER_ADVERTISE).or_else(|| find(msrp::attribute::TALKER_FAILED))
+    }
 }
 
 impl Drop for OwnParticipants {
@@ -137,6 +162,63 @@ impl Reservation {
         match self {
             Self::Shared(shared) => shared.available,
             Self::Own(_) => true,
+        }
+    }
+
+    /// Whether plaa can listen through it: always through its own; through
+    /// a program's, where it says it takes Listen, `None` while plaa waits
+    /// for it to say.
+    pub(crate) fn listens(&self) -> Option<bool> {
+        match self {
+            Self::Shared(shared) => shared.hello.map(|hello| hello.has(feature::LISTENERS)),
+            Self::Own(_) => Some(true),
+        }
+    }
+
+    /// Starts listening to `stream_id`: a program sharing its participant
+    /// is asked to, and answers with its talker; plaa's own participants
+    /// look for its talker among what they registered.
+    pub(crate) fn listen(&mut self, stream_id: u64) -> Option<Heard> {
+        match self {
+            Self::Own(own) => Some(Heard::Talker(own.talker(stream_id))),
+            Self::Shared(shared) => {
+                let _ = sharing::write_request(&mut shared.writer, &Request::Listen(stream_id));
+                None
+            }
+        }
+    }
+
+    /// Declares plaa's listener for `stream_id` in `state` on its own
+    /// participants, or withdraws it for none; a program sharing its
+    /// participant does that itself, as the talker comes and goes.
+    pub(crate) fn declare_listener(
+        &mut self,
+        since: Duration,
+        stream_id: u64,
+        state: Option<ListenerState>,
+    ) {
+        let Self::Own(own) = self else {
+            return;
+        };
+        let key = stream_id.to_be_bytes().to_vec();
+        match state {
+            Some(state) => {
+                own.msrp
+                    .declare(since, msrp::attribute::LISTENER, key, Some(state.number()));
+            }
+            None => own.msrp.withdraw(since, msrp::attribute::LISTENER, &key),
+        }
+    }
+
+    pub(crate) fn unlisten(&mut self, since: Duration, stream_id: u64) {
+        match self {
+            Self::Own(own) => {
+                own.msrp
+                    .withdraw(since, msrp::attribute::LISTENER, &stream_id.to_be_bytes());
+            }
+            Self::Shared(shared) => {
+                let _ = sharing::write_request(&mut shared.writer, &Request::Unlisten(stream_id));
+            }
         }
     }
 
@@ -203,9 +285,14 @@ impl Reservation {
         }
     }
 
-    /// What the program sharing its participant said, of `ours` or of the
-    /// port.
-    pub(crate) fn handle_notice(&mut self, notice: Notice, ours: Option<u64>) -> Option<Heard> {
+    /// What the program sharing its participant said, of `ours`, of the
+    /// stream plaa listens to, `listened`, or of the port.
+    pub(crate) fn handle_notice(
+        &mut self,
+        notice: Notice,
+        ours: Option<u64>,
+        listened: Option<u64>,
+    ) -> Option<Heard> {
         let Self::Shared(shared) = self else {
             return None;
         };
@@ -213,6 +300,15 @@ impl Reservation {
             Notice::Hello(hello) => {
                 shared.hello = Some(hello);
                 None
+            }
+            Notice::Talker { stream_id, talker } if Some(stream_id) == listened => {
+                Some(Heard::Talker(talker))
+            }
+            Notice::Refused {
+                stream_id,
+                refusal: Refusal::Unavailable,
+            } if Some(stream_id) == listened && Some(stream_id) != ours => {
+                Some(Heard::ListenRefused)
             }
             Notice::Listener { stream_id, state } if Some(stream_id) == ours => {
                 Some(Heard::Listener(state))
@@ -258,8 +354,9 @@ impl Reservation {
         }
     }
 
-    /// What plaa's own participants registered for `ours`.
-    pub(crate) fn poll_heard(&mut self, ours: Option<u64>) -> Option<Heard> {
+    /// What plaa's own participants registered for `ours`, and for the
+    /// stream plaa listens to, `listened`: its talker as it is now.
+    pub(crate) fn poll_heard(&mut self, ours: Option<u64>, listened: Option<u64>) -> Option<Heard> {
         let Self::Own(own) = self else {
             return None;
         };
@@ -278,6 +375,20 @@ impl Reservation {
                     attribute_type: msrp::attribute::LISTENER,
                     value,
                 } if stream_of(&value) == ours => return Some(Heard::Listener(None)),
+                Registration::Joined {
+                    attribute_type:
+                        msrp::attribute::TALKER_ADVERTISE | msrp::attribute::TALKER_FAILED,
+                    value,
+                    ..
+                }
+                | Registration::Left {
+                    attribute_type:
+                        msrp::attribute::TALKER_ADVERTISE | msrp::attribute::TALKER_FAILED,
+                    value,
+                } if listened.is_some() && stream_of(&value) == listened => {
+                    let stream_id = listened.unwrap_or_default();
+                    return Some(Heard::Talker(own.talker(stream_id)));
+                }
                 _ => {}
             }
         }
@@ -428,11 +539,11 @@ mod tests {
             panic!("no notice");
         };
         assert_eq!(
-            reservation.handle_notice(heard, Some(0x77)),
+            reservation.handle_notice(heard, Some(0x77), None),
             Some(Heard::Listener(Some(ListenerState::Ready)))
         );
         // Another stream's listeners are not plaa's.
-        assert_eq!(reservation.handle_notice(heard, Some(0x78)), None);
+        assert_eq!(reservation.handle_notice(heard, Some(0x78), None), None);
         drop(theirs);
         assert!(matches!(
             receiver.recv_timeout(Duration::from_secs(2)),
@@ -456,30 +567,30 @@ mod tests {
             features: feature::LOCAL_LISTENERS,
         };
         assert_eq!(
-            reservation.handle_notice(Notice::Hello(hello), Some(7)),
+            reservation.handle_notice(Notice::Hello(hello), Some(7), None),
             None
         );
         reservation.handle_timeout(Duration::from_secs(5));
         assert!(reservation.reaches_local());
         assert_eq!(
-            reservation.handle_notice(Notice::Declared(7), Some(7)),
+            reservation.handle_notice(Notice::Declared(7), Some(7), None),
             Some(Heard::Declared)
         );
         let refused = |refusal, stream_id| Notice::Refused { stream_id, refusal };
         assert_eq!(
-            reservation.handle_notice(refused(Refusal::Taken, 7), Some(7)),
+            reservation.handle_notice(refused(Refusal::Taken, 7), Some(7), None),
             Some(Heard::Taken)
         );
         assert_eq!(
-            reservation.handle_notice(refused(Refusal::Taken, 8), Some(7)),
+            reservation.handle_notice(refused(Refusal::Taken, 8), Some(7), None),
             None
         );
         assert_eq!(
-            reservation.handle_notice(refused(Refusal::Unreadable, 0), Some(7)),
+            reservation.handle_notice(refused(Refusal::Unreadable, 0), Some(7), None),
             Some(Heard::Refused(Refusal::Unreadable))
         );
         assert_eq!(
-            reservation.handle_notice(refused(Refusal::Unavailable, 7), Some(7)),
+            reservation.handle_notice(refused(Refusal::Unavailable, 7), Some(7), None),
             Some(Heard::Unavailable)
         );
         assert!(!reservation.available());
@@ -500,7 +611,78 @@ mod tests {
             version: 1,
             features: 0,
         };
-        plain.handle_notice(Notice::Hello(hello), Some(7));
+        plain.handle_notice(Notice::Hello(hello), Some(7), None);
         assert!(!plain.reaches_local());
+    }
+
+    /// plaa listens through a participant that says it takes Listen: it
+    /// asks, hears the stream's talker, and hears when it cannot.
+    #[test]
+    fn a_shared_participant_listens_for_plaa() {
+        let (ours, mut theirs) = UnixStream::pair().unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut reservation = shared(ours, &sender, 1, Duration::ZERO).unwrap();
+        sharing::read_request(&mut theirs).unwrap();
+        // Not known until it says hello.
+        assert_eq!(reservation.listens(), None);
+        let hello = Hello {
+            version: 2,
+            features: feature::LOCAL_LISTENERS | feature::LISTENERS,
+        };
+        reservation.handle_notice(Notice::Hello(hello), Some(7), None);
+        assert_eq!(reservation.listens(), Some(true));
+        assert_eq!(reservation.listen(0x99), None, "it answers by notice");
+        assert_eq!(
+            sharing::read_request(&mut theirs).unwrap(),
+            Request::Listen(0x99)
+        );
+        let talker = TalkerDeclaration {
+            stream_id: 0x99,
+            destination: MacAddress([0x91, 0xe0, 0xf0, 0, 0, 9]),
+            vlan_id: VLAN,
+            max_frame_size: 56,
+            max_interval_frames: 1,
+            priority: 3,
+            rank: true,
+            accumulated_latency: 250_000,
+            failure: None,
+            event: avb_mrp::Event::New,
+        };
+        let notice = Notice::Talker {
+            stream_id: 0x99,
+            talker: Some(talker),
+        };
+        sharing::write_notice(&mut theirs, &notice).unwrap();
+        let Ok(Input::Shared(heard)) = receiver.recv_timeout(Duration::from_secs(2)) else {
+            panic!("no notice");
+        };
+        assert_eq!(
+            reservation.handle_notice(heard, Some(7), Some(0x99)),
+            Some(Heard::Talker(Some(talker)))
+        );
+        // Another stream's talker is not the one plaa listens to.
+        assert_eq!(reservation.handle_notice(heard, Some(7), Some(0x98)), None);
+        let refused = Notice::Refused {
+            stream_id: 0x99,
+            refusal: Refusal::Unavailable,
+        };
+        assert_eq!(
+            reservation.handle_notice(refused, Some(7), Some(0x99)),
+            Some(Heard::ListenRefused)
+        );
+        reservation.unlisten(Duration::ZERO, 0x99);
+        assert_eq!(
+            sharing::read_request(&mut theirs).unwrap(),
+            Request::Unlisten(0x99)
+        );
+        // One of version 1 cannot listen for plaa.
+        let (ours, _theirs) = UnixStream::pair().unwrap();
+        let mut old = shared(ours, &sender, 2, Duration::ZERO).unwrap();
+        let hello = Hello {
+            version: 1,
+            features: feature::LOCAL_LISTENERS,
+        };
+        old.handle_notice(Notice::Hello(hello), Some(7), None);
+        assert_eq!(old.listens(), Some(false));
     }
 }

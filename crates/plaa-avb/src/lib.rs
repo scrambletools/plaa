@@ -1,7 +1,8 @@
 //! plaa on an AVB network: a controller that finds the talkers and
 //! listeners there and connects them, and a talker sending what plaa
 //! plays once a listener is ready for it: on Linux plaa's own Milan
-//! entity, whose one stream output sends it, and on a Mac the Mac's own
+//! entity, whose one stream output sends it and whose one stream input
+//! plays what a controller binds it to, and on a Mac the Mac's own
 //! entity, which macOS runs and plaa plays into (`host`).
 //!
 //! One thread runs it all on the interface, as triib's endpoint daemon
@@ -94,6 +95,17 @@ pub enum TalkerState {
     Streaming,
 }
 
+/// Why plaa's stream input cannot reserve the stream it listens to, and
+/// takes only what comes to the port anyway.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListenBlocked {
+    /// triib's entity service, whose participant plaa shares, is too old
+    /// to listen for it.
+    OldService,
+    /// The port runs AVB Lite, which reserves no streams.
+    AvbLite,
+}
+
 /// How ptp4l, which keeps the time plaa's stream is sent by, stands on
 /// the interface.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -126,6 +138,7 @@ pub struct Snapshot {
     /// triib's entity service did before it said hello.
     pub local_unserved: bool,
     pub ptp: Ptp,
+    pub listen_blocked: Option<ListenBlocked>,
 }
 
 /// plaa on one interface. Dropping it says goodbye to the network: the

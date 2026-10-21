@@ -2,14 +2,16 @@
 //! what plaa plays, by name, each with one button: play there, where it
 //! takes plaa's stream as it is; stop, where it plays it; or, where it is
 //! in another format, a menu of the formats both share, to connect in.
-//! Under them, how the one chosen takes its stream.
+//! Under them, how the one chosen takes its stream; and the talkers plaa
+//! can listen to, playing their stream here.
 
 use std::sync::Arc;
 
 use iced::widget::{container, text};
 use iced::{Center, Element, Fill, Length};
 use plaa_avb::{
-    EntityId, Found, Ptp, Snapshot, Stream, StreamFormat, StreamInfo, StreamInfoFlags, TalkerState,
+    EntityId, Found, ListenBlocked, Ptp, Snapshot, Stream, StreamFormat, StreamInfo,
+    StreamInfoFlags, TalkerState,
 };
 use scramble_ui::dropdown::{self, Entry};
 use scramble_ui::{Icon, Type, button, column, component, row, style};
@@ -137,6 +139,9 @@ pub fn sheet<'a>(
                 }
                 None => {}
             }
+            if let Some(own) = own {
+                content = content.push(listen_here(&snapshot, own));
+            }
         }
     }
     if let Some(failure) = &snapshot.failure {
@@ -218,6 +223,90 @@ fn row_for<'a>(
         .style(move |theme, status| crate::window::list_row_style(theme, status, chosen))
         .on_press(Control::AvbChoose(end))
         .into()
+}
+
+/// The talkers plaa's own input can take as they send, each with one
+/// button: listen, or stop where it listens; and how the input takes its
+/// stream.
+fn listen_here<'a>(snapshot: &Snapshot, own: &Found) -> Element<'a, Control> {
+    let mut content = column![component::section(crate::fl!("network-listen-section"))].spacing(4);
+    let Some(input) = own.inputs.first() else {
+        return content.into();
+    };
+    let ours = (own.id, input.index);
+    match snapshot.listen_blocked {
+        Some(ListenBlocked::OldService) => {
+            content = content.push(note(crate::fl!("network-listen-update-triib")));
+        }
+        Some(ListenBlocked::AvbLite) => {
+            content = content.push(note(crate::fl!("network-listen-lite")));
+        }
+        None => {}
+    }
+    let talkers = talkers(snapshot, input);
+    if talkers.is_empty() {
+        content = content.push(note(crate::fl!("network-no-talkers")));
+    }
+    for (end, name) in talkers {
+        let action = if input.bound == Some(end) {
+            component::tool(
+                Icon::Stop,
+                crate::fl!("network-listen-stop", talker = name.clone()),
+                Some(Control::AvbDisconnect(ours)),
+            )
+        } else {
+            component::tool(
+                Icon::VolumeUp,
+                crate::fl!("network-listen-to", talker = name.clone()),
+                Some(Control::AvbConnect(end, ours, None)),
+            )
+        };
+        content = content.push(
+            container(
+                row![
+                    container(scramble_ui::aligned(scramble_ui::styled(
+                        name,
+                        Type::BodyLarge
+                    )))
+                    .width(Fill),
+                    action
+                ]
+                .spacing(12)
+                .align_y(Center),
+            )
+            .padding(scramble_ui::dir::padding(4.0, 4.0, 4.0, 16.0)),
+        );
+    }
+    if input.bound.is_some() {
+        content = content.push(note(status(snapshot, input)));
+        if let Some(frames) = input.counters.and_then(|counters| counters.frames_rx) {
+            content = content.push(note(crate::fl!(
+                "network-listen-frames",
+                frames = frames.to_string()
+            )));
+        }
+    }
+    content.into()
+}
+
+/// The outputs of other entities that send in a format plaa's input
+/// takes, as they send now, named as listeners are.
+fn talkers(snapshot: &Snapshot, input: &Stream) -> Vec<(End, String)> {
+    let mut found = Vec::new();
+    for entity in snapshot.entities.iter().filter(|entity| !entity.own) {
+        let able: Vec<&Stream> = entity
+            .outputs
+            .iter()
+            .filter(|output| input.formats.contains(&output.format))
+            .collect();
+        for output in &able {
+            found.push((
+                (entity.id, output.index),
+                name(entity, output, able.len() > 1),
+            ));
+        }
+    }
+    found
 }
 
 /// How a listener's input takes its stream: from which talker and how

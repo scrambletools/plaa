@@ -265,6 +265,16 @@ network-failed = Could not connect: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Update triib to play here.
 network-choose = Choose a listener to see how it takes its stream.
+# The section of talkers plaa can listen to, playing their stream on
+# this computer's sound output.
+network-listen-section = Listen here
+network-no-talkers = No talker on the network sends in a format plaa can play.
+# $talker is a talker's name, or its name and its output's.
+network-listen-to = Listen to { $talker }
+network-listen-stop = Stop listening to { $talker }
+network-listen-frames = { $frames } frames received
+network-listen-update-triib = Update triib to listen here: plaa plays only what reaches this computer anyway.
+network-listen-lite = The port runs AVB Lite, which reserves no streams: plaa plays only what reaches this computer anyway.
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

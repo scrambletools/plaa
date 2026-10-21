@@ -1,8 +1,10 @@
 //! plaa's own Milan entity: one stream output of two channels that sends
 //! what plaa plays, on gPTP time, once a listener on the network is ready
-//! for it. MAAP claims the stream's multicast address; MSRP advertises it
-//! and hears listeners, MVRP joins its VLAN, as triib's endpoints do, in
-//! triib's entity service's participant where it runs on the port.
+//! for it, and one stream input that plays the stream a controller binds
+//! it to on the sound output. MAAP claims the stream's multicast address;
+//! MSRP advertises it and hears listeners, and declares the input's
+//! listener, MVRP joins its VLAN, as triib's endpoints do, in triib's
+//! entity service's participant where it runs on the port.
 
 use std::io;
 use std::sync::Arc;
@@ -12,16 +14,17 @@ use std::time::Duration;
 
 use atdecc::descriptor::DescriptorType;
 use atdecc::entity::{
-    EndpointModel, Entity, EntityEvent, OutputReservation, StreamModel, UNADDRESSED,
+    EndpointModel, Entity, EntityEvent, InputReservation, OutputReservation, ProbedStream,
+    StreamModel, UNADDRESSED,
 };
 use atdecc::maap::{self, Maap, MaapEvent};
 use atdecc::stream_format::StreamFormat;
 use atdecc::{ClockIdentity, EntityId, EntityModelId, Instant, MacAddress, StreamId};
 use avb_mrp::msrp::{ListenerState, TalkerDeclaration};
 use avb_mrp::sharing::Notice;
-use avb_stream::audio::Source;
+use avb_stream::audio::{Sink, Source};
 use avb_stream::media::Media;
-use avb_stream::{MediaClock, Talker, TalkerConfig, TalkerStats};
+use avb_stream::{Listener, ListenerConfig, MediaClock, Talker, TalkerConfig, TalkerStats};
 
 use crate::reservation::{self, Heard, Reservation, VLAN};
 use crate::runtime::Input;
@@ -34,8 +37,9 @@ const INSTANCE: u8 = 0x70;
 
 /// plaa's entity model, under Scramble Tools' MA-S block, as triib's. Its
 /// revision, the last octet, goes up as the model changes, so controllers
-/// that keep models by their ID read it again: 2 brought the logos.
-const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0002);
+/// that keep models by their ID read it again: 2 brought the logos, 3 the
+/// stream input.
+const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0003);
 
 /// plaa's app icon, which controllers show the entity with.
 const LOGO: &[u8] =
@@ -44,9 +48,10 @@ const LOGO: &[u8] =
 /// Scramble Tools' logo, its vendor's, as triib's entities carry it.
 const VENDOR_LOGO: &[u8] = include_bytes!("../../../data/icons/scramble-vendor.png");
 
-/// What the stream sends: AAF at 48 kHz, six samples a frame, in 32 bits
-/// or 24 in 32, of two channels or eight, the sizes Milan's Basic Audio
-/// profile has, the sound in the first two of eight.
+/// What the stream sends, and the input takes: AAF at 48 kHz, six
+/// samples a frame, in 32 bits or 24 in 32, of two channels or eight, the
+/// sizes Milan's Basic Audio profile has, the sound in the first two of
+/// eight.
 const FORMATS: [StreamFormat; 4] = [
     StreamFormat(0x0205_0220_0080_6000),
     StreamFormat(0x0205_0218_0080_6000),
@@ -119,8 +124,32 @@ impl Sent {
     }
 }
 
+/// What the stream input listens to.
+#[derive(Default)]
+struct Listening {
+    /// The stream of the talker's output it is bound to, once the probe
+    /// found it.
+    stream: Option<ProbedStream>,
+    /// Its talker's declaration, as the port registered it: none until
+    /// heard, or while no talker declares it.
+    talker: Option<TalkerDeclaration>,
+    /// The participant plaa shares was asked to listen to the stream.
+    asked: bool,
+    /// The listener plaa's own participants declare for it.
+    declared: Option<ListenerState>,
+    /// The participant plaa shares cannot declare listeners now, as in
+    /// AVB Lite.
+    refused: bool,
+    receiver: Option<Listener>,
+    /// The stream it takes, and where it comes to.
+    receiving: Option<(u64, MacAddress)>,
+    /// The input's counters, kept as the receivers come and go.
+    counters: [u32; 32],
+}
+
 pub(crate) struct Own {
     entity: Entity,
+    listening: Listening,
     maap: Maap,
     /// Where the stream is reserved; none while plaa waits for a program
     /// that went to come back, or cannot.
@@ -226,7 +255,12 @@ impl Own {
                 current_format: FORMATS[0],
                 channels: CHANNELS,
             }],
-            inputs: Vec::new(),
+            inputs: vec![StreamModel {
+                name: "Listen".into(),
+                formats: FORMATS.to_vec(),
+                current_format: FORMATS[0],
+                channels: CHANNELS,
+            }],
             clock_source: 0,
             clock_source_inputs: Vec::new(),
             logo: Some(LOGO.to_vec()),
@@ -235,6 +269,7 @@ impl Own {
         let stream = StreamId::new(mac, u16::from(INSTANCE) << 8);
         Ok(Self {
             entity: Entity::new(model, &[(stream, UNADDRESSED)]),
+            listening: Listening::default(),
             maap: Maap::new(mac, 1),
             reservation,
             generation,
@@ -384,6 +419,7 @@ impl Own {
         self.declared = false;
         self.ready = false;
         self.declare_at = None;
+        self.lost_participant(since);
         self.entity.depart();
     }
 
@@ -401,6 +437,7 @@ impl Own {
         // plaa's own participants go without a word, as the stream they
         // declared is declared again in the shared one.
         self.reservation = Some(shared);
+        self.lost_participant(since);
         if self.blocked.take().is_some() {
             self.begin(now, since);
         } else if self.declared {
@@ -414,12 +451,17 @@ impl Own {
     /// What the program sharing its participant said.
     pub(crate) fn handle_shared(&mut self, since: Duration, notice: Notice) {
         let ours = self.entity.output_stream(0).map(|(id, _)| id.0);
+        let listened = self.listened();
         if let Some(heard) = self
             .reservation
             .as_mut()
-            .and_then(|reservation| reservation.handle_notice(notice, ours))
+            .and_then(|reservation| reservation.handle_notice(notice, ours, listened))
         {
             self.heard(since, heard);
+        }
+        // It said whether it takes Listen.
+        if matches!(notice, Notice::Hello(_)) {
+            self.ask_to_listen(since);
         }
     }
 
@@ -441,6 +483,17 @@ impl Own {
         self.declare_at = None;
         self.look_at = since + REDECLARE;
         self.update_talker();
+        self.lost_participant(since);
+    }
+
+    /// The participant plaa declared its listener in went, and with it
+    /// what it registered: plaa listens again once it has another.
+    fn lost_participant(&mut self, since: Duration) {
+        self.listening.talker = None;
+        self.listening.asked = false;
+        self.listening.declared = None;
+        self.listening.refused = false;
+        self.update_listener(since);
     }
 
     /// Looks for a program serving the port's participant, to share it;
@@ -462,6 +515,7 @@ impl Own {
                 if self.addressed() {
                     self.declare_at = Some(self.redeclare_at(since));
                 }
+                self.ask_to_listen(since);
             }
             Err(error) => {
                 self.blocked = Some(error.to_string());
@@ -486,7 +540,7 @@ impl Own {
             }
             Heard::Unavailable => {
                 // Withdrawn by the program sharing its participant, or
-                // not declared.
+                // not declared; its listener too.
                 self.stop_talker();
                 self.declare_at = None;
                 if self.declared {
@@ -494,11 +548,29 @@ impl Own {
                     self.withdrawn_at = Some(since);
                 }
                 self.ready = false;
+                self.listening.talker = None;
+                self.listening.asked = false;
+                self.listening.refused = true;
+                self.update_listener(since);
             }
             Heard::Available => {
                 if self.addressed() && !self.declared {
                     self.declare_at = Some(self.redeclare_at(since));
                 }
+                self.listening.refused = false;
+                self.ask_to_listen(since);
+            }
+            Heard::Talker(talker) => {
+                self.listening.talker = talker;
+                self.listening.refused = false;
+                self.update_listener(since);
+                return;
+            }
+            Heard::ListenRefused => {
+                self.listening.talker = None;
+                self.listening.refused = true;
+                self.update_listener(since);
+                return;
             }
             Heard::Declared => self.refused = None,
             Heard::Taken => {
@@ -608,6 +680,7 @@ impl Own {
             let counters = self.sent.counters(self.talker.as_ref().map(Talker::stats));
             self.entity
                 .set_counters(DescriptorType::STREAM_OUTPUT, 0, counters);
+            self.count_received();
         }
         self.maap.handle_timeout(now);
         while let Some(event) = self.maap.poll_event() {
@@ -660,17 +733,230 @@ impl Own {
                 EntityEvent::MaxTransitTimeChanged { .. } if self.talker.is_some() => {
                     self.start_talker();
                 }
+                EntityEvent::InputSettled { index: 0, stream } => self.settled(since, stream),
+                EntityEvent::InputUnsettled { index: 0 }
+                | EntityEvent::InputUnbound { index: 0 } => {
+                    self.stop_listening(since);
+                }
+                EntityEvent::StreamFormatChanged {
+                    descriptor_type: DescriptorType::STREAM_INPUT,
+                    ..
+                } => {
+                    // Taken anew in its new format.
+                    self.stop_receiver();
+                    self.update_listener(since);
+                }
                 _ => {}
             }
         }
         let ours = self.entity.output_stream(0).map(|(id, _)| id.0);
+        let listened = self.listened();
         while let Some(heard) = self
             .reservation
             .as_mut()
-            .and_then(|reservation| reservation.poll_heard(ours))
+            .and_then(|reservation| reservation.poll_heard(ours, listened))
         {
             self.heard(since, heard);
         }
+    }
+
+    /// Why the input cannot reserve its stream, where it cannot.
+    pub(crate) fn listen_blocked(&self) -> Option<crate::ListenBlocked> {
+        self.listening.stream?;
+        if self.listening.refused {
+            return Some(crate::ListenBlocked::AvbLite);
+        }
+        self.reservation
+            .as_ref()
+            .filter(|reservation| reservation.listens() == Some(false))
+            .map(|_| crate::ListenBlocked::OldService)
+    }
+
+    /// The stream the input listens to, once found.
+    fn listened(&self) -> Option<u64> {
+        self.listening.stream.map(|stream| stream.stream_id.0)
+    }
+
+    /// The probe found the bound talker's stream: plaa listens to it, or
+    /// to where it moved.
+    fn settled(&mut self, since: Duration, stream: ProbedStream) {
+        if self.listened() != Some(stream.stream_id.0) {
+            self.stop_listening(since);
+        }
+        self.listening.stream = Some(stream);
+        self.ask_to_listen(since);
+        self.update_listener(since);
+    }
+
+    /// Asks the participant to listen to the input's stream, where it can
+    /// and has yet to be asked; plaa's own participants answer at once
+    /// with its talker.
+    fn ask_to_listen(&mut self, since: Duration) {
+        let Some(stream_id) = self.listened() else {
+            return;
+        };
+        if self.listening.asked {
+            return;
+        }
+        let Some(reservation) = self
+            .reservation
+            .as_mut()
+            .filter(|reservation| reservation.listens() == Some(true))
+        else {
+            return;
+        };
+        self.listening.asked = true;
+        if let Some(heard) = reservation.listen(stream_id) {
+            self.heard(since, heard);
+        }
+    }
+
+    /// The input lost its stream: plaa's listener is withdrawn, and the
+    /// stream stops playing.
+    fn stop_listening(&mut self, since: Duration) {
+        if let (Some(stream_id), Some(reservation)) = (self.listened(), &mut self.reservation)
+            && (self.listening.asked || self.listening.declared.is_some())
+        {
+            reservation.unlisten(since, stream_id);
+        }
+        self.stop_receiver();
+        self.listening.stream = None;
+        self.listening.talker = None;
+        self.listening.asked = false;
+        self.listening.declared = None;
+        self.entity
+            .set_input_reservation(0, InputReservation::default());
+    }
+
+    /// Declares plaa's listener as the stream's talker is registered, tells
+    /// controllers how it stands, and takes the stream once it is
+    /// reserved, or, beside a participant that cannot listen for plaa,
+    /// takes what comes.
+    fn update_listener(&mut self, since: Duration) {
+        let Some(stream) = self.listening.stream else {
+            self.stop_receiver();
+            return;
+        };
+        let stream_id = stream.stream_id.0;
+        let talker = self.listening.talker;
+        let state = talker.map(|talker| {
+            if talker.failure.is_some() {
+                ListenerState::AskingFailed
+            } else {
+                ListenerState::Ready
+            }
+        });
+        if self.listening.declared != state
+            && let Some(reservation) = &mut self.reservation
+        {
+            reservation.declare_listener(since, stream_id, state);
+            self.listening.declared = state;
+        }
+        self.entity.set_input_reservation(
+            0,
+            InputReservation {
+                talker_registered: talker.is_some_and(|talker| talker.failure.is_none()),
+                failure: talker
+                    .and_then(|talker| talker.failure)
+                    .map(|failure| (failure.code, failure.bridge_id)),
+                accumulated_latency: talker.map_or(0, |talker| talker.accumulated_latency),
+                registering: state.is_some(),
+            },
+        );
+        let cannot_listen = self
+            .reservation
+            .as_ref()
+            .is_some_and(|reservation| reservation.listens() == Some(false));
+        // Where the stream goes, as its talker declares it now: the probe
+        // can have answered before the talker moved it.
+        let destination = talker.map_or(stream.destination, |talker| talker.destination);
+        if state == Some(ListenerState::Ready) || cannot_listen {
+            if self.listening.receiving != Some((stream_id, destination)) {
+                self.start_receiver(stream_id, destination);
+            }
+        } else {
+            self.stop_receiver();
+        }
+    }
+
+    /// Plays the stream `stream_id`, sent to `destination`, on the sound
+    /// output, or nowhere where there is none.
+    fn start_receiver(&mut self, stream_id: u64, destination: MacAddress) {
+        self.stop_receiver();
+        let Some(format) = self
+            .entity
+            .model()
+            .inputs
+            .first()
+            .map(|stream| stream.current_format)
+        else {
+            return;
+        };
+        let config = ListenerConfig {
+            interface: self.interface.clone(),
+            stream_id,
+            destinations: vec![destination],
+            format,
+            sink: Sink::Device {
+                name: None,
+                first_channel: 0,
+            },
+            recovered: None,
+            // The first two of eight channels, as plaa sends its own.
+            channel_map: format
+                .channels()
+                .is_some_and(|channels| channels != CHANNELS)
+                .then(|| (0..CHANNELS).map(Some).collect()),
+        };
+        let started = Listener::start(config.clone(), self.clock.clone()).or_else(|error| {
+            eprintln!("plaa: the AVB stream plays nowhere: {error}");
+            Listener::start(
+                ListenerConfig {
+                    sink: Sink::Discard,
+                    ..config
+                },
+                self.clock.clone(),
+            )
+        });
+        match started {
+            Ok(receiver) => {
+                self.listening.receiver = Some(receiver);
+                self.listening.receiving = Some((stream_id, destination));
+            }
+            Err(error) => eprintln!("plaa: could not listen to the AVB stream: {error}"),
+        }
+    }
+
+    fn stop_receiver(&mut self) {
+        self.listening.receiver = None;
+        self.listening.receiving = None;
+    }
+
+    /// The input's counters, as Milan's GET_COUNTERS places them, from
+    /// what the receiver counted; one that stopped while locked unlocked
+    /// as it stopped.
+    fn count_received(&mut self) {
+        let counters = &mut self.listening.counters;
+        match &self.listening.receiver {
+            Some(receiver) => {
+                let stats = receiver.stats();
+                let low = |count: u64| count as u32;
+                *counters = [0; 32];
+                counters[0] = low(stats.media_locked);
+                counters[1] = low(stats.media_unlocked);
+                counters[2] = low(stats.interrupted);
+                counters[3] = low(stats.sequence_mismatches);
+                counters[6] = low(stats.frames_received);
+                counters[8] = low(stats.unsupported_formats);
+                counters[9] = low(stats.late);
+                counters[10] = low(stats.early);
+                counters[11] = low(stats.frames_received);
+            }
+            None if counters[0] > counters[1] => counters[1] += 1,
+            None => return,
+        }
+        self.entity
+            .set_counters(DescriptorType::STREAM_INPUT, 0, *counters);
     }
 
     /// When the entity, MAAP or MRP next need their timers run.
@@ -719,6 +1005,7 @@ impl Own {
         }
         self.stop_talker();
         self.withdraw(since);
+        self.stop_listening(since);
         if let Some(reservation) = &mut self.reservation {
             reservation.handle_timeout(since);
         }
