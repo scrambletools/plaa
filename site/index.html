@@ -62,6 +62,10 @@
         <p>Send what plays to a TV, speaker or program that plays DLNA on your network, and play, pause and seek it from plaa's own controls and timeline.</p>
       </article>
       <article>
+        <h3>An assistant beside what plays</h3>
+        <p>Ask about what plays in a chat panel, and the assistant looks at it and plays, pauses, seeks or changes the sound for you. Use a local model that stays on your computer, or a cloud model from Anthropic, OpenAI or Google with your own key.</p>
+      </article>
+      <article>
         <h3>AI agents</h3>
         <p>Agents such as Claude Code see what plays and control the plaa you are using over MCP, only once you allow them, and asking before the steps you choose.</p>
       </article>
@@ -142,8 +146,11 @@
       the addresses and web pages you open, through yt-dlp for web pages, and to open links you click.
       On your local network it finds TVs and speakers when you open the Cast menu, serves the file you
       cast to the one you choose while it plays, and, when you choose a network interface for AVB,
-      takes part in that network. Agents reach plaa only through <code>plaa --mcp</code> on your own
-      computer, once you allow them. plaa has no accounts and sends no telemetry. This website sets no
+      takes part in that network. When you use the assistant with a model you added, plaa sends that
+      model your messages and what it asks to see of what plays: to the provider you chose for a
+      cloud model, or to the server you gave for a local model. API keys stay in your system's
+      keychain. Agents reach plaa only through <code>plaa --mcp</code> on your own computer, once you
+      allow them. plaa has no accounts and sends no telemetry. This website sets no
       cookies and loads nothing from other sites.</p>
   </section>
 </main>
