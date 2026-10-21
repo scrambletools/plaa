@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 atdecc.workspace = true
+avb-lite.workspace = true
 avb-mrp.workspace = true
 avb-net.workspace = true
 avb-stream.workspace = true

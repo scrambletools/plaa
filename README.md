@@ -169,8 +169,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-AVB Lite without triib's entity service, as plaa runs it beside the
-service already. The [plan](docs/PLAN.md) has the order.
+AVB Lite without triib's entity service is made and yet to be tried on
+a network. The [plan](docs/PLAN.md) has the order.
 
 ## Packages
 

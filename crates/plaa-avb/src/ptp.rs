@@ -1,18 +1,22 @@
 //! ptp4l as plaa runs it where nothing else does: its service,
 //! plaa-ptp4l@<interface>, which plaa's packages install with a polkit
 //! rule letting the person at the computer start it, as triib's do
-//! theirs. It gives way to triib's, which conflict with it.
+//! theirs, and plaa-ptp4l-lite@<interface>, the AVB Lite PTP profile's,
+//! which plaa moves it to as its entity falls back to AVB Lite. They give
+//! way to triib's, which conflict with them.
 
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-/// The service's unit on `interface`, where the name needs no escaping.
-fn unit(interface: &str) -> Option<String> {
+/// The service's unit on `interface`, gPTP's or, `lite`, the AVB Lite
+/// PTP profile's, where the name needs no escaping.
+fn unit(interface: &str, lite: bool) -> Option<String> {
     let nameable = !interface.is_empty()
         && interface
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'));
-    nameable.then(|| format!("plaa-ptp4l@{interface}.service"))
+    let profile = if lite { "-lite" } else { "" };
+    nameable.then(|| format!("plaa-ptp4l{profile}@{interface}.service"))
 }
 
 /// Whether plaa's package installed the service.
@@ -55,7 +59,31 @@ fn runs_ptp4l_on(line: &[u8], interface: &str) -> bool {
 /// Starts the service on `interface`; why it could not, where it could
 /// not.
 pub(crate) fn start(interface: &str) -> Result<(), String> {
-    let unit = unit(interface).ok_or_else(|| format!("{interface} cannot name a service"))?;
+    start_unit(interface, false)
+}
+
+/// Moves plaa's ptp4l on `interface` to the AVB Lite PTP profile, `lite`,
+/// or back to gPTP, where plaa's other service runs it: the two conflict,
+/// so starting one stops the other. A ptp4l run by hand or by another
+/// unit plaa leaves as it is.
+pub(crate) fn switch(interface: &str, lite: bool) -> Result<(), String> {
+    let Some(from) = unit(interface, !lite) else {
+        return Ok(());
+    };
+    let active = Command::new("systemctl")
+        .args(["is-active", "--quiet", &from])
+        .stdin(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success());
+    if active {
+        start_unit(interface, lite)
+    } else {
+        Ok(())
+    }
+}
+
+fn start_unit(interface: &str, lite: bool) -> Result<(), String> {
+    let unit = unit(interface, lite).ok_or_else(|| format!("{interface} cannot name a service"))?;
     let output = Command::new("systemctl")
         .args(["start", "--no-block", "--no-ask-password", &unit])
         .stdin(Stdio::null())
@@ -74,10 +102,16 @@ mod tests {
 
     #[test]
     fn units_are_named_for_plain_interfaces_only() {
-        assert_eq!(unit("enp2s0").as_deref(), Some("plaa-ptp4l@enp2s0.service"));
-        assert_eq!(unit("eth0.2").as_deref(), Some("plaa-ptp4l@eth0.2.service"));
-        assert_eq!(unit(""), None);
-        assert_eq!(unit("we ird"), None);
+        assert_eq!(
+            unit("enp2s0", false).as_deref(),
+            Some("plaa-ptp4l@enp2s0.service")
+        );
+        assert_eq!(
+            unit("eth0.2", true).as_deref(),
+            Some("plaa-ptp4l-lite@eth0.2.service")
+        );
+        assert_eq!(unit("", false), None);
+        assert_eq!(unit("we ird", true), None);
     }
 
     #[test]

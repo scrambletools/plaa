@@ -94,7 +94,7 @@ trimming and splitting, and Intel Macs.
 7. **AVB and Milan**: the entity, its talker and listener, and a
    controller to connect talkers and listeners, and AVB Lite through
    triib's entity service (done); AVB Lite on plaa's own participants
-   next.
+   (made, on avb's avb-lite crate, and yet to be tried on a network).
 8. **Casting** (done): DLNA/UPnP renderers and Chromecasts.
 9. **Assistant and MCP** (done): the MCP server, `plaa --mcp`, with
    prev's consent prompts, and the assistant panel, both on one tool
@@ -488,7 +488,13 @@ and says to update triib; one without AVB Lite stops plaa's stream while
 the port runs it.
 When the service goes, plaa waits 15 s for triib to bring it back, as it
 does within seconds, then runs its own participants, and shares the
-service's again when it is back. Beside an older service,
+service's again when it is back. On its own participants plaa runs AVB
+Lite itself, with avb's avb-lite crate, which triib's service is to move
+onto: it weighs from the Pdelay exchange whether a bridge reserves its
+streams, and where none does it falls back, declaring by CVU SRP in its
+entity's name, sending a unicast copy to each listener it admits within
+its fan-out and 75% of the link, and moving its ptp4l service to the AVB
+Lite PTP profile (plaa-ptp4l-lite@), until the link comes up again. Beside an older service,
 which does not share it, or another program declaring MRP from this
 computer's address, the entity steps aside. Tested against an ESP32
 Milan listener through a MOTU AVB switch: the listener locked to the

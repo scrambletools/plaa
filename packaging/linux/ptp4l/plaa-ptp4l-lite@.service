@@ -1,0 +1,13 @@
+[Unit]
+Description=ptp4l running the AVB Lite PTP profile on %i for plaa
+Documentation=man:ptp4l(8)
+After=network.target
+# plaa moves ptp4l to this one from plaa-ptp4l@ as its entity falls back
+# to AVB Lite, and back as the link comes up again. triib's ptp4l serves
+# plaa as well: where one of triib's starts, this one stops.
+Conflicts=plaa-ptp4l@%i.service triib-ptp4l-gptp@%i.service triib-ptp4l-lite@%i.service
+
+[Service]
+ExecStart=ptp4l -f /usr/share/plaa/ptp4l-lite.cfg -i %i
+Restart=on-failure
+RestartSec=2

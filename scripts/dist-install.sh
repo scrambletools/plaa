@@ -40,4 +40,6 @@ install -Dm644 "$root/README.md" "$share/doc/plaa/README.md"
 ptp4l=$root/packaging/linux/ptp4l
 install -Dm644 "$ptp4l/ptp4l-gptp.cfg" "$share/plaa/ptp4l-gptp.cfg"
 install -Dm644 "$ptp4l/plaa-ptp4l@.service" "$destdir$prefix/lib/systemd/system/plaa-ptp4l@.service"
+install -Dm644 "$ptp4l/ptp4l-lite.cfg" "$share/plaa/ptp4l-lite.cfg"
+install -Dm644 "$ptp4l/plaa-ptp4l-lite@.service" "$destdir$prefix/lib/systemd/system/plaa-ptp4l-lite@.service"
 install -Dm644 "$ptp4l/50-plaa-ptp4l.rules" "$share/polkit-1/rules.d/50-plaa-ptp4l.rules"

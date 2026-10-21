@@ -9,6 +9,9 @@
 //! entity's name, and the stream goes as a copy to each listener it
 //! admits, as it says.
 
+mod lite;
+
+use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -34,6 +37,7 @@ use crate::reservation::{self, Heard, Reservation, VLAN};
 use crate::runtime::Input;
 use crate::sound::{CHANNELS, Sound};
 use crate::{Config, Ptp, TalkerState, gptp, ptp};
+use lite::OwnLite;
 
 /// The middle of plaa's entity ID, after the interface address's first
 /// half: triib's endpoints count up from 0 there.
@@ -196,6 +200,16 @@ pub(crate) struct Own {
     gptp: Option<gptp::Status>,
     /// The interface's link and grandmaster, counted for controllers.
     link: Link,
+    /// AVB Lite on plaa's own participants: weighing whether to fall
+    /// back, and CVU SRP once it does.
+    own_lite: Option<OwnLite>,
+    /// Where PTP's messages come in, for the fallback and each
+    /// grandmaster's link speed.
+    ptp_socket: Option<Arc<avb_net::Socket>>,
+    /// The link speed each grandmaster announces, and the media clock's
+    /// correction for it in AVB Lite (profile 5).
+    grandmaster_links: HashMap<u64, u32>,
+    correction: i64,
     interface: String,
     mac: MacAddress,
     own_clock: ClockIdentity,
@@ -307,7 +321,13 @@ impl Own {
             vendor_logo: Some(VENDOR_LOGO.to_vec()),
         };
         let stream = StreamId::new(mac, u16::from(INSTANCE) << 8);
-        Ok(Self {
+        let ptp_socket = lite::open_ptp(&interface, sender, stop)
+            .inspect_err(|error| eprintln!("plaa: PTP's messages go unheard: {error}"))
+            .ok();
+        let alone = reservation
+            .as_ref()
+            .is_some_and(|reservation| !reservation.is_shared());
+        let mut own = Self {
             entity: Entity::new(model, &[(stream, UNADDRESSED)]),
             listening: Listening::default(),
             maap: Maap::new(mac, 1),
@@ -325,6 +345,10 @@ impl Own {
             link_speed: found.speed.unwrap_or(0),
             gptp: None,
             link: Link::default(),
+            own_lite: None,
+            ptp_socket,
+            grandmaster_links: HashMap::new(),
+            correction: 0,
             interface,
             mac,
             own_clock,
@@ -344,7 +368,11 @@ impl Own {
             ptp: Ptp::Unknown,
             ptp_tried: false,
             ptp_started: None,
-        })
+        };
+        if alone {
+            own.arm_lite(Duration::ZERO);
+        }
+        Ok(own)
     }
 
     pub(crate) fn entity_id(&self) -> EntityId {
@@ -405,14 +433,23 @@ impl Own {
     }
 
     /// An ATDECC or MAAP frame from the network, or from plaa's own
-    /// controller.
-    pub(crate) fn handle_avtp(&mut self, now: Instant, source: MacAddress, bytes: &[u8]) {
+    /// controller, sent to a group address or not: CVU SRP's commands
+    /// among them in AVB Lite.
+    pub(crate) fn handle_avtp(
+        &mut self,
+        now: Instant,
+        since: Duration,
+        source: MacAddress,
+        group: bool,
+        bytes: &[u8],
+    ) {
         if self.blocked.is_some() {
             return;
         }
         if bytes.first() == Some(&atdecc::avtp::subtype::MAAP) {
             self.maap.handle_frame(now, source, bytes);
         } else {
+            self.cvu_heard(since, source, group, bytes);
             self.entity.handle_frame(now, source, bytes);
         }
     }
@@ -461,6 +498,7 @@ impl Own {
             "another program declares streams on {}, and does not share them",
             self.interface
         ));
+        self.disarm_lite();
         self.reservation = None;
         self.stop_talker();
         self.declared = false;
@@ -484,6 +522,7 @@ impl Own {
         self.generation = generation;
         self.gone_at = None;
         self.refused = None;
+        self.disarm_lite();
         // plaa's own participants go without a word, as the stream they
         // declared is declared again in the shared one.
         self.reservation = Some(shared);
@@ -576,6 +615,7 @@ impl Own {
             Ok(mut own) => {
                 own.begin(since);
                 self.reservation = Some(own);
+                self.arm_lite(since);
                 if self.addressed() {
                     self.declare_at = Some(self.redeclare_at(since));
                 }
@@ -596,8 +636,12 @@ impl Own {
             .max(since)
     }
 
-    /// Acts on what the port says of the stream.
+    /// Acts on what the port says of the stream; in AVB Lite on plaa's own
+    /// participants CVU SRP says it, and MSRP's word goes unheeded.
     fn heard(&mut self, since: Duration, heard: Heard) {
+        if self.cvu().is_some() && matches!(heard, Heard::Listener(_) | Heard::Talker(_)) {
+            return;
+        }
         match heard {
             Heard::Listener(state) => {
                 self.ready = state.is_some_and(ListenerState::ready);
@@ -690,7 +734,12 @@ impl Own {
         self.update_talker();
     }
 
-    pub(crate) fn handle_gptp(&mut self, now: Instant, status: Option<gptp::Status>) {
+    pub(crate) fn handle_gptp(
+        &mut self,
+        now: Instant,
+        since: Duration,
+        status: Option<gptp::Status>,
+    ) {
         let answered = status.is_some();
         // ptp4l on another interface says nothing of this one.
         let ours = status.filter(|status| status.own_clock == self.own_clock);
@@ -708,6 +757,7 @@ impl Own {
             self.link.grandmaster(status.gptp.grandmaster);
         }
         self.gptp = ours;
+        self.lite_ptp4l(since);
         self.update_lite_status();
     }
 
@@ -776,9 +826,11 @@ impl Own {
             self.entity
                 .set_counters(DescriptorType::STREAM_OUTPUT, 0, counters);
             self.count_received();
-            self.link.link(link_up(&self.interface));
+            let up = link_up(&self.interface);
+            self.link.link(up);
             self.entity
                 .set_counters(DescriptorType::AVB_INTERFACE, 0, self.link.counters());
+            self.lite_link(since, up);
         }
         self.maap.handle_timeout(now);
         while let Some(event) = self.maap.poll_event() {
@@ -834,8 +886,10 @@ impl Own {
                 EntityEvent::LiteConfigChanged { escalation_allowed } => {
                     // The port's to decide, for every talker on it: the
                     // program sharing its participant takes it, and says
-                    // the Mode that follows.
-                    if let Some(reservation) = &mut self.reservation {
+                    // the Mode that follows; on plaa's own, plaa does.
+                    if self.own_lite.is_some() {
+                        self.lite_escalation(since, escalation_allowed);
+                    } else if let Some(reservation) = &mut self.reservation {
                         reservation.escalate(escalation_allowed);
                     }
                 }
@@ -864,6 +918,7 @@ impl Own {
         {
             self.heard(since, heard);
         }
+        self.lite_turn(since);
     }
 
     /// Why the input cannot reserve its stream, where it cannot.
@@ -904,6 +959,14 @@ impl Own {
         if self.listening.asked {
             return;
         }
+        let entity = self.entity.entity_id();
+        if let Some(participant) = self.cvu() {
+            let talker = participant.listen(since, stream_id, Some(entity));
+            self.listening.asked = true;
+            self.listening.talker = talker;
+            self.update_listener(since);
+            return;
+        }
         let Some(reservation) = self
             .reservation
             .as_mut()
@@ -920,7 +983,10 @@ impl Own {
     /// The input lost its stream: plaa's listener is withdrawn, and the
     /// stream stops playing.
     fn stop_listening(&mut self, since: Duration) {
-        if let (Some(stream_id), Some(reservation)) = (self.listened(), &mut self.reservation)
+        let listened = self.listened();
+        if let (Some(stream_id), Some(participant)) = (listened, self.cvu()) {
+            participant.listen(since, stream_id, None);
+        } else if let (Some(stream_id), Some(reservation)) = (listened, &mut self.reservation)
             && (self.listening.asked || self.listening.declared.is_some())
         {
             reservation.unlisten(since, stream_id);
@@ -952,7 +1018,9 @@ impl Own {
                 ListenerState::Ready
             }
         });
+        // In AVB Lite on plaa's own participants CVU SRP declares it.
         if self.listening.declared != state
+            && self.cvu().is_none()
             && let Some(reservation) = &mut self.reservation
         {
             reservation.declare_listener(since, stream_id, state);
@@ -1085,6 +1153,7 @@ impl Own {
                 .and_then(Reservation::poll_timeout),
             self.declare_at,
             Some(self.look_at),
+            self.lite_timeout(),
         ]
         .into_iter()
         .flatten()
@@ -1117,6 +1186,7 @@ impl Own {
         self.stop_talker();
         self.withdraw(since);
         self.stop_listening(since);
+        self.disarm_lite();
         if let Some(reservation) = &mut self.reservation {
             reservation.handle_timeout(since);
         }
@@ -1146,6 +1216,13 @@ impl Own {
         let Some(declaration) = self.declaration() else {
             return;
         };
+        let entity = self.entity.entity_id();
+        if let Some(participant) = self.cvu() {
+            participant.declare_talker(since, entity, declaration);
+            self.declared = true;
+            self.update_talker();
+            return;
+        }
         let Some(reservation) = self
             .reservation
             .as_mut()
@@ -1165,7 +1242,9 @@ impl Own {
         if !self.declared {
             return;
         }
-        if let Some(reservation) = &mut self.reservation {
+        if let Some(participant) = self.cvu() {
+            participant.withdraw_talker(since, stream_id.0);
+        } else if let Some(reservation) = &mut self.reservation {
             reservation.withdraw(since, stream_id.0);
         }
         self.declared = false;

@@ -484,14 +484,14 @@ fn own(interface: &str, mac: MacAddress, sender: &Sender<Input>) -> io::Result<R
         stop.clone(),
         sender.clone(),
         "plaa-msrp",
-        Input::Msrp,
+        |source, _, bytes| Input::Msrp(source, bytes),
     )?;
     read_into(
         mvrp_socket.clone(),
         stop.clone(),
         sender.clone(),
         "plaa-mvrp",
-        Input::Mvrp,
+        |source, _, bytes| Input::Mvrp(source, bytes),
     )?;
     let seed = mac
         .0

@@ -75,8 +75,12 @@ struct OnThread(Option<atdecc::blocking::Local>);
 unsafe impl Send for OnThread {}
 
 pub(crate) enum Input {
-    /// An ATDECC or MAAP frame, and who sent it.
-    Avtp(MacAddress, Vec<u8>),
+    /// An ATDECC or MAAP frame, who sent it, and whether to a group
+    /// address.
+    Avtp(MacAddress, bool, Vec<u8>),
+    /// A PTP message, for AVB Lite's fallback.
+    #[cfg(target_os = "linux")]
+    Ptp(Vec<u8>),
     #[cfg(target_os = "linux")]
     Msrp(MacAddress, Vec<u8>),
     #[cfg(target_os = "linux")]
@@ -104,13 +108,13 @@ pub(crate) enum Input {
 }
 
 /// Reads `socket`'s frames into `sender` on a thread of its own, until
-/// `stop`.
+/// `stop`, each with its source and whether it went to a group address.
 pub(crate) fn read_into(
     socket: Arc<Socket>,
     stop: Arc<AtomicBool>,
     sender: Sender<Input>,
     name: &str,
-    wrap: fn(MacAddress, Vec<u8>) -> Input,
+    wrap: fn(MacAddress, bool, Vec<u8>) -> Input,
 ) -> io::Result<()> {
     std::thread::Builder::new()
         .name(name.into())
@@ -120,7 +124,10 @@ pub(crate) fn read_into(
                 match socket.receive(&mut buffer, Some(Duration::from_millis(200))) {
                     Ok(Some(received)) => {
                         let bytes = buffer[..received.length].to_vec();
-                        if sender.send(wrap(received.source, bytes)).is_err() {
+                        if sender
+                            .send(wrap(received.source, received.group, bytes))
+                            .is_err()
+                        {
                             return;
                         }
                     }
@@ -352,7 +359,7 @@ impl Runtime {
     fn handle(&mut self, input: Input) {
         let now = self.now();
         match input {
-            Input::Avtp(source, bytes) => self.heard(now, source, &bytes),
+            Input::Avtp(source, group, bytes) => self.heard(now, source, group, &bytes),
             #[cfg(target_os = "linux")]
             Input::Msrp(source, bytes) => {
                 let since = self.since();
@@ -368,9 +375,17 @@ impl Runtime {
                 }
             }
             #[cfg(target_os = "linux")]
-            Input::Gptp(status) => {
+            Input::Ptp(bytes) => {
+                let since = self.since();
                 if let Some(own) = &mut self.own {
-                    own.handle_gptp(now, status);
+                    own.handle_ptp(since, &bytes);
+                }
+            }
+            #[cfg(target_os = "linux")]
+            Input::Gptp(status) => {
+                let since = self.since();
+                if let Some(own) = &mut self.own {
+                    own.handle_gptp(now, since, status);
                 }
             }
             #[cfg(target_os = "linux")]
@@ -418,7 +433,7 @@ impl Runtime {
 
     /// A frame from the network, or from plaa's own entity or controller,
     /// which the socket does not bring back: each hears the other.
-    fn heard(&mut self, now: Instant, source: MacAddress, bytes: &[u8]) {
+    fn heard(&mut self, now: Instant, source: MacAddress, group: bool, bytes: &[u8]) {
         if bytes.first() != Some(&atdecc::avtp::subtype::MAAP) {
             if let Some(entity) = notifier(bytes, self.controller.entity_id()) {
                 self.watch.notifying.insert(entity);
@@ -426,9 +441,13 @@ impl Runtime {
             let _ = self.controller.handle_frame(now, source, bytes);
         }
         #[cfg(target_os = "linux")]
-        if let Some(own) = &mut self.own {
-            own.handle_avtp(now, source, bytes);
+        {
+            let since = self.since();
+            if let Some(own) = &mut self.own {
+                own.handle_avtp(now, since, source, group, bytes);
+            }
         }
+        let _ = group;
     }
 
     /// Binds `listener` to `talker` in `format`, or in the talker's: the
@@ -590,9 +609,11 @@ impl Runtime {
             }
         }
         #[cfg(target_os = "linux")]
+        let since = self.since();
+        #[cfg(target_os = "linux")]
         if let Some(own) = &mut self.own {
             for bytes in &from_controller {
-                own.handle_avtp(now, self.mac, bytes);
+                own.handle_avtp(now, since, self.mac, true, bytes);
                 handed = true;
             }
             let mut from_entity = Vec::new();
@@ -603,6 +624,7 @@ impl Runtime {
                 }
             }
             own.send_mrp();
+            own.send_lite();
             for bytes in from_entity {
                 let _ = self.controller.handle_frame(now, self.mac, &bytes);
                 handed = true;
