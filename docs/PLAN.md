@@ -92,9 +92,9 @@ trimming and splitting, and Intel Macs.
    waveform under a sound file's cover, a scene in three dimensions
    filling the window, or the cover alone.
 7. **AVB and Milan**: the entity, its talker and listener, and a
-   controller to connect talkers and listeners (done); AVB Lite through
-   triib's entity service (made, not yet tried on a network), then on
-   plaa's own participants.
+   controller to connect talkers and listeners, and AVB Lite through
+   triib's entity service (done); AVB Lite on plaa's own participants
+   next.
 8. **Casting** (done): DLNA/UPnP renderers and Chromecasts.
 9. **Assistant and MCP** (done): the MCP server, `plaa --mcp`, with
    prev's consent prompts, and the assistant panel, both on one tool
@@ -493,7 +493,11 @@ computer's address, the entity steps aside. Tested against an ESP32
 Milan listener through a MOTU AVB switch: the listener locked to the
 stream, 8,000 frames a second, none late or early, with plaa on its own
 participants and through triib's, the service stopped and started again
-while it streamed.
+while it streamed. In AVB Lite, with the port on a switch without AVB
+beside an AVB Lite endpoint, plaa's stream reached triib's entity as a
+unicast copy, plaa took one sent to this computer, escalation set on
+either entity reached the other, and plaa went back to MSRP as the port
+returned to an AVB switch.
 
 ## Dependency and license policy
 
