@@ -8,9 +8,10 @@
 #       packaging/windows/ffmpeg-sources.sh OUT
 #
 # FFMPEG_TARGETS (win64 winarm64) and FFMPEG_VARIANT (gpl-shared) name
-# the builds. It needs git, svn, wget, curl, python3 and the autotools
-# (autoconf, automake, libtool), as BtbN's download stage does: some
-# scripts prepare their sources as they fetch them.
+# the builds. It needs git, svn, wget, curl, python3, the autotools
+# (autoconf, automake, libtool), meson and cargo, as BtbN's download
+# stage does: some scripts prepare their sources as they fetch them,
+# glib's fetching its subprojects and librsvg's its crates.
 set -euo pipefail
 shopt -s globstar
 
