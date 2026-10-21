@@ -144,9 +144,28 @@ impl Own {
         if let Some(mut participant) = lite.participant.take() {
             participant.leave();
             send_all(&mut participant, &lite.tagged, self.mac);
+            self.hear_media_vlan(false);
             if let Err(why) = ptp::switch(&self.interface, false) {
                 eprintln!("plaa: ptp4l stays in AVB Lite's profile: {why}");
             }
+        }
+    }
+
+    /// CVU SRP's commands come tagged in the media VLAN, which an
+    /// interface filtering VLANs in hardware, as the I210 does, drops
+    /// unless it is promiscuous: held so while AVB Lite runs, `on`.
+    fn hear_media_vlan(&self, on: bool) {
+        let Some(socket) = &self.ptp_socket else {
+            return;
+        };
+        if on && !avb_net::interfaces::filters_vlans(&self.interface).unwrap_or(false) {
+            return;
+        }
+        if let Err(error) = socket.set_promiscuous(on) {
+            eprintln!(
+                "plaa: {} may not hear AVB Lite's media VLAN: {error}",
+                self.interface
+            );
         }
     }
 
@@ -312,6 +331,7 @@ impl Own {
         participant.set_escalation(since, lite.escalation);
         let escalation = lite.escalation;
         lite.participant = Some(participant);
+        self.hear_media_vlan(true);
         self.mode = Some(mode(Some(reason), escalation));
         self.copies = None;
         self.ready = false;
@@ -350,6 +370,7 @@ impl Own {
         fallback.set_ptp4l(since, ptp4l(self.gptp.as_ref(), &self.ptp));
         lite.fallback = fallback;
         let escalation = lite.escalation;
+        self.hear_media_vlan(false);
         eprintln!(
             "plaa: {}'s link came up again: AVB, declaring with MSRP",
             self.interface

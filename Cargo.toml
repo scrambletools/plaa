@@ -19,11 +19,11 @@ plaa-store = { path = "crates/plaa-store", version = "0.1.0" }
 # The AVB crates, shared with triib, pinned by revision. A git-ignored
 # .cargo/avb-local.toml can point them at a local checkout while changing
 # both (see the README).
-atdecc = { git = "https://github.com/scrambletools/avb", rev = "cbebb83853d27665a9f53ff9d505c89ba27cd487", version = "0.1.0" }
-avb-lite = { git = "https://github.com/scrambletools/avb", rev = "cbebb83853d27665a9f53ff9d505c89ba27cd487", version = "0.1.0" }
-avb-mrp = { git = "https://github.com/scrambletools/avb", rev = "cbebb83853d27665a9f53ff9d505c89ba27cd487", version = "0.1.0" }
-avb-net = { git = "https://github.com/scrambletools/avb", rev = "cbebb83853d27665a9f53ff9d505c89ba27cd487", version = "0.1.0" }
-avb-stream = { git = "https://github.com/scrambletools/avb", rev = "cbebb83853d27665a9f53ff9d505c89ba27cd487", version = "0.1.0" }
+atdecc = { git = "https://github.com/scrambletools/avb", rev = "f8dd6bf77e0834fef87329828767c1d396fc9146", version = "0.1.0" }
+avb-lite = { git = "https://github.com/scrambletools/avb", rev = "f8dd6bf77e0834fef87329828767c1d396fc9146", version = "0.1.0" }
+avb-mrp = { git = "https://github.com/scrambletools/avb", rev = "f8dd6bf77e0834fef87329828767c1d396fc9146", version = "0.1.0" }
+avb-net = { git = "https://github.com/scrambletools/avb", rev = "f8dd6bf77e0834fef87329828767c1d396fc9146", version = "0.1.0" }
+avb-stream = { git = "https://github.com/scrambletools/avb", rev = "f8dd6bf77e0834fef87329828767c1d396fc9146", version = "0.1.0" }
 # Material Design 3 for iced, shared by Scramble Tools apps. A git-ignored
 # .cargo/scramble-ui-local.toml can point it at a local checkout while
 # changing both (see the README).
