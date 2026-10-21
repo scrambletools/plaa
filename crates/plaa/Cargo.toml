@@ -26,6 +26,16 @@ toml = "1"
 # and logind on Linux, power assertions on macOS, execution state on
 # Windows.
 keepawake = "0.6"
+# Outside control: the control channel other programs call the running
+# plaa over (JSON-RPC on a local socket or named pipe), and `plaa --mcp`,
+# which serves MCP to agents and relays their calls to it.
+interprocess = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rmcp = { version = "3", default-features = false, features = ["server", "transport-io"] }
+tokio = { version = "1", features = ["rt", "sync"] }
+schemars = "1"
+base64 = "0.22"
 
 # The file dialogs and screen sharing: the XDG desktop portal on Linux,
 # the system's own dialogs elsewhere, as prev has them.
@@ -55,8 +65,6 @@ objc2-media-player = { version = "0.3", default-features = false, features = ["s
 objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFCGTypes"] }
 
 [target.'cfg(windows)'.dependencies]
-# The single instance's named pipe.
-interprocess = "2"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_System_Console", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
 # The System Media Transport Controls: what plays in the media flyout,
 # and the media keys.

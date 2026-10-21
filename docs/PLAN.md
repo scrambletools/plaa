@@ -94,7 +94,8 @@ trimming and splitting, and Intel Macs.
 7. **AVB and Milan**: the entity and talker, and a controller to connect
    talkers and listeners (done); the listener and AVB Lite next.
 8. **Casting**: Chromecast and DLNA/UPnP.
-9. **Assistant and MCP**.
+9. **Assistant and MCP**: the MCP server, `plaa --mcp`, with prev's
+   consent prompts (done); the assistant panel next.
 10. **Release**: packages (made, with installer tests on each system,
     `docs/RELEASING.md`), translations, signing, the website.
 

@@ -2,6 +2,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod app;
+mod control;
 mod dialog;
 mod edit_bar;
 mod editing;
@@ -12,6 +13,7 @@ mod instance;
 #[cfg(windows)]
 #[path = "instance_windows.rs"]
 mod instance;
+mod mcp;
 mod media;
 #[cfg(target_os = "macos")]
 mod menu_macos;
@@ -91,6 +93,9 @@ pub enum External {
     /// An item of the macOS menu bar was chosen.
     #[cfg(target_os = "macos")]
     Menu(shortcuts::Action),
+    /// A request on the control channel, from `plaa --mcp` or another
+    /// program.
+    Control(control::Call),
 }
 
 static EXTERNAL_EVENTS: Mutex<Option<UnboundedReceiver<External>>> = Mutex::new(None);
@@ -100,6 +105,17 @@ static EXTERNAL_SENDER: OnceLock<UnboundedSender<External>> = OnceLock::new();
 pub fn post(event: External) {
     if let Some(sender) = EXTERNAL_SENDER.get() {
         let _ = sender.unbounded_send(event);
+    }
+}
+
+/// Opens the control channel, whose calls the app answers; only the
+/// plaa that owns the single-instance socket does. plaa runs without it
+/// if it cannot be opened.
+fn serve_control() {
+    let opened = control::address()
+        .and_then(|address| control::serve(address, |call| post(External::Control(call))));
+    if let Err(error) = opened {
+        eprintln!("plaa: running without the control channel: {error}");
     }
 }
 
@@ -200,6 +216,13 @@ fn main() -> iced::Result {
                     print_interfaces();
                     return Ok(());
                 }
+                "--mcp" => {
+                    if let Err(error) = mcp::run() {
+                        eprintln!("plaa: {error}");
+                        std::process::exit(1);
+                    }
+                    return Ok(());
+                }
                 "--" => {
                     options_done = true;
                     continue;
@@ -227,6 +250,7 @@ fn main() -> iced::Result {
             Ok(instance::Role::Forwarded) => return Ok(()),
             Ok(instance::Role::Primary(listener)) => {
                 listener.spawn(|sources| post(External::OpenSources(sources)));
+                serve_control();
             }
             Err(error) => eprintln!("plaa: running without single instance: {error}"),
         }
@@ -236,6 +260,7 @@ fn main() -> iced::Result {
         Ok(instance::Role::Forwarded) => return Ok(()),
         Ok(instance::Role::Primary(listener)) => {
             listener.spawn(|sources| post(External::OpenSources(sources)));
+            serve_control();
         }
         Err(error) => eprintln!("plaa: running without single instance: {error}"),
     }

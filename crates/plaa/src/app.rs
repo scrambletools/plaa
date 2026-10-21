@@ -27,10 +27,12 @@ use crate::window::{
     self as player_window, Control, Menu, PlayerWindow, QualityChoice, SPEEDS, Sheet,
 };
 
+mod agents;
 mod avb;
 mod edits;
 mod export;
 mod recording;
+pub(crate) mod tools;
 
 /// plaa's id, reversed domain style: its desktop entry on Linux, and how
 /// it names itself to the system's services everywhere.
@@ -124,9 +126,11 @@ pub struct Plaa {
     /// last played or used.
     media_window: Option<window::Id>,
     media: Option<crate::media::Service>,
-    /// The window last focused, which the menu bar's items act on.
-    #[cfg(target_os = "macos")]
+    /// The window last focused, which the menu bar's items and agents'
+    /// tools act on.
     focused: Option<window::Id>,
+    /// Agents waiting for the user to allow them or their tools.
+    agents: agents::Agents,
     next_surface: u64,
 }
 
@@ -218,7 +222,6 @@ pub enum Message {
     /// A window's Wayland surface or AppKit view, once it shows.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     Surface(window::Id, Option<usize>),
-    #[cfg(target_os = "macos")]
     Focused(window::Id),
     #[cfg(target_os = "macos")]
     TitleBarDoubleClicked(window::Id),
@@ -271,6 +274,14 @@ pub enum Message {
         window::Id,
         Result<Option<crate::screen_share::Shared>, String>,
     ),
+    /// The user answered an agent asking to control plaa.
+    AgentAnswered(bool),
+    /// The user answered a tool call shown over a window.
+    RunAnswered(window::Id, bool),
+    /// A prompt's buttons take clicks now.
+    AgentPromptReady,
+    /// A tool's answer, once what it waited on is done.
+    ToolAnswer(tools::Answer, Result<tools::Output, crate::control::Error>),
 }
 
 fn window_icon() -> Option<window::Icon> {
@@ -352,8 +363,8 @@ impl Plaa {
             media: crate::media::Service::start("plaa", |command| {
                 crate::post(External::Media(command));
             }),
-            #[cfg(target_os = "macos")]
             focused: None,
+            agents: agents::Agents::default(),
             next_surface: 1,
         };
         plaa.apply_looks();
@@ -435,6 +446,15 @@ impl Plaa {
 
     /// Opens a window per source, going to the window already playing one
     /// where there is one; `into` is a start window the first one may use.
+    /// The start window plaa opened to, when it is the only window, which
+    /// takes what opens next.
+    fn lone_start(&self) -> Option<window::Id> {
+        match self.windows.iter().collect::<Vec<_>>().as_slice() {
+            [(id, window)] if matches!(window.content, Content::Start) => Some(**id),
+            _ => None,
+        }
+    }
+
     fn open_sources(&mut self, sources: Vec<Source>, into: Option<window::Id>) -> Task<Message> {
         self.remember_addresses(&sources);
         if sources.is_empty() {
@@ -954,11 +974,7 @@ impl Plaa {
                 if self.stop_hidden() && sources.is_empty() {
                     return Task::none();
                 }
-                // The start window plaa opened to, alone, takes them.
-                let start = match self.windows.iter().collect::<Vec<_>>().as_slice() {
-                    [(id, window)] if matches!(window.content, Content::Start) => Some(**id),
-                    _ => None,
-                };
+                let start = self.lone_start();
                 self.open_sources(sources, start)
             }
             Message::External(External::StopHidden) => {
@@ -973,6 +989,7 @@ impl Plaa {
             Message::WindowOpened => Task::none(),
             Message::WindowClosed(id) => {
                 self.avb_window_closed(id);
+                self.agents_window_gone(id);
                 match self.windows.remove(&id).map(|window| window.content) {
                     Some(Content::Player(player)) => {
                         remember_position(&mut self.positions, &player);
@@ -1101,9 +1118,16 @@ impl Plaa {
                 }
                 Task::none()
             }
-            #[cfg(target_os = "macos")]
             Message::Focused(id) => {
                 self.focused = Some(id);
+                Task::none()
+            }
+            Message::External(External::Control(call)) => self.control_call(call),
+            Message::AgentAnswered(allow) => self.agent_answered(allow),
+            Message::RunAnswered(id, allow) => self.run_answered(id, allow),
+            Message::AgentPromptReady => Task::none(),
+            Message::ToolAnswer(answer, result) => {
+                answer.send(result);
                 Task::none()
             }
             #[cfg(target_os = "macos")]
@@ -1473,6 +1497,13 @@ impl Plaa {
     }
 
     fn key(&mut self, id: window::Id, key: Key, modifiers: Modifiers) -> Task<Message> {
+        // An agent's prompt takes the keys: Escape turns it down.
+        if self.shows_agent_prompt(id) {
+            if shortcuts::is_escape(&key) {
+                return self.answer_prompt(id, false).unwrap_or_else(Task::none);
+            }
+            return Task::none();
+        }
         let Some(window) = self.windows.get_mut(&id) else {
             return Task::none();
         };
@@ -2100,7 +2131,6 @@ impl Plaa {
                 (Event::Window(window::Event::FileDropped(path)), _) => {
                     Some(Message::FileDropped(id, path))
                 }
-                #[cfg(target_os = "macos")]
                 (Event::Window(window::Event::Focused), _) => Some(Message::Focused(id)),
                 _ => None,
             }),
@@ -2204,6 +2234,7 @@ impl Plaa {
         } else {
             body
         };
+        let prompt = self.agent_prompt(id).unwrap_or_else(full);
         scramble_ui::smooth::smooth(stack![
             body,
             exporting,
@@ -2211,7 +2242,8 @@ impl Plaa {
             address,
             export_dialog,
             settings,
-            closing
+            closing,
+            prompt
         ])
     }
 }

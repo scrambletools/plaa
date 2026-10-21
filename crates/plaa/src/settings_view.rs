@@ -21,6 +21,7 @@ pub enum SettingsTab {
     Playback,
     Network,
     Language,
+    Agents,
 }
 
 /// The folders Settings chooses.
@@ -62,6 +63,10 @@ pub enum SettingsMessage {
     /// The entity's name as typed, and Enter.
     AvbName(String),
     AvbNameDone,
+    OutsideControl(bool),
+    /// The allowed agents are asked about again.
+    ForgetAgents,
+    AskBefore(crate::app::tools::Kind, bool),
 }
 
 /// The colors offered when the system's accent is not used.
@@ -223,6 +228,7 @@ impl Plaa {
             tab(crate::fl!("settings-tab-playback"), SettingsTab::Playback),
             tab(crate::fl!("settings-tab-network"), SettingsTab::Network),
             tab(crate::fl!("settings-tab-language"), SettingsTab::Language),
+            tab(crate::fl!("settings-tab-agents"), SettingsTab::Agents),
         ]);
         let header = column![
             row![
@@ -244,6 +250,7 @@ impl Plaa {
             SettingsTab::Playback => self.playback_settings(),
             SettingsTab::Network => self.network_settings(),
             SettingsTab::Language => self.language_settings(),
+            SettingsTab::Agents => self.agent_settings(),
         };
         if let Some(error) = &self.settings_error {
             content = content.push(scramble_ui::aligned(
@@ -679,6 +686,54 @@ impl Plaa {
         .spacing(12)
     }
 
+    /// Outside control: whether agents may control plaa, those allowed,
+    /// and what plaa asks about first.
+    fn agent_settings(&self) -> iced::widget::Column<'_, SettingsMessage> {
+        use crate::app::tools::Kind as ToolKind;
+        let mut content = column![switch_row(
+            crate::fl!("settings-allow-outside-control"),
+            crate::fl!("settings-allow-outside-control-note"),
+            self.settings.outside_control,
+            SettingsMessage::OutsideControl,
+        )]
+        .spacing(12);
+        if !self.settings.allowed_agents.is_empty() {
+            content = content.push(
+                row![
+                    container(note(crate::fl!(
+                        "settings-allowed-agents",
+                        agents = self.settings.allowed_agents.join(", ")
+                    )))
+                    .width(Fill),
+                    scramble_ui::button(Kind::Text, crate::fl!("settings-forget-agents"))
+                        .on_press(SettingsMessage::ForgetAgents),
+                ]
+                .spacing(16)
+                .align_y(Center),
+            );
+        }
+        let mut asks = column![note(crate::fl!("settings-ask-before-note"))].spacing(4);
+        for kind in ToolKind::ALL {
+            let label = match kind {
+                ToolKind::Read => crate::fl!("settings-ask-reading"),
+                ToolKind::Play => crate::fl!("settings-ask-playing"),
+                ToolKind::Open => crate::fl!("settings-ask-opening"),
+            };
+            asks = asks.push(
+                row![
+                    container(scramble_ui::styled(label, Type::BodyLarge)).width(Fill),
+                    toggler(kind.asks(&self.settings.ask_before))
+                        .on_toggle(move |on| SettingsMessage::AskBefore(kind, on))
+                        .size(28)
+                        .style(style::switch),
+                ]
+                .spacing(16)
+                .align_y(Center),
+            );
+        }
+        content.push(asks)
+    }
+
     pub(crate) fn settings_update(&mut self, message: SettingsMessage) -> Task<Message> {
         match message {
             SettingsMessage::Close(id) => {
@@ -804,6 +859,16 @@ impl Plaa {
                 if self.settings.avb_talker {
                     self.apply_avb();
                 }
+            }
+            SettingsMessage::OutsideControl(on) => {
+                self.settings.outside_control = on;
+                if !on {
+                    self.outside_control_off();
+                }
+            }
+            SettingsMessage::ForgetAgents => self.settings.allowed_agents.clear(),
+            SettingsMessage::AskBefore(kind, on) => {
+                kind.set_asks(&mut self.settings.ask_before, on)
             }
         }
         self.save_settings();

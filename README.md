@@ -146,10 +146,16 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   Windows, `~/Library/Application Support/plaa/plaa.toml` on macOS).
 - **One window per file** and one running plaa: files opened again, from
   the file manager or the command line, go to the running one.
+- **AI agents**: `plaa --mcp` serves plaa's tools over MCP, so Claude
+  Code or a local model in an MCP client can see what plays in the plaa
+  you are using, and play, pause, seek, loop, change the volume and
+  tracks, open files and close windows, asking you first. plaa bundles
+  no model and listens on no network. See
+  [Using plaa with AI agents](#using-plaa-with-ai-agents).
 
 ### Planned
 
-Listening to AVB streams and AVB Lite, casting, the assistant and MCP,
+Listening to AVB streams and AVB Lite, casting, the assistant panel,
 and translations. The [plan](docs/PLAN.md) has the order.
 
 ## Packages
@@ -315,6 +321,42 @@ picture-in-picture, trim, split, rotate-left, rotate-right,
 flip-horizontal, flip-vertical, undo, redo, revert, export,
 record-sound, record-screen and record-camera. A shortcut the settings give one action is taken
 from any other that had it by default.
+
+## Using plaa with AI agents
+
+Add plaa to an agent as an MCP server that runs `plaa --mcp`. For Claude
+Code:
+
+```sh
+claude mcp add plaa -- plaa --mcp
+```
+
+Where `plaa` is not on the path, give its whole path:
+`/Applications/plaa.app/Contents/MacOS/plaa` on macOS, or
+`%LOCALAPPDATA%\Programs\plaa\plaa.exe` on Windows. MCP clients for
+local models take the same command, often as
+`{ "mcpServers": { "plaa": { "command": "plaa", "args": ["--mcp"] } } }`.
+`plaa --mcp` starts plaa when it is not running, and relays the agent's
+calls to it over a socket only you can open (a named pipe on Windows).
+
+The first time an agent connects, plaa asks whether to let it in. The
+Agents tab of Settings turns outside control off, lists the agents
+allowed, and has a switch for each kind of tool (seeing what plays,
+controlling playback, and opening files or closing windows) that makes
+plaa ask before an agent's call runs. What the agent sees, the picture
+shown among it, goes to its model.
+
+| Tool | What it does |
+|---|---|
+| `list_windows` | plaa's windows: their numbers, titles, what they play and how |
+| `get_status` | A window's state, position, length, speed, volume, loop and tracks chosen |
+| `get_info` | The file's format, tags, chapters and streams, and the window's list |
+| `get_frame` | The picture shown, as a PNG at most 1280 pixels across |
+| `play`, `pause`, `seek`, `set_speed` | Playback |
+| `set_volume`, `set_loop`, `choose_tracks` | The sound, looping, and the sound track and subtitles |
+| `next_item`, `previous_item` | Moving through a window's list |
+| `set_fullscreen`, `focus_window` | The window |
+| `open`, `close_window` | Opening a file or address, and closing a window |
 
 ## License
 

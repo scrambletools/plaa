@@ -113,6 +113,14 @@ pub struct Settings {
     /// Where frames saved as pictures go.
     #[serde(with = "home_path")]
     pub screenshots: PathBuf,
+    /// Whether other programs, such as AI agents through `plaa --mcp`,
+    /// may see what plays and control it.
+    pub outside_control: bool,
+    /// The agents, by the names they give, that the user allowed to
+    /// control plaa. Others are asked about on their first connection.
+    pub allowed_agents: Vec<String>,
+    /// What plaa asks about before an agent's tool runs.
+    pub ask_before: AskBefore,
     /// How much louder each input is taken, in decibels, by the id the
     /// system gives it; "" for the system's default.
     pub input_gains: BTreeMap<String, f32>,
@@ -162,9 +170,25 @@ impl Default for Settings {
             avb_talker: false,
             avb_name: String::new(),
             screenshots: paths::default_screenshots(),
+            outside_control: true,
+            allowed_agents: Vec::new(),
+            ask_before: AskBefore::default(),
             keys: toml::Table::new(),
         }
     }
+}
+
+/// Whether plaa asks before an agent's tool of each kind runs. Nothing
+/// asks at first: an agent is asked about once, as it connects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct AskBefore {
+    /// Seeing what plays: the windows, the files, the picture shown.
+    pub reading: bool,
+    /// Playing, pausing, seeking, the volume and the tracks.
+    pub playing: bool,
+    /// Opening files and addresses, and closing windows.
+    pub opening: bool,
 }
 
 impl Settings {

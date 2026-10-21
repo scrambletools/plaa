@@ -36,6 +36,8 @@ usage-help =
       -V, --version     Show the version
           --interfaces  Show the wired interfaces, and whether plaa can
                         send AVB streams on them
+          --mcp         Serve MCP on stdin and stdout, for AI agents to
+                        see what the running plaa plays and control it
 
 ## Start window
 
@@ -165,6 +167,7 @@ settings-tab-appearance = Appearance
 settings-tab-playback = Playback
 settings-tab-network = Network
 settings-tab-language = Language
+settings-tab-agents = Agents
 settings-version = plaa { $version } ({ $build })
 settings-version-development = plaa { $version } (dev build, { $build })
 settings-choose = Choose…
@@ -499,3 +502,26 @@ menu-record-camera = New Camera Recording
 notice-no-camera = There is no camera to record
 notice-recorded = Saved “{ $name }” in { $folder }
 notice-record-failed = Couldn’t record: { $error }
+
+## Outside control: AI agents, through plaa --mcp
+
+settings-allow-outside-control = Allow outside control
+settings-allow-outside-control-note = AI agents such as Claude Code can see what plays in plaa and control it, through plaa --mcp. plaa asks before each new agent.
+# $agents is a list of agent names, such as claude-code.
+settings-allowed-agents = Allowed: { $agents }
+settings-forget-agents = Forget
+settings-ask-before-note = Ask before an agent:
+settings-ask-reading = Sees what plays, or the picture
+settings-ask-playing = Controls playback, the sound or full screen
+settings-ask-opening = Opens a file or closes a window
+# $agent is the agent's name, such as Claude Code.
+agent-prompt-title = Allow { $agent } to control plaa?
+agent-prompt-body = { $agent } asks to use plaa's outside control, to see what plays and control it. You can turn outside control off in Settings.
+agent-prompt-allow = Allow
+agent-prompt-deny = Don't allow
+# The prompt before an agent's tool runs; $agent is the agent's name.
+agent-ask-read = Let { $agent } see what plays here?
+agent-ask-play = Let { $agent } control playback here?
+agent-ask-open = Let { $agent } open or close a window?
+# $tool is the name of what the agent asks to do, such as Seek.
+agent-ask-body = { $agent } asks to use “{ $tool }”. Settings chooses what plaa asks about.
