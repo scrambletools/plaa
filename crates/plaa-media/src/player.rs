@@ -22,12 +22,15 @@ use crate::queue::{Item, PacketQueue};
 use crate::subtitle::{self, Cue, Cues, PictureCues, SubtitlePicture};
 use crate::web::{Entry, Page};
 
-/// What to open: a file, or an address FFmpeg reads, such as an HTTP or
-/// RTSP stream.
+/// What to open: a file, an address FFmpeg reads, such as an HTTP or
+/// RTSP stream, or sound arriving live from elsewhere in the program, as
+/// a network stream plaa listens to, by its own id and name, its sound
+/// from [`Options::live`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Source {
     File(PathBuf),
     Url(String),
+    Live { id: String, name: String },
 }
 
 impl Source {
@@ -56,6 +59,7 @@ impl Source {
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| path.display().to_string()),
             Source::Url(url) => url.clone(),
+            Source::Live { name, .. } => name.clone(),
         }
     }
 
@@ -63,11 +67,31 @@ impl Source {
         match self {
             Source::File(path) => path,
             Source::Url(url) => Path::new(url),
+            Source::Live { id, .. } => Path::new(id),
         }
     }
 
     pub fn is_url(&self) -> bool {
         matches!(self, Source::Url(_))
+    }
+
+    pub fn is_live(&self) -> bool {
+        matches!(self, Source::Live { .. })
+    }
+}
+
+/// Where a live source's sound comes from: given the output's rate, a
+/// pull that fills two interleaved channels at that rate with what came,
+/// taken a chunk at a time as a sound device takes it.
+#[derive(Clone)]
+pub struct LiveSound(pub Arc<dyn Fn(u32) -> LivePull + Send + Sync>);
+
+/// Fills its slice with the next frames, silence where none came.
+pub type LivePull = Box<dyn FnMut(&mut [f32]) + Send>;
+
+impl std::fmt::Debug for LiveSound {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("LiveSound")
     }
 }
 
@@ -94,6 +118,8 @@ pub struct Options {
     /// The web page yt-dlp read for the source already, so opening it
     /// again, as in another quality, does not ask it again.
     pub page: Option<Arc<Page>>,
+    /// A live source's sound.
+    pub live: Option<LiveSound>,
 }
 
 /// Which of a source's versions to play, as an HLS stream's qualities.
@@ -123,6 +149,7 @@ impl Default for Options {
             quality: Quality::Best,
             web: true,
             page: None,
+            live: None,
         }
     }
 }
@@ -934,6 +961,96 @@ impl Reading {
 
 /// The reading thread: opens the source, starts the decoders and feeds
 /// them until stopped.
+/// How much live sound waits for the output, little, so it is heard soon
+/// after it arrives.
+const LIVE_AHEAD: Duration = Duration::from_millis(40);
+
+/// How much live sound is taken at a time.
+const LIVE_CHUNK: Duration = Duration::from_millis(10);
+
+/// Plays a live source's sound as it comes, at the output's rate: it has
+/// no duration and cannot seek, and it plays from where it is on a new
+/// output, as the sound arrives at that one's rate.
+fn read_live(
+    source: &Source,
+    options: Options,
+    shared: &Shared,
+    commands: &Receiver<Command>,
+    events: &dyn Fn(Event),
+) {
+    let Some(live) = options.live.clone() else {
+        events(Event::Failed("nothing sends this sound".to_owned()));
+        return;
+    };
+    let open = |device: Option<&str>| {
+        let output =
+            audio::Output::open(shared.clock.clone(), options.volume, options.muted, device)
+                .unwrap_or_else(|error| {
+                    events(Event::NoSound(error.to_string()));
+                    audio::Output::silent(shared.clock.clone(), options.volume, options.muted)
+                });
+        let pull = (live.0)(output.shared.rate);
+        shared.use_output(Some(output.shared.clone()));
+        (output, pull)
+    };
+    let (mut output, mut pull) = open(options.audio_device.as_deref());
+    let info = Arc::new(MediaInfo {
+        format: source.name(),
+        audio: vec![crate::info::AudioTrack {
+            sample_rate: output.shared.rate,
+            channels: 2,
+            layout: "stereo".to_owned(),
+            ..crate::info::AudioTrack::default()
+        }],
+        ..MediaInfo::default()
+    });
+    shared.state().info = Some(info.clone());
+    events(Event::Opened { info, cover: None });
+    shared.clock.set_paused(options.paused);
+    let mut position = 0.0;
+    while !shared.stopping() {
+        for command in commands.try_iter() {
+            if let Command::SetAudioDevice(device) = command {
+                // Volume and mute as they are now.
+                let (volume, muted) = output.shared.volume();
+                drop(output);
+                (output, pull) = open(device.as_deref());
+                output.shared.set_volume(volume);
+                output.shared.set_muted(muted);
+            }
+        }
+        let sound = &output.shared;
+        let rate = sound.rate.max(1);
+        let ahead = (LIVE_AHEAD.as_secs_f64() * f64::from(rate)) as usize;
+        if shared.clock.paused() || sound.queued() >= ahead {
+            if sound.queued() > 0 {
+                shared.clock.end_wait();
+            }
+            std::thread::sleep(LIVE_CHUNK / 2);
+            continue;
+        }
+        let frames = (LIVE_CHUNK.as_secs_f64() * f64::from(rate)) as usize;
+        let mut two = vec![0.0f32; frames * 2];
+        pull(&mut two);
+        // Its two channels on the output's first two.
+        let channels = usize::from(sound.channels.max(1));
+        let samples: Vec<f32> = two
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .flat_map(|frame| {
+                (0..channels).map(move |channel| frame.get(channel).copied().unwrap_or(0.0))
+            })
+            .collect();
+        let serial = shared.serial.load(Ordering::Relaxed);
+        let step = 1.0 / f64::from(rate);
+        if sound.push(serial, position, step, samples, &shared.stop) {
+            position += frames as f64 * step;
+        }
+        shared.clock.end_wait();
+    }
+}
+
 fn read(
     source: Source,
     options: Options,
@@ -941,6 +1058,10 @@ fn read(
     commands: Receiver<Command>,
     events: Box<dyn Fn(Event) + Send>,
 ) {
+    if source.is_live() {
+        read_live(&source, options, &shared, &commands, &*events);
+        return;
+    }
     let Some(opened) = inputs::open(&source, &options, &shared, &*events) else {
         return;
     };
@@ -953,7 +1074,7 @@ fn read(
     inputs::merge(&mut info, sound, opened.page.as_deref());
     let subtitle_files = match &source {
         Source::File(path) => read_subtitle_files(path, &mut info),
-        Source::Url(_) => Vec::new(),
+        Source::Url(_) | Source::Live { .. } => Vec::new(),
     };
     let info = Arc::new(info);
     let start = inputs.start;

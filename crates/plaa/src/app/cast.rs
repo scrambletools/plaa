@@ -74,6 +74,8 @@ impl Plaa {
         let media = match player.source() {
             Source::File(path) => Media::File(path.clone()),
             Source::Url(url) => Media::Url(url.clone()),
+            // A stream plaa listens to, whose window offers no casting.
+            Source::Live { .. } => return Task::none(),
         };
         let start = player.status.position.as_secs_f64();
         player.player.pause();

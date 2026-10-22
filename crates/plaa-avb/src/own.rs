@@ -29,7 +29,7 @@ use atdecc::stream_format::StreamFormat;
 use atdecc::{ClockIdentity, EntityId, EntityModelId, Instant, MacAddress, StreamId};
 use avb_mrp::msrp::{ListenerState, TalkerDeclaration};
 use avb_mrp::sharing::{Mode, Notice};
-use avb_stream::audio::{Sink, Source};
+use avb_stream::audio::{SharedBuffer, Sink, Source};
 use avb_stream::media::Media;
 use avb_stream::{Listener, ListenerConfig, MediaClock, Talker, TalkerConfig, TalkerStats};
 
@@ -164,6 +164,9 @@ struct Listening {
     receiver: Option<Listener>,
     /// The stream it takes, and where it comes to.
     receiving: Option<(u64, Vec<MacAddress>)>,
+    /// The buffer a player drains, which the stream plays into; the sound
+    /// output where none.
+    into: Option<SharedBuffer>,
     /// The input's counters, kept as the receivers come and go.
     counters: [u32; 32],
 }
@@ -1076,9 +1079,12 @@ impl Own {
             stream_id,
             destinations: destinations.clone(),
             format,
-            sink: Sink::Device {
-                name: None,
-                first_channel: 0,
+            sink: match &self.listening.into {
+                Some(buffer) => Sink::Shared(buffer.clone()),
+                None => Sink::Device {
+                    name: None,
+                    first_channel: 0,
+                },
             },
             recovered: None,
             // The first two of eight channels, as plaa sends its own.
@@ -1103,6 +1109,18 @@ impl Own {
                 self.listening.receiving = Some((stream_id, destinations));
             }
             Err(error) => eprintln!("plaa: could not listen to the AVB stream: {error}"),
+        }
+    }
+
+    /// Plays the stream into `buffer` from now on, or on the sound output
+    /// where none, starting again where it plays already.
+    pub(crate) fn listen_into(&mut self, buffer: Option<SharedBuffer>) {
+        if self.listening.into == buffer {
+            return;
+        }
+        self.listening.into = buffer;
+        if let Some((stream_id, destinations)) = self.listening.receiving.clone() {
+            self.start_receiver(stream_id, destinations);
         }
     }
 

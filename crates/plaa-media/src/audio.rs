@@ -151,6 +151,11 @@ impl Shared {
         true
     }
 
+    /// The frames waiting for the device.
+    pub fn queued(&self) -> usize {
+        self.queue().frames
+    }
+
     /// Drops all sound and plays only `serial`'s from now on.
     pub fn flush(&self, serial: u64) {
         let mut queue = self.queue();

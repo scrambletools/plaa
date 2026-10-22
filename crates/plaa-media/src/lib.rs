@@ -27,7 +27,7 @@ pub use decode::{Picture, same_language};
 pub use edit::{Clip, Edit, Transform};
 pub use frame::VideoFrame;
 pub use info::MediaInfo;
-pub use player::{Event, Options, Player, Quality, Source, Status};
+pub use player::{Event, LivePull, LiveSound, Options, Player, Quality, Source, Status};
 pub use subtitle::SubtitlePicture;
 pub use thumbnails::{Thumbnail, Thumbnails};
 

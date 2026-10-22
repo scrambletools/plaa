@@ -213,6 +213,49 @@ impl Network {
     pub fn sound(&self) -> Arc<Sound> {
         self.sound.clone()
     }
+
+    /// What a player takes the stream plaa listens to from.
+    pub fn listened(&self) -> Listened {
+        Listened {
+            inputs: self.inputs.clone(),
+        }
+    }
+
+    /// The stream plaa listens to plays on the sound output again, as
+    /// no player takes it.
+    pub fn listen_on_output(&self) {
+        let _ = self.inputs.send(Input::ListenInto(None));
+    }
+}
+
+/// What drains the stream plaa listens to: two channels a chunk at a
+/// time, silence where none came.
+pub type Pull = Box<dyn FnMut(&mut [f32]) + Send>;
+
+/// The stream plaa's input takes, for a player to play.
+#[derive(Clone)]
+pub struct Listened {
+    inputs: std::sync::mpsc::Sender<Input>,
+}
+
+impl Listened {
+    /// Has the stream play into a buffer at `rate` from now on, and gives
+    /// what drains it, two channels a chunk at a time, as a sound device
+    /// does, so the stream keeps to the device's clock.
+    pub fn open(&self, rate: u32) -> Pull {
+        let buffer = Arc::new(avb_stream::audio::FrameBuffer::new(
+            sound::CHANNELS,
+            rate as usize / 100,
+        ));
+        let _ = self
+            .inputs
+            .send(Input::ListenInto(Some(avb_stream::audio::SharedBuffer {
+                buffer: buffer.clone(),
+                channels: sound::CHANNELS,
+                rate,
+            })));
+        Box::new(move |out: &mut [f32]| buffer.device_pull(out, None))
+    }
 }
 
 impl Drop for Network {

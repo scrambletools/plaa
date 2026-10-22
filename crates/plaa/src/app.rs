@@ -121,6 +121,12 @@ pub struct Plaa {
     avb_watched: (bool, Vec<(plaa_avb::EntityId, u16)>),
     /// The start window whose Connect menu is open.
     start_connect: Option<window::Id>,
+    /// The window plaa's input was last connected from, to play the
+    /// stream in where it is a start window.
+    connect_window: Option<window::Id>,
+    /// Windows playing a stream that were paused, which stops listening,
+    /// while plaa's input still takes it.
+    listen_paused: HashSet<window::Id>,
     /// The wired interfaces, as when Settings last opened.
     pub(crate) avb_interfaces: Vec<plaa_avb::Interface>,
     /// What is kept awake while something plays, and the hold on it when
@@ -375,6 +381,8 @@ impl Plaa {
             avb_feeding: None,
             avb_watched: (false, Vec::new()),
             start_connect: None,
+            connect_window: None,
+            listen_paused: HashSet::new(),
             avb_interfaces: Vec::new(),
             awake: None,
             media_window: None,
@@ -803,7 +811,17 @@ impl Plaa {
     /// Starts a player for `list`'s current item in window `id`.
     fn open_player(&mut self, id: window::Id, list: Playlist, opening: Opening) {
         self.media_window = Some(id);
+        // A stream plaa listens to plays from the network's side.
+        let live = list
+            .source()
+            .is_live()
+            .then(|| self.avb.as_ref().map(plaa_avb::Network::listened))
+            .flatten()
+            .map(|listened| {
+                plaa_media::LiveSound(std::sync::Arc::new(move |rate| listened.open(rate)))
+            });
         let options = Options {
+            live,
             hardware: self.settings.hardware_decoding,
             volume: self.settings.volume,
             muted: self.settings.muted,
@@ -914,6 +932,7 @@ impl Plaa {
                     url: match player.source() {
                         Source::File(path) => Some(crate::mpris::file_uri(path)),
                         Source::Url(url) => Some(url.clone()),
+                        Source::Live { .. } => None,
                     },
                     art: player.art.clone(),
                     position: status.position,
@@ -1259,7 +1278,7 @@ impl Plaa {
             }
             Message::External(External::Avb) => {
                 self.avb_changed();
-                Task::none()
+                self.follow_listening()
             }
             Message::External(External::Thumbnail(id, thumbnail)) => {
                 if let Some(player) = self.player_mut(id) {
@@ -1714,6 +1733,10 @@ impl Plaa {
                 self.touch(id);
                 return task;
             }
+            Action::PlayPause if self.plays_live(id) => {
+                self.toggle_listening(id);
+                return Task::none();
+            }
             _ => {}
         }
         let delay = self.settings.overlay_delay();
@@ -1947,7 +1970,14 @@ impl Plaa {
             Control::TogglePip => return self.toggle_pip(id),
             Control::Previous => return self.previous(id),
             Control::Next => return self.next(id),
+            Control::TogglePlay if self.plays_live(id) => {
+                self.toggle_listening(id);
+                return Task::none();
+            }
             Control::AvbConnect(talker, listener, format) => {
+                if self.own_input().is_some_and(|(ours, _)| ours == listener) {
+                    self.connect_window = Some(id);
+                }
                 self.avb_connect(talker, listener, format);
                 if let Some(player) = self.player_mut(id) {
                     player.menu = None;
@@ -2417,7 +2447,7 @@ fn remember_position(positions: &mut Positions, player: &PlayerWindow) {
 fn position_key(source: &Source) -> String {
     match source {
         Source::File(path) => path.to_string_lossy().into_owned(),
-        Source::Url(url) => url.clone(),
+        Source::Url(url) | Source::Live { id: url, .. } => url.clone(),
     }
 }
 

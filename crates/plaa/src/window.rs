@@ -332,7 +332,7 @@ impl PlayerWindow {
             Source::File(_) if self.info.is_some() && !self.is_video() => {
                 tagged.unwrap_or_else(|| self.source().name())
             }
-            Source::File(_) => self.source().name(),
+            Source::File(_) | Source::Live { .. } => self.source().name(),
         }
     }
 
@@ -647,7 +647,10 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             Control::TogglePlaylist,
         ));
     }
-    tools.push(cast_menu(window, context));
+    // A stream plaa listens to plays here alone.
+    if !window.source().is_live() {
+        tools.push(cast_menu(window, context));
+    }
     if context.avb.is_some() {
         tools.push(component::toggle_tool(
             Icon::Lan,
@@ -798,9 +801,12 @@ fn transport<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
         container(time(elapsed)).padding([0, 4]).into(),
         timeline,
         container(time(remaining)).padding([0, 4]).into(),
-        speed_menu(window),
-        mute,
     ]);
+    // A stream plaa listens to plays as it comes.
+    if !window.source().is_live() {
+        controls.push(speed_menu(window));
+    }
+    controls.push(mute);
     // Narrow windows keep the mute button and lose the slider.
     if context.width >= 640.0 {
         controls.push(volume.into());
@@ -1698,7 +1704,9 @@ fn inspector(window: &PlayerWindow) -> Element<'_, Control> {
     content = content.push(component::section(crate::fl!("info-file")));
     content = content.push(match window.source() {
         Source::Url(url) => field(crate::fl!("info-address"), url.clone()),
-        Source::File(_) => field(crate::fl!("info-name"), window.source().name()),
+        Source::File(_) | Source::Live { .. } => {
+            field(crate::fl!("info-name"), window.source().name())
+        }
     });
     if let Source::File(path) = window.source() {
         if let Some(folder) = path.parent() {

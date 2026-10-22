@@ -962,11 +962,12 @@ fn round(seconds: f64) -> f64 {
     (seconds * 1000.0).round() / 1000.0
 }
 
-/// A file's path or a stream's address.
+/// A file's path, a stream's address, or the talker plaa listens to.
 fn source_text(source: &Source) -> String {
     match source {
         Source::File(path) => path.display().to_string(),
         Source::Url(url) => url.clone(),
+        Source::Live { name, .. } => name.clone(),
     }
 }
 

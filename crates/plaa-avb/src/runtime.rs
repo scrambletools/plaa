@@ -105,6 +105,9 @@ pub(crate) enum Input {
     },
     /// What plays arrives at another rate.
     SoundRate,
+    /// The stream plaa's input takes plays into this buffer, which a
+    /// player drains, or on the sound output where none.
+    ListenInto(Option<avb_stream::audio::SharedBuffer>),
     Stop,
 }
 
@@ -417,6 +420,14 @@ impl Runtime {
                 }
                 self.watch.listed = listed;
                 self.watch.chosen = chosen;
+            }
+            Input::ListenInto(buffer) => {
+                #[cfg(target_os = "linux")]
+                if let Some(own) = &mut self.own {
+                    own.listen_into(buffer);
+                }
+                #[cfg(not(target_os = "linux"))]
+                let _ = buffer;
             }
             Input::SoundRate => {
                 #[cfg(target_os = "linux")]

@@ -596,7 +596,7 @@ fn status(snapshot: &Snapshot, input: &Stream) -> String {
 
 /// A talker's output by name, as listeners are named, or by its entity's
 /// ID where the entity is not found.
-fn talker_name(snapshot: &Snapshot, (id, index): End) -> String {
+pub fn talker_name(snapshot: &Snapshot, (id, index): End) -> String {
     let Some(entity) = snapshot.entities.iter().find(|entity| entity.id == id) else {
         return id.to_string();
     };
