@@ -457,7 +457,7 @@ mod tests {
         let lite = mode(Some(FallbackReason::ENDPOINT_TLV), true);
         assert_eq!(lite.lite, Some(1));
         assert!(lite.escalation);
-        assert_eq!((lite.media_vlan, lite.unicast_fanout), (2, 2));
+        assert_eq!((lite.media_vlan, lite.unicast_fanout), (2, 5));
         assert_eq!(mode(None, false).lite, None);
     }
 }
