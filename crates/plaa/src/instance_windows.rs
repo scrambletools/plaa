@@ -103,6 +103,8 @@ fn encode(sources: &[Source]) -> io::Result<Vec<u8>> {
                 request.extend_from_slice(text.as_bytes());
             }
             Source::Url(url) => request.extend_from_slice(url.as_bytes()),
+            // Only this instance hears its own network.
+            Source::Live { .. } => continue,
         }
         request.push(0);
     }
