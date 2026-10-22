@@ -3,9 +3,9 @@
 # as triib and Wireshark may use it too.
 #
 #   sudo "/Library/Application Support/plaa/uninstall"
-daemon=/Library/LaunchDaemons/io.github.scrambletools.plaa.bpf.plist
+daemon=/Library/LaunchDaemons/run.plaa.bpf.plist
 launchctl bootout system "$daemon" 2>/dev/null
 rm -f "$daemon"
 rm -rf /Applications/plaa.app "/Library/Application Support/plaa"
-pkgutil --forget io.github.scrambletools.plaa >/dev/null 2>&1
+pkgutil --forget run.plaa >/dev/null 2>&1
 exit 0

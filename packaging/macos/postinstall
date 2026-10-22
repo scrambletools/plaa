@@ -4,7 +4,7 @@
 # start, so plaa reaches AVB devices on the network.
 group=access_bpf
 support="/Library/Application Support/plaa"
-daemon=/Library/LaunchDaemons/io.github.scrambletools.plaa.bpf.plist
+daemon=/Library/LaunchDaemons/run.plaa.bpf.plist
 
 dseditgroup -q -o read "$group" >/dev/null 2>&1 || dseditgroup -q -o create "$group"
 user=$(stat -f%Su /dev/console)

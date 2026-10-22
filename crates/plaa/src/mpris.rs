@@ -107,7 +107,7 @@ fn status(playback: Playback) -> &'static str {
 
 fn metadata(now: &NowPlaying) -> HashMap<String, OwnedValue> {
     let mut values: HashMap<String, Value> = HashMap::new();
-    let track = format!("/io/github/scrambletools/plaa/track/{}", now.track);
+    let track = format!("/run/plaa/track/{}", now.track);
     if let Ok(path) = ObjectPath::try_from(track) {
         values.insert("mpris:trackid".into(), Value::from(path));
     }
@@ -246,7 +246,7 @@ impl Player {
 
     /// Goes to `position` microseconds, if `track` still plays.
     fn set_position(&self, track: ObjectPath<'_>, position: i64) {
-        let playing = format!("/io/github/scrambletools/plaa/track/{}", self.now().track);
+        let playing = format!("/run/plaa/track/{}", self.now().track);
         if track.as_str() == playing && position >= 0 {
             (self.send)(Command::SeekTo(position as f64 / 1_000_000.0));
         }

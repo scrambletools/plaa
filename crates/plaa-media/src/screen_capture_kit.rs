@@ -319,7 +319,7 @@ impl Capture {
                 &config,
                 Some(ProtocolObject::from_ref(&*taker)),
             );
-            let queue = DispatchQueue::new("io.github.scrambletools.plaa.screen", None);
+            let queue = DispatchQueue::new("run.plaa.screen", None);
             stream
                 .addStreamOutput_type_sampleHandlerQueue_error(
                     ProtocolObject::from_ref(&*taker),

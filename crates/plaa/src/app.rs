@@ -39,9 +39,9 @@ pub(crate) mod tools;
 /// plaa's id, reversed domain style: its desktop entry on Linux, and how
 /// it names itself to the system's services everywhere.
 pub const APP_ID: &str = if plaa_store::paths::PRODUCTION {
-    "io.github.scrambletools.plaa"
+    "run.plaa"
 } else {
-    "io.github.scrambletools.plaa.Devel"
+    "run.plaa.Devel"
 };
 
 /// How long a notice shows before it goes away by itself.
@@ -308,8 +308,7 @@ pub enum Message {
 }
 
 fn window_icon() -> Option<window::Icon> {
-    let png =
-        include_bytes!("../../../data/icons/hicolor/64x64/apps/io.github.scrambletools.plaa.png");
+    let png = include_bytes!("../../../data/icons/hicolor/64x64/apps/run.plaa.png");
     let decoder = png::Decoder::new(std::io::Cursor::new(&png[..]));
     let mut reader = decoder.read_info().ok()?;
     let mut pixels = vec![0; reader.output_buffer_size()?];

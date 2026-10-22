@@ -52,9 +52,9 @@ done
 
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1)
 if [ -n "${PLAA_PRODUCTION:-}" ]; then
-    name=plaa; id=io.github.scrambletools.plaa
+    name=plaa; id=run.plaa
 else
-    name=plaa-dev; id=io.github.scrambletools.plaa.dev
+    name=plaa-dev; id=run.plaa.dev
 fi
 brew=$(brew --prefix)
 
@@ -191,7 +191,7 @@ done
 # The icon: each size an .iconset asks for, from the PNGs the Linux
 # packages use and the 1024 one they are made from.
 icons="$root/data/icons/hicolor"
-png() { echo "$icons/$1x$1/apps/io.github.scrambletools.plaa.png"; }
+png() { echo "$icons/$1x$1/apps/run.plaa.png"; }
 iconset=$(mktemp -d)/plaa.iconset
 mkdir -p "$iconset"
 for size in 16 32 128 256 512; do
@@ -322,7 +322,7 @@ if $pkg; then
     mkdir -p "$payload/Applications" "$payload/Library/LaunchDaemons" \
         "$payload/Library/Application Support/plaa"
     cp -R "$app" "$payload/Applications/"
-    cp "$here/io.github.scrambletools.plaa.bpf.plist" "$payload/Library/LaunchDaemons/"
+    cp "$here/run.plaa.bpf.plist" "$payload/Library/LaunchDaemons/"
     install -m 755 "$here/bpf-access" "$here/uninstall" "$payload/Library/Application Support/plaa/"
     scripts=$(mktemp -d)
     install -m 755 "$here/postinstall" "$scripts/postinstall"

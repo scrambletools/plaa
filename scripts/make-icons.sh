@@ -8,7 +8,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-id=io.github.scrambletools.plaa
+id=run.plaa
 hicolor=$root/data/icons/hicolor
 svg=$hicolor/scalable/apps/$id.svg
 work=$(mktemp -d)

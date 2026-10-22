@@ -20,7 +20,7 @@ previous=${2:+$(readlink -f "$2")}
 emulated=${PLAA_TEST_EMULATED:-}
 shots=${PLAA_TEST_SHOTS:-}
 here=$(cd "$(dirname "$0")" && pwd)
-id=io.github.scrambletools.plaa
+id=run.plaa
 
 section() { printf '\n== %s\n' "$*"; }
 fail() {

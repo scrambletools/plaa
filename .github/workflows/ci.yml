@@ -31,7 +31,9 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - run: desktop-file-validate data/*.desktop
-      - run: appstreamcli validate --no-net data/*.metainfo.xml
+      # plaa's ID is run.plaa, plaa.run reversed, which has two parts
+      # where AppStream looks for three.
+      - run: appstreamcli validate --no-net --override=cid-desktopapp-is-not-rdns=info data/*.metainfo.xml
 
   macos:
     # Apple Silicon, with Homebrew's FFmpeg; releases will bundle their own.

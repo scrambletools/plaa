@@ -81,7 +81,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends desktop-file-utils appstream
           desktop-file-validate data/*.desktop
-          appstreamcli validate --no-net data/*.metainfo.xml
+          # plaa's ID is run.plaa, plaa.run reversed, which has two parts
+          # where AppStream looks for three.
+          appstreamcli validate --no-net --override=cid-desktopapp-is-not-rdns=info data/*.metainfo.xml
       - name: Package name
         id: name
         run: echo "name=$(tr -c 'a-z0-9\n' - <<<"$IMAGE")" >>"$GITHUB_OUTPUT"
@@ -333,7 +335,7 @@ jobs:
           version=$(dist/plaa.app/Contents/MacOS/plaa --version)
           echo "$version"
           [[ $version == plaa\ [0-9]*FFmpeg\ [0-9]* ]]
-          pkgutil --payload-files dist/*.pkg | grep -q 'Library/LaunchDaemons/io.github.scrambletools.plaa.bpf.plist'
+          pkgutil --payload-files dist/*.pkg | grep -q 'Library/LaunchDaemons/run.plaa.bpf.plist'
       # The signatures, checked against the identities named: a package
       # signed by anyone else, or not notarized, must not go out.
       - if: env.SIGNING == 'true'

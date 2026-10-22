@@ -4,9 +4,9 @@ Everything a release ships is built from this repository:
 
 | Path | What |
 |---|---|
-| `data/io.github.scrambletools.plaa.desktop` | Desktop entry |
-| `data/io.github.scrambletools.plaa.metainfo.xml` | AppStream metadata, with the release history |
-| `data/icons/hicolor/scalable/apps/io.github.scrambletools.plaa.svg` | The app icon, which `scripts/make-icons.sh` renders into the hicolor PNGs every package picks up, `data/icons/plaa-1024.png` for macOS and `packaging/windows/plaa.ico` |
+| `data/run.plaa.desktop` | Desktop entry |
+| `data/run.plaa.metainfo.xml` | AppStream metadata, with the release history |
+| `data/icons/hicolor/scalable/apps/run.plaa.svg` | The app icon, which `scripts/make-icons.sh` renders into the hicolor PNGs every package picks up, `data/icons/plaa-1024.png` for macOS and `packaging/windows/plaa.ico` |
 | `packaging/licenses/` | The licenses of the fonts plaa carries, from scramble-ui |
 | `scripts/dist-install.sh` | Installs a build of plaa and plaa-netraw and the files above into a system layout; the Linux packages use it |
 | `packaging/linux/` | Debian and RPM packages, each built by `build.sh` in a container of the release it is for and made with nfpm (`packaging/nfpm.yaml`); they grant `plaa-netraw` `CAP_NET_RAW` as they install and run `avb-check` |
@@ -30,7 +30,7 @@ RISC-V release to build for.
 Packages are built with `PLAA_PRODUCTION=1`, which makes the installed
 copy: settings in `plaa.toml` (`~/.config` on Linux, `%APPDATA%\plaa` on
 Windows, `~/Library/Application Support/plaa` on macOS), state and cache
-under `plaa`, app id `io.github.scrambletools.plaa`. Builds without it
+under `plaa`, app id `run.plaa`. Builds without it
 are development builds, which keep their own.
 
 ## What each system needs
@@ -68,7 +68,7 @@ are development builds, which keep their own.
   devices, `/dev/bpf*`, which are root's alone at every start: the
   installer package puts `plaa.app` in /Applications, adds the user
   installing it to the `access_bpf` group, and installs the launch daemon
-  `io.github.scrambletools.plaa.bpf`, which opens the devices to that
+  `run.plaa.bpf`, which opens the devices to that
   group at every start, as triib's and Wireshark's ChmodBPF do with the
   same group. `sudo "/Library/Application Support/plaa/uninstall"`
   removes it all. As it opens, the installer warns when the Mac has no

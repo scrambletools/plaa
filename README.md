@@ -1,4 +1,4 @@
-<img src="data/icons/hicolor/scalable/apps/io.github.scrambletools.plaa.svg" width="128" alt="The plaa icon: a play button on a screen, with sound coming from it">
+<img src="data/icons/hicolor/scalable/apps/run.plaa.svg" width="128" alt="The plaa icon: a play button on a screen, with sound coming from it">
 
 # plaa
 

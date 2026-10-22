@@ -50,8 +50,7 @@ const INSTANCE: u8 = 0x70;
 const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0004);
 
 /// plaa's app icon, which controllers show the entity with.
-const LOGO: &[u8] =
-    include_bytes!("../../../data/icons/hicolor/128x128/apps/io.github.scrambletools.plaa.png");
+const LOGO: &[u8] = include_bytes!("../../../data/icons/hicolor/128x128/apps/run.plaa.png");
 
 /// Scramble Tools' logo, its vendor's, as triib's entities carry it.
 const VENDOR_LOGO: &[u8] = include_bytes!("../../../data/icons/scramble-vendor.png");

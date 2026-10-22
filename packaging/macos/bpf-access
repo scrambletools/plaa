@@ -2,7 +2,7 @@
 # Opens the BPF capture devices to the access_bpf group, which they lose
 # at every start, so its members can run plaa without root. The same
 # group Wireshark's ChmodBPF and triib use; run at each start by the
-# launch daemon io.github.scrambletools.plaa.bpf.
+# launch daemon run.plaa.bpf.
 group=access_bpf
 dseditgroup -q -o read "$group" >/dev/null 2>&1 || dseditgroup -q -o create "$group"
 # macOS makes a device when the last one is opened; making some ahead of

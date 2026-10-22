@@ -17,7 +17,7 @@ set -euo pipefail
 package=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 previous=${2:+$(cd "$(dirname "$2")" && pwd)/$(basename "$2")}
 here=$(cd "$(dirname "$0")" && pwd)
-id=io.github.scrambletools.plaa
+id=run.plaa
 app=/Applications/plaa.app
 daemon=/Library/LaunchDaemons/$id.bpf.plist
 support="/Library/Application Support/plaa"
