@@ -56,19 +56,28 @@ const LOGO: &[u8] =
 /// Scramble Tools' logo, its vendor's, as triib's entities carry it.
 const VENDOR_LOGO: &[u8] = include_bytes!("../../../data/icons/scramble-vendor.png");
 
-/// What the stream sends, and the input takes: AAF at 48 kHz, six
-/// samples a frame, in 32 bits or 24 in 32, of two channels or eight, the
-/// sizes Milan's Basic Audio profile has, the sound in the first two of
-/// eight.
-const FORMATS: [StreamFormat; 4] = [
+/// What the stream sends, and the input takes: AAF at 48 kHz, in 32
+/// bits or 24 in 32, of two channels or eight, the sizes Milan's Basic
+/// Audio profile has, the sound in the first two of eight. Six samples a
+/// frame, a frame each class A interval as Milan's formats send, come
+/// first; then twelve, a frame each class B interval, as the ESP boards
+/// and triib's class B talkers send.
+const FORMATS: [StreamFormat; 8] = [
     StreamFormat(0x0205_0220_0080_6000),
     StreamFormat(0x0205_0218_0080_6000),
     StreamFormat(0x0205_0220_0200_6000),
     StreamFormat(0x0205_0218_0200_6000),
+    StreamFormat(0x0205_0220_0080_c000),
+    StreamFormat(0x0205_0218_0080_c000),
+    StreamFormat(0x0205_0220_0200_c000),
+    StreamFormat(0x0205_0218_0200_c000),
 ];
 
 /// The priority of class A streams.
 const PRIORITY: u8 = 3;
+
+/// The priority of class B streams.
+const CLASS_B_PRIORITY: u8 = 2;
 
 /// The priority of AVB Lite's streams (AVB Lite profile, 7).
 const LITE_PRIORITY: u8 = 5;
@@ -1203,8 +1212,9 @@ impl Own {
             destination,
             vlan_id: VLAN,
             max_frame_size: media.pdu_length() as u16,
+            // One frame each interval of its class.
             max_interval_frames: 1,
-            priority: PRIORITY,
+            priority: self.priority(),
             rank: true,
             accumulated_latency: TALKER_LATENCY,
             failure: None,
@@ -1289,7 +1299,25 @@ impl Own {
             (Some(mode @ Mode { lite: Some(_), .. }), None) => {
                 (Vec::new(), tag(LITE_PRIORITY, mode.media_vlan))
             }
-            _ => (vec![destination], tag(PRIORITY, VLAN)),
+            _ => (vec![destination], tag(self.priority(), VLAN)),
+        }
+    }
+
+    /// Whether the stream goes in SR class B, as its format decides.
+    fn class_b(&self) -> bool {
+        self.entity
+            .model()
+            .outputs
+            .first()
+            .is_some_and(|output| output.class_b())
+    }
+
+    /// The priority its frames go out on outside AVB Lite: its class's.
+    fn priority(&self) -> u8 {
+        if self.class_b() {
+            CLASS_B_PRIORITY
+        } else {
+            PRIORITY
         }
     }
 
@@ -1326,10 +1354,11 @@ impl Own {
             flags.set(LiteFlags::ESCALATION_ALLOWED, mode.escalation);
         }
         flags.set(LiteFlags::OFFSET_VALID, offset.is_some());
-        // kb/s, each copy counted.
+        // kb/s, each copy counted, a frame each interval of its class.
+        let intervals = if self.class_b() { 4000 } else { 8000 };
         let egress = match (&self.copies, self.declaration()) {
             (Some((_, copies)), Some(declaration)) if lite.is_some() => {
-                copies.len() as u64 * declaration.bandwidth(8000) / 1000
+                copies.len() as u64 * declaration.bandwidth(intervals) / 1000
             }
             _ => 0,
         };
@@ -1631,7 +1660,16 @@ mod tests {
         for format in FORMATS {
             assert!(matches!(format.channels(), Some(2 | 8)));
             assert_eq!(format.sample_rate(), Some(48_000));
-            assert!(Media::of(format).is_some_and(|media| media.pdu_length() <= 1500));
+            let media = Media::of(format).unwrap();
+            assert!(media.pdu_length() <= 1500);
+            // Six samples a frame in class A, twelve in class B.
+            let samples = if format.is_class_b() { 12 } else { 6 };
+            assert_eq!(media.samples_per_frame(), samples);
         }
+        assert!(!FORMATS[0].is_class_b());
+        assert_eq!(
+            FORMATS.iter().filter(|format| format.is_class_b()).count(),
+            4
+        );
     }
 }

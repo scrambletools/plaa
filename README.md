@@ -128,7 +128,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   and rates; the recording itself is as the camera sees.
 - **Send what plays over AVB** (Milan): on Linux plaa becomes a talker
   entity of its own, named as Settings say, with a stereo 48 kHz AAF
-  stream on gPTP time, which any Milan controller can connect, and which
+  stream on gPTP time, of 6 samples a frame in class A as Milan's are, or
+  12 in class B, which any Milan controller can connect, and which
   sends the sound of the window last played once a listener is ready; on
   a Mac it sends through the Mac's own AVB entity, as triib does.
 - **Network Audio**: the listeners on the interface Settings choose that
