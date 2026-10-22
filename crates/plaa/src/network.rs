@@ -39,20 +39,16 @@ struct Listener<'s> {
     here: bool,
 }
 
-/// The inputs that can take one of plaa's formats, named by their entity,
-/// and by the input too where an entity has several.
+/// The inputs that can take one of plaa's formats, as a format taking up
+/// to as many channels takes fewer too, named by their entity, and by the
+/// input too where an entity has several.
 fn listeners<'s>(snapshot: &'s Snapshot, ours: &Stream) -> Vec<Listener<'s>> {
     let mut found = Vec::new();
     for entity in snapshot.entities.iter().filter(|entity| !entity.own) {
         let able: Vec<&Stream> = entity
             .inputs
             .iter()
-            .filter(|input| {
-                input
-                    .formats
-                    .iter()
-                    .any(|format| ours.formats.contains(format))
-            })
+            .filter(|input| ours.formats.iter().any(|format| takes(input, *format)))
             .collect();
         for input in &able {
             found.push(Listener {
@@ -63,13 +59,19 @@ fn listeners<'s>(snapshot: &'s Snapshot, ours: &Stream) -> Vec<Listener<'s>> {
                     .formats
                     .iter()
                     .copied()
-                    .filter(|format| input.formats.contains(format))
+                    .filter(|format| takes(input, *format))
                     .collect(),
                 here: entity.here,
             });
         }
     }
     found
+}
+
+/// Whether an input can take a stream sent in `format`, in one of its
+/// own.
+fn takes(input: &Stream, format: StreamFormat) -> bool {
+    input.formats.iter().any(|own| format.suits(*own))
 }
 
 fn name(entity: &Found, stream: &Stream, several: bool) -> String {
@@ -176,7 +178,7 @@ fn row_for<'a>(
             crate::fl!("network-stop-on", listener = listener.name.clone()),
             Some(Control::AvbDisconnect(end)),
         )
-    } else if listener.input.format == format {
+    } else if format.suits(listener.input.format) {
         component::tool(
             Icon::PlayArrow,
             crate::fl!("network-play-on", listener = listener.name.clone()),
@@ -314,7 +316,7 @@ fn sources(snapshot: &Snapshot, input: &Stream) -> Vec<Source> {
             .outputs
             .iter()
             .filter_map(|output| {
-                if input.formats.contains(&output.format) {
+                if takes(input, output.format) {
                     Some((output, None))
                 } else {
                     change_to(output, input).map(|format| (output, Some(format)))
@@ -334,21 +336,18 @@ fn sources(snapshot: &Snapshot, input: &Stream) -> Vec<Source> {
     found
 }
 
-/// The format a talker's output changes to for plaa's input: of those
-/// both take, one of as many channels as it sends now where there is
-/// one, else the first plaa's input lists.
+/// The format a talker's output changes to for plaa's input: of those it
+/// offers that the input takes, one at the rate it sends at now, so its
+/// entity's other streams keep theirs, and of as many channels, where
+/// there is one, the first it lists of those nearest.
 fn change_to(output: &Stream, input: &Stream) -> Option<StreamFormat> {
-    let shared = || {
-        input
-            .formats
-            .iter()
-            .copied()
-            .filter(|format| output.formats.contains(format))
-    };
-    let channels = output.format.channels();
-    shared()
-        .find(|format| format.channels() == channels)
-        .or_else(|| shared().next())
+    let (rate, channels) = (output.format.sample_rate(), output.format.channels());
+    output
+        .formats
+        .iter()
+        .copied()
+        .filter(|format| takes(input, *format))
+        .min_by_key(|format| (format.sample_rate() != rate, format.channels() != channels))
 }
 
 /// How many inputs of entities other than plaa take a talker's output.
@@ -767,6 +766,52 @@ mod tests {
         let snapshot = network(&[STEREO_24, STEREO]);
         let input = &snapshot.entities[0].inputs[0];
         assert_eq!(sources(&snapshot, input)[2].change, Some(STEREO));
+    }
+
+    #[test]
+    fn a_format_of_up_to_as_many_channels_takes_fewer() {
+        // AM824 at 48 kHz: the MOTU 8D's, of 8 channels or fewer, and one
+        // of 2 channels, as a Mac might send.
+        const MOTU: StreamFormat = StreamFormat(0x00a0_0208_6000_0800);
+        const AM824_2: StreamFormat = StreamFormat(0x00a0_0202_4000_0200);
+        let mut motu = entity(1, "8D", vec![stream(0, "In", MOTU, &[MOTU])]);
+        motu.outputs = vec![stream(0, "Out", MOTU, &[MOTU])];
+        let mut mac = entity(2, "Mac", Vec::new());
+        mac.outputs = vec![stream(0, "Out", AM824_2, &[AM824_2])];
+        let mut plaa = entity(
+            9,
+            "plaa",
+            vec![stream(0, "Listen", STEREO, &[STEREO, MOTU])],
+        );
+        plaa.own = true;
+        let snapshot = Snapshot {
+            entities: vec![plaa, motu, mac],
+            ..Snapshot::default()
+        };
+        // plaa's input of up to 8 takes both as they send.
+        let found = sources(&snapshot, &snapshot.entities[0].inputs[0]);
+        let names: Vec<&str> = found.iter().map(|source| source.name.as_str()).collect();
+        assert_eq!(names, ["8D", "Mac"]);
+        assert!(found.iter().all(|source| source.change.is_none()));
+        // The 8D's input takes plaa's 2 channels of AM824.
+        let ours = stream(0, "Playback", STEREO, &[STEREO, AM824_2]);
+        let found = listeners(&snapshot, &ours);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].shared, [AM824_2]);
+    }
+
+    #[test]
+    fn a_talker_changes_format_at_its_own_rate_first() {
+        // AAF of 32 bits at 96 kHz, 12 samples a frame, 8 and 2 channels.
+        const AAF_96_8: StreamFormat = StreamFormat(0x0207_0220_0200_c000);
+        const AAF_96_2: StreamFormat = StreamFormat(0x0207_0220_0080_c000);
+        let input = stream(0, "Listen", STEREO, &[STEREO, EIGHT, AAF_96_2]);
+        let output = stream(0, "Out", AAF_96_8, &[AAF_96_8, STEREO, EIGHT, AAF_96_2]);
+        // Its rate kept rather than its channels, as its entity's other
+        // streams keep theirs.
+        assert_eq!(change_to(&output, &input), Some(AAF_96_2));
+        let output = stream(0, "Out", AAF_96_8, &[AAF_96_8, STEREO, EIGHT]);
+        assert_eq!(change_to(&output, &input), Some(EIGHT));
     }
 
     /// The menu's entries as text: items with a mark where checked, and

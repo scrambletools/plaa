@@ -478,16 +478,23 @@ impl Runtime {
                 wanted,
             ));
         }
+        // The listener takes it as it is, or changes to the format of its
+        // own that takes it, the talker's own where it has it, as one that
+        // takes up to as many channels takes fewer too.
         if let (Some(wanted), Some((current, formats))) =
             (wanted, stream(listener.0, true, listener.1))
-            && wanted != current
-            && formats.contains(&wanted)
+            && !wanted.suits(current)
+            && let Some(taking) = formats
+                .iter()
+                .copied()
+                .find(|format| *format == wanted)
+                .or_else(|| formats.iter().copied().find(|format| wanted.suits(*format)))
         {
             steps.push_back(Step::Format(
                 listener.0,
                 DescriptorType::STREAM_INPUT,
                 listener.1,
-                wanted,
+                taking,
             ));
         }
         steps.push_back(Step::Bind(talker, listener));

@@ -47,7 +47,7 @@ const INSTANCE: u8 = 0x70;
 /// revision, the last octet, goes up as the model changes, so controllers
 /// that keep models by their ID read it again: 2 brought the logos, 3 the
 /// stream input.
-const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0003);
+const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0004);
 
 /// plaa's app icon, which controllers show the entity with.
 const LOGO: &[u8] =
@@ -56,22 +56,13 @@ const LOGO: &[u8] =
 /// Scramble Tools' logo, its vendor's, as triib's entities carry it.
 const VENDOR_LOGO: &[u8] = include_bytes!("../../../data/icons/scramble-vendor.png");
 
-/// What the stream sends, and the input takes: AAF at 48 kHz, in 32
-/// bits or 24 in 32, of two channels or eight, the sizes Milan's Basic
-/// Audio profile has, the sound in the first two of eight. Six samples a
-/// frame, a frame each class A interval as Milan's formats send, come
-/// first; then twelve, a frame each class B interval, as the ESP boards
-/// and triib's class B talkers send.
-const FORMATS: [StreamFormat; 8] = [
-    StreamFormat(0x0205_0220_0080_6000),
-    StreamFormat(0x0205_0218_0080_6000),
-    StreamFormat(0x0205_0220_0200_6000),
-    StreamFormat(0x0205_0218_0200_6000),
-    StreamFormat(0x0205_0220_0080_c000),
-    StreamFormat(0x0205_0218_0080_c000),
-    StreamFormat(0x0205_0220_0200_c000),
-    StreamFormat(0x0205_0218_0200_c000),
-];
+/// What the stream sends, and the input takes, as triib's entities do:
+/// the AVB community's Basic and Extended Audio profiles' AAF, in SR class
+/// A and B, and AM824, at 48, 96 and 192 kHz, of two channels or eight,
+/// the sound in the first two. Milan's stereo stream first, its default.
+fn formats() -> Vec<StreamFormat> {
+    avb_stream::formats::offered(CHANNELS, false)
+}
 
 /// The priority of class A streams.
 const PRIORITY: u8 = 3;
@@ -310,18 +301,18 @@ impl Own {
             mac,
             interface_name: interface.clone(),
             clock_identity: own_clock,
-            sampling_rates: vec![48_000],
-            current_sampling_rate: 48_000,
+            sampling_rates: avb_stream::formats::RATES.to_vec(),
+            current_sampling_rate: avb_stream::formats::RATES[0],
             outputs: vec![StreamModel {
                 name: "Playback".into(),
-                formats: FORMATS.to_vec(),
-                current_format: FORMATS[0],
+                formats: formats(),
+                current_format: formats()[0],
                 channels: CHANNELS,
             }],
             inputs: vec![StreamModel {
                 name: "Listen".into(),
-                formats: FORMATS.to_vec(),
-                current_format: FORMATS[0],
+                formats: formats(),
+                current_format: formats()[0],
                 channels: CHANNELS,
             }],
             clock_source: 0,
@@ -1656,20 +1647,23 @@ mod tests {
     }
 
     #[test]
-    fn its_formats_are_milans_sizes_and_fit() {
-        for format in FORMATS {
+    fn its_formats_are_the_profiles_and_fit() {
+        let formats = formats();
+        assert_eq!(formats[0], StreamFormat(0x0205_0220_0080_6000));
+        for format in &formats {
             assert!(matches!(format.channels(), Some(2 | 8)));
-            assert_eq!(format.sample_rate(), Some(48_000));
-            let media = Media::of(format).unwrap();
-            assert!(media.pdu_length() <= 1500);
-            // Six samples a frame in class A, twelve in class B.
-            let samples = if format.is_class_b() { 12 } else { 6 };
-            assert_eq!(media.samples_per_frame(), samples);
+            let rate = format.sample_rate().unwrap();
+            assert!(avb_stream::formats::RATES.contains(&rate));
+            assert!(Media::of(*format).is_some_and(|media| media.pdu_length() <= 1500));
         }
-        assert!(!FORMATS[0].is_class_b());
-        assert_eq!(
-            FORMATS.iter().filter(|format| format.is_class_b()).count(),
-            4
-        );
+        // Class B's 12 samples at 48 kHz, as the ESP boards send, Milan's
+        // 24 of 32 bits at 192 kHz, and AM824 as the MOTU 8D declares it.
+        for format in [
+            0x0205_0220_0080_c000,
+            0x0209_0218_0201_8000,
+            0x00a0_0208_6000_0800,
+        ] {
+            assert!(formats.contains(&StreamFormat(format)), "{format:#x}");
+        }
     }
 }

@@ -87,9 +87,11 @@ The first build.
 - plaa listens too: its entity's stream input plays the stream connected
   to it on the sound output, with Milan's input counters, and Network
   Audio lists the talkers it can take, each with Listen or Stop.
-- plaa sends and takes AAF of 12 samples a frame in SR class B, as the
-  ESP boards and triib's class B talkers send, as well as Milan's 6 in
-  class A.
+- plaa sends and takes the formats the avb crates set for every
+  endpoint: the AVB community's Basic and Extended Audio profiles'
+  AAF, in SR class A and B at 48, 96 and 192 kHz, and AM824 as MOTU's,
+  Apple's and PreSonus's endpoints send, of 2 channels or 8; and meets
+  a talker or listener whose format takes up to as many channels.
 - Connect, beside Open on the start screen and in the toolbar: a menu of
   the talkers plaa can listen to, those sending in a format it plays and
   those that can change to one, which it changes as it connects, saying
