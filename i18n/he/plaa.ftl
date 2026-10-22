@@ -294,22 +294,9 @@ network-failed = לא ניתן להתחבר: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = כדי לנגן כאן, יש לעדכן את triib.
 network-choose = יש לבחור מאזין כדי לראות איך הוא מקבל את הזרם שלו.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = האזנה כאן
 network-no-sources = אין ברשת משדר ששולח בפורמט ש-plaa מנגן, או שיכול לעבור לפורמט כזה.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = האזנה ל-{ $talker }
 network-listen-stop = הפסקת ההאזנה ל-{ $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = העברת { $talker } לפורמט { $format } והאזנה
-network-listen-change-cuts-off = העברת { $talker } לפורמט { $format } והאזנה, תוך ניתוק { $count ->
-        [one] המאזין האחר שלו
-        [two] שני המאזינים האחרים שלו
-       *[other] { $count } המאזינים האחרים שלו
-    }
-network-listen-frames = מסגרות שהתקבלו: { $frames }
 network-listen-update-triib = כדי להאזין כאן, יש לעדכן את triib: plaa מנגן רק את מה שמגיע ממילא למחשב הזה.
 network-listen-lite = היציאה פועלת ב-AVB Lite, שאינו מקצה רוחב פס לזרמים: plaa מנגן רק את מה שמגיע ממילא למחשב הזה.
 

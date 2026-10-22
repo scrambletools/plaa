@@ -291,21 +291,9 @@ network-failed = Não foi possível ligar: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Atualize o triib para reproduzir aqui.
 network-choose = Escolha um listener para ver como recebe o stream.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Ouvir aqui
 network-no-sources = Nenhum talker na rede envia num formato que o plaa reproduz, nem consegue mudar para um.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Ouvir { $talker }
 network-listen-stop = Parar de ouvir { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Mudar { $talker } para { $format } e ouvir
-network-listen-change-cuts-off = Mudar { $talker } para { $format } e ouvir, desligando { $count ->
-        [one] o seu outro listener
-       *[other] os seus outros { $count } listeners
-    }
-network-listen-frames = Tramas recebidas: { $frames }
 network-listen-update-triib = Atualize o triib para ouvir aqui: o plaa só reproduz o que chega a este computador de qualquer forma.
 network-listen-lite = A porta utiliza AVB Lite, que não reserva streams: o plaa só reproduz o que chega a este computador de qualquer forma.
 

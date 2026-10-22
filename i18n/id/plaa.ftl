@@ -285,20 +285,9 @@ network-failed = Tidak dapat terhubung: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Perbarui triib untuk memutar di sini.
 network-choose = Pilih listener untuk melihat cara ia menerima stream.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Dengarkan di sini
 network-no-sources = Tidak ada talker di jaringan yang mengirim dalam format yang diputar plaa, atau dapat beralih ke format tersebut.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Dengarkan { $talker }
 network-listen-stop = Berhenti mendengarkan { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Ubah { $talker } ke { $format } dan dengarkan
-network-listen-change-cuts-off = Ubah { $talker } ke { $format } dan dengarkan, memutus { $count ->
-       *[other] { $count } listener lainnya
-    }
-network-listen-frames = { $frames } frame diterima
 network-listen-update-triib = Perbarui triib untuk mendengarkan di sini: plaa hanya memutar apa yang memang sampai ke komputer ini.
 network-listen-lite = Port menjalankan AVB Lite, yang tidak melakukan reservasi stream: plaa hanya memutar apa yang memang sampai ke komputer ini.
 

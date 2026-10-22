@@ -291,21 +291,9 @@ network-failed = Kunne ikke koble til: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Oppdater triib for å spille av her.
 network-choose = Velg en mottaker for å se hvordan den tar imot strømmen sin.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Lytt her
 network-no-sources = Ingen sender på nettverket sender i et format plaa spiller av, eller kan bytte til et.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Lytt til { $talker }
 network-listen-stop = Slutt å lytte til { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Bytt { $talker } til { $format } og lytt
-network-listen-change-cuts-off = Bytt { $talker } til { $format } og lytt, noe som kobler fra { $count ->
-        [one] dens andre mottaker
-       *[other] dens { $count } andre mottakere
-    }
-network-listen-frames = Mottatte rammer: { $frames }
 network-listen-update-triib = Oppdater triib for å lytte her: plaa spiller bare av det som uansett når denne datamaskinen.
 network-listen-lite = Porten kjører AVB Lite, som ikke reserverer strømmer: plaa spiller bare av det som uansett når denne datamaskinen.
 

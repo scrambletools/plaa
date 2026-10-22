@@ -85,8 +85,8 @@ The first build.
   which the packages bring, and Network Audio says when ptp4l keeps no
   time for its stream.
 - plaa listens too: its entity's stream input plays the stream connected
-  to it on the sound output, with Milan's input counters, and Network
-  Audio lists the talkers it can take, each with Listen or Stop.
+  to it, with Milan's input counters, the talkers it can take listed by
+  Connect.
 - plaa sends and takes the formats the avb crates set for every
   endpoint: the AVB community's Basic and Extended Audio profiles'
   AAF, in SR class A and B at 48, 96 and 192 kHz, and AM824 as MOTU's,

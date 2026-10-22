@@ -2,9 +2,8 @@
 //! what plaa plays, by name, each with one button: play there, where it
 //! takes plaa's stream as it is; stop, where it plays it; or, where it is
 //! in another format, a menu of the formats both share, to connect in.
-//! Under them, how the one chosen takes its stream; and the talkers plaa
-//! can listen to, playing their stream here, as the Connect menu offers
-//! them too.
+//! Under them, how the one chosen takes its stream. The talkers plaa
+//! listens to are the Connect menu's.
 
 use std::sync::Arc;
 
@@ -142,9 +141,6 @@ pub fn sheet<'a>(
                 }
                 None => {}
             }
-            if let Some(own) = own {
-                content = content.push(listen_here(&snapshot, own));
-            }
         }
     }
     if let Some(failure) = &snapshot.failure {
@@ -228,75 +224,6 @@ fn row_for<'a>(
         .into()
 }
 
-/// The talkers plaa's own input can take, each with one button: listen,
-/// change its format and listen, or stop where it listens; and how the
-/// input takes its stream.
-fn listen_here<'a>(snapshot: &Snapshot, own: &Found) -> Element<'a, Control> {
-    let mut content = column![component::section(crate::fl!("network-listen-section"))].spacing(4);
-    let Some(input) = own.inputs.first() else {
-        return content.into();
-    };
-    let ours = (own.id, input.index);
-    match snapshot.listen_blocked {
-        Some(ListenBlocked::OldService) => {
-            content = content.push(note(crate::fl!("network-listen-update-triib")));
-        }
-        Some(ListenBlocked::AvbLite) => {
-            content = content.push(note(crate::fl!("network-listen-lite")));
-        }
-        None => {}
-    }
-    let sources = sources(snapshot, input);
-    if sources.is_empty() {
-        content = content.push(note(crate::fl!("network-no-sources")));
-    }
-    for source in sources {
-        let name = source.name.clone();
-        let action = match source.change {
-            _ if input.bound == Some(source.end) => component::tool(
-                Icon::Stop,
-                crate::fl!("network-listen-stop", talker = name.clone()),
-                Some(Control::AvbDisconnect(ours)),
-            ),
-            None => component::tool(
-                Icon::VolumeUp,
-                crate::fl!("network-listen-to", talker = name.clone()),
-                Some(Control::AvbConnect(source.end, ours, None)),
-            ),
-            Some(format) => component::tool(
-                Icon::ChangeCircle,
-                change_tip(&source, format),
-                Some(Control::AvbConnect(source.end, ours, Some(format))),
-            ),
-        };
-        content = content.push(
-            container(
-                row![
-                    container(scramble_ui::aligned(scramble_ui::styled(
-                        name,
-                        Type::BodyLarge
-                    )))
-                    .width(Fill),
-                    action
-                ]
-                .spacing(12)
-                .align_y(Center),
-            )
-            .padding(scramble_ui::dir::padding(4.0, 4.0, 4.0, 16.0)),
-        );
-    }
-    if input.bound.is_some() {
-        content = content.push(note(status(snapshot, input)));
-        if let Some(frames) = input.counters.and_then(|counters| counters.frames_rx) {
-            content = content.push(note(crate::fl!(
-                "network-listen-frames",
-                frames = frames.to_string()
-            )));
-        }
-    }
-    content.into()
-}
-
 /// A talker's output plaa's input can take: as it sends now, or once it
 /// changes to `change`, which cuts off the `others` that take it now.
 struct Source {
@@ -370,22 +297,6 @@ fn change_label(source: &Source, format: StreamFormat) -> String {
         0 => crate::fl!("connect-change", talker = talker, format = format),
         count => crate::fl!(
             "connect-change-cuts-off",
-            talker = talker,
-            format = format,
-            count = count
-        ),
-    }
-}
-
-/// Listening to a talker that changes its format first, and what that
-/// cuts off, as the sheet's button says.
-fn change_tip(source: &Source, format: StreamFormat) -> String {
-    let talker = source.name.clone();
-    let format = format.to_string();
-    match source.others {
-        0 => crate::fl!("network-listen-change", talker = talker, format = format),
-        count => crate::fl!(
-            "network-listen-change-cuts-off",
             talker = talker,
             format = format,
             count = count

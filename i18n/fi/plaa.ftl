@@ -292,21 +292,9 @@ network-failed = Yhdistäminen epäonnistui: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Päivitä triib, niin voit toistaa tässä.
 network-choose = Valitse vastaanotin nähdäksesi, miten se ottaa virtansa vastaan.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Kuuntele tässä
 network-no-sources = Mikään verkon lähetin ei lähetä muodossa, jota plaa toistaa, eikä voi vaihtaa sellaiseen.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Kuuntele lähetintä { $talker }
 network-listen-stop = Lopeta lähettimen { $talker } kuuntelu
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Vaihda lähetin { $talker } muotoon { $format } ja kuuntele
-network-listen-change-cuts-off = Vaihda lähetin { $talker } muotoon { $format } ja kuuntele, jolloin { $count ->
-        [one] sen toisen vastaanottimen yhteys katkeaa
-       *[other] sen { $count } muun vastaanottimen yhteys katkeaa
-    }
-network-listen-frames = Vastaanotetut kehykset: { $frames }
 network-listen-update-triib = Päivitä triib, niin voit kuunnella tässä: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
 network-listen-lite = Portissa on käytössä AVB Lite, joka ei varaa virtoja: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
 

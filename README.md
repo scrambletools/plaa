@@ -141,7 +141,6 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   The one chosen shows how it takes its stream: from which talker, its
   media clock lock, format, stream ID, destination, latency and counters,
   kept up to date as other controllers, such as triib's, change them.
-  Under them, the talkers plaa can listen to, playing their stream here.
 - **Connect**, beside Open: the talkers plaa can listen to, those sending
   in a format it plays, then those that can change to one, changed as
   plaa connects, with the other listeners that would cut off. The

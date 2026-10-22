@@ -284,20 +284,9 @@ network-failed = Không thể kết nối: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Hãy cập nhật triib để phát ở đây.
 network-choose = Chọn một Listener để xem cách nó nhận luồng.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Nghe tại đây
 network-no-sources = Không có Talker nào trên mạng gửi ở định dạng mà plaa phát, hoặc có thể chuyển sang định dạng đó.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Nghe { $talker }
 network-listen-stop = Dừng nghe { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Chuyển { $talker } sang { $format } và nghe
-network-listen-change-cuts-off = Chuyển { $talker } sang { $format } và nghe, ngắt { $count ->
-       *[other] { $count } Listener khác của nó
-    }
-network-listen-frames = Đã nhận { $frames } khung
 network-listen-update-triib = Hãy cập nhật triib để nghe ở đây: plaa chỉ phát những gì vốn đã đến được máy tính này.
 network-listen-lite = Cổng đang chạy AVB Lite, không đặt trước luồng nào: plaa chỉ phát những gì vốn đã đến được máy tính này.
 

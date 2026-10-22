@@ -297,23 +297,9 @@ network-failed = Nie można nawiązać połączenia: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Zaktualizuj triib, aby odtwarzać tutaj.
 network-choose = Wybierz odbiornik, aby zobaczyć, jak odbiera strumień.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Słuchaj tutaj
 network-no-sources = Żaden nadajnik w sieci nie wysyła w formacie, który plaa odtwarza, ani nie może się na taki przełączyć.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Słuchaj nadajnika { $talker }
 network-listen-stop = Przestań słuchać nadajnika { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Przełącz nadajnik { $talker } na { $format } i słuchaj
-network-listen-change-cuts-off = Przełącz nadajnik { $talker } na { $format } i słuchaj, odłączając { $count ->
-        [one] jego pozostały odbiornik
-        [few] jego { $count } pozostałe odbiorniki
-        [many] jego { $count } pozostałych odbiorników
-       *[other] jego { $count } pozostałego odbiornika
-    }
-network-listen-frames = Odebrane ramki: { $frames }
 network-listen-update-triib = Zaktualizuj triib, aby słuchać tutaj: plaa odtwarza tylko to, co i tak dociera do tego komputera.
 network-listen-lite = Port działa w trybie AVB Lite, który nie rezerwuje strumieni: plaa odtwarza tylko to, co i tak dociera do tego komputera.
 

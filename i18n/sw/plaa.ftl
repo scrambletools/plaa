@@ -286,21 +286,9 @@ network-failed = Imeshindwa kuunganisha: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Sasisha triib ili kucheza hapa.
 network-choose = Chagua listener ili kuona jinsi inavyopokea mtiririko wake.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Sikiliza hapa
 network-no-sources = Hakuna talker kwenye mtandao inayotuma katika umbizo ambalo plaa hucheza, au inayoweza kubadilika kuwa umbizo hilo.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Sikiliza { $talker }
 network-listen-stop = Acha kusikiliza { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Badilisha { $talker } kuwa { $format } na usikilize
-network-listen-change-cuts-off = Badilisha { $talker } kuwa { $format } na usikilize, ukitenganisha { $count ->
-        [one] listener yake nyingine
-       *[other] listener zake nyingine { $count }
-    }
-network-listen-frames = Fremu zilizopokelewa: { $frames }
 network-listen-update-triib = Sasisha triib ili kusikiliza hapa: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
 network-listen-lite = Mlango unatumia AVB Lite, ambayo haihifadhi mitiririko: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
 

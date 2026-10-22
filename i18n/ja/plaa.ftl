@@ -284,20 +284,9 @@ network-failed = 接続できませんでした：{ $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = ここで再生するには、triibをアップデートしてください。
 network-choose = リスナーを選ぶと、ストリームの受け取り状況が表示されます。
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = ここで聴く
 network-no-sources = ネットワーク上に、plaaで再生できるフォーマットで送信している、またはそのフォーマットに切り替えられるトーカーがありません。
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = { $talker }を聴く
 network-listen-stop = { $talker }を聴くのを停止
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = { $talker }を{ $format }に切り替えて聴く
-network-listen-change-cuts-off = { $talker }を{ $format }に切り替えて聴く{ $count ->
-       *[other] （ほかのリスナー{ $count }台は切断されます）
-    }
-network-listen-frames = { $frames }フレームを受信
 network-listen-update-triib = ここで聴くには、triibをアップデートしてください：plaaは、もともとこのコンピュータに届くものだけを再生します。
 network-listen-lite = このポートは、ストリームを予約しないAVB Liteで動作しています：plaaは、もともとこのコンピュータに届くものだけを再生します。
 

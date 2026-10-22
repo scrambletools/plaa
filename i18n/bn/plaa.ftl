@@ -285,21 +285,9 @@ network-failed = সংযোগ করা যায়নি: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = এখানে চালাতে triib আপডেট করুন।
 network-choose = কোনো Listener কীভাবে তার স্ট্রিম নেয় তা দেখতে সেটি বেছে নিন।
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = এখানে শুনুন
 network-no-sources = নেটওয়ার্কের কোনো Talker এমন ফরম্যাটে পাঠায় না যা plaa চালায়, আর এমন ফরম্যাটে বদলাতেও পারে না।
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = { $talker } শুনুন
 network-listen-stop = { $talker } শোনা বন্ধ করুন
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = { $talker }-কে { $format }-এ বদলে শুনুন
-network-listen-change-cuts-off = { $talker }-কে { $format }-এ বদলে শুনুন, এতে { $count ->
-        [one] এর অন্য Listener-টির সংযোগ কেটে যাবে
-       *[other] এর অন্য { $count }টি Listener-এর সংযোগ কেটে যাবে
-    }
-network-listen-frames = প্রাপ্ত frames: { $frames }
 network-listen-update-triib = এখানে শুনতে triib আপডেট করুন: plaa শুধু সেটুকুই চালায় যা এমনিতেই এই কম্পিউটারে পৌঁছায়।
 network-listen-lite = পোর্টটি AVB Lite-এ চলছে, যা কোনো স্ট্রিম reserve করে না: plaa শুধু সেটুকুই চালায় যা এমনিতেই এই কম্পিউটারে পৌঁছায়।
 

@@ -292,21 +292,9 @@ network-failed = இணைக்க முடியவில்லை: { $reason
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = இங்கே இயக்க triib-ஐப் புதுப்பிக்கவும்.
 network-choose = ஒரு Listener தன் stream-ஐ எப்படிப் பெறுகிறது என்பதைப் பார்க்க, அதைத் தேர்ந்தெடுக்கவும்.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = இங்கே கேள்
 network-no-sources = plaa இயக்கும் format-இல் அனுப்பும் அல்லது அதற்கு மாறக்கூடிய Talker எதுவும் நெட்வொர்க்கில் இல்லை.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = { $talker }-ஐக் கேள்
 network-listen-stop = { $talker }-ஐக் கேட்பதை நிறுத்து
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = { $talker }-ஐ { $format }-க்கு மாற்றிக் கேள்
-network-listen-change-cuts-off = { $talker }-ஐ { $format }-க்கு மாற்றிக் கேள், இதனால் { $count ->
-        [one] அதன் மற்ற Listener துண்டிக்கப்படும்
-       *[other] அதன் மற்ற { $count } Listeners துண்டிக்கப்படும்
-    }
-network-listen-frames = பெற்ற frames: { $frames }
 network-listen-update-triib = இங்கே கேட்க triib-ஐப் புதுப்பிக்கவும்: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
 network-listen-lite = இந்த port AVB Lite-இல் இயங்குகிறது, அது எந்த stream-ஐயும் reserve செய்வதில்லை: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
 

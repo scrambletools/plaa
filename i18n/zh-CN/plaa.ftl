@@ -283,20 +283,9 @@ network-failed = 无法连接：{ $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = 请更新 triib 以在此播放。
 network-choose = 选择一个接收端，查看它如何接收流。
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = 在此收听
 network-no-sources = 网络上没有以 plaa 能播放的格式发送、或能切换为这种格式的发送端。
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = 收听 { $talker }
 network-listen-stop = 停止收听 { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = 将 { $talker } 切换为 { $format } 并收听
-network-listen-change-cuts-off = 将 { $talker } 切换为 { $format } 并收听，{ $count ->
-       *[other] 同时断开其他 { $count } 个接收端
-    }
-network-listen-frames = 已接收 { $frames } 帧
 network-listen-update-triib = 请更新 triib 以在此收听：plaa 只会播放本来就到达这台电脑的内容。
 network-listen-lite = 该端口运行 AVB Lite，不预留任何流：plaa 只会播放本来就到达这台电脑的内容。
 

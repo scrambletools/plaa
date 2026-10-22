@@ -294,22 +294,9 @@ network-failed = Nu s-a putut conecta: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Actualizează triib pentru a reda aici.
 network-choose = Alege un receptor pentru a vedea cum își primește fluxul.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Ascultă aici
 network-no-sources = Niciun emițător din rețea nu trimite într-un format pe care plaa îl redă și nici nu poate trece la unul.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Ascultă { $talker }
 network-listen-stop = Nu mai asculta { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Comută { $talker } la { $format } și ascultă
-network-listen-change-cuts-off = Comută { $talker } la { $format } și ascultă, deconectând { $count ->
-        [one] celălalt receptor al său
-        [few] ceilalți { $count } receptori ai săi
-       *[other] ceilalți { $count } de receptori ai săi
-    }
-network-listen-frames = Cadre primite: { $frames }
 network-listen-update-triib = Actualizează triib pentru a asculta aici: plaa redă doar ce ajunge oricum la acest computer.
 network-listen-lite = Portul folosește AVB Lite, care nu rezervă fluxuri: plaa redă doar ce ajunge oricum la acest computer.
 

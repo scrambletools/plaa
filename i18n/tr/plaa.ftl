@@ -285,21 +285,9 @@ network-failed = Bağlanılamadı: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Burada oynatmak için triib'i güncelleyin.
 network-choose = Akışını nasıl aldığını görmek için bir dinleyici seçin.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Burada dinle
 network-no-sources = Ağda plaa'nın oynattığı bir biçimde gönderen ya da böyle bir biçime geçebilen konuşmacı yok.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = { $talker } konuşmacısını dinle
 network-listen-stop = { $talker } konuşmacısını dinlemeyi durdur
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = { $talker } konuşmacısını { $format } biçimine geçir ve dinle
-network-listen-change-cuts-off = { $talker } konuşmacısını { $format } biçimine geçir ve dinle, { $count ->
-        [one] diğer dinleyicisinin bağlantısı kesilir
-       *[other] diğer { $count } dinleyicisinin bağlantısı kesilir
-    }
-network-listen-frames = Alınan çerçeveler: { $frames }
 network-listen-update-triib = Burada dinlemek için triib'i güncelleyin: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
 network-listen-lite = Bağlantı noktası, hiçbir akışı rezerve etmeyen AVB Lite ile çalışıyor: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
 

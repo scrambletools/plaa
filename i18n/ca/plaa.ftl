@@ -291,21 +291,9 @@ network-failed = No s'ha pogut connectar: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Actualitza el triib per reproduir aquí.
 network-choose = Tria un receptor per veure com rep el flux.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Escolta aquí
 network-no-sources = Cap emissor de la xarxa no envia en un format que el plaa reprodueix, ni pot passar a un d'aquests formats.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Escolta { $talker }
 network-listen-stop = Deixa d'escoltar { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Canvia { $talker } a { $format } i escolta
-network-listen-change-cuts-off = Canvia { $talker } a { $format } i escolta, desconnectant { $count ->
-        [one] el seu altre receptor
-       *[other] els seus altres { $count } receptors
-    }
-network-listen-frames = Trames rebudes: { $frames }
 network-listen-update-triib = Actualitza el triib per escoltar aquí: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
 network-listen-lite = El port fa servir AVB Lite, que no reserva fluxos: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
 

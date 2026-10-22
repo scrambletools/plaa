@@ -285,21 +285,9 @@ network-failed = Nem sikerült kapcsolódni: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Az itteni lejátszáshoz frissítse a triib alkalmazást.
 network-choose = Válasszon egy vevőt, hogy lássa, hogyan fogadja az adatfolyamát.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Hallgatás itt
 network-no-sources = A hálózaton egyetlen adó sem küld olyan formátumban, amelyet a plaa lejátszik, és nem is tud ilyenre váltani.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Hallgatás: { $talker }
 network-listen-stop = Hallgatás leállítása: { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = { $talker } átállítása { $format } formátumra és hallgatás
-network-listen-change-cuts-off = { $talker } átállítása { $format } formátumra és hallgatás, ami leválasztja { $count ->
-        [one] a másik vevőjét
-       *[other] a többi { $count } vevőjét
-    }
-network-listen-frames = Fogadott keretek: { $frames }
 network-listen-update-triib = Az itteni hallgatáshoz frissítse a triib alkalmazást: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
 network-listen-lite = A port AVB Lite módban fut, amely nem foglal adatfolyamokat: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
 

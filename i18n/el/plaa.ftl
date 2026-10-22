@@ -291,21 +291,9 @@ network-failed = Δεν ήταν δυνατή η σύνδεση: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Ενημερώστε το triib για αναπαραγωγή εδώ.
 network-choose = Επιλέξτε έναν δέκτη για να δείτε πώς λαμβάνει τη ροή του.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Ακρόαση εδώ
 network-no-sources = Κανένας πομπός στο δίκτυο δεν στέλνει σε μορφή που αναπαράγει το plaa, ούτε μπορεί να αλλάξει σε τέτοια μορφή.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Ακρόαση του { $talker }
 network-listen-stop = Διακοπή ακρόασης του { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Αλλαγή του { $talker } σε { $format } και ακρόαση
-network-listen-change-cuts-off = Αλλαγή του { $talker } σε { $format } και ακρόαση, με αποσύνδεση { $count ->
-        [one] του άλλου δέκτη του
-       *[other] των άλλων { $count } δεκτών του
-    }
-network-listen-frames = Πλαίσια που ελήφθησαν: { $frames }
 network-listen-update-triib = Ενημερώστε το triib για ακρόαση εδώ: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
 network-listen-lite = Η θύρα λειτουργεί με AVB Lite, που δεν κάνει κράτηση ροών: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
 

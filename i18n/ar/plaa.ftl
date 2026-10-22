@@ -303,25 +303,9 @@ network-failed = تعذّر الاتصال: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = حدّث triib للتشغيل هنا.
 network-choose = اختر مستقبِلًا لترى كيف يستقبل تدفقه.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = الاستماع هنا
 network-no-sources = لا يوجد على الشبكة مُرسِل يرسل بتنسيق يشغّله plaa، أو يمكنه التحوّل إلى تنسيق كهذا.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = الاستماع إلى { $talker }
 network-listen-stop = إيقاف الاستماع إلى { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = تحويل { $talker } إلى { $format } والاستماع
-network-listen-change-cuts-off = تحويل { $talker } إلى { $format } والاستماع، مع فصل { $count ->
-        [zero] { $count } مستقبِل آخر له
-        [one] مستقبِله الآخر
-        [two] مستقبِلَيه الآخرَين
-        [few] { $count } مستقبِلات أخرى له
-        [many] { $count } مستقبِلًا آخر له
-       *[other] { $count } مستقبِل آخر له
-    }
-network-listen-frames = الإطارات المستلمة: { $frames }
 network-listen-update-triib = حدّث triib للاستماع هنا: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
 network-listen-lite = يعمل المنفذ بنظام AVB Lite الذي لا يحجز أي تدفقات: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
 

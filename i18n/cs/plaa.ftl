@@ -297,23 +297,9 @@ network-failed = Nepodařilo se připojit: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Chcete-li přehrávat zde, aktualizujte triib.
 network-choose = Vyberte přijímač a uvidíte, jak přijímá svůj stream.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Poslouchat zde
 network-no-sources = Žádný vysílač v síti neodesílá ve formátu, který plaa přehrává, ani na takový formát nemůže přejít.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Poslouchat vysílač { $talker }
 network-listen-stop = Přestat poslouchat vysílač { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Přepnout vysílač { $talker } na { $format } a poslouchat
-network-listen-change-cuts-off = Přepnout vysílač { $talker } na { $format } a poslouchat, čímž se odpojí { $count ->
-        [one] jeho další přijímač
-        [few] jeho { $count } další přijímače
-        [many] jeho { $count } dalšího přijímače
-       *[other] jeho { $count } dalších přijímačů
-    }
-network-listen-frames = Přijaté rámce: { $frames }
 network-listen-update-triib = Chcete-li poslouchat zde, aktualizujte triib: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
 network-listen-lite = Port používá AVB Lite, který nerezervuje žádné streamy: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
 

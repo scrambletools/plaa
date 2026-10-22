@@ -292,21 +292,9 @@ network-failed = Kan geen verbinding maken: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Werk triib bij om hier af te spelen.
 network-choose = Kies een ontvanger om te zien hoe die zijn stream ontvangt.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Hier luisteren
 network-no-sources = Geen enkele zender op het netwerk verstuurt in een formaat dat plaa afspeelt, of kan naar zo’n formaat wisselen.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Luisteren naar { $talker }
 network-listen-stop = Stoppen met luisteren naar { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = { $talker } naar { $format } omzetten en luisteren
-network-listen-change-cuts-off = { $talker } naar { $format } omzetten en luisteren, waarbij { $count ->
-        [one] zijn andere ontvanger wordt losgekoppeld
-       *[other] zijn { $count } andere ontvangers worden losgekoppeld
-    }
-network-listen-frames = Ontvangen frames: { $frames }
 network-listen-update-triib = Werk triib bij om hier te luisteren: plaa speelt alleen af wat deze computer hoe dan ook bereikt.
 network-listen-lite = De poort gebruikt AVB Lite, dat geen streams reserveert: plaa speelt alleen af wat deze computer hoe dan ook bereikt.
 

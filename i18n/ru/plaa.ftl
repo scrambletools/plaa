@@ -297,23 +297,9 @@ network-failed = Не удалось подключиться: { $reason }
 # triib's entity service is too old to pass plaa's stream to it.
 network-update-triib = Обновите triib, чтобы воспроизводить здесь.
 network-choose = Выберите приёмник, чтобы увидеть, как он принимает поток.
-# The section of talkers plaa can listen to, playing their stream on
-# this computer's sound output.
-network-listen-section = Слушать здесь
 network-no-sources = В сети нет передатчиков с форматом, который воспроизводит plaa, или способных переключиться на такой формат.
 # $talker is a talker's name, or its name and its output's.
-network-listen-to = Слушать передатчик { $talker }
 network-listen-stop = Перестать слушать передатчик { $talker }
-# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
-# talker's other listeners stop, as they do not take that format.
-network-listen-change = Переключить передатчик { $talker } на { $format } и слушать
-network-listen-change-cuts-off = Переключить передатчик { $talker } на { $format } и слушать, отключив { $count ->
-        [one] { $count } другой приёмник
-        [few] { $count } других приёмника
-        [many] { $count } других приёмников
-       *[other] { $count } другого приёмника
-    }
-network-listen-frames = Получено кадров: { $frames }
 network-listen-update-triib = Обновите triib, чтобы слушать здесь: plaa воспроизводит только то, что и так доходит до этого компьютера.
 network-listen-lite = Порт работает в режиме AVB Lite, который не резервирует потоки: plaa воспроизводит только то, что и так доходит до этого компьютера.
 
