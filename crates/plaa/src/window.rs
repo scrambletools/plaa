@@ -660,7 +660,7 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
         ));
     }
     tools.push(component::toggle_tool(
-        Icon::ChatBubble,
+        Icon::SmartToy,
         crate::fl!("action-assistant"),
         context.assistant_open,
         Control::ToggleAssistant,
