@@ -41,7 +41,7 @@ look follows Material Design 3, as in prev.
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first, and the 38 languages prev has |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
-| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb pinned by revision: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
+| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb pinned by revision: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
 | Distribution | As prev, once the features settle: .deb, .rpm, AppImage, tarball, Flatpak, PKGBUILD, MSI and zip, disk image |
 
 ## Scope
@@ -91,10 +91,10 @@ trimming and splitting, and Intel Macs.
 6. **Visualizer** (done): a spectrum of what is heard and the file's
    waveform under a sound file's cover, a scene in three dimensions
    filling the window, or the cover alone.
-7. **AVB and Milan**: the entity, its talker and listener, and a
-   controller to connect talkers and listeners, and AVB Lite through
-   triib's entity service (done); AVB Lite on plaa's own participants
-   (made, on avb's avb-lite crate, and yet to be tried on a network).
+7. **AVB and Milan** (done): the entity, its talker and listener, a
+   controller to connect talkers and listeners, and AVB Lite, through
+   triib's entity service or on plaa's own participants with avb's
+   avb-lite crate.
 8. **Casting** (done): DLNA/UPnP renderers and Chromecasts.
 9. **Assistant and MCP** (done): the MCP server, `plaa --mcp`, with
    prev's consent prompts, and the assistant panel, both on one tool
@@ -493,8 +493,11 @@ Lite itself, with avb's avb-lite crate, which triib's service is to move
 onto: it weighs from the Pdelay exchange whether a bridge reserves its
 streams, and where none does it falls back, declaring by CVU SRP in its
 entity's name, sending a unicast copy to each listener it admits within
-its fan-out and 75% of the link, and moving its ptp4l service to the AVB
-Lite PTP profile (plaa-ptp4l-lite@), until the link comes up again. Beside an older service,
+its fan-out, 5 by default, and 75% of the link, and moving its ptp4l
+service to the AVB Lite PTP profile (plaa-ptp4l-lite@), until the link
+comes up again. Meanwhile it holds the interface promiscuous where it
+filters VLANs in hardware, as the I210 does, which otherwise drops CVU
+SRP's commands, tagged in the media VLAN. Beside an older service,
 which does not share it, or another program declaring MRP from this
 computer's address, the entity steps aside. Tested against an ESP32
 Milan listener through a MOTU AVB switch: the listener locked to the
@@ -504,7 +507,11 @@ while it streamed. In AVB Lite, with the port on a switch without AVB
 beside an AVB Lite endpoint, plaa's stream reached triib's entity as a
 unicast copy, plaa took one sent to this computer, escalation set on
 either entity reached the other, and plaa went back to MSRP as the port
-returned to an AVB switch.
+returned to an AVB switch. On plaa's own participants, triib's service
+stopped, its MSRP streamed both ways through the MOTU switch, and on the
+switch without AVB it fell back within 3 s and streamed both ways with
+an ESP32 AVB Lite endpoint by unicast copy, none late, staying in AVB
+Lite with a MOTU 8D, which has no AVB Lite, answering Pdelay there too.
 
 ## Dependency and license policy
 

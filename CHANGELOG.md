@@ -67,8 +67,8 @@ The first build.
 - A visualizer under a sound file's cover: the spectrum of what is
   heard, or the file's waveform, which seeks where it is clicked.
 - plaa as an AVB talker on Linux: a Milan entity of its own sending what
-  plays as a stereo AAF stream on gPTP time, beside triib's entity
-  service, which reserves the stream for it, and a Network Audio sheet
+  plays as a stereo AAF stream on gPTP time, reserved by its own MSRP or
+  by triib's entity service where that runs, and a Network Audio sheet
   listing the listeners that can play it, with the chosen one's status,
   format, stream and counters under them, kept up to date as other
   controllers change them, by asking again where entities send no
@@ -77,12 +77,22 @@ The first build.
   say when triib must be updated to play there. plaa's entity shows
   controllers its app icon, and Scramble Tools' logo as its vendor's,
   PNG memory objects read through Address Access, and counts its
-  stream's starts, stops and frames for them. Started again, plaa sends
+  stream's starts, stops and frames, and its interface's link and
+  grandmaster changes, for them. Started again, plaa sends
   to the address its stream had last time at once, while MAAP claims
   one anew, so listeners hear it again within a fraction of a second.
   Where no ptp4l runs, plaa starts its own, `plaa-ptp4l@<interface>`,
   which the packages bring, and Network Audio says when ptp4l keeps no
   time for its stream.
+- plaa listens too: its entity's stream input plays the stream connected
+  to it on the sound output, with Milan's input counters, and Network
+  Audio lists the talkers it can take, each with Listen or Stop.
+- AVB Lite where no bridge reserves streams, as on a switch without AVB:
+  plaa falls back from its own MSRP, or follows triib's entity service,
+  declaring by CVU SRP, sending each listener it admits, up to 5, a
+  unicast copy of its stream, taking one sent here, and answering
+  GET_LITE_STATUS and SET_LITE_CONFIG, while its ptp4l runs the AVB Lite
+  PTP profile, `plaa-ptp4l-lite@<interface>`.
 - On a Mac, plaa sends through the Mac's own AVB entity, turned on in
   Audio MIDI Setup, as triib uses it: its controller reaches the entity
   through Apple's AVB framework, and plaa plays into the Core Audio

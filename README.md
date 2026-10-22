@@ -13,10 +13,11 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 > web videos play, with the controls floating over the picture, and
 > files can be trimmed, split, turned and exported, and sound, the
 > screen and a camera recorded, and sound files show a spectrum or their
-> waveform; plaa sends what it plays to AVB/Milan listeners on Linux and
-> connects talkers and listeners; see the [development plan](docs/PLAN.md)
-> for what comes next: listening to AVB streams, casting, and an
-> assistant.
+> waveform; plaa sends what it plays to AVB/Milan listeners on Linux,
+> plays their talkers' streams and connects talkers and listeners, with
+> AVB Lite where the switch has no AVB, casts to TVs and speakers, and
+> has an assistant; see the [development plan](docs/PLAN.md) for what
+> comes next: signing and the website.
 
 ## Features
 
@@ -137,6 +138,10 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   media clock lock, format, stream ID, destination, latency and counters,
   kept up to date as other controllers, such as triib's, change them.
   Under them, the talkers plaa can listen to, playing their stream here.
+- **AVB Lite** where the switch has no AVB: plaa finds that no bridge
+  reserves its streams and falls back, as triib's entity service does,
+  sending each listener, up to five, a copy of its own, and playing a
+  stream sent to this computer, on its own or through triib's service.
 - **Cast** to a Chromecast, or a TV, speaker or program that plays DLNA
   (UPnP AV), found on the network as the Cast menu opens: plaa serves
   the file to it, or hands it a stream's address, and its controls and
@@ -169,8 +174,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-AVB Lite without triib's entity service is made and yet to be tried on
-a network. The [plan](docs/PLAN.md) has the order.
+Signed packages for Windows and macOS, and the website. The
+[plan](docs/PLAN.md) has the order.
 
 ## Packages
 
@@ -247,13 +252,19 @@ plaa's stream, and why. Where triib's entity service
 runs on the interface, plaa reserves its stream in the service's MRP
 participant, which the service shares, as two on one port withdraw each
 other's declarations; beside an older service, which does not share it,
-plaa's entity steps aside.
+plaa's entity steps aside. Without the service, plaa runs MSRP and MVRP
+itself, and where no bridge reserves its streams it falls back to AVB
+Lite, moving ptp4l to the AVB Lite PTP profile,
+`plaa-ptp4l-lite@<interface>`, until the link goes down. Meanwhile it
+holds an interface that filters VLANs in hardware, as the I210 does,
+promiscuous, so it hears CVU SRP's commands in the media VLAN.
 
 The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
 pinned by commit. To change them alongside, `cargo --config
 .cargo/avb-local.toml build` builds against a checkout beside this one,
 from a git-ignored file with `[patch."https://github.com/scrambletools/avb"]`
-path entries for `atdecc`, `avb-mrp`, `avb-net` and `avb-stream`.
+path entries for `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and
+`avb-stream`.
 
 ### AVB on a Mac
 
