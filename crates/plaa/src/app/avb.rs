@@ -9,7 +9,7 @@ use plaa_avb::{EntityId, Network, Snapshot};
 
 use super::{Content, Plaa};
 use crate::External;
-use crate::window::Sheet;
+use crate::window::{Menu, Sheet};
 
 impl Plaa {
     /// Starts plaa on the interface Settings name, or stops it where they
@@ -79,21 +79,28 @@ impl Plaa {
     }
 
     /// Tells plaa's AVB side what the windows show of the network, which
-    /// it keeps up to date: whether any lists the listeners, and those
-    /// chosen there.
+    /// it keeps up to date: whether any lists the talkers and listeners,
+    /// in the Network Audio sheet or a Connect menu, and the listeners
+    /// chosen in the sheet.
     pub(crate) fn watch_avb(&mut self) {
         let Some(network) = &self.avb else {
             return;
         };
-        let mut listed = false;
+        let mut listed = self.start_connect.is_some_and(|id| {
+            self.windows
+                .get(&id)
+                .is_some_and(|window| matches!(window.content, Content::Start))
+        });
         let mut chosen = Vec::new();
         for window in self.windows.values() {
-            if let Some(player) = window.player()
-                && player.sheet == Some(Sheet::Network)
-            {
+            let Some(player) = window.player() else {
+                continue;
+            };
+            if player.sheet == Some(Sheet::Network) {
                 listed = true;
                 chosen.extend(player.listener);
             }
+            listed |= player.menu == Some(Menu::Connect);
         }
         let watched = (listed, chosen);
         if self.avb_watched != watched {
@@ -141,10 +148,14 @@ impl Plaa {
         }
     }
 
-    /// The window `id` closed: it was perhaps the one being sent.
+    /// The window `id` closed: it was perhaps the one being sent, or the
+    /// one with its Connect menu open.
     pub(crate) fn avb_window_closed(&mut self, id: window::Id) {
         if self.avb_feeding.is_some_and(|(feeding, _)| feeding == id) {
             self.avb_feeding = None;
+        }
+        if self.start_connect == Some(id) {
+            self.start_connect = None;
         }
     }
 }

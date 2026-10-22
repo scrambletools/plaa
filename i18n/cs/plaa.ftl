@@ -44,6 +44,8 @@ usage-help =
 start-hint = Otevřete video, zvukový soubor, stream nebo video z webu.
 start-open = Otevřít
 start-open-address = Otevřít adresu
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Připojit
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -85,6 +87,7 @@ action-quality = Kvalita
 action-visualizer = Vizualizace
 action-network = Síťový zvuk
 action-cast = Odeslat
+action-connect = Připojit
 action-assistant = Asistent
 
 ## What a sound file shows under its cover
@@ -281,13 +284,40 @@ network-choose = Vyberte přijímač a uvidíte, jak přijímá svůj stream.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Poslouchat zde
-network-no-talkers = Žádný vysílač v síti neodesílá ve formátu, který plaa dokáže přehrát.
+network-no-sources = Žádný vysílač v síti neodesílá ve formátu, který plaa přehrává, ani na takový formát nemůže přejít.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Poslouchat vysílač { $talker }
 network-listen-stop = Přestat poslouchat vysílač { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Přepnout vysílač { $talker } na { $format } a poslouchat
+network-listen-change-cuts-off = Přepnout vysílač { $talker } na { $format } a poslouchat, čímž se odpojí { $count ->
+        [one] jeho další přijímač
+        [few] jeho { $count } další přijímače
+        [many] jeho { $count } dalšího přijímače
+       *[other] jeho { $count } dalších přijímačů
+    }
 network-listen-frames = Přijaté rámce: { $frames }
 network-listen-update-triib = Chcete-li poslouchat zde, aktualizujte triib: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
 network-listen-lite = Port používá AVB Lite, který nerezervuje žádné streamy: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Hledání vysílačů…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Chcete-li zde poslouchat vysílače, zapněte v Nastavení volbu Odesílat přehrávaný zvuk.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa zde nemůže poslouchat: { $reason }
+connect-sending = Odesílají ve formátu, který plaa přehrává
+connect-changing = Přepnou na formát, který plaa přehrává
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, ve formátu { $format }
+connect-change-cuts-off = { $talker }, ve formátu { $format }, s odpojením { $count ->
+        [one] jeho dalšího přijímače
+        [few] jeho { $count } dalších přijímačů
+        [many] jeho { $count } dalšího přijímače
+       *[other] jeho { $count } dalších přijímačů
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

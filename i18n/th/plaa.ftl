@@ -44,6 +44,8 @@ usage-help =
 start-hint = เปิดไฟล์วิดีโอหรือเสียง สตรีม หรือวิดีโอบนเว็บ
 start-open = เปิด
 start-open-address = เปิดที่อยู่
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = เชื่อมต่อ
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = คุณภาพ
 action-visualizer = การแสดงภาพเสียง
 action-network = เสียงผ่านเครือข่าย
 action-cast = แคสต์
+action-connect = เชื่อมต่อ
 action-assistant = ผู้ช่วย
 
 ## What a sound file shows under its cover
@@ -271,13 +274,34 @@ network-choose = เลือก Listener เพื่อดูว่ารั�
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = ฟังที่นี่
-network-no-talkers = ไม่มี Talker บนเครือข่ายที่ส่งในรูปแบบที่ plaa เล่นได้
+network-no-sources = ไม่มี Talker บนเครือข่ายที่ส่งในรูปแบบที่ plaa เล่น หรือเปลี่ยนเป็นรูปแบบนั้นได้
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = ฟัง { $talker }
 network-listen-stop = หยุดฟัง { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = เปลี่ยน { $talker } เป็น { $format } แล้วฟัง
+network-listen-change-cuts-off = เปลี่ยน { $talker } เป็น { $format } แล้วฟัง โดยตัด { $count ->
+       *[other] Listener อื่นอีก { $count } ตัว
+    }
 network-listen-frames = ได้รับ { $frames } เฟรม
 network-listen-update-triib = อัปเดต triib เพื่อฟังที่นี่: plaa เล่นเฉพาะสิ่งที่มาถึงคอมพิวเตอร์เครื่องนี้อยู่แล้ว
 network-listen-lite = พอร์ตใช้ AVB Lite ซึ่งไม่จองสตรีม: plaa เล่นเฉพาะสิ่งที่มาถึงคอมพิวเตอร์เครื่องนี้อยู่แล้ว
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = กำลังค้นหา Talker…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = เปิด “ส่งสิ่งที่กำลังเล่น” ในการตั้งค่าเพื่อฟัง Talker ที่นี่
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa ฟังที่นี่ไม่ได้: { $reason }
+connect-sending = ส่งในรูปแบบที่ plaa เล่น
+connect-changing = เปลี่ยนเป็นรูปแบบที่ plaa เล่น
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker } ในรูปแบบ { $format }
+connect-change-cuts-off = { $talker } ในรูปแบบ { $format } โดยตัด { $count ->
+       *[other] Listener อื่นอีก { $count } ตัว
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

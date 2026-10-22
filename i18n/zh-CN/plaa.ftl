@@ -43,6 +43,8 @@ usage-help =
 start-hint = 打开视频或音频文件、流或网络视频。
 start-open = 打开
 start-open-address = 打开地址
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = 连接
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -74,6 +76,7 @@ action-quality = 画质
 action-visualizer = 可视化效果
 action-network = 网络音频
 action-cast = 投放
+action-connect = 连接
 action-assistant = 助手
 
 ## What a sound file shows under its cover
@@ -270,13 +273,34 @@ network-choose = 选择一个接收端，查看它如何接收流。
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = 在此收听
-network-no-talkers = 网络上没有以 plaa 能播放的格式发送的发送端。
+network-no-sources = 网络上没有以 plaa 能播放的格式发送、或能切换为这种格式的发送端。
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = 收听 { $talker }
 network-listen-stop = 停止收听 { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = 将 { $talker } 切换为 { $format } 并收听
+network-listen-change-cuts-off = 将 { $talker } 切换为 { $format } 并收听，{ $count ->
+       *[other] 同时断开其他 { $count } 个接收端
+    }
 network-listen-frames = 已接收 { $frames } 帧
 network-listen-update-triib = 请更新 triib 以在此收听：plaa 只会播放本来就到达这台电脑的内容。
 network-listen-lite = 该端口运行 AVB Lite，不预留任何流：plaa 只会播放本来就到达这台电脑的内容。
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = 正在查找发送端…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = 在“设置”中打开“发送正在播放的内容”，即可在此收听发送端。
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa 无法在此收听：{ $reason }
+connect-sending = 以 plaa 能播放的格式发送
+connect-changing = 切换为 plaa 能播放的格式
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }，采用 { $format }
+connect-change-cuts-off = { $talker }，采用 { $format }，{ $count ->
+       *[other] 断开其他 { $count } 个接收端
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

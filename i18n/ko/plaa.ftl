@@ -44,6 +44,8 @@ usage-help =
 start-hint = 비디오 또는 오디오 파일, 스트림, 웹 동영상을 여세요.
 start-open = 열기
 start-open-address = 주소 열기
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = 연결
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = 화질
 action-visualizer = 비주얼라이저
 action-network = 네트워크 오디오
 action-cast = 전송
+action-connect = 연결
 action-assistant = 어시스턴트
 
 ## What a sound file shows under its cover
@@ -271,13 +274,34 @@ network-choose = 리스너를 선택하면 스트림을 받는 방식이 표시�
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = 여기서 듣기
-network-no-talkers = 네트워크에 plaa가 재생할 수 있는 포맷으로 보내는 토커가 없습니다.
+network-no-sources = 네트워크에 plaa가 재생하는 포맷으로 보내거나 그런 포맷으로 바꿀 수 있는 토커가 없습니다.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = { $talker } 듣기
 network-listen-stop = { $talker } 듣기 중지
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = { $talker }을(를) { $format }(으)로 바꾸고 듣기
+network-listen-change-cuts-off = { $talker }을(를) { $format }(으)로 바꾸고 듣기, { $count ->
+       *[other] 다른 리스너 { $count }개의 연결이 끊어짐
+    }
 network-listen-frames = 받은 프레임: { $frames }
 network-listen-update-triib = 여기서 들으려면 triib을 업데이트하세요: plaa는 어차피 이 컴퓨터에 도달하는 것만 재생합니다.
 network-listen-lite = 이 포트는 스트림을 예약하지 않는 AVB Lite로 실행 중입니다: plaa는 어차피 이 컴퓨터에 도달하는 것만 재생합니다.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = 토커를 찾는 중…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = 여기서 토커를 들으려면 설정에서 재생 중인 사운드 보내기를 켜세요.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa가 여기서 들을 수 없음: { $reason }
+connect-sending = plaa가 재생하는 포맷으로 보내는 중
+connect-changing = plaa가 재생하는 포맷으로 변경
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, { $format } 사용
+connect-change-cuts-off = { $talker }, { $format } 사용, { $count ->
+       *[other] 다른 리스너 { $count }개의 연결이 끊어짐
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

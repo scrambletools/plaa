@@ -44,6 +44,8 @@ usage-help =
 start-hint = Відкрийте відео- чи аудіофайл, потік або вебвідео.
 start-open = Відкрити
 start-open-address = Відкрити адресу
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Підключитися
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -85,6 +87,7 @@ action-quality = Якість
 action-visualizer = Візуалізація
 action-network = Мережеве аудіо
 action-cast = Транслювати
+action-connect = Підключитися
 action-assistant = Асистент
 
 ## What a sound file shows under its cover
@@ -281,13 +284,40 @@ network-choose = Виберіть приймач, щоб побачити, як 
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Слухати тут
-network-no-talkers = У мережі немає передавача, що надсилає у форматі, який може відтворити plaa.
+network-no-sources = У мережі немає передавача, що надсилає у форматі, який відтворює plaa, або може на нього перемкнутися.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Слухати передавач { $talker }
 network-listen-stop = Перестати слухати передавач { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Перемкнути передавач { $talker } на { $format } і слухати
+network-listen-change-cuts-off = Перемкнути передавач { $talker } на { $format } і слухати, відключивши { $count ->
+        [one] { $count } інший приймач
+        [few] { $count } інші приймачі
+        [many] { $count } інших приймачів
+       *[other] { $count } іншого приймача
+    }
 network-listen-frames = Отримано кадрів: { $frames }
 network-listen-update-triib = Оновіть triib, щоб слухати тут: plaa відтворює лише те, що й так доходить до цього комп’ютера.
 network-listen-lite = Порт працює в режимі AVB Lite, який не резервує потоків: plaa відтворює лише те, що й так доходить до цього комп’ютера.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Пошук передавачів…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Щоб слухати тут передавачі, увімкніть «Надсилати те, що відтворюється» в параметрах.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa не може слухати тут: { $reason }
+connect-sending = Надсилають у форматі, який відтворює plaa
+connect-changing = Перемкнуться на формат, який відтворює plaa
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, у форматі { $format }
+connect-change-cuts-off = { $talker }, у форматі { $format }, з відключенням { $count ->
+        [one] { $count } іншого приймача
+        [few] { $count } інших приймачів
+        [many] { $count } інших приймачів
+       *[other] { $count } іншого приймача
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

@@ -44,6 +44,8 @@ usage-help =
 start-hint = Nyisson meg egy videó- vagy hangfájlt, egy adatfolyamot vagy egy webes videót.
 start-open = Megnyitás
 start-open-address = Cím megnyitása
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Csatlakozás
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = Minőség
 action-visualizer = Vizualizáció
 action-network = Hálózati hang
 action-cast = Átküldés
+action-connect = Csatlakozás
 action-assistant = Asszisztens
 
 ## What a sound file shows under its cover
@@ -271,13 +274,36 @@ network-choose = Válasszon egy vevőt, hogy lássa, hogyan fogadja az adatfolya
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Hallgatás itt
-network-no-talkers = A hálózaton egyetlen adó sem küld olyan formátumban, amelyet a plaa le tud játszani.
+network-no-sources = A hálózaton egyetlen adó sem küld olyan formátumban, amelyet a plaa lejátszik, és nem is tud ilyenre váltani.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Hallgatás: { $talker }
 network-listen-stop = Hallgatás leállítása: { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = { $talker } átállítása { $format } formátumra és hallgatás
+network-listen-change-cuts-off = { $talker } átállítása { $format } formátumra és hallgatás, ami leválasztja { $count ->
+        [one] a másik vevőjét
+       *[other] a többi { $count } vevőjét
+    }
 network-listen-frames = Fogadott keretek: { $frames }
 network-listen-update-triib = Az itteni hallgatáshoz frissítse a triib alkalmazást: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
 network-listen-lite = A port AVB Lite módban fut, amely nem foglal adatfolyamokat: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Adók keresése…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Az adók itteni hallgatásához kapcsolja be a Beállításokban a Lejátszott hang küldése lehetőséget.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = A plaa itt nem tud hallgatni: { $reason }
+connect-sending = Olyan formátumban küld, amelyet a plaa lejátszik
+connect-changing = Olyan formátumra vált, amelyet a plaa lejátszik
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, { $format } formátumban
+connect-change-cuts-off = { $talker }, { $format } formátumban, ami leválasztja { $count ->
+        [one] a másik vevőjét
+       *[other] a többi { $count } vevőjét
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

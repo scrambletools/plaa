@@ -138,6 +138,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   media clock lock, format, stream ID, destination, latency and counters,
   kept up to date as other controllers, such as triib's, change them.
   Under them, the talkers plaa can listen to, playing their stream here.
+- **Connect**, beside Open: the talkers plaa can listen to, those sending
+  in a format it plays, then those that can change to one, changed as
+  plaa connects, with the other listeners that would cut off.
 - **AVB Lite** where the switch has no AVB: plaa finds that no bridge
   reserves its streams and falls back, as triib's entity service does,
   sending each listener, up to five, a copy of its own, and playing a

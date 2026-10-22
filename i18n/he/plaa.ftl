@@ -44,6 +44,8 @@ usage-help =
 start-hint = אפשר לפתוח קובץ וידאו או שמע, זרם או סרטון מהאינטרנט.
 start-open = פתיחה
 start-open-address = פתיחת כתובת
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = התחברות
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -83,6 +85,7 @@ action-quality = איכות
 action-visualizer = ויזואליזציה
 action-network = שמע ברשת
 action-cast = העברה
+action-connect = התחברות
 action-assistant = עוזר
 
 ## What a sound file shows under its cover
@@ -279,13 +282,38 @@ network-choose = יש לבחור מאזין כדי לראות איך הוא מק
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = האזנה כאן
-network-no-talkers = אין ברשת משדר ששולח בפורמט ש-plaa יכול לנגן.
+network-no-sources = אין ברשת משדר ששולח בפורמט ש-plaa מנגן, או שיכול לעבור לפורמט כזה.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = האזנה ל-{ $talker }
 network-listen-stop = הפסקת ההאזנה ל-{ $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = העברת { $talker } לפורמט { $format } והאזנה
+network-listen-change-cuts-off = העברת { $talker } לפורמט { $format } והאזנה, תוך ניתוק { $count ->
+        [one] המאזין האחר שלו
+        [two] שני המאזינים האחרים שלו
+       *[other] { $count } המאזינים האחרים שלו
+    }
 network-listen-frames = מסגרות שהתקבלו: { $frames }
 network-listen-update-triib = כדי להאזין כאן, יש לעדכן את triib: plaa מנגן רק את מה שמגיע ממילא למחשב הזה.
 network-listen-lite = היציאה פועלת ב-AVB Lite, שאינו מקצה רוחב פס לזרמים: plaa מנגן רק את מה שמגיע ממילא למחשב הזה.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = מחפש משדרים…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = כדי להאזין כאן למשדרים, יש להפעיל את "שליחת מה שמתנגן" בהגדרות.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa לא יכול להאזין כאן: { $reason }
+connect-sending = שולחים בפורמט ש-plaa מנגן
+connect-changing = עוברים לפורמט ש-plaa מנגן
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, בפורמט { $format }
+connect-change-cuts-off = { $talker }, בפורמט { $format }, תוך ניתוק { $count ->
+        [one] המאזין האחר שלו
+        [two] שני המאזינים האחרים שלו
+       *[other] { $count } המאזינים האחרים שלו
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

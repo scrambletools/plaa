@@ -45,6 +45,8 @@ usage-help =
 start-hint = Avaa video- tai äänitiedosto, virta tai verkkovideo.
 start-open = Avaa
 start-open-address = Avaa osoite
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Yhdistä
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -82,6 +84,7 @@ action-quality = Laatu
 action-visualizer = Visualisointi
 action-network = Verkkoääni
 action-cast = Suoratoista
+action-connect = Yhdistä
 action-assistant = Avustaja
 
 ## What a sound file shows under its cover
@@ -278,13 +281,36 @@ network-choose = Valitse vastaanotin nähdäksesi, miten se ottaa virtansa vasta
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Kuuntele tässä
-network-no-talkers = Mikään verkon lähetin ei lähetä muodossa, jota plaa pystyy toistamaan.
+network-no-sources = Mikään verkon lähetin ei lähetä muodossa, jota plaa toistaa, eikä voi vaihtaa sellaiseen.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Kuuntele lähetintä { $talker }
 network-listen-stop = Lopeta lähettimen { $talker } kuuntelu
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Vaihda lähetin { $talker } muotoon { $format } ja kuuntele
+network-listen-change-cuts-off = Vaihda lähetin { $talker } muotoon { $format } ja kuuntele, jolloin { $count ->
+        [one] sen toisen vastaanottimen yhteys katkeaa
+       *[other] sen { $count } muun vastaanottimen yhteys katkeaa
+    }
 network-listen-frames = Vastaanotetut kehykset: { $frames }
 network-listen-update-triib = Päivitä triib, niin voit kuunnella tässä: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
 network-listen-lite = Portissa on käytössä AVB Lite, joka ei varaa virtoja: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Etsitään lähettimiä…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Ota Asetuksissa käyttöön ”Lähetä toistettava ääni”, niin voit kuunnella lähettimiä tässä.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa ei voi kuunnella tässä: { $reason }
+connect-sending = Lähettää muodossa, jota plaa toistaa
+connect-changing = Vaihtaa muotoon, jota plaa toistaa
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, muodossa { $format }
+connect-change-cuts-off = { $talker }, muodossa { $format }, jolloin { $count ->
+        [one] sen toisen vastaanottimen yhteys katkeaa
+       *[other] sen { $count } muun vastaanottimen yhteys katkeaa
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

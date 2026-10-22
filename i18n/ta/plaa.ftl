@@ -45,6 +45,8 @@ usage-help =
 start-hint = வீடியோ அல்லது ஆடியோ கோப்பு, ஸ்ட்ரீம் அல்லது இணைய வீடியோவைத் திறக்கவும்.
 start-open = திற
 start-open-address = முகவரியைத் திற
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = இணை
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -82,6 +84,7 @@ action-quality = தரம்
 action-visualizer = காட்சிப்படுத்தி
 action-network = நெட்வொர்க் ஆடியோ
 action-cast = அனுப்பு
+action-connect = இணை
 action-assistant = உதவியாளர்
 
 ## What a sound file shows under its cover
@@ -278,13 +281,36 @@ network-choose = ஒரு Listener தன் stream-ஐ எப்படிப�
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = இங்கே கேள்
-network-no-talkers = plaa இயக்கக்கூடிய format-இல் அனுப்பும் Talker எதுவும் நெட்வொர்க்கில் இல்லை.
+network-no-sources = plaa இயக்கும் format-இல் அனுப்பும் அல்லது அதற்கு மாறக்கூடிய Talker எதுவும் நெட்வொர்க்கில் இல்லை.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = { $talker }-ஐக் கேள்
 network-listen-stop = { $talker }-ஐக் கேட்பதை நிறுத்து
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = { $talker }-ஐ { $format }-க்கு மாற்றிக் கேள்
+network-listen-change-cuts-off = { $talker }-ஐ { $format }-க்கு மாற்றிக் கேள், இதனால் { $count ->
+        [one] அதன் மற்ற Listener துண்டிக்கப்படும்
+       *[other] அதன் மற்ற { $count } Listeners துண்டிக்கப்படும்
+    }
 network-listen-frames = பெற்ற frames: { $frames }
 network-listen-update-triib = இங்கே கேட்க triib-ஐப் புதுப்பிக்கவும்: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
 network-listen-lite = இந்த port AVB Lite-இல் இயங்குகிறது, அது எந்த stream-ஐயும் reserve செய்வதில்லை: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Talkers-ஐத் தேடுகிறது…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = இங்கே Talkers-ஐக் கேட்க, அமைப்புகளில் “இயங்குவதை அனுப்பு” என்பதை இயக்கவும்.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa-வால் இங்கே கேட்க முடியாது: { $reason }
+connect-sending = plaa இயக்கும் format-இல் அனுப்புகின்றன
+connect-changing = plaa இயக்கும் format-க்கு மாறுகின்றன
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, { $format }-இல்
+connect-change-cuts-off = { $talker }, { $format }-இல், இதனால் { $count ->
+        [one] அதன் மற்ற Listener துண்டிக்கப்படும்
+       *[other] அதன் மற்ற { $count } Listeners துண்டிக்கப்படும்
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

@@ -45,6 +45,8 @@ usage-help =
 start-hint = Fungua faili ya video au sauti, mtiririko au video ya wavuti.
 start-open = Fungua
 start-open-address = Fungua Anwani
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Unganisha
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -76,6 +78,7 @@ action-quality = Ubora
 action-visualizer = Taswira ya Sauti
 action-network = Sauti ya Mtandao
 action-cast = Tuma
+action-connect = Unganisha
 action-assistant = Msaidizi
 
 ## What a sound file shows under its cover
@@ -272,13 +275,36 @@ network-choose = Chagua listener ili kuona jinsi inavyopokea mtiririko wake.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Sikiliza hapa
-network-no-talkers = Hakuna talker kwenye mtandao inayotuma katika umbizo ambalo plaa inaweza kucheza.
+network-no-sources = Hakuna talker kwenye mtandao inayotuma katika umbizo ambalo plaa hucheza, au inayoweza kubadilika kuwa umbizo hilo.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Sikiliza { $talker }
 network-listen-stop = Acha kusikiliza { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Badilisha { $talker } kuwa { $format } na usikilize
+network-listen-change-cuts-off = Badilisha { $talker } kuwa { $format } na usikilize, ukitenganisha { $count ->
+        [one] listener yake nyingine
+       *[other] listener zake nyingine { $count }
+    }
 network-listen-frames = Fremu zilizopokelewa: { $frames }
 network-listen-update-triib = Sasisha triib ili kusikiliza hapa: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
 network-listen-lite = Mlango unatumia AVB Lite, ambayo haihifadhi mitiririko: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Inatafuta talker…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Washa “Tuma kinachocheza” katika Mipangilio ili kusikiliza talker hapa.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa haiwezi kusikiliza hapa: { $reason }
+connect-sending = Zinazotuma katika umbizo ambalo plaa hucheza
+connect-changing = Zinazobadilika kuwa umbizo ambalo plaa hucheza
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, katika { $format }
+connect-change-cuts-off = { $talker }, katika { $format }, ikitenganisha { $count ->
+        [one] listener yake nyingine
+       *[other] listener zake nyingine { $count }
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

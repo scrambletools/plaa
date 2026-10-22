@@ -87,6 +87,10 @@ The first build.
 - plaa listens too: its entity's stream input plays the stream connected
   to it on the sound output, with Milan's input counters, and Network
   Audio lists the talkers it can take, each with Listen or Stop.
+- Connect, beside Open on the start screen and in the toolbar: a menu of
+  the talkers plaa can listen to, those sending in a format it plays and
+  those that can change to one, which it changes as it connects, saying
+  which other listeners that cuts off.
 - AVB Lite where no bridge reserves streams, as on a switch without AVB:
   plaa falls back from its own MSRP, or follows triib's entity service,
   declaring by CVU SRP, sending each listener it admits, up to 5, a

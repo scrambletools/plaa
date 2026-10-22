@@ -44,6 +44,8 @@ usage-help =
 start-hint = Åpne en video- eller lydfil, en strøm eller en nettvideo.
 start-open = Åpne
 start-open-address = Åpne adresse
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Koble til
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -81,6 +83,7 @@ action-quality = Kvalitet
 action-visualizer = Visualisering
 action-network = Nettverkslyd
 action-cast = Cast
+action-connect = Koble til
 action-assistant = Assistent
 
 ## What a sound file shows under its cover
@@ -277,13 +280,36 @@ network-choose = Velg en mottaker for å se hvordan den tar imot strømmen sin.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Lytt her
-network-no-talkers = Ingen sender på nettverket sender i et format plaa kan spille av.
+network-no-sources = Ingen sender på nettverket sender i et format plaa spiller av, eller kan bytte til et.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Lytt til { $talker }
 network-listen-stop = Slutt å lytte til { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Bytt { $talker } til { $format } og lytt
+network-listen-change-cuts-off = Bytt { $talker } til { $format } og lytt, noe som kobler fra { $count ->
+        [one] dens andre mottaker
+       *[other] dens { $count } andre mottakere
+    }
 network-listen-frames = Mottatte rammer: { $frames }
 network-listen-update-triib = Oppdater triib for å lytte her: plaa spiller bare av det som uansett når denne datamaskinen.
 network-listen-lite = Porten kjører AVB Lite, som ikke reserverer strømmer: plaa spiller bare av det som uansett når denne datamaskinen.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Ser etter sendere…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Slå på «Send det som spilles» i Innstillinger for å lytte til sendere her.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa kan ikke lytte her: { $reason }
+connect-sending = Sender i et format plaa spiller av
+connect-changing = Bytter til et format plaa spiller av
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, i { $format }
+connect-change-cuts-off = { $talker }, i { $format }, noe som kobler fra { $count ->
+        [one] dens andre mottaker
+       *[other] dens { $count } andre mottakere
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

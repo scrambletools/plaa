@@ -44,6 +44,8 @@ usage-help =
 start-hint = کوئی ویڈیو یا آڈیو فائل، اسٹریم یا ویب ویڈیو کھولیں۔
 start-open = کھولیں
 start-open-address = پتہ کھولیں
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = کنیکٹ کریں
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = معیار
 action-visualizer = ویژولائزر
 action-network = نیٹ ورک آڈیو
 action-cast = کاسٹ کریں
+action-connect = کنیکٹ کریں
 action-assistant = اسسٹنٹ
 
 ## What a sound file shows under its cover
@@ -271,13 +274,36 @@ network-choose = کوئی لسنر منتخب کریں تاکہ دیکھ سکی�
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = یہاں سنیں
-network-no-talkers = نیٹ ورک پر کوئی ٹاکر ایسے فارمیٹ میں نہیں بھیج رہا جو plaa چلا سکے۔
+network-no-sources = نیٹ ورک پر کوئی ٹاکر ایسے فارمیٹ میں نہیں بھیج رہا جو plaa چلاتا ہے، اور نہ ہی ایسے فارمیٹ پر بدل سکتا ہے۔
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = { $talker } کو سنیں
 network-listen-stop = { $talker } کو سننا بند کریں
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = { $talker } کو { $format } پر بدلیں اور سنیں
+network-listen-change-cuts-off = { $talker } کو { $format } پر بدلیں اور سنیں، جس سے { $count ->
+        [one] اس کا دوسرا لسنر منقطع ہو جائے گا
+       *[other] اس کے { $count } دوسرے لسنرز منقطع ہو جائیں گے
+    }
 network-listen-frames = موصول ہونے والے فریمز: { $frames }
 network-listen-update-triib = یہاں سننے کے لیے triib اپ ڈیٹ کریں: plaa صرف وہی چلاتا ہے جو ویسے بھی اس کمپیوٹر تک پہنچتا ہے۔
 network-listen-lite = پورٹ AVB Lite پر چل رہا ہے، جو کوئی اسٹریم ریزرو نہیں کرتا: plaa صرف وہی چلاتا ہے جو ویسے بھی اس کمپیوٹر تک پہنچتا ہے۔
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = ٹاکرز تلاش کیے جا رہے ہیں…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = یہاں ٹاکرز کو سننے کے لیے ترتیبات میں “جو چل رہا ہے وہ بھیجیں” آن کریں۔
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa یہاں نہیں سن سکتا: { $reason }
+connect-sending = ایسے فارمیٹ میں بھیج رہے ہیں جو plaa چلاتا ہے
+connect-changing = ایسے فارمیٹ پر بدلیں گے جو plaa چلاتا ہے
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }، { $format } میں
+connect-change-cuts-off = { $talker }، { $format } میں، جس سے { $count ->
+        [one] اس کا دوسرا لسنر منقطع ہو جائے گا
+       *[other] اس کے { $count } دوسرے لسنرز منقطع ہو جائیں گے
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

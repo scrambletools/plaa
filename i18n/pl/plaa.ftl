@@ -44,6 +44,8 @@ usage-help =
 start-hint = Otwórz plik wideo lub audio, strumień albo film z internetu.
 start-open = Otwórz
 start-open-address = Otwórz adres
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Połącz
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -85,6 +87,7 @@ action-quality = Jakość
 action-visualizer = Wizualizacja
 action-network = Dźwięk sieciowy
 action-cast = Przesyłaj
+action-connect = Połącz
 action-assistant = Asystent
 
 ## What a sound file shows under its cover
@@ -281,13 +284,40 @@ network-choose = Wybierz odbiornik, aby zobaczyć, jak odbiera strumień.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Słuchaj tutaj
-network-no-talkers = Żaden nadajnik w sieci nie wysyła w formacie, który plaa może odtworzyć.
+network-no-sources = Żaden nadajnik w sieci nie wysyła w formacie, który plaa odtwarza, ani nie może się na taki przełączyć.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Słuchaj nadajnika { $talker }
 network-listen-stop = Przestań słuchać nadajnika { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Przełącz nadajnik { $talker } na { $format } i słuchaj
+network-listen-change-cuts-off = Przełącz nadajnik { $talker } na { $format } i słuchaj, odłączając { $count ->
+        [one] jego pozostały odbiornik
+        [few] jego { $count } pozostałe odbiorniki
+        [many] jego { $count } pozostałych odbiorników
+       *[other] jego { $count } pozostałego odbiornika
+    }
 network-listen-frames = Odebrane ramki: { $frames }
 network-listen-update-triib = Zaktualizuj triib, aby słuchać tutaj: plaa odtwarza tylko to, co i tak dociera do tego komputera.
 network-listen-lite = Port działa w trybie AVB Lite, który nie rezerwuje strumieni: plaa odtwarza tylko to, co i tak dociera do tego komputera.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Wyszukiwanie nadajników…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Włącz „Wysyłaj odtwarzany dźwięk” w Ustawieniach, aby słuchać tutaj nadajników.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa nie może tutaj słuchać: { $reason }
+connect-sending = Wysyłają w formacie, który plaa odtwarza
+connect-changing = Przełączą się na format, który plaa odtwarza
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, w formacie { $format }
+connect-change-cuts-off = { $talker }, w formacie { $format }, z odłączeniem { $count ->
+        [one] jego pozostałego odbiornika
+        [few] jego { $count } pozostałych odbiorników
+        [many] jego { $count } pozostałych odbiorników
+       *[other] jego { $count } pozostałego odbiornika
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

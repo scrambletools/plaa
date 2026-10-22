@@ -44,6 +44,8 @@ usage-help =
 start-hint = Obre un fitxer de vídeo o d'àudio, un flux o un vídeo web.
 start-open = Obre
 start-open-address = Obre una adreça
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Connecta
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -81,6 +83,7 @@ action-quality = Qualitat
 action-visualizer = Visualitzador
 action-network = Àudio en xarxa
 action-cast = Emet
+action-connect = Connecta
 action-assistant = Assistent
 
 ## What a sound file shows under its cover
@@ -277,13 +280,36 @@ network-choose = Tria un receptor per veure com rep el flux.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Escolta aquí
-network-no-talkers = Cap emissor de la xarxa no envia en un format que el plaa pugui reproduir.
+network-no-sources = Cap emissor de la xarxa no envia en un format que el plaa reprodueix, ni pot passar a un d'aquests formats.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Escolta { $talker }
 network-listen-stop = Deixa d'escoltar { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Canvia { $talker } a { $format } i escolta
+network-listen-change-cuts-off = Canvia { $talker } a { $format } i escolta, desconnectant { $count ->
+        [one] el seu altre receptor
+       *[other] els seus altres { $count } receptors
+    }
 network-listen-frames = Trames rebudes: { $frames }
 network-listen-update-triib = Actualitza el triib per escoltar aquí: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
 network-listen-lite = El port fa servir AVB Lite, que no reserva fluxos: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = S'estan cercant emissors…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Activa «Envia el que es reprodueix» a Configuració per escoltar emissors aquí.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = El plaa no pot escoltar aquí: { $reason }
+connect-sending = Envien en un format que el plaa reprodueix
+connect-changing = Canvien a un format que el plaa reprodueix
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, en { $format }
+connect-change-cuts-off = { $talker }, en { $format }, desconnectant { $count ->
+        [one] el seu altre receptor
+       *[other] els seus altres { $count } receptors
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

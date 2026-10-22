@@ -44,6 +44,8 @@ usage-help =
 start-hint = ビデオファイル、オーディオファイル、ストリーム、Web動画を開いてください。
 start-open = 開く
 start-open-address = アドレスを開く
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = 接続
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = 画質
 action-visualizer = ビジュアライザ
 action-network = ネットワークオーディオ
 action-cast = キャスト
+action-connect = 接続
 action-assistant = アシスタント
 
 ## What a sound file shows under its cover
@@ -271,13 +274,34 @@ network-choose = リスナーを選ぶと、ストリームの受け取り状況
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = ここで聴く
-network-no-talkers = ネットワーク上に、plaaで再生できるフォーマットで送信しているトーカーがありません。
+network-no-sources = ネットワーク上に、plaaで再生できるフォーマットで送信している、またはそのフォーマットに切り替えられるトーカーがありません。
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = { $talker }を聴く
 network-listen-stop = { $talker }を聴くのを停止
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = { $talker }を{ $format }に切り替えて聴く
+network-listen-change-cuts-off = { $talker }を{ $format }に切り替えて聴く{ $count ->
+       *[other] （ほかのリスナー{ $count }台は切断されます）
+    }
 network-listen-frames = { $frames }フレームを受信
 network-listen-update-triib = ここで聴くには、triibをアップデートしてください：plaaは、もともとこのコンピュータに届くものだけを再生します。
 network-listen-lite = このポートは、ストリームを予約しないAVB Liteで動作しています：plaaは、もともとこのコンピュータに届くものだけを再生します。
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = トーカーを探しています…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = ここでトーカーを聴くには、「設定」で「再生中のサウンドを送信」をオンにしてください。
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaaはここで聴けません：{ $reason }
+connect-sending = plaaで再生できるフォーマットで送信中
+connect-changing = plaaで再生できるフォーマットに切り替え
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }、{ $format }で
+connect-change-cuts-off = { $talker }、{ $format }で{ $count ->
+       *[other] （ほかのリスナー{ $count }台は切断されます）
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

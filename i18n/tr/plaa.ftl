@@ -44,6 +44,8 @@ usage-help =
 start-hint = Bir video veya ses dosyası, bir akış ya da bir web videosu açın.
 start-open = Aç
 start-open-address = Adres Aç
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Bağlan
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = Kalite
 action-visualizer = Görselleştirici
 action-network = Ağ Sesi
 action-cast = Yayınla
+action-connect = Bağlan
 action-assistant = Asistan
 
 ## What a sound file shows under its cover
@@ -271,13 +274,36 @@ network-choose = Akışını nasıl aldığını görmek için bir dinleyici se�
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Burada dinle
-network-no-talkers = Ağda plaa'nın oynatabileceği bir biçimde gönderen konuşmacı yok.
+network-no-sources = Ağda plaa'nın oynattığı bir biçimde gönderen ya da böyle bir biçime geçebilen konuşmacı yok.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = { $talker } konuşmacısını dinle
 network-listen-stop = { $talker } konuşmacısını dinlemeyi durdur
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = { $talker } konuşmacısını { $format } biçimine geçir ve dinle
+network-listen-change-cuts-off = { $talker } konuşmacısını { $format } biçimine geçir ve dinle, { $count ->
+        [one] diğer dinleyicisinin bağlantısı kesilir
+       *[other] diğer { $count } dinleyicisinin bağlantısı kesilir
+    }
 network-listen-frames = Alınan çerçeveler: { $frames }
 network-listen-update-triib = Burada dinlemek için triib'i güncelleyin: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
 network-listen-lite = Bağlantı noktası, hiçbir akışı rezerve etmeyen AVB Lite ile çalışıyor: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Konuşmacılar aranıyor…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Konuşmacıları burada dinlemek için Ayarlar'da Oynatılanı gönder seçeneğini açın.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa burada dinleyemiyor: { $reason }
+connect-sending = plaa'nın oynattığı bir biçimde gönderiyor
+connect-changing = plaa'nın oynattığı bir biçime geçiyor
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, { $format } biçiminde
+connect-change-cuts-off = { $talker }, { $format } biçiminde, { $count ->
+        [one] diğer dinleyicisinin bağlantısı kesilir
+       *[other] diğer { $count } dinleyicisinin bağlantısı kesilir
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

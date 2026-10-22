@@ -44,6 +44,8 @@ usage-help =
 start-hint = افتح ملف فيديو أو صوت، أو بثًّا، أو فيديو من الويب.
 start-open = فتح
 start-open-address = فتح عنوان
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = اتصال
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -89,6 +91,7 @@ action-quality = الجودة
 action-visualizer = المؤثرات المرئية
 action-network = الصوت عبر الشبكة
 action-cast = إرسال
+action-connect = اتصال
 action-assistant = المساعد
 
 ## What a sound file shows under its cover
@@ -285,13 +288,44 @@ network-choose = اختر مستقبِلًا لترى كيف يستقبل تدف
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = الاستماع هنا
-network-no-talkers = لا يوجد على الشبكة مُرسِل يرسل بتنسيق يمكن لـ plaa تشغيله.
+network-no-sources = لا يوجد على الشبكة مُرسِل يرسل بتنسيق يشغّله plaa، أو يمكنه التحوّل إلى تنسيق كهذا.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = الاستماع إلى { $talker }
 network-listen-stop = إيقاف الاستماع إلى { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = تحويل { $talker } إلى { $format } والاستماع
+network-listen-change-cuts-off = تحويل { $talker } إلى { $format } والاستماع، مع فصل { $count ->
+        [zero] { $count } مستقبِل آخر له
+        [one] مستقبِله الآخر
+        [two] مستقبِلَيه الآخرَين
+        [few] { $count } مستقبِلات أخرى له
+        [many] { $count } مستقبِلًا آخر له
+       *[other] { $count } مستقبِل آخر له
+    }
 network-listen-frames = الإطارات المستلمة: { $frames }
 network-listen-update-triib = حدّث triib للاستماع هنا: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
 network-listen-lite = يعمل المنفذ بنظام AVB Lite الذي لا يحجز أي تدفقات: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = جارٍ البحث عن مُرسِلات…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = شغّل “إرسال ما يُشغَّل” في الإعدادات للاستماع إلى المُرسِلات هنا.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = لا يمكن لـ plaa الاستماع هنا: { $reason }
+connect-sending = ترسل بتنسيق يشغّله plaa
+connect-changing = تتحوّل إلى تنسيق يشغّله plaa
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }، بتنسيق { $format }
+connect-change-cuts-off = { $talker }، بتنسيق { $format }، مع فصل { $count ->
+        [zero] { $count } مستقبِل آخر له
+        [one] مستقبِله الآخر
+        [two] مستقبِلَيه الآخرَين
+        [few] { $count } مستقبِلات أخرى له
+        [many] { $count } مستقبِلًا آخر له
+       *[other] { $count } مستقبِل آخر له
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

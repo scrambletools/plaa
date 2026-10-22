@@ -44,6 +44,8 @@ usage-help =
 start-hint = Ανοίξτε ένα αρχείο βίντεο ή ήχου, μια ροή ή ένα βίντεο από τον ιστό.
 start-open = Άνοιγμα
 start-open-address = Άνοιγμα διεύθυνσης
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Σύνδεση
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -81,6 +83,7 @@ action-quality = Ποιότητα
 action-visualizer = Οπτικοποίηση
 action-network = Ήχος δικτύου
 action-cast = Μετάδοση
+action-connect = Σύνδεση
 action-assistant = Βοηθός
 
 ## What a sound file shows under its cover
@@ -277,13 +280,36 @@ network-choose = Επιλέξτε έναν δέκτη για να δείτε π�
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Ακρόαση εδώ
-network-no-talkers = Κανένας πομπός στο δίκτυο δεν στέλνει σε μορφή που μπορεί να αναπαράγει το plaa.
+network-no-sources = Κανένας πομπός στο δίκτυο δεν στέλνει σε μορφή που αναπαράγει το plaa, ούτε μπορεί να αλλάξει σε τέτοια μορφή.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Ακρόαση του { $talker }
 network-listen-stop = Διακοπή ακρόασης του { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Αλλαγή του { $talker } σε { $format } και ακρόαση
+network-listen-change-cuts-off = Αλλαγή του { $talker } σε { $format } και ακρόαση, με αποσύνδεση { $count ->
+        [one] του άλλου δέκτη του
+       *[other] των άλλων { $count } δεκτών του
+    }
 network-listen-frames = Πλαίσια που ελήφθησαν: { $frames }
 network-listen-update-triib = Ενημερώστε το triib για ακρόαση εδώ: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
 network-listen-lite = Η θύρα λειτουργεί με AVB Lite, που δεν κάνει κράτηση ροών: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Αναζήτηση πομπών…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Ενεργοποιήστε την «Αποστολή του ήχου αναπαραγωγής» στις Ρυθμίσεις για ακρόαση πομπών εδώ.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = Το plaa δεν μπορεί να κάνει ακρόαση εδώ: { $reason }
+connect-sending = Στέλνουν σε μορφή που αναπαράγει το plaa
+connect-changing = Αλλάζουν σε μορφή που αναπαράγει το plaa
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, σε { $format }
+connect-change-cuts-off = { $talker }, σε { $format }, με αποσύνδεση { $count ->
+        [one] του άλλου δέκτη του
+       *[other] των άλλων { $count } δεκτών του
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

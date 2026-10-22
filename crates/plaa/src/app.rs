@@ -117,8 +117,10 @@ pub struct Plaa {
     /// surface, as a window's player changes when its list moves on.
     avb_feeding: Option<(window::Id, u64)>,
     /// What the windows were last said to show of the network: whether
-    /// any lists the listeners, and those chosen there.
+    /// any lists the talkers and listeners, and the listeners chosen there.
     avb_watched: (bool, Vec<(plaa_avb::EntityId, u16)>),
+    /// The start window whose Connect menu is open.
+    start_connect: Option<window::Id>,
     /// The wired interfaces, as when Settings last opened.
     pub(crate) avb_interfaces: Vec<plaa_avb::Interface>,
     /// What is kept awake while something plays, and the hold on it when
@@ -372,6 +374,7 @@ impl Plaa {
             avb_snapshot: std::sync::Arc::default(),
             avb_feeding: None,
             avb_watched: (false, Vec::new()),
+            start_connect: None,
             avb_interfaces: Vec::new(),
             awake: None,
             media_window: None,
@@ -1913,6 +1916,16 @@ impl Plaa {
             Control::CastTo(renderer) => return self.cast_to(id, &renderer),
             Control::StopCasting => return self.stop_casting(id),
             Control::Menu(Menu::Cast, true) => self.look_for_renderers(),
+            // The start window's, which has no player to keep it.
+            Control::Menu(Menu::Connect, open)
+                if self
+                    .windows
+                    .get(&id)
+                    .is_some_and(|window| matches!(window.content, Content::Start)) =>
+            {
+                self.start_connect = open.then_some(id);
+                return Task::none();
+            }
             Control::Open => return self.perform(id, Action::Open),
             Control::Settings => return self.perform(id, Action::Settings),
             Control::Close => return window::close(id),
@@ -1943,6 +1956,9 @@ impl Plaa {
             }
             Control::AvbDisconnect(listener) => {
                 self.avb_disconnect(listener);
+                if let Some(player) = self.player_mut(id) {
+                    player.menu = None;
+                }
                 return Task::none();
             }
             Control::Visualizer(visualizer) => {
@@ -2200,7 +2216,13 @@ impl Plaa {
         };
         let close_button = !scramble_ui::desktop::draws_title_bars();
         let body: Element<'_, Message> = match &window.content {
-            Content::Start => start_view(id, close_button),
+            Content::Start => {
+                let connect = self
+                    .avb
+                    .as_ref()
+                    .map(|_| (self.avb_snapshot.clone(), self.start_connect == Some(id)));
+                start_view(id, close_button, connect)
+            }
             Content::Recorder(recorder) => self.recorder_view(id, recorder, close_button),
             Content::Player(player) => player_window::view(
                 player,
@@ -2674,7 +2696,14 @@ fn recent_addresses<'a>(
     )
 }
 
-fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
+/// The start window: what it can open and record, and, on an AVB
+/// network, the talkers to `connect` to, as the network stands and with
+/// its menu open or not.
+fn start_view(
+    id: window::Id,
+    close_button: bool,
+    connect: Option<(std::sync::Arc<plaa_avb::Snapshot>, bool)>,
+) -> Element<'static, Message> {
     // Each action's name and shortcut, in a row.
     let hints = |actions: &[Action]| -> Element<'static, Message> {
         let shown: Vec<Element<'static, Message>> = actions
@@ -2719,6 +2748,29 @@ fn start_view(id: window::Id, close_button: bool) -> Element<'static, Message> {
             Action::OpenAddress,
         ),
     ]);
+    // Connecting, after opening, its menu below it.
+    let opening = match connect {
+        Some((snapshot, open)) => {
+            let toggle = Message::Control(id, Control::Menu(Menu::Connect, !open));
+            let close = Message::Control(id, Control::Menu(Menu::Connect, false));
+            let anchor = scramble_ui::with_icon(
+                button::Kind::Tonal,
+                Icon::Cable,
+                crate::fl!("start-connect"),
+            )
+            .size(button::Size::Medium)
+            .on_press(toggle);
+            let menu = open.then(|| {
+                scramble_ui::dropdown::surface(crate::network::connect_entries(&snapshot), 0.0)
+                    .map(move |control| Message::Control(id, control))
+            });
+            let connect = scramble_ui::popover::popover(anchor, menu, close).close_on_choice();
+            scramble_ui::dir::row(vec![opening, connect.into()])
+                .spacing(12)
+                .into()
+        }
+        None => opening,
+    };
     let recording = buttons(vec![
         (
             button::Kind::Tonal,

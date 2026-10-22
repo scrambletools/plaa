@@ -45,6 +45,8 @@ usage-help =
 start-hint = Buka fail video atau audio, strim atau video web.
 start-open = Buka
 start-open-address = Buka Alamat
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Sambung
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -76,6 +78,7 @@ action-quality = Kualiti
 action-visualizer = Pengvisualan
 action-network = Audio Rangkaian
 action-cast = Hantar
+action-connect = Sambung
 action-assistant = Pembantu
 
 ## What a sound file shows under its cover
@@ -272,13 +275,34 @@ network-choose = Pilih listener untuk melihat cara ia menerima strimnya.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Dengar di sini
-network-no-talkers = Tiada talker pada rangkaian yang menghantar dalam format yang dapat dimainkan oleh plaa.
+network-no-sources = Tiada talker pada rangkaian yang menghantar dalam format yang dimainkan oleh plaa, atau boleh bertukar kepada format itu.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Dengar { $talker }
 network-listen-stop = Henti mendengar { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Tukar { $talker } kepada { $format } dan dengar
+network-listen-change-cuts-off = Tukar { $talker } kepada { $format } dan dengar, memutuskan { $count ->
+       *[other] { $count } listener lain
+    }
 network-listen-frames = { $frames } bingkai diterima
 network-listen-update-triib = Kemas kini triib untuk mendengar di sini: plaa hanya memainkan apa yang memang sampai ke komputer ini.
 network-listen-lite = Port menjalankan AVB Lite, yang tidak menempah strim: plaa hanya memainkan apa yang memang sampai ke komputer ini.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Mencari talker…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Hidupkan “Hantar apa yang dimainkan” dalam Tetapan untuk mendengar talker di sini.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa tidak dapat mendengar di sini: { $reason }
+connect-sending = Menghantar dalam format yang dimainkan oleh plaa
+connect-changing = Bertukar kepada format yang dimainkan oleh plaa
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, dalam { $format }
+connect-change-cuts-off = { $talker }, dalam { $format }, memutuskan { $count ->
+       *[other] { $count } listener lain
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

@@ -3,7 +3,8 @@
 //! takes plaa's stream as it is; stop, where it plays it; or, where it is
 //! in another format, a menu of the formats both share, to connect in.
 //! Under them, how the one chosen takes its stream; and the talkers plaa
-//! can listen to, playing their stream here.
+//! can listen to, playing their stream here, as the Connect menu offers
+//! them too.
 
 use std::sync::Arc;
 
@@ -225,9 +226,9 @@ fn row_for<'a>(
         .into()
 }
 
-/// The talkers plaa's own input can take as they send, each with one
-/// button: listen, or stop where it listens; and how the input takes its
-/// stream.
+/// The talkers plaa's own input can take, each with one button: listen,
+/// change its format and listen, or stop where it listens; and how the
+/// input takes its stream.
 fn listen_here<'a>(snapshot: &Snapshot, own: &Found) -> Element<'a, Control> {
     let mut content = column![component::section(crate::fl!("network-listen-section"))].spacing(4);
     let Some(input) = own.inputs.first() else {
@@ -243,23 +244,28 @@ fn listen_here<'a>(snapshot: &Snapshot, own: &Found) -> Element<'a, Control> {
         }
         None => {}
     }
-    let talkers = talkers(snapshot, input);
-    if talkers.is_empty() {
-        content = content.push(note(crate::fl!("network-no-talkers")));
+    let sources = sources(snapshot, input);
+    if sources.is_empty() {
+        content = content.push(note(crate::fl!("network-no-sources")));
     }
-    for (end, name) in talkers {
-        let action = if input.bound == Some(end) {
-            component::tool(
+    for source in sources {
+        let name = source.name.clone();
+        let action = match source.change {
+            _ if input.bound == Some(source.end) => component::tool(
                 Icon::Stop,
                 crate::fl!("network-listen-stop", talker = name.clone()),
                 Some(Control::AvbDisconnect(ours)),
-            )
-        } else {
-            component::tool(
+            ),
+            None => component::tool(
                 Icon::VolumeUp,
                 crate::fl!("network-listen-to", talker = name.clone()),
-                Some(Control::AvbConnect(end, ours, None)),
-            )
+                Some(Control::AvbConnect(source.end, ours, None)),
+            ),
+            Some(format) => component::tool(
+                Icon::ChangeCircle,
+                change_tip(&source, format),
+                Some(Control::AvbConnect(source.end, ours, Some(format))),
+            ),
         };
         content = content.push(
             container(
@@ -289,24 +295,199 @@ fn listen_here<'a>(snapshot: &Snapshot, own: &Found) -> Element<'a, Control> {
     content.into()
 }
 
-/// The outputs of other entities that send in a format plaa's input
-/// takes, as they send now, named as listeners are.
-fn talkers(snapshot: &Snapshot, input: &Stream) -> Vec<(End, String)> {
+/// A talker's output plaa's input can take: as it sends now, or once it
+/// changes to `change`, which cuts off the `others` that take it now.
+struct Source {
+    end: End,
+    name: String,
+    change: Option<StreamFormat>,
+    others: usize,
+}
+
+/// The outputs of other entities plaa's `input` can take, named as
+/// listeners are: those sending in a format it takes, and those that can
+/// change to one.
+fn sources(snapshot: &Snapshot, input: &Stream) -> Vec<Source> {
     let mut found = Vec::new();
     for entity in snapshot.entities.iter().filter(|entity| !entity.own) {
-        let able: Vec<&Stream> = entity
+        let able: Vec<(&Stream, Option<StreamFormat>)> = entity
             .outputs
             .iter()
-            .filter(|output| input.formats.contains(&output.format))
+            .filter_map(|output| {
+                if input.formats.contains(&output.format) {
+                    Some((output, None))
+                } else {
+                    change_to(output, input).map(|format| (output, Some(format)))
+                }
+            })
             .collect();
-        for output in &able {
-            found.push((
-                (entity.id, output.index),
-                name(entity, output, able.len() > 1),
-            ));
+        for &(output, change) in &able {
+            let end = (entity.id, output.index);
+            found.push(Source {
+                end,
+                name: name(entity, output, able.len() > 1),
+                change,
+                others: listening(snapshot, end),
+            });
         }
     }
     found
+}
+
+/// The format a talker's output changes to for plaa's input: of those
+/// both take, one of as many channels as it sends now where there is
+/// one, else the first plaa's input lists.
+fn change_to(output: &Stream, input: &Stream) -> Option<StreamFormat> {
+    let shared = || {
+        input
+            .formats
+            .iter()
+            .copied()
+            .filter(|format| output.formats.contains(format))
+    };
+    let channels = output.format.channels();
+    shared()
+        .find(|format| format.channels() == channels)
+        .or_else(|| shared().next())
+}
+
+/// How many inputs of entities other than plaa take a talker's output.
+fn listening(snapshot: &Snapshot, talker: End) -> usize {
+    snapshot
+        .entities
+        .iter()
+        .filter(|entity| !entity.own)
+        .flat_map(|entity| &entity.inputs)
+        .filter(|input| input.bound == Some(talker))
+        .count()
+}
+
+/// Listening to a talker that changes its format first, and what that
+/// cuts off.
+fn change_label(source: &Source, format: StreamFormat) -> String {
+    let talker = source.name.clone();
+    let format = format.to_string();
+    match source.others {
+        0 => crate::fl!("connect-change", talker = talker, format = format),
+        count => crate::fl!(
+            "connect-change-cuts-off",
+            talker = talker,
+            format = format,
+            count = count
+        ),
+    }
+}
+
+/// Listening to a talker that changes its format first, and what that
+/// cuts off, as the sheet's button says.
+fn change_tip(source: &Source, format: StreamFormat) -> String {
+    let talker = source.name.clone();
+    let format = format.to_string();
+    match source.others {
+        0 => crate::fl!("network-listen-change", talker = talker, format = format),
+        count => crate::fl!(
+            "network-listen-change-cuts-off",
+            talker = talker,
+            format = format,
+            count = count
+        ),
+    }
+}
+
+/// The Connect menu: what plaa's input takes now, and stopping it; then
+/// the talkers it can take, those sending in a format it plays before
+/// those that change format for it.
+pub fn connect_entries(snapshot: &Snapshot) -> Vec<Entry<Control>> {
+    let mut entries = Vec::new();
+    // Its input is its entity's, which sends too.
+    match &snapshot.talker {
+        TalkerState::Off => {
+            entries.push(Entry::note(crate::fl!("connect-off")));
+            return entries;
+        }
+        TalkerState::Blocked(why) => {
+            entries.push(Entry::note(crate::fl!(
+                "connect-blocked",
+                reason = why.clone()
+            )));
+            return entries;
+        }
+        _ => {}
+    }
+    let own = snapshot.entities.iter().find(|entity| entity.own);
+    let Some((own, input)) = own.and_then(|own| Some((own, own.inputs.first()?))) else {
+        entries.push(Entry::note(crate::fl!("connect-looking")));
+        return entries;
+    };
+    let ours = (own.id, input.index);
+    match snapshot.listen_blocked {
+        Some(ListenBlocked::OldService) => {
+            entries.push(Entry::note(crate::fl!("network-listen-update-triib")));
+        }
+        Some(ListenBlocked::AvbLite) => {
+            entries.push(Entry::note(crate::fl!("network-listen-lite")));
+        }
+        None => {}
+    }
+    if let Some(talker) = input.bound {
+        entries.push(
+            Entry::item(
+                crate::fl!(
+                    "network-listen-stop",
+                    talker = talker_name(snapshot, talker)
+                ),
+                Control::AvbDisconnect(ours),
+            )
+            .icon(Icon::Stop),
+        );
+        entries.push(Entry::note(status(snapshot, input)));
+        entries.push(Entry::divider());
+    }
+    let (sending, changing): (Vec<Source>, Vec<Source>) = sources(snapshot, input)
+        .into_iter()
+        .partition(|source| source.change.is_none());
+    if sending.is_empty() && changing.is_empty() {
+        entries.push(Entry::note(crate::fl!("network-no-sources")));
+    }
+    if !sending.is_empty() && !changing.is_empty() {
+        entries.push(Entry::heading(crate::fl!("connect-sending")));
+    }
+    for source in sending {
+        let picked = input.bound == Some(source.end);
+        entries.push(
+            Entry::item(source.name, Control::AvbConnect(source.end, ours, None)).checked(picked),
+        );
+    }
+    if !changing.is_empty() {
+        entries.push(Entry::heading(crate::fl!("connect-changing")));
+    }
+    for source in changing {
+        let Some(format) = source.change else {
+            continue;
+        };
+        entries.push(Entry::item(
+            change_label(&source, format),
+            Control::AvbConnect(source.end, ours, Some(format)),
+        ));
+    }
+    if let Some(failure) = &snapshot.failure {
+        entries.push(Entry::note(crate::fl!(
+            "network-failed",
+            reason = failure.clone()
+        )));
+    }
+    entries
+}
+
+/// Whether plaa's input takes a talker's stream, for the Connect button
+/// to show it in use.
+pub fn listening_here(snapshot: &Snapshot) -> bool {
+    snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.own)
+        .and_then(|own| own.inputs.first())
+        .is_some_and(|input| input.bound.is_some())
 }
 
 /// How a listener's input takes its stream: from which talker and how
@@ -535,6 +716,124 @@ mod tests {
         assert_eq!(found[0].shared, [STEREO, EIGHT]);
         assert_eq!(found[1].shared, [EIGHT]);
         assert_eq!(found[2].shared, [STEREO_24]);
+    }
+
+    const STEREO_12: StreamFormat = StreamFormat(0x0205_0220_0080_c000);
+    const EIGHT_12: StreamFormat = StreamFormat(0x0205_0220_0200_c000);
+
+    /// plaa, listening on an input that takes `formats`, and the talkers
+    /// around it: one sending in a format plaa takes, two that can change
+    /// to one, the second of eight channels, one that cannot, and a
+    /// listener on the first that changes.
+    fn network(formats: &[StreamFormat]) -> Snapshot {
+        let mut plaa = entity(9, "plaa", vec![stream(0, "Listen", STEREO, formats)]);
+        plaa.own = true;
+        plaa.outputs = vec![stream(0, "Playback", STEREO, &[STEREO])];
+        let mut mic = entity(1, "Mic", Vec::new());
+        mic.outputs = vec![stream(0, "Out", STEREO, &[STEREO])];
+        let mut synthia = entity(2, "Synthia", Vec::new());
+        synthia.outputs = vec![stream(0, "Out", STEREO_12, &[STEREO_12, STEREO, EIGHT])];
+        let mut desk = entity(3, "Desk", Vec::new());
+        desk.outputs = vec![stream(0, "Main", EIGHT_12, &[EIGHT_12, STEREO, EIGHT])];
+        let mut old = entity(4, "Old", Vec::new());
+        old.outputs = vec![stream(0, "Out", AM824, &[AM824])];
+        let mut amp = entity(5, "Amp", vec![stream(0, "In", STEREO_12, &[STEREO_12])]);
+        amp.inputs[0].bound = Some((EntityId(2), 0));
+        Snapshot {
+            entities: vec![plaa, mic, synthia, desk, old, amp],
+            talker: TalkerState::Waiting,
+            ..Snapshot::default()
+        }
+    }
+
+    #[test]
+    fn talkers_that_can_change_to_a_format_plaa_takes_are_offered() {
+        let snapshot = network(&[STEREO, STEREO_24, EIGHT]);
+        let input = &snapshot.entities[0].inputs[0];
+        let found = sources(&snapshot, input);
+        let names: Vec<&str> = found.iter().map(|source| source.name.as_str()).collect();
+        // plaa's own and the AM824-only one are left out.
+        assert_eq!(names, ["Mic", "Synthia", "Desk"]);
+        assert_eq!(found[0].change, None);
+        // Each changes to one of as many channels as it sends.
+        assert_eq!(found[1].change, Some(STEREO));
+        assert_eq!(found[2].change, Some(EIGHT));
+        // The amp listens to Synthia, and would be cut off.
+        assert_eq!(
+            found.iter().map(|source| source.others).collect::<Vec<_>>(),
+            [0, 1, 0]
+        );
+        // Without eight channels, the first both take.
+        let snapshot = network(&[STEREO_24, STEREO]);
+        let input = &snapshot.entities[0].inputs[0];
+        assert_eq!(sources(&snapshot, input)[2].change, Some(STEREO));
+    }
+
+    /// The menu's entries as text: items with a mark where checked, and
+    /// headings and notes in brackets.
+    fn shown(entries: &[Entry<Control>]) -> Vec<String> {
+        entries
+            .iter()
+            .map(|entry| match entry {
+                Entry::Item { label, checked, .. } if *checked => format!("* {label}"),
+                Entry::Item { label, .. } => label.clone(),
+                Entry::Heading(label) => format!("[{label}]"),
+                Entry::Note(note) => format!("({note})"),
+                Entry::Divider => "-".into(),
+                _ => "?".into(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn connect_menu_offers_talkers_and_stopping_the_one_heard() {
+        let mut snapshot = network(&[STEREO, STEREO_24, EIGHT]);
+        assert_eq!(
+            shown(&connect_entries(&snapshot)),
+            [
+                "[Sending in a format plaa plays]",
+                "Mic",
+                "[Changing to a format plaa plays]",
+                "Synthia, in AAF 48 kHz, 2 ch, 32-bit, cutting off its other listener",
+                "Desk, in AAF 48 kHz, 8 ch, 32-bit",
+            ]
+        );
+        snapshot.entities[0].inputs[0].bound = Some((EntityId(1), 0));
+        let entries = connect_entries(&snapshot);
+        assert_eq!(
+            shown(&entries)[..4],
+            [
+                "Stop listening to Mic",
+                "(From Mic)",
+                "-",
+                "[Sending in a format plaa plays]"
+            ]
+        );
+        assert_eq!(shown(&entries)[4], "* Mic");
+        assert!(listening_here(&snapshot));
+        // Choosing one that changes sets its format as it connects.
+        let Some(Entry::Item { message, .. }) = entries.last() else {
+            panic!("no item last");
+        };
+        assert!(matches!(
+            message,
+            Control::AvbConnect((EntityId(3), 0), (EntityId(9), 0), Some(EIGHT))
+        ));
+        // Without an entity, as when it sends nothing.
+        assert_eq!(
+            shown(&connect_entries(&Snapshot::default())),
+            ["(Turn on Send what plays in Settings to listen to talkers here.)"]
+        );
+        // Before plaa's own entity is found.
+        let looking = Snapshot {
+            talker: TalkerState::Waiting,
+            ..Snapshot::default()
+        };
+        assert_eq!(
+            shown(&connect_entries(&looking)),
+            ["(Looking for talkers…)"]
+        );
+        assert!(!listening_here(&looking));
     }
 
     /// A listener's stream info, as GET_STREAM_INFO would carry it.

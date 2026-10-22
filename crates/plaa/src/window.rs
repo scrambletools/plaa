@@ -57,6 +57,8 @@ pub enum Menu {
     Visualizer,
     /// The formats a listener and plaa share, to play there in.
     AvbFormats((plaa_avb::EntityId, u16)),
+    /// The talkers on the AVB network to listen to.
+    Connect,
     /// The renderers to cast to.
     Cast,
 }
@@ -578,8 +580,9 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
     )
 }
 
-/// The toolbar: open, and the window's tools at the other end. The file's
-/// name is the window's title, as tools would cover it in a narrow window.
+/// The toolbar: open, and connect while on an AVB network, and the
+/// window's tools at the other end. The file's name is the window's
+/// title, as tools would cover it in a narrow window.
 fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
     let open = dropdown::icon_menu(
         Icon::FolderOpen,
@@ -613,7 +616,11 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
     .open(window.menu == Some(Menu::Open), |open| {
         Control::Menu(Menu::Open, open)
     });
-    let mut tools = vec![open.into(), space().width(Fill).into()];
+    let mut tools = vec![open.into()];
+    if let Some(snapshot) = &context.avb {
+        tools.push(connect_menu(window, snapshot));
+    }
+    tools.push(space().width(Fill).into());
     if let Some(menu) = edit_menu(window) {
         tools.push(menu);
     }
@@ -1037,6 +1044,22 @@ fn visualizer_menu(window: &PlayerWindow) -> Element<'_, Control> {
         .tip(crate::fl!("action-visualizer"))
         .open(window.menu == Some(Menu::Visualizer), |open| {
             Control::Menu(Menu::Visualizer, open)
+        })
+        .into()
+}
+
+/// The talkers on the AVB network plaa can listen to, the one it listens
+/// to checked, and stopping.
+fn connect_menu<'a>(
+    window: &'a PlayerWindow,
+    snapshot: &plaa_avb::Snapshot,
+) -> Element<'a, Control> {
+    dropdown::icon_menu(Icon::Cable, crate::network::connect_entries(snapshot))
+        .size(button::Size::Small)
+        .tip(crate::fl!("action-connect"))
+        .selected(crate::network::listening_here(snapshot))
+        .open(window.menu == Some(Menu::Connect), |open| {
+            Control::Menu(Menu::Connect, open)
         })
         .into()
 }

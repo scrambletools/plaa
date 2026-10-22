@@ -44,6 +44,8 @@ usage-help =
 start-hint = Open a video or audio file, a stream or a web video.
 start-open = Open
 start-open-address = Open Address
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Connect
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = Quality
 action-visualizer = Visualizer
 action-network = Network Audio
 action-cast = Cast
+action-connect = Connect
 action-assistant = Assistant
 
 ## What a sound file shows under its cover
@@ -271,13 +274,36 @@ network-choose = Choose a listener to see how it takes its stream.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Listen here
-network-no-talkers = No talker on the network sends in a format plaa can play.
+network-no-sources = No talker on the network sends in a format plaa plays, or can change to one.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Listen to { $talker }
 network-listen-stop = Stop listening to { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Change { $talker } to { $format } and listen
+network-listen-change-cuts-off = Change { $talker } to { $format } and listen, cutting off { $count ->
+        [one] its other listener
+       *[other] its { $count } other listeners
+    }
 network-listen-frames = { $frames } frames received
 network-listen-update-triib = Update triib to listen here: plaa plays only what reaches this computer anyway.
 network-listen-lite = The port runs AVB Lite, which reserves no streams: plaa plays only what reaches this computer anyway.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Looking for talkers…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Turn on Send what plays in Settings to listen to talkers here.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa cannot listen here: { $reason }
+connect-sending = Sending in a format plaa plays
+connect-changing = Changing to a format plaa plays
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, in { $format }
+connect-change-cuts-off = { $talker }, in { $format }, cutting off { $count ->
+        [one] its other listener
+       *[other] its { $count } other listeners
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

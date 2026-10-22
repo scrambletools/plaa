@@ -44,6 +44,8 @@ usage-help =
 start-hint = Mở tệp video hoặc âm thanh, luồng hoặc video trên web.
 start-open = Mở
 start-open-address = Mở địa chỉ
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Kết nối
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -75,6 +77,7 @@ action-quality = Chất lượng
 action-visualizer = Hiệu ứng hình ảnh
 action-network = Âm thanh qua mạng
 action-cast = Truyền
+action-connect = Kết nối
 action-assistant = Trợ lý
 
 ## What a sound file shows under its cover
@@ -271,13 +274,34 @@ network-choose = Chọn một Listener để xem cách nó nhận luồng.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Nghe tại đây
-network-no-talkers = Không có Talker nào trên mạng gửi ở định dạng mà plaa có thể phát.
+network-no-sources = Không có Talker nào trên mạng gửi ở định dạng mà plaa phát, hoặc có thể chuyển sang định dạng đó.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Nghe { $talker }
 network-listen-stop = Dừng nghe { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Chuyển { $talker } sang { $format } và nghe
+network-listen-change-cuts-off = Chuyển { $talker } sang { $format } và nghe, ngắt { $count ->
+       *[other] { $count } Listener khác của nó
+    }
 network-listen-frames = Đã nhận { $frames } khung
 network-listen-update-triib = Hãy cập nhật triib để nghe ở đây: plaa chỉ phát những gì vốn đã đến được máy tính này.
 network-listen-lite = Cổng đang chạy AVB Lite, không đặt trước luồng nào: plaa chỉ phát những gì vốn đã đến được máy tính này.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Đang tìm Talker…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Hãy bật “Gửi nội dung đang phát” trong Cài đặt để nghe các Talker tại đây.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa không thể nghe tại đây: { $reason }
+connect-sending = Đang gửi ở định dạng mà plaa phát
+connect-changing = Chuyển sang định dạng mà plaa phát
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, ở { $format }
+connect-change-cuts-off = { $talker }, ở { $format }, ngắt { $count ->
+       *[other] { $count } Listener khác của nó
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

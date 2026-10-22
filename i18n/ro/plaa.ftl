@@ -44,6 +44,8 @@ usage-help =
 start-hint = Deschide un fișier video sau audio, un flux sau un videoclip de pe web.
 start-open = Deschide
 start-open-address = Deschide o adresă
+# Opens a list of the talkers on the AVB network to listen to.
+start-connect = Conectează
 
 ## Actions, as buttons, tooltips and menus name them
 
@@ -83,6 +85,7 @@ action-quality = Calitate
 action-visualizer = Vizualizator
 action-network = Audio în rețea
 action-cast = Proiectează
+action-connect = Conectează
 action-assistant = Asistent
 
 ## What a sound file shows under its cover
@@ -279,13 +282,38 @@ network-choose = Alege un receptor pentru a vedea cum își primește fluxul.
 # The section of talkers plaa can listen to, playing their stream on
 # this computer's sound output.
 network-listen-section = Ascultă aici
-network-no-talkers = Niciun emițător din rețea nu trimite într-un format pe care plaa îl poate reda.
+network-no-sources = Niciun emițător din rețea nu trimite într-un format pe care plaa îl redă și nici nu poate trece la unul.
 # $talker is a talker's name, or its name and its output's.
 network-listen-to = Ascultă { $talker }
 network-listen-stop = Nu mai asculta { $talker }
+# $format is a stream format, such as "AAF 48 kHz, 2 ch, 32-bit". The
+# talker's other listeners stop, as they do not take that format.
+network-listen-change = Comută { $talker } la { $format } și ascultă
+network-listen-change-cuts-off = Comută { $talker } la { $format } și ascultă, deconectând { $count ->
+        [one] celălalt receptor al său
+        [few] ceilalți { $count } receptori ai săi
+       *[other] ceilalți { $count } de receptori ai săi
+    }
 network-listen-frames = Cadre primite: { $frames }
 network-listen-update-triib = Actualizează triib pentru a asculta aici: plaa redă doar ce ajunge oricum la acest computer.
 network-listen-lite = Portul folosește AVB Lite, care nu rezervă fluxuri: plaa redă doar ce ajunge oricum la acest computer.
+
+# The Connect menu: the talkers on the AVB network plaa can listen to,
+# those sending in a format it plays, then those that change format.
+connect-looking = Se caută emițători…
+# plaa listens through its entity, which exists only while it sends.
+connect-off = Activează „Trimite ce se redă” în Configurări pentru a asculta emițători aici.
+# $reason is why plaa's entity cannot run, as network-blocked gives it.
+connect-blocked = plaa nu poate asculta aici: { $reason }
+connect-sending = Trimit într-un format pe care plaa îl redă
+connect-changing = Trec la un format pe care plaa îl redă
+# A talker that changes to $format for plaa, under connect-changing.
+connect-change = { $talker }, în { $format }
+connect-change-cuts-off = { $talker }, în { $format }, deconectând { $count ->
+        [one] celălalt receptor al său
+        [few] ceilalți { $count } receptori ai săi
+       *[other] ceilalți { $count } de receptori ai săi
+    }
 
 # The listener chosen: how its input takes its stream. A reservation is
 # the bandwidth the network sets aside for a stream.

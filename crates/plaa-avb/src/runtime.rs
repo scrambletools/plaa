@@ -50,11 +50,11 @@ const MOST_WAIT: Duration = Duration::from_millis(250);
 /// How often the inputs the windows detail are asked how they stand.
 const CHOSEN_EVERY: Duration = Duration::from_secs(1);
 
-/// How often each listener that sends no notifications is read again at
-/// most, while the windows list them, one in turn.
+/// How often each entity that sends no notifications is read again at
+/// most, while the windows list the network, one in turn.
 const LISTED_EVERY: Duration = Duration::from_secs(3);
 
-/// The shortest wait between two listeners read in turn, so many take
+/// The shortest wait between two entities read in turn, so many take
 /// longer each.
 const LISTED_STEP: Duration = Duration::from_millis(500);
 
@@ -97,7 +97,8 @@ pub(crate) enum Input {
     /// given, or the talker's.
     Connect(End, End, Option<StreamFormat>),
     Disconnect((EntityId, u16)),
-    /// What the windows show: the listeners, and the inputs detailed.
+    /// What the windows show: the talkers and listeners, and the inputs
+    /// detailed.
     Watch {
         listed: bool,
         chosen: Vec<End>,
@@ -249,10 +250,10 @@ struct Watch {
     /// The entities that sent the controller notifications, until they
     /// go or restart and must be registered with again.
     notifying: HashSet<EntityId>,
-    /// When the chosen inputs, and the last listener in turn, were asked.
+    /// When the chosen inputs, and the last entity in turn, were asked.
     chosen_at: Option<Duration>,
     listed_at: Option<Duration>,
-    /// Counts the listeners asked, to take the next in turn.
+    /// Counts the entities asked, to take the next in turn.
     turn: usize,
 }
 
@@ -743,24 +744,32 @@ impl Runtime {
             return;
         }
         let own = self.own_entity();
-        let listeners: Vec<(EntityId, Vec<u16>)> = self
+        // Their inputs, for the formats they take and what they listen to,
+        // and their outputs, for the formats they send in.
+        let entities: Vec<(EntityId, Vec<(DescriptorType, u16)>)> = self
             .controller
             .entities()
             .map(|discovered| discovered.entity_id())
             .filter(|&id| Some(id) != own && !self.watch.notifying.contains(&id))
             .filter_map(|id| {
-                let inputs: Vec<u16> = self
-                    .controller
-                    .model(id)?
-                    .streams(true)
-                    .filter(|stream| !stream.is_media_clock())
-                    .map(|stream| stream.index)
-                    .collect();
-                (!inputs.is_empty()).then_some((id, inputs))
+                let model = self.controller.model(id)?;
+                let streams: Vec<(DescriptorType, u16)> = [
+                    (true, DescriptorType::STREAM_INPUT),
+                    (false, DescriptorType::STREAM_OUTPUT),
+                ]
+                .into_iter()
+                .flat_map(|(input, kind)| {
+                    model
+                        .streams(input)
+                        .filter(|stream| !stream.is_media_clock())
+                        .map(move |stream| (kind, stream.index))
+                })
+                .collect();
+                (!streams.is_empty()).then_some((id, streams))
             })
             .collect();
         // However few, each is read again only so often.
-        let count = u32::try_from(listeners.len()).unwrap_or(u32::MAX);
+        let count = u32::try_from(entities.len()).unwrap_or(u32::MAX);
         if count == 0
             || !due(
                 self.watch.listed_at,
@@ -770,13 +779,13 @@ impl Runtime {
             return;
         }
         self.watch.listed_at = Some(since);
-        let (entity, inputs) = &listeners[self.watch.turn % listeners.len()];
+        let (entity, streams) = &entities[self.watch.turn % entities.len()];
         self.watch.turn = self.watch.turn.wrapping_add(1);
         self.controller
             .refresh_descriptor(now, *entity, DescriptorType::ENTITY, 0);
-        for &input in inputs {
+        for &(kind, index) in streams {
             self.controller
-                .refresh_descriptor(now, *entity, DescriptorType::STREAM_INPUT, input);
+                .refresh_descriptor(now, *entity, kind, index);
         }
     }
 
