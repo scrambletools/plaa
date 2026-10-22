@@ -14,7 +14,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use atdecc::controller::{self, CommandId, Controller, Event, Outcome};
-use atdecc::descriptor::DescriptorType;
+use atdecc::descriptor::{DescriptorType, SamplingRate};
 use atdecc::model::EntityModel;
 use atdecc::pdu::{self, Pdu};
 use atdecc::stream_format::StreamFormat;
@@ -37,11 +37,26 @@ const CONTROLLER_INSTANCE: u8 = 0xfc;
 /// A stream's end: an entity, and its stream output's or input's index.
 type End = (EntityId, u16);
 
-/// A step in connecting: a stream's new format, then the binding.
+/// A step in connecting: the talker's rate and format, the listener's
+/// following what it then sends, then the binding.
 #[derive(Debug, Clone, Copy)]
 enum Step {
+    /// An entity's audio unit at a rate, before a format at that rate.
+    Rate(EntityId, u32),
     Format(EntityId, DescriptorType, u16, StreamFormat),
+    /// The listener changes, where it must, to its format that takes the
+    /// talker's stream as the talker sends it now, whatever it was asked.
+    Follow(End, End),
     Bind(End, End),
+}
+
+/// Why a command did not do what it asked, as Network Audio says it.
+fn failure(outcome: Outcome) -> String {
+    match outcome {
+        Outcome::Refused(refusal) => format!("refused: {refusal:?}"),
+        Outcome::NoResponse => "no response".into(),
+        Outcome::NotPossible | Outcome::Done => "not possible".into(),
+    }
 }
 
 /// The longest the thread waits without looking at its timers.
@@ -482,6 +497,20 @@ impl Runtime {
             && wanted != *current
             && formats.contains(&wanted)
         {
+            // At another rate than the talker runs at, its audio unit
+            // goes there first, as controllers change rates.
+            if let Some(rate) = wanted.sample_rate()
+                && let Some(unit) = self
+                    .controller
+                    .model(talker.0)
+                    .and_then(|model| model.audio_units().next())
+                && unit.current_sampling_rate.base_frequency() != rate
+                && unit
+                    .sampling_rates()
+                    .any(|offered| offered.base_frequency() == rate)
+            {
+                steps.push_back(Step::Rate(talker.0, rate));
+            }
             steps.push_back(Step::Format(
                 talker.0,
                 DescriptorType::STREAM_OUTPUT,
@@ -489,39 +518,66 @@ impl Runtime {
                 wanted,
             ));
         }
-        // The listener takes it as it is, or changes to the format of its
-        // own that takes it, the talker's own where it has it, as one that
-        // takes up to as many channels takes fewer too.
-        if let (Some(wanted), Some((current, formats))) =
-            (wanted, stream(listener.0, true, listener.1))
-            && !wanted.suits(current)
-            && let Some(taking) = formats
-                .iter()
-                .copied()
-                .find(|format| *format == wanted)
-                .or_else(|| formats.iter().copied().find(|format| wanted.suits(*format)))
-        {
-            steps.push_back(Step::Format(
-                listener.0,
-                DescriptorType::STREAM_INPUT,
-                listener.1,
-                taking,
-            ));
-        }
+        // The listener follows once the talker has answered, as it may
+        // send in another format than it was asked.
+        steps.push_back(Step::Follow(talker, listener));
         steps.push_back(Step::Bind(talker, listener));
         self.next_step(now, steps);
     }
 
+    /// The listener's format that takes the talker's stream as the talker
+    /// sends it now, the talker's own where it has it, where the listener
+    /// must change to it.
+    fn follow(&self, talker: End, listener: End) -> Option<Step> {
+        let format = |entity: EntityId, input: bool, index: u16| {
+            let model = self.controller.model(entity)?;
+            let stream = model.streams(input).find(|stream| stream.index == index)?;
+            Some((stream.current_format, stream.formats().collect::<Vec<_>>()))
+        };
+        let (sent, _) = format(talker.0, false, talker.1)?;
+        let (current, formats) = format(listener.0, true, listener.1)?;
+        if sent.suits(current) {
+            return None;
+        }
+        let taking = formats
+            .iter()
+            .copied()
+            .find(|format| *format == sent)
+            .or_else(|| formats.iter().copied().find(|format| sent.suits(*format)))?;
+        Some(Step::Format(
+            listener.0,
+            DescriptorType::STREAM_INPUT,
+            listener.1,
+            taking,
+        ))
+    }
+
     /// Sends the first of `steps`, keeping the rest for when it is done.
     fn next_step(&mut self, now: Instant, mut steps: VecDeque<Step>) {
+        // Following the talker asks nothing where the listener takes its
+        // stream already.
+        while let Some(Step::Follow(talker, listener)) = steps.front().copied() {
+            steps.pop_front();
+            if let Some(step) = self.follow(talker, listener) {
+                steps.push_front(step);
+            }
+        }
         let Some(step) = steps.pop_front() else {
             return;
         };
         let command = match step {
+            Step::Rate(entity, rate) => self.controller.set_sampling_rate(
+                now,
+                entity,
+                DescriptorType::AUDIO_UNIT,
+                0,
+                SamplingRate(rate),
+            ),
             Step::Format(entity, descriptor_type, index, format) => self
                 .controller
                 .set_stream_format(now, entity, descriptor_type, index, format),
             Step::Bind(talker, listener) => self.controller.connect(now, talker, listener),
+            Step::Follow(..) => return,
         };
         if !steps.is_empty() {
             self.pending.insert(command, steps);
@@ -587,17 +643,17 @@ impl Runtime {
         match event {
             Event::CommandFinished(command, outcome) => {
                 if let Some(steps) = self.pending.remove(&command) {
-                    // A format is set, or could not be: on either way, as
-                    // the listener may still take the stream.
+                    // A rate or format is set, or could not be: said where
+                    // not, and on either way, as the listener follows what
+                    // the talker sends.
+                    if outcome != Outcome::Done {
+                        self.failure = Some(failure(outcome));
+                    }
                     self.next_step(now, steps);
-                    return false;
+                    return outcome != Outcome::Done;
                 }
                 if outcome != Outcome::Done {
-                    self.failure = Some(match outcome {
-                        Outcome::Refused(refusal) => format!("refused: {refusal:?}"),
-                        Outcome::NoResponse => "no response".into(),
-                        Outcome::NotPossible | Outcome::Done => "not possible".into(),
-                    });
+                    self.failure = Some(failure(outcome));
                 }
                 true
             }
