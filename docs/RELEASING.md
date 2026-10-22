@@ -177,9 +177,18 @@ with Microsoft's Azure Artifact Signing once the repository variables
 `AZURE_CERTIFICATE_PROFILE` are set, signing in with GitHub's OpenID
 Connect token as the environment `release`, as triib's does
 (`docs/RELEASING.md` there): the signing account, identity validation
-and certificate profile can be shared, and plaa needs an app
-registration of its own, with a federated credential for this
-repository's `release` environment.
+and certificate profile are shared, and plaa has an app registration of
+its own, whose ID is `AZURE_CLIENT_ID`, with plaa.run as its publisher
+domain, verified by `site/.well-known/microsoft-identity-association.json`.
+Its federated credential has the issuer
+`https://token.actions.githubusercontent.com`, the audience
+`api://AzureADTokenExchange` and the subject
+`repo:scrambletools@339924107/plaa@1424990663:environment:release`.
+GitHub puts the organization's and repository's IDs in the subject, so
+the portal's GitHub Actions scenario, which leaves them out, does not
+match; the azure/login step prints the subject a run presents. The app
+holds the Artifact Signing Certificate Profile Signer role on the
+certificate profile.
 
 ## macOS signing
 
