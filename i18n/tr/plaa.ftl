@@ -136,6 +136,20 @@ info-channels = Kanallar
 info-language = Dil
 info-no-sound = Ses yok
 info-tags = Etiketler
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Konuşmacı
+info-stream = Akış
+# The talker's listeners other than plaa.
+info-other-listeners = Diğer dinleyiciler
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SR sınıfı
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Yeni bir biçim { $count ->
+        [one] konuşmacının diğer dinleyicisinin bağlantısını keser.
+       *[other] konuşmacının diğer { $count } dinleyicisinin bağlantısını keser.
+    }
 
 ## Dialogs
 
@@ -334,6 +348,9 @@ network-frames = Alınan çerçeveler
 network-out-of-sequence = Sırası bozuk çerçeveler
 # How often the stream stopped coming while it was taken.
 network-interrupted = Kesintiler
+# Frames that came after, or long before, their time to be played.
+network-late = Geç gelen çerçeveler
+network-early = Erken gelen çerçeveler
 network-entity-id = Varlık kimliği
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

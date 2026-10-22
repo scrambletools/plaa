@@ -135,6 +135,19 @@ info-channels = 聲道
 info-language = 語言
 info-no-sound = 無聲音
 info-tags = 標籤
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = 傳送端
+info-stream = 串流
+# The talker's listeners other than plaa.
+info-other-listeners = 其他接收端
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SR 類別
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = 新格式會中斷{ $count ->
+       *[other] 傳送端其他 { $count } 個接收端的連線。
+    }
 
 ## Dialogs
 
@@ -331,6 +344,9 @@ network-frames = 已接收的訊框
 network-out-of-sequence = 順序錯亂的訊框
 # How often the stream stopped coming while it was taken.
 network-interrupted = 中斷次數
+# Frames that came after, or long before, their time to be played.
+network-late = 延遲到達的訊框
+network-early = 過早到達的訊框
 network-entity-id = 實體 ID
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

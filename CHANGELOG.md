@@ -96,6 +96,11 @@ The first build.
   the talkers plaa can listen to, those sending in a format it plays and
   those that can change to one, which it changes as it connects, saying
   which other listeners that cuts off.
+- The stream plaa listens to plays in a window as a file plays, titled
+  by its talker, with plaa's volume, the visualizer and the media keys:
+  pausing stops listening and closing the window stops it too. The
+  inspector shows the talker and the stream as it comes, its counters,
+  and its format, which it changes to another plaa takes.
 - AVB Lite where no bridge reserves streams, as on a switch without AVB:
   plaa falls back from its own MSRP, or follows triib's entity service,
   declaring by CVU SRP, sending each listener it admits, up to 5, a

@@ -142,6 +142,20 @@ info-channels = Canais
 info-language = Idioma
 info-no-sound = Sem som
 info-tags = Etiquetas
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Talker
+info-stream = Stream
+# The talker's listeners other than plaa.
+info-other-listeners = Outros listeners
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Classe SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Um novo formato desliga { $count ->
+        [one] o outro listener do talker.
+       *[other] os outros { $count } listeners do talker.
+    }
 
 ## Dialogs
 
@@ -340,6 +354,9 @@ network-frames = Tramas recebidas
 network-out-of-sequence = Tramas fora de sequência
 # How often the stream stopped coming while it was taken.
 network-interrupted = Interrupções
+# Frames that came after, or long before, their time to be played.
+network-late = Tramas atrasadas
+network-early = Tramas adiantadas
 network-entity-id = ID da entidade
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

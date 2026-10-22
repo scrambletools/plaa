@@ -143,6 +143,20 @@ info-channels = Kanavat
 info-language = Kieli
 info-no-sound = Ei ääntä
 info-tags = Tunnisteet
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Lähetin
+info-stream = Virta
+# The talker's listeners other than plaa.
+info-other-listeners = Muut vastaanottimet
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SR-luokka
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Uusi muoto katkaisee { $count ->
+        [one] lähettimen toisen vastaanottimen yhteyden.
+       *[other] lähettimen { $count } muun vastaanottimen yhteydet.
+    }
 
 ## Dialogs
 
@@ -341,6 +355,9 @@ network-frames = Vastaanotetut kehykset
 network-out-of-sequence = Kehykset väärässä järjestyksessä
 # How often the stream stopped coming while it was taken.
 network-interrupted = Katkokset
+# Frames that came after, or long before, their time to be played.
+network-late = Myöhästyneet kehykset
+network-early = Ennenaikaiset kehykset
 network-entity-id = Entiteetin tunnus
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

@@ -146,6 +146,22 @@ info-channels = Kanały
 info-language = Język
 info-no-sound = Brak dźwięku
 info-tags = Tagi
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Nadajnik
+info-stream = Strumień
+# The talker's listeners other than plaa.
+info-other-listeners = Pozostałe odbiorniki
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Klasa SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Nowy format odłączy { $count ->
+        [one] pozostały odbiornik nadajnika.
+        [few] { $count } pozostałe odbiorniki nadajnika.
+        [many] { $count } pozostałych odbiorników nadajnika.
+       *[other] { $count } pozostałego odbiornika nadajnika.
+    }
 
 ## Dialogs
 
@@ -348,6 +364,9 @@ network-frames = Odebrane ramki
 network-out-of-sequence = Ramki poza kolejnością
 # How often the stream stopped coming while it was taken.
 network-interrupted = Przerwy
+# Frames that came after, or long before, their time to be played.
+network-late = Spóźnione ramki
+network-early = Przedwczesne ramki
 network-entity-id = ID jednostki
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

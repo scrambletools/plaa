@@ -144,6 +144,21 @@ info-channels = Canale
 info-language = Limbă
 info-no-sound = Fără sunet
 info-tags = Etichete
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Emițător
+info-stream = Flux
+# The talker's listeners other than plaa.
+info-other-listeners = Alți receptori
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Clasă SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Un format nou deconectează { $count ->
+        [one] celălalt receptor al emițătorului.
+        [few] ceilalți { $count } receptori ai emițătorului.
+       *[other] ceilalți { $count } de receptori ai emițătorului.
+    }
 
 ## Dialogs
 
@@ -344,6 +359,9 @@ network-frames = Cadre primite
 network-out-of-sequence = Cadre în afara secvenței
 # How often the stream stopped coming while it was taken.
 network-interrupted = Întreruperi
+# Frames that came after, or long before, their time to be played.
+network-late = Cadre întârziate
+network-early = Cadre premature
 network-entity-id = ID entitate
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

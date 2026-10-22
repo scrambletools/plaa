@@ -144,7 +144,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   Under them, the talkers plaa can listen to, playing their stream here.
 - **Connect**, beside Open: the talkers plaa can listen to, those sending
   in a format it plays, then those that can change to one, changed as
-  plaa connects, with the other listeners that would cut off.
+  plaa connects, with the other listeners that would cut off. The
+  stream plays in a window as a file plays, and its inspector shows the
+  talker and the stream as it comes, and changes its format.
 - **AVB Lite** where the switch has no AVB: plaa finds that no bridge
   reserves its streams and falls back, as triib's entity service does,
   sending each listener, up to five, a copy of its own, and playing a

@@ -478,6 +478,20 @@ pub fn connect_entries(snapshot: &Snapshot) -> Vec<Entry<Control>> {
     entries
 }
 
+/// How a talker's stream is known as a live source.
+pub fn live_id((entity, index): End) -> String {
+    format!("avb:{:016x}:{index}", entity.0)
+}
+
+/// The talker of a live source's id.
+pub fn talker_of(id: &str) -> Option<End> {
+    let (entity, index) = id.strip_prefix("avb:")?.split_once(':')?;
+    Some((
+        EntityId(u64::from_str_radix(entity, 16).ok()?),
+        index.parse().ok()?,
+    ))
+}
+
 /// Whether plaa's input takes a talker's stream, for the Connect button
 /// to show it in use.
 pub fn listening_here(snapshot: &Snapshot) -> bool {
@@ -489,21 +503,20 @@ pub fn listening_here(snapshot: &Snapshot) -> bool {
         .is_some_and(|input| input.bound.is_some())
 }
 
-/// How a listener's input takes its stream: from which talker and how
-/// that goes, in what format and what others it shares with plaa's
-/// output, and what it counted.
-fn details<'a>(snapshot: &Snapshot, listener: &Listener<'_>) -> Element<'a, Control> {
-    let field = |label: String, value: String| -> Element<'a, Control> {
-        column![
-            scramble_ui::styled(label, Type::LabelMedium).style(style::on_surface_variant),
-            scramble_ui::aligned(scramble_ui::styled(value, Type::BodyMedium)),
-        ]
-        .spacing(2)
-        .into()
-    };
-    let input = listener.input;
-    let mut content = column![component::section(listener.name.clone())].spacing(6);
-    content = content.push(field(crate::fl!("network-status"), status(snapshot, input)));
+/// A labelled value, as the details and the inspector show them.
+fn field<'a>(label: String, value: String) -> Element<'a, Control> {
+    column![
+        scramble_ui::styled(label, Type::LabelMedium).style(style::on_surface_variant),
+        scramble_ui::aligned(scramble_ui::styled(value, Type::BodyMedium)),
+    ]
+    .spacing(2)
+    .into()
+}
+
+/// How an input takes its stream: from which talker and how that goes,
+/// and whether its media clock is locked to it.
+fn taking<'a>(snapshot: &Snapshot, input: &Stream) -> Vec<Element<'a, Control>> {
+    let mut fields = vec![field(crate::fl!("network-status"), status(snapshot, input))];
     if input.bound.is_some()
         && let Some(locked) = media_locked(input)
     {
@@ -512,30 +525,31 @@ fn details<'a>(snapshot: &Snapshot, listener: &Listener<'_>) -> Element<'a, Cont
         } else {
             crate::fl!("network-not-locked")
         };
-        content = content.push(field(crate::fl!("network-media-clock"), clock));
+        fields.push(field(crate::fl!("network-media-clock"), clock));
     }
-    content = content.push(field(
-        crate::fl!("network-format"),
-        input.format.to_string(),
-    ));
-    let shared: Vec<String> = listener.shared.iter().map(ToString::to_string).collect();
-    content = content.push(field(crate::fl!("network-formats"), shared.join("\n")));
+    fields
+}
+
+/// The stream an input takes, as its stream info says, and what it
+/// counted.
+fn received<'a>(input: &Stream) -> Vec<Element<'a, Control>> {
+    let mut fields = Vec::new();
     if let Some(info) = input.info.filter(|_| input.bound.is_some()) {
         // Some entities have it without marking it valid.
         if info.settled() || info.stream_id.0 != 0 {
-            content = content.push(field(
+            fields.push(field(
                 crate::fl!("network-stream-id"),
                 info.stream_id.to_string(),
             ));
         }
         if info.flags.contains(StreamInfoFlags::STREAM_DEST_MAC_VALID) {
-            content = content.push(field(
+            fields.push(field(
                 crate::fl!("network-destination"),
                 info.stream_dest_mac.to_string(),
             ));
         }
         if info.registering() {
-            content = content.push(field(
+            fields.push(field(
                 crate::fl!("network-latency"),
                 crate::fl!(
                     "network-microseconds",
@@ -545,27 +559,151 @@ fn details<'a>(snapshot: &Snapshot, listener: &Listener<'_>) -> Element<'a, Cont
         }
     }
     if let Some(counters) = input.counters {
-        if let Some(frames) = counters.frames_rx {
-            content = content.push(field(crate::fl!("network-frames"), frames.to_string()));
-        }
-        if let Some(mismatches) = counters.seq_num_mismatch {
-            content = content.push(field(
+        let counted = [
+            (crate::fl!("network-frames"), counters.frames_rx),
+            (
                 crate::fl!("network-out-of-sequence"),
-                mismatches.to_string(),
-            ));
-        }
-        if let Some(interrupted) = counters.stream_interrupted {
-            content = content.push(field(
+                counters.seq_num_mismatch,
+            ),
+            (
                 crate::fl!("network-interrupted"),
-                interrupted.to_string(),
-            ));
+                counters.stream_interrupted,
+            ),
+            (crate::fl!("network-late"), counters.late_timestamp),
+            (crate::fl!("network-early"), counters.early_timestamp),
+        ];
+        for (label, count) in counted {
+            if let Some(count) = count {
+                fields.push(field(label, count.to_string()));
+            }
         }
     }
+    fields
+}
+
+/// How a listener's input takes its stream: from which talker and how
+/// that goes, in what format and what others it shares with plaa's
+/// output, and what it counted.
+fn details<'a>(snapshot: &Snapshot, listener: &Listener<'_>) -> Element<'a, Control> {
+    let input = listener.input;
+    let mut content = column![component::section(listener.name.clone())].spacing(6);
+    content = content.extend(taking(snapshot, input));
+    content = content.push(field(
+        crate::fl!("network-format"),
+        input.format.to_string(),
+    ));
+    let shared: Vec<String> = listener.shared.iter().map(ToString::to_string).collect();
+    content = content.push(field(crate::fl!("network-formats"), shared.join("\n")));
+    content = content.extend(received(input));
     content = content.push(field(
         crate::fl!("network-entity-id"),
         listener.end.0.to_string(),
     ));
     content.into()
+}
+
+/// The inspector of a window playing the stream plaa listens to from
+/// `talker`: the talker, and its other listeners, which a new format cuts
+/// off; how the stream comes, in a format to change to another both take;
+/// and what plaa's input counted.
+pub fn stream_inspector<'a>(
+    snapshot: &Snapshot,
+    talker: End,
+    menu: Option<Menu>,
+) -> Element<'a, Control> {
+    let mut content = column![component::section(crate::fl!("info-talker"))].spacing(6);
+    content = content.push(field(
+        crate::fl!("info-name"),
+        talker_name(snapshot, talker),
+    ));
+    content = content.push(field(crate::fl!("network-entity-id"), talker.0.to_string()));
+    let others = listening(snapshot, talker);
+    if others > 0 {
+        content = content.push(field(
+            crate::fl!("info-other-listeners"),
+            others.to_string(),
+        ));
+    }
+    let own = snapshot.entities.iter().find(|entity| entity.own);
+    let Some((own, input)) = own.and_then(|own| Some((own, own.inputs.first()?))) else {
+        return content.into();
+    };
+    let ours = (own.id, input.index);
+    let output = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.id == talker.0)
+        .and_then(|entity| {
+            entity
+                .outputs
+                .iter()
+                .find(|output| output.index == talker.1)
+        });
+    content = content.push(component::section(crate::fl!("info-stream")));
+    content = content.extend(taking(snapshot, input));
+    if let Some(output) = output {
+        content = content.push(format_menu(output, input, talker, ours, others, menu));
+        let class = if output.format.is_class_b() { "B" } else { "A" };
+        content = content.push(field(crate::fl!("info-sr-class"), class.to_owned()));
+    }
+    content = content.extend(received(input));
+    content.into()
+}
+
+/// The formats a talker offers that plaa's input takes, its own checked,
+/// each connecting in it, after a note of the listeners a new one cuts
+/// off.
+fn format_entries(
+    output: &Stream,
+    input: &Stream,
+    talker: End,
+    ours: End,
+    others: usize,
+) -> Vec<Entry<Control>> {
+    let mut entries = Vec::new();
+    if others > 0 {
+        entries.push(Entry::note(crate::fl!(
+            "info-format-cuts-off",
+            count = others
+        )));
+    }
+    for format in output.formats.iter().copied() {
+        if takes(input, format) {
+            entries.push(
+                Entry::item(
+                    format.to_string(),
+                    Control::AvbConnect(talker, ours, Some(format)),
+                )
+                .checked(format == output.format),
+            );
+        }
+    }
+    entries
+}
+
+/// The talker's format, and the others it offers that plaa's input takes,
+/// to change to, saying which listeners the change cuts off.
+fn format_menu<'a>(
+    output: &Stream,
+    input: &Stream,
+    talker: End,
+    ours: End,
+    others: usize,
+    menu: Option<Menu>,
+) -> Element<'a, Control> {
+    let entries = format_entries(output, input, talker, ours, others);
+    let picker = dropdown::menu(output.format.to_string(), entries)
+        .width(Fill)
+        .open(menu == Some(Menu::AvbFormats(ours)), move |open| {
+            Control::Menu(Menu::AvbFormats(ours), open)
+        });
+    column![
+        scramble_ui::styled(crate::fl!("network-format"), Type::LabelMedium)
+            .style(style::on_surface_variant),
+        picker,
+    ]
+    .spacing(2)
+    .into()
 }
 
 /// What an input takes, in words: nothing, or a talker's stream, and
@@ -766,6 +904,38 @@ mod tests {
         let snapshot = network(&[STEREO_24, STEREO]);
         let input = &snapshot.entities[0].inputs[0];
         assert_eq!(sources(&snapshot, input)[2].change, Some(STEREO));
+    }
+
+    #[test]
+    fn the_inspector_offers_the_talkers_formats_plaa_takes() {
+        let snapshot = network(&[STEREO, STEREO_24, EIGHT]);
+        let input = &snapshot.entities[0].inputs[0];
+        // Synthia, whose output the amp listens to, offers 12 samples a
+        // frame, which this input does not take.
+        let synthia = &snapshot.entities[2].outputs[0];
+        let entries = format_entries(synthia, input, (EntityId(2), 0), (EntityId(9), 0), 1);
+        assert_eq!(
+            shown(&entries),
+            [
+                "(A new format cuts off the talker's other listener.)",
+                "AAF 48 kHz, 2 ch, 32-bit",
+                "AAF 48 kHz, 8 ch, 32-bit",
+            ]
+        );
+        // The mic's own format is checked.
+        let mic = &snapshot.entities[1].outputs[0];
+        let entries = format_entries(mic, input, (EntityId(1), 0), (EntityId(9), 0), 0);
+        assert_eq!(shown(&entries), ["* AAF 48 kHz, 2 ch, 32-bit"]);
+    }
+
+    #[test]
+    fn a_talker_comes_back_from_its_live_source() {
+        let talker = (EntityId(0xe8f6_0ae8_16f5_0000), 0);
+        let id = live_id(talker);
+        assert_eq!(id, "avb:e8f60ae816f50000:0");
+        assert_eq!(talker_of(&id), Some(talker));
+        assert_eq!(talker_of("https://example.com/live"), None);
+        assert_eq!(talker_of("avb:nothex:0"), None);
     }
 
     #[test]

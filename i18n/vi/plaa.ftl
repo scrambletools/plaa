@@ -136,6 +136,19 @@ info-channels = Kênh
 info-language = Ngôn ngữ
 info-no-sound = Không có âm thanh
 info-tags = Thẻ
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Talker
+info-stream = Luồng
+# The talker's listeners other than plaa.
+info-other-listeners = Listener khác
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Lớp SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Định dạng mới sẽ ngắt { $count ->
+       *[other] { $count } Listener khác của Talker.
+    }
 
 ## Dialogs
 
@@ -332,6 +345,9 @@ network-frames = Khung đã nhận
 network-out-of-sequence = Khung sai thứ tự
 # How often the stream stopped coming while it was taken.
 network-interrupted = Số lần gián đoạn
+# Frames that came after, or long before, their time to be played.
+network-late = Khung đến trễ
+network-early = Khung đến sớm
 network-entity-id = ID thực thể
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

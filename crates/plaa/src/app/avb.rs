@@ -197,7 +197,7 @@ impl Plaa {
     fn live_talker(&self, id: window::Id) -> Option<End> {
         let player = self.windows.get(&id)?.player()?;
         match player.source() {
-            Source::Live { id, .. } => talker_of(id),
+            Source::Live { id, .. } => crate::network::talker_of(id),
             _ => None,
         }
     }
@@ -238,7 +238,7 @@ impl Plaa {
             return Task::none();
         }
         let source = Source::Live {
-            id: live_id(talker),
+            id: crate::network::live_id(talker),
             name: crate::network::talker_name(&self.avb_snapshot, talker),
         };
         if let Some((id, _)) = playing.first() {
@@ -291,20 +291,6 @@ impl Plaa {
     }
 }
 
-/// How a talker's stream is known as a live source.
-fn live_id((entity, index): End) -> String {
-    format!("avb:{:016x}:{index}", entity.0)
-}
-
-/// The talker of a live source's id.
-fn talker_of(id: &str) -> Option<End> {
-    let (entity, index) = id.strip_prefix("avb:")?.split_once(':')?;
-    Some((
-        EntityId(u64::from_str_radix(entity, 16).ok()?),
-        index.parse().ok()?,
-    ))
-}
-
 /// plaa's entity name, with the computer's name where it can be read.
 fn default_name() -> String {
     let computer = std::fs::read_to_string("/proc/sys/kernel/hostname")
@@ -315,20 +301,5 @@ fn default_name() -> String {
     match computer {
         Some(computer) => crate::fl!("avb-default-name", computer = computer),
         None => "plaa".to_owned(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_talker_comes_back_from_its_live_source() {
-        let talker = (EntityId(0xe8f6_0ae8_16f5_0000), 0);
-        let id = live_id(talker);
-        assert_eq!(id, "avb:e8f60ae816f50000:0");
-        assert_eq!(talker_of(&id), Some(talker));
-        assert_eq!(talker_of("https://example.com/live"), None);
-        assert_eq!(talker_of("avb:nothex:0"), None);
     }
 }

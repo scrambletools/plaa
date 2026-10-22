@@ -146,6 +146,22 @@ info-channels = Kanály
 info-language = Jazyk
 info-no-sound = Bez zvuku
 info-tags = Štítky
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Vysílač
+info-stream = Stream
+# The talker's listeners other than plaa.
+info-other-listeners = Další přijímače
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Třída SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Nový formát odpojí { $count ->
+        [one] další přijímač vysílače.
+        [few] { $count } další přijímače vysílače.
+        [many] { $count } dalšího přijímače vysílače.
+       *[other] { $count } dalších přijímačů vysílače.
+    }
 
 ## Dialogs
 
@@ -348,6 +364,9 @@ network-frames = Přijaté rámce
 network-out-of-sequence = Rámce mimo pořadí
 # How often the stream stopped coming while it was taken.
 network-interrupted = Přerušení
+# Frames that came after, or long before, their time to be played.
+network-late = Opožděné rámce
+network-early = Předčasné rámce
 network-entity-id = ID entity
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

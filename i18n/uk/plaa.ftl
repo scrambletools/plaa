@@ -146,6 +146,22 @@ info-channels = Канали
 info-language = Мова
 info-no-sound = Без звуку
 info-tags = Теги
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Передавач
+info-stream = Потік
+# The talker's listeners other than plaa.
+info-other-listeners = Інші приймачі
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Клас SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Новий формат відключить { $count ->
+        [one] { $count } інший приймач передавача.
+        [few] { $count } інші приймачі передавача.
+        [many] { $count } інших приймачів передавача.
+       *[other] { $count } іншого приймача передавача.
+    }
 
 ## Dialogs
 
@@ -348,6 +364,9 @@ network-frames = Отримано кадрів
 network-out-of-sequence = Кадри поза послідовністю
 # How often the stream stopped coming while it was taken.
 network-interrupted = Переривання
+# Frames that came after, or long before, their time to be played.
+network-late = Запізнілі кадри
+network-early = Передчасні кадри
 network-entity-id = ID сутності
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

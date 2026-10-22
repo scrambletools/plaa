@@ -150,6 +150,24 @@ info-channels = القنوات
 info-language = اللغة
 info-no-sound = لا يوجد صوت
 info-tags = الوسوم
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = المُرسِل
+info-stream = التدفق
+# The talker's listeners other than plaa.
+info-other-listeners = المستقبِلات الأخرى
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = فئة SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = يفصل التنسيق الجديد { $count ->
+        [zero] { $count } مستقبِل آخر للمُرسِل.
+        [one] المستقبِل الآخر للمُرسِل.
+        [two] المستقبِلَين الآخرَين للمُرسِل.
+        [few] { $count } مستقبِلات أخرى للمُرسِل.
+        [many] { $count } مستقبِلًا آخر للمُرسِل.
+       *[other] { $count } مستقبِل آخر للمُرسِل.
+    }
 
 ## Dialogs
 
@@ -356,6 +374,9 @@ network-frames = الإطارات المستلمة
 network-out-of-sequence = إطارات خارج التسلسل
 # How often the stream stopped coming while it was taken.
 network-interrupted = الانقطاعات
+# Frames that came after, or long before, their time to be played.
+network-late = الإطارات المتأخرة
+network-early = الإطارات المبكرة
 network-entity-id = معرّف الكيان
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

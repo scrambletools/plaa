@@ -136,6 +136,19 @@ info-channels = チャンネル
 info-language = 言語
 info-no-sound = サウンドなし
 info-tags = タグ
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = トーカー
+info-stream = ストリーム
+# The talker's listeners other than plaa.
+info-other-listeners = ほかのリスナー
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SRクラス
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = 新しいフォーマットにすると、{ $count ->
+       *[other] トーカーのほかのリスナー{ $count }台が切断されます。
+    }
 
 ## Dialogs
 
@@ -332,6 +345,9 @@ network-frames = 受信したフレーム
 network-out-of-sequence = 順序が乱れたフレーム
 # How often the stream stopped coming while it was taken.
 network-interrupted = 中断
+# Frames that came after, or long before, their time to be played.
+network-late = 遅れたフレーム
+network-early = 早すぎたフレーム
 network-entity-id = エンティティID
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

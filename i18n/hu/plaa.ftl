@@ -136,6 +136,20 @@ info-channels = Csatornák
 info-language = Nyelv
 info-no-sound = Nincs hang
 info-tags = Címkék
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Adó
+info-stream = Adatfolyam
+# The talker's listeners other than plaa.
+info-other-listeners = Többi vevő
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SR-osztály
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Az új formátum leválasztja { $count ->
+        [one] az adó másik vevőjét.
+       *[other] az adó többi { $count } vevőjét.
+    }
 
 ## Dialogs
 
@@ -334,6 +348,9 @@ network-frames = Fogadott keretek
 network-out-of-sequence = Sorrenden kívüli keretek
 # How often the stream stopped coming while it was taken.
 network-interrupted = Megszakadások
+# Frames that came after, or long before, their time to be played.
+network-late = Késve érkezett keretek
+network-early = Túl korán érkezett keretek
 network-entity-id = Entitásazonosító
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

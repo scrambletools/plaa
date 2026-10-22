@@ -136,6 +136,20 @@ info-channels = کانال‌ها
 info-language = زبان
 info-no-sound = بدون صدا
 info-tags = برچسب‌ها
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = فرستنده
+info-stream = جریان
+# The talker's listeners other than plaa.
+info-other-listeners = گیرنده‌های دیگر
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = کلاس SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = قالب جدید { $count ->
+        [one] گیرندهٔ دیگر فرستنده را قطع می‌کند.
+       *[other] { $count } گیرندهٔ دیگر فرستنده را قطع می‌کند.
+    }
 
 ## Dialogs
 
@@ -334,6 +348,9 @@ network-frames = فریم‌های دریافت‌شده
 network-out-of-sequence = فریم‌های خارج از ترتیب
 # How often the stream stopped coming while it was taken.
 network-interrupted = وقفه‌ها
+# Frames that came after, or long before, their time to be played.
+network-late = فریم‌های دیررس
+network-early = فریم‌های زودرس
 network-entity-id = شناسهٔ موجودیت
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

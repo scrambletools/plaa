@@ -143,6 +143,20 @@ info-channels = சேனல்கள்
 info-language = மொழி
 info-no-sound = ஒலி இல்லை
 info-tags = குறிச்சொற்கள்
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Talker
+info-stream = Stream
+# The talker's listeners other than plaa.
+info-other-listeners = மற்ற Listeners
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SR class
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = புதிய format-க்கு மாற்றினால், { $count ->
+        [one] Talker-இன் மற்ற Listener துண்டிக்கப்படும்.
+       *[other] Talker-இன் மற்ற { $count } Listeners துண்டிக்கப்படும்.
+    }
 
 ## Dialogs
 
@@ -341,6 +355,9 @@ network-frames = பெற்ற frames
 network-out-of-sequence = வரிசை தவறிய frames
 # How often the stream stopped coming while it was taken.
 network-interrupted = தடங்கல்கள்
+# Frames that came after, or long before, their time to be played.
+network-late = தாமதமாக வந்த frames
+network-early = முன்கூட்டியே வந்த frames
 network-entity-id = Entity ID
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

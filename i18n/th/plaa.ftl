@@ -136,6 +136,19 @@ info-channels = ช่องสัญญาณ
 info-language = ภาษา
 info-no-sound = ไม่มีเสียง
 info-tags = แท็ก
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Talker
+info-stream = สตรีม
+# The talker's listeners other than plaa.
+info-other-listeners = Listener อื่น
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = คลาส SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = รูปแบบใหม่จะตัด { $count ->
+       *[other] Listener อื่นของ Talker อีก { $count } ตัว
+    }
 
 ## Dialogs
 
@@ -332,6 +345,9 @@ network-frames = เฟรมที่รับ
 network-out-of-sequence = เฟรมผิดลำดับ
 # How often the stream stopped coming while it was taken.
 network-interrupted = การหยุดชะงัก
+# Frames that came after, or long before, their time to be played.
+network-late = เฟรมที่มาช้า
+network-early = เฟรมที่มาเร็วเกินไป
 network-entity-id = ID เอนทิตี
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

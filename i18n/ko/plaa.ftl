@@ -136,6 +136,19 @@ info-channels = 채널
 info-language = 언어
 info-no-sound = 사운드 없음
 info-tags = 태그
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = 토커
+info-stream = 스트림
+# The talker's listeners other than plaa.
+info-other-listeners = 다른 리스너
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SR 클래스
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = 새 포맷으로 바꾸면 { $count ->
+       *[other] 토커의 다른 리스너 { $count }개의 연결이 끊어집니다.
+    }
 
 ## Dialogs
 
@@ -332,6 +345,9 @@ network-frames = 받은 프레임
 network-out-of-sequence = 순서가 어긋난 프레임
 # How often the stream stopped coming while it was taken.
 network-interrupted = 중단 횟수
+# Frames that came after, or long before, their time to be played.
+network-late = 늦게 도착한 프레임
+network-early = 너무 일찍 도착한 프레임
 network-entity-id = 엔티티 ID
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

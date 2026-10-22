@@ -136,6 +136,20 @@ info-channels = चैनल
 info-language = भाषा
 info-no-sound = कोई ध्वनि नहीं
 info-tags = टैग
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Talker
+info-stream = Stream
+# The talker's listeners other than plaa.
+info-other-listeners = दूसरे Listeners
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = SR class
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = नए फ़ॉर्मेट से { $count ->
+        [one] Talker का दूसरा Listener डिस्कनेक्ट हो जाएगा।
+       *[other] Talker के { $count } दूसरे Listeners डिस्कनेक्ट हो जाएँगे।
+    }
 
 ## Dialogs
 
@@ -334,6 +348,9 @@ network-frames = प्राप्त frames
 network-out-of-sequence = क्रम से बाहर frames
 # How often the stream stopped coming while it was taken.
 network-interrupted = रुकावटें
+# Frames that came after, or long before, their time to be played.
+network-late = देर से आए frames
+network-early = समय से पहले आए frames
 network-entity-id = Entity ID
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

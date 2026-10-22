@@ -1598,7 +1598,7 @@ fn docked<'a>(content: Element<'a, Control>) -> Element<'a, Control> {
 /// The sheet beside the picture, if one is open.
 fn sheet<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, Control>> {
     match window.sheet? {
-        Sheet::Inspector => Some(inspector(window)),
+        Sheet::Inspector => Some(inspector(window, context)),
         Sheet::Playlist => Some(playlist_sheet(window)),
         Sheet::Network => Some(crate::network::sheet(
             context.avb.clone()?,
@@ -1691,7 +1691,18 @@ pub(crate) fn list_row_style(
 }
 
 /// The inspector: what the file holds and how it plays.
-fn inspector(window: &PlayerWindow) -> Element<'_, Control> {
+fn inspector<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
+    // A stream plaa listens to: how it comes, from where.
+    if let Source::Live { id, .. } = window.source()
+        && let (Some(snapshot), Some(talker)) = (&context.avb, crate::network::talker_of(id))
+    {
+        return component::side_sheet_sized(
+            crate::fl!("info-title"),
+            Control::ToggleInspector,
+            crate::network::stream_inspector(snapshot, talker, window.menu),
+            Length::Fixed(component::SIDE_SHEET_WIDTH),
+        );
+    }
     let mut content = column![].spacing(6).width(Fill);
     let field = |label: String, value: String| -> Element<'_, Control> {
         column![

@@ -137,6 +137,20 @@ info-channels = Chaneli
 info-language = Lugha
 info-no-sound = Hakuna sauti
 info-tags = Lebo
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Talker
+info-stream = Mtiririko
+# The talker's listeners other than plaa.
+info-other-listeners = Listener nyingine
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Daraja la SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Umbizo jipya litatenganisha { $count ->
+        [one] listener nyingine ya talker.
+       *[other] listener nyingine { $count } za talker.
+    }
 
 ## Dialogs
 
@@ -335,6 +349,9 @@ network-frames = Fremu zilizopokelewa
 network-out-of-sequence = Fremu zisizofuata mpangilio
 # How often the stream stopped coming while it was taken.
 network-interrupted = Mikatizo
+# Frames that came after, or long before, their time to be played.
+network-late = Fremu zilizochelewa
+network-early = Fremu zilizofika mapema
 network-entity-id = ID ya huluki
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE

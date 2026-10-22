@@ -142,6 +142,20 @@ info-channels = Κανάλια
 info-language = Γλώσσα
 info-no-sound = Χωρίς ήχο
 info-tags = Ετικέτες
+# For a stream plaa listens to on the network: the talker sending it, and
+# the stream as it comes.
+info-talker = Πομπός
+info-stream = Ροή
+# The talker's listeners other than plaa.
+info-other-listeners = Άλλοι δέκτες
+# The stream's SR class, A or B, by how often its frames come.
+info-sr-class = Κλάση SR
+# Over the talker's formats to change to: its other listeners do not take
+# the new one.
+info-format-cuts-off = Μια νέα μορφή αποσυνδέει { $count ->
+        [one] τον άλλο δέκτη του πομπού.
+       *[other] τους άλλους { $count } δέκτες του πομπού.
+    }
 
 ## Dialogs
 
@@ -340,6 +354,9 @@ network-frames = Πλαίσια που ελήφθησαν
 network-out-of-sequence = Πλαίσια εκτός σειράς
 # How often the stream stopped coming while it was taken.
 network-interrupted = Διακοπές
+# Frames that came after, or long before, their time to be played.
+network-late = Καθυστερημένα πλαίσια
+network-early = Πρόωρα πλαίσια
 network-entity-id = Αναγνωριστικό οντότητας
 
 # Why a stream's reservation failed, by the MSRP failure codes of IEEE
