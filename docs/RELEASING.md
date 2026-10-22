@@ -15,6 +15,7 @@ Everything a release ships is built from this repository:
 | `packaging/macos/` | plaa.app, carrying FFmpeg and libass, and its installer package, made by `bundle.sh --pkg` around `distribution.xml`, signed and notarized as [macOS signing](#macos-signing) says, with the BPF access helper |
 | `.github/workflows/release.yml` | Builds all of them for a tag and drafts the GitHub release once the installer tests pass |
 | `packaging/tests/` | The installer tests: each package installed, upgraded, run, made to play a video and removed in a clean system, as [Installer tests](#installer-tests) says |
+| `site/`, `.github/workflows/site.yml` | The website, plaa.run, published to GitHub Pages whenever it changes on main |
 | `BUILD`, `.gitattributes` | The commit, which `git archive` and GitHub's source archives write into `BUILD` for the version line of a build without `.git`, as the AUR's |
 
 The Linux packages are built for x86_64 and ARM64 on GitHub's runners of
