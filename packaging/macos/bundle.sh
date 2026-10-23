@@ -64,7 +64,7 @@ app="$out/$name.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resources/licenses/fonts"
 cp "$root/target/release/plaa" "$app/Contents/MacOS/"
-cp "$root/LICENSE" "$app/Contents/Resources/licenses/"
+cp "$root/LICENSE" "$root/docs/THIRD-PARTY.md" "$app/Contents/Resources/licenses/"
 cp "$root"/packaging/licenses/* "$app/Contents/Resources/licenses/fonts/"
 
 # Whether a library is macOS's own, which every Mac has.

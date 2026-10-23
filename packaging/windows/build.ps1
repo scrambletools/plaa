@@ -36,6 +36,10 @@ $libraries = Join-Path ([System.IO.Path]::GetTempPath()) "plaa-libraries-$PID.wx
       <Component Id="Libraries" Guid="7f3c9b2e-1d48-4a6f-b5e0-2c9a8d4f6e17">
 $files
         <File Id="FFmpegLicense" Source="$(Join-Path $Source 'LICENSE.txt')" Name="FFmpeg-LICENSE.txt" />
+        <File Id="License" Source="$(Join-Path $root 'LICENSE')" Name="LICENSE.txt" />
+        <File Id="ThirdParty" Source="$(Join-Path $root 'docs\THIRD-PARTY.md')" Name="THIRD-PARTY.md" />
+        <File Id="FontLicense" Source="$(Join-Path $root 'packaging\licenses\OFL.txt')" Name="RobotoFlex-OFL.txt" />
+        <File Id="IconLicense" Source="$(Join-Path $root 'packaging\licenses\LICENSE-MaterialSymbols.txt')" Name="LICENSE-MaterialSymbols.txt" />
         <RegistryValue Root="HKCU" Key="Software\Scramble Tools\plaa" Name="Libraries" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
@@ -60,7 +64,7 @@ Copy-Item (Join-Path $Source 'plaa.exe') $stage
 $dlls | Copy-Item -Destination $stage
 $licenses | Copy-Item -Destination $stage
 Copy-Item (Join-Path $Source 'LICENSE.txt') (Join-Path $stage 'FFmpeg-LICENSE.txt')
-Copy-Item (Join-Path $root 'LICENSE'), (Join-Path $root 'README.md') $stage
+Copy-Item (Join-Path $root 'LICENSE'), (Join-Path $root 'README.md'), (Join-Path $root 'docs\THIRD-PARTY.md') $stage
 New-Item -ItemType Directory (Join-Path $stage 'fonts') | Out-Null
 Copy-Item (Join-Path $root 'packaging\licenses\*') (Join-Path $stage 'fonts')
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force

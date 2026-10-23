@@ -183,7 +183,7 @@ Section "Install $(Split-Path -Leaf $Msi)"
 Invoke-Msiexec @('/i', "`"$Msi`"") (Join-Path $work 'install.log')
 
 Section 'What it installed'
-foreach ($file in @('plaa.exe', 'FFmpeg-LICENSE.txt')) {
+foreach ($file in @('plaa.exe', 'FFmpeg-LICENSE.txt', 'LICENSE.txt', 'THIRD-PARTY.md')) {
     if (-not (Test-Path (Join-Path $folder $file))) { Fail "$folder\$file is missing" }
 }
 if (@(Get-ChildItem (Join-Path $folder 'avcodec-*.dll')).Count -ne 1) { Fail "$folder has no FFmpeg" }

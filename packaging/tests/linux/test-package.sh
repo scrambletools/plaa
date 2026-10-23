@@ -103,6 +103,7 @@ for file in \
     "/usr/share/icons/hicolor/512x512/apps/$id.png" \
     "/usr/share/icons/hicolor/scalable/apps/$id.svg" \
     /usr/share/licenses/plaa/LICENSE \
+    /usr/share/licenses/plaa/THIRD-PARTY.md \
     /usr/share/licenses/plaa/fonts/OFL.txt \
     /usr/share/licenses/plaa/fonts/LICENSE-MaterialSymbols.txt \
     /usr/share/plaa/ptp4l-gptp.cfg \

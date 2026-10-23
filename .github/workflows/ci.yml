@@ -30,6 +30,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      # The crates and their licenses, as the packages name them.
+      - run: python3 scripts/third-party.py --check
       - run: desktop-file-validate data/*.desktop
       # plaa's ID is run.plaa, plaa.run reversed, which has two parts
       # where AppStream looks for three.

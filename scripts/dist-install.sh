@@ -32,6 +32,7 @@ install -Dm644 "$root/data/$id.metainfo.xml" "$share/metainfo/$id.metainfo.xml"
     install -Dm644 "$root/data/icons/$icon" "$share/icons/$icon"
 done
 install -Dm644 "$root/LICENSE" "$share/licenses/plaa/LICENSE"
+install -Dm644 "$root/docs/THIRD-PARTY.md" "$share/licenses/plaa/THIRD-PARTY.md"
 for font_license in OFL.txt LICENSE-MaterialSymbols.txt; do
     install -Dm644 "$root/packaging/licenses/$font_license" \
         "$share/licenses/plaa/fonts/$font_license"

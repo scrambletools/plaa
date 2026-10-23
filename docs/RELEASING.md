@@ -8,6 +8,7 @@ Everything a release ships is built from this repository:
 | `data/run.plaa.metainfo.xml` | AppStream metadata, with the release history |
 | `data/icons/hicolor/scalable/apps/run.plaa.svg` | The app icon, which `scripts/make-icons.sh` renders into the hicolor PNGs every package picks up, `data/icons/plaa-1024.png` for macOS and `packaging/windows/plaa.ico` |
 | `packaging/licenses/` | The licenses of the fonts plaa carries, from scramble-ui |
+| `docs/THIRD-PARTY.md` | The libraries, fonts and crates plaa is built from or carries, with their licenses, written by `scripts/third-party.py`, to run again after dependencies change, as CI fails while it is out of date; every package carries it |
 | `scripts/dist-install.sh` | Installs a build of plaa and plaa-netraw and the files above into a system layout; the Linux packages use it |
 | `packaging/linux/` | Debian and RPM packages, each built by `build.sh` in a container of the release it is for and made with nfpm (`packaging/nfpm.yaml`); they grant `plaa-netraw` `CAP_NET_RAW` as they install and run `avb-check` |
 | `packaging/arch/plaa/` | AUR package, whose install script does the same |
