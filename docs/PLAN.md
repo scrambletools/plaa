@@ -558,7 +558,7 @@ Targets, to be measured as prev's are.
 | libass missing where plaa runs | ASS shows as plain text then; packages for Windows and macOS bundle libass beside FFmpeg |
 | Copying hardware pictures to memory costs bandwidth at 4K and above | Measured: with memory reused on the way out and on the way back in, an RTX 4080 SUPER copies 8K 10 bit pictures out at 137 a second through CUDA and uploads one in 8.5 ms, so 8K plays at 60 fps. Import DMA-BUF, D3D11 and IOSurface pictures into wgpu directly where it pays off |
 | `atempo` holds a little sound, so speed changes are a fraction of a second late | Acceptable; the clock follows what is heard |
-| Patented codecs in bundled FFmpeg builds | Linux uses the system's FFmpeg; the Windows and macOS builds are chosen with this in mind before release |
+| Patented codecs in bundled FFmpeg builds | Linux uses the system's FFmpeg. The Windows and macOS builds carry H.264, HEVC and AAC, the x264 and x265 encoders included, as VLC, HandBrake and OBS do: the pools collect from device makers and software sold, and plaa is free. If plaa is ever sold, preinstalled or downloaded in large numbers, take advice; dropping x264 and x265 on macOS first costs nothing, as VideoToolbox and Apple's AAC encoder export there |
 | Screen recording differs by desktop | The ScreenCast portal on Wayland, the system APIs elsewhere |
 | macOS asks before an app hears the microphone, naming the app by its bundle | Until plaa is packaged, macOS asks for the terminal that started it; the package's Info.plist gives the reason (`NSMicrophoneUsageDescription`) |
 | AVB needs hardware timestamping and ptp4l | Follow triib: Linux first, the entity off where the interface cannot do it |

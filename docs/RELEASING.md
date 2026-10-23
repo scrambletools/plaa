@@ -99,9 +99,9 @@ each month's last build for two years, so pin a month's last build. To
 move to a newer one, take its tag from BtbN's releases, the FFmpeg
 version from its file names, FFmpeg's commit from that version's hash,
 and the scripts' commit as the one BtbN tagged; then update the
-SHA-256 of both zips. Before the first public release, check the
-codecs the macOS and Windows builds carry against patents
-(`docs/PLAN.md`, Risks).
+SHA-256 of both zips. The macOS and Windows builds carry FFmpeg as
+BtbN and Homebrew build it, with the x264 and x265 encoders, as other
+free players' downloads do (`docs/PLAN.md`, Risks).
 
 ## Steps
 
