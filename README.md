@@ -9,15 +9,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 [triib](https://github.com/scrambletools/triib) through
 [scramble-ui](https://github.com/scrambletools/scramble-ui).
 
-> **Status:** early development, not yet released. Files, streams and
-> web videos play, with the controls floating over the picture, and
-> files can be trimmed, split, turned and exported, and sound, the
-> screen and a camera recorded, and sound files show a spectrum or their
-> waveform; plaa sends what it plays to AVB/Milan listeners on Linux,
-> plays their talkers' streams and connects talkers and listeners, with
-> AVB Lite where the switch has no AVB, casts to TVs and speakers, and
-> has an assistant; see the [development plan](docs/PLAN.md) for what
-> comes next: signing and the website.
+Download it from [plaa.run](https://plaa.run#download) or the
+[release page](https://github.com/scrambletools/plaa/releases/latest).
 
 ## Features
 
@@ -189,8 +182,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 
 ### Planned
 
-Signed packages for Windows and macOS, and the website. The
-[plan](docs/PLAN.md) has the order.
+Video over AVB, as IEEE 1722 CVF streams, and an icon in Windows'
+notification area while a screen recording runs hidden. The
+[plan](docs/PLAN.md) says how plaa is built and what it will do.
 
 ## Packages
 
@@ -198,9 +192,13 @@ Each release has packages for Debian 13, Ubuntu 24.04 and 26.04,
 Fedora 44 and Arch (x86_64 and ARM64, and RISC-V for Debian and Ubuntu),
 Windows (an MSI and a zip, x64 and ARM64) and macOS (Apple Silicon,
 macOS 14 and later), each installed, upgraded, run, made to play a video
-and removed in a clean system before the release goes out. On Linux the packages use the system's FFmpeg, each
-built for its release; on Windows and macOS they carry their own.
-[Releasing](docs/RELEASING.md) says how they are made and checked.
+and removed in a clean system before the release goes out. On Linux
+the packages use the system's FFmpeg, each built for its release; on
+Windows and macOS they carry their own. Download them from
+[plaa.run](https://plaa.run#download), which says how to install each,
+or the [release page](https://github.com/scrambletools/plaa/releases/latest).
+[Releasing](docs/RELEASING.md) says how they are made and checked, and
+[THIRD-PARTY.md](docs/THIRD-PARTY.md) names what they are built from.
 
 ## Building
 

@@ -19,19 +19,51 @@
     </p>
     <ul>
       <li>One window per file, with controls that float over the picture and slide away while you watch</li>
-      <li>Audio and subtitle tracks, playback speed with the pitch kept, looping and frame stepping</li>
-      <li>Streams from the network, such as HLS, DASH and RTSP</li>
-      <li>HDR video shown on ordinary screens</li>
+      <li>Audio and subtitle tracks, ASS subtitles as styled, playback speed with the pitch kept, A-B loops and frame stepping</li>
+      <li>Streams from the network, such as HLS, DASH and RTSP, and web videos through yt-dlp</li>
+      <li>HDR video shown on ordinary screens, and 8K played smoothly on the graphics card</li>
+      <li>Trimming, splitting and exporting, on the graphics card's encoder where there is one</li>
+      <li>Recording sound, the screen and a camera</li>
+      <li>Casting to Chromecasts and DLNA renderers</li>
+      <li>A spectrum, waveform or Prism, a scene in three dimensions, for sound files</li>
+      <li>Sending and playing AVB and Milan network audio</li>
+      <li>An assistant using a model of your choice</li>
       <li>Starts where you left off, and saves frames as pictures</li>
       <li>Material 3 design, with colors from the system accent color</li>
     </ul>
+    <p>
+      The screenshots show Big Buck Bunny, © 2008 Blender Foundation, under CC BY 3.0.
+    </p>
   </description>
 
   <launchable type="desktop-id">run.plaa.desktop</launchable>
 
-  <url type="homepage">https://github.com/scrambletools/plaa</url>
+  <url type="homepage">https://plaa.run</url>
   <url type="bugtracker">https://github.com/scrambletools/plaa/issues</url>
   <url type="vcs-browser">https://github.com/scrambletools/plaa</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>A video playing, its controls floating over the picture</caption>
+      <image>https://plaa.run/screenshots/playing.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Trimming, splitting and arranging clips</caption>
+      <image>https://plaa.run/screenshots/edit.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The inspector: the file and its streams</caption>
+      <image>https://plaa.run/screenshots/inspector.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A sound file's cover, tags and spectrum</caption>
+      <image>https://plaa.run/screenshots/sound.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Prism, moved by the music</caption>
+      <image>https://plaa.run/screenshots/prism.png</image>
+    </screenshot>
+  </screenshots>
 
   <branding>
     <color type="primary" scheme_preference="light">#b4a5f5</color>
@@ -45,10 +77,11 @@
   </provides>
 
   <releases>
-    <release version="0.1.0" date="2026-10-18" type="development">
+    <release version="0.1.0" date="2026-10-23">
       <description>
-        <p>The first build: playback with FFmpeg, the floating controls, tracks, subtitles and Settings.</p>
+        <p>The first release: playback, streams and web videos, editing and export, recording, casting, the visualizer, AVB network audio and the assistant.</p>
       </description>
+      <url type="details">https://github.com/scrambletools/plaa/releases/tag/v0.1.0</url>
     </release>
   </releases>
 </component>

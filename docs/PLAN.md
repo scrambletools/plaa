@@ -25,7 +25,7 @@ look follows Material Design 3, as in prev.
 | Area | Decision |
 |---|---|
 | License | GPL-3.0-or-later, so packages can bundle a full FFmpeg build, GPL parts included |
-| Platforms | As prev: Linux (Wayland first, X11 supported), Windows 10 and 11, macOS 11 and later on Apple Silicon |
+| Platforms | Linux (Wayland first, X11 supported), Windows 10 and 11, macOS 14 and later on Apple Silicon, the oldest the FFmpeg it carries there is built for |
 | Language | Rust, stable toolchain, edition 2024, minimum Rust 1.95 |
 | GUI | iced 0.14 with scramble-ui's Material 3 components; the picture through a wgpu shader widget of plaa's own |
 | Media engine | FFmpeg's libraries (libavformat, libavcodec, libavfilter, libswresample, libswscale) through `ffmpeg-next`, all inside `plaa-media` ([ADR 0001](decisions/0001-media-engine.md)) |
@@ -42,7 +42,7 @@ look follows Material Design 3, as in prev.
 | Interface languages | Fluent files in `i18n/`, English first, and the 38 languages prev has |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
 | AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb pinned by revision: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
-| Distribution | As prev, once the features settle: .deb, .rpm, AppImage, tarball, Flatpak, PKGBUILD, MSI and zip, disk image |
+| Distribution | A .deb for each Debian and Ubuntu release and an .rpm for Fedora's, each built against its FFmpeg, a PKGBUILD, an MSI and zip for Windows and an installer package for macOS ([Releasing](RELEASING.md)); no AppImage, Flatpak or plain archive for Linux, as none can grant the raw socket capability AVB needs |
 
 ## Scope
 
@@ -99,9 +99,9 @@ trimming and splitting, and Intel Macs.
 9. **Assistant and MCP** (done): the MCP server, `plaa --mcp`, with
    prev's consent prompts, and the assistant panel, both on one tool
    registry.
-10. **Release**: packages (made, with installer tests on each system,
-    `docs/RELEASING.md`), translations (done, 38 languages), signing,
-    the website.
+10. **Release** (done): packages for each system, with installer tests
+    (`docs/RELEASING.md`), translations (38 languages), signing, and the
+    website, plaa.run.
 
 ## Architecture
 

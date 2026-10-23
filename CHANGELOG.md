@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.1.0] - 2026-10-23
 
-The first build.
+The first release.
 
 - Plays files and streams through FFmpeg, decoding video on the graphics
   card where it can, 8K at 60 fps included, with sound in step through
