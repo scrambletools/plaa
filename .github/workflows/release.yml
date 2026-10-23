@@ -18,14 +18,15 @@ env:
   CARGO_TERM_COLOR: always
   NFPM_VERSION: 2.43.0
   # A shared FFmpeg build for Windows, its headers, import libraries and
-  # DLLs, as CI builds with: BtbN's last build of September 2026, which
+  # DLLs, as CI builds with: BtbN's last build of August 2026, which
   # BtbN keeps for two years, as it does each month's last; FFmpeg's
   # commit and that of BtbN's build scripts, which pin each library's,
-  # give the sources the release carries.
-  FFMPEG_BUILDS_TAG: autobuild-2026-09-30-13-08
-  FFMPEG_BUILDS_COMMIT: 6c9aec5fc9a72ec3abedd1fa84db141fa18cf52b
-  FFMPEG_VERSION: n9.0.2-17-g2a571b6068
-  FFMPEG_COMMIT: 2a571b606854520cf89804d8030c8b328e621689
+  # give the sources the release carries. September's ARM64 build
+  # crashes as it loads, BtbN/FFmpeg-Builds#675.
+  FFMPEG_BUILDS_TAG: autobuild-2026-08-31-13-27
+  FFMPEG_BUILDS_COMMIT: 8267213e26c1031621e6e1210fe3aa4867214f6a
+  FFMPEG_VERSION: n9.0.1-11-ge47273f4d9
+  FFMPEG_COMMIT: e47273f4d9227152dcbf543cebaf9e2430ddbcc4
   FFMPEG_SERIES: '9.0'
   # The vcpkg that builds libass and the libraries it needs for Windows.
   VCPKG_COMMIT: 857036234d15fbed8f30fed66e898d7725446c0c
@@ -123,11 +124,11 @@ jobs:
           - arch: x64
             runner: windows-2025
             ffmpeg: win64
-            ffmpeg_sha256: 3da6c7b60bb9ccd73ec5b5e815ba804a0879eb362ba0e3beebce50174c022696
+            ffmpeg_sha256: 00d78694632f17a1de325c639d0acf04a6b3ab8f20ce0a2e5bedd2d5e21e3adb
           - arch: arm64
             runner: windows-11-arm
             ffmpeg: winarm64
-            ffmpeg_sha256: 92460cf103340012d41413b557669902538f040e0c953abc1d719750dcd5f8a8
+            ffmpeg_sha256: 4419887ac2c5585d909d532944843756f67e430d4f3822e9062bff1455498abc
     runs-on: ${{ matrix.runner }}
     env:
       SIGNING: ${{ vars.AZURE_SIGNING_ACCOUNT != '' }}

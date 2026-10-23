@@ -95,13 +95,15 @@ they build for x64 and ARM64, fetched as the scripts fetch them
 
 The FFmpeg build is pinned by its tag, version and SHA-256 in
 `release.yml` and `ci.yml`. BtbN keeps daily builds for 14 days and
-each month's last build for two years, so pin a month's last build. To
-move to a newer one, take its tag from BtbN's releases, the FFmpeg
-version from its file names, FFmpeg's commit from that version's hash,
-and the scripts' commit as the one BtbN tagged; then update the
-SHA-256 of both zips. The macOS and Windows builds carry FFmpeg as
-BtbN and Homebrew build it, with the x264 and x265 encoders, as other
-free players' downloads do (`docs/PLAN.md`, Risks).
+each month's last build for two years, so pin a month's last build,
+and try its ARM64 one: September 2026's crashes as it loads
+(BtbN/FFmpeg-Builds#675). To move to a newer one, take its tag from
+BtbN's releases, the FFmpeg version from its file names, FFmpeg's
+commit from that version's hash, and the scripts' commit as the one
+BtbN tagged; then update the SHA-256 of both zips. The macOS and
+Windows builds carry FFmpeg as BtbN and Homebrew build it, with the
+x264 and x265 encoders, as other free players' downloads do
+(`docs/PLAN.md`, Risks).
 
 ## Steps
 

@@ -63,9 +63,9 @@ jobs:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
       # A shared FFmpeg build, its headers, import libraries and DLLs, the
       # one the Release workflow pins.
-      FFMPEG_BUILDS_TAG: autobuild-2026-09-30-13-08
-      FFMPEG_BUILD: ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-shared-9.0
-      FFMPEG_SHA256: 3da6c7b60bb9ccd73ec5b5e815ba804a0879eb362ba0e3beebce50174c022696
+      FFMPEG_BUILDS_TAG: autobuild-2026-08-31-13-27
+      FFMPEG_BUILD: ffmpeg-n9.0.1-11-ge47273f4d9-win64-gpl-shared-9.0
+      FFMPEG_SHA256: 00d78694632f17a1de325c639d0acf04a6b3ab8f20ce0a2e5bedd2d5e21e3adb
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
