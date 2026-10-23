@@ -73,7 +73,7 @@ function Get-Imports([string] $Path) {
 # libass's DLL and those it needs, among vcpkg's, followed through their
 # imports; and the Visual C++ runtime DLLs any of them imports.
 $wanted = @{}
-$runtime = @{}
+$redistributables = @{}
 $queue = [System.Collections.Generic.Queue[string]]::new()
 $queue.Enqueue((Get-ChildItem (Join-Path $bin 'ass*.dll') | Select-Object -First 1).Name)
 while ($queue.Count -gt 0) {
@@ -82,7 +82,7 @@ while ($queue.Count -gt 0) {
     $wanted[$name.ToLower()] = $name
     foreach ($import in Get-Imports (Join-Path $bin $name)) {
         if (Test-Path (Join-Path $bin $import)) { $queue.Enqueue($import) }
-        elseif ($import -match '^vcruntime\d+(_\d+)?\.dll$') { $runtime[$import.ToLower()] = $import }
+        elseif ($import -match '^vcruntime\d+(_\d+)?\.dll$') { $redistributables[$import.ToLower()] = $import }
     }
 }
 $wanted.Values | ForEach-Object { Copy-Item (Join-Path $bin $_) $Out }
@@ -90,7 +90,7 @@ $wanted.Values | ForEach-Object { Copy-Item (Join-Path $bin $_) $Out }
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $redist = & $vswhere -latest -products * -find "VC\Redist\MSVC\*\$Arch\Microsoft.VC*.CRT" | Select-Object -Last 1
 if (-not $redist) { throw "no Visual C++ runtime for $Arch" }
-$runtime.Values | ForEach-Object { Copy-Item (Join-Path $redist $_) $Runtime }
+$redistributables.Values | ForEach-Object { Copy-Item (Join-Path $redist $_) $Runtime }
 
 # Each port a DLL came from: its license, and its source archive.
 $ports = @{}
@@ -107,5 +107,5 @@ foreach ($port in $ports.Keys) {
     Get-ChildItem (Join-Path $Vcpkg 'downloads') -File | Where-Object { $_.Name -like "*$port*" } |
         Copy-Item -Destination $Sources
 }
-Write-Host "libass for $Arch`: $(@($wanted.Values) -join ', '); runtime: $(@($runtime.Values) -join ', ')"
+Write-Host "libass for $Arch`: $(@($wanted.Values) -join ', '); runtime: $(@($redistributables.Values) -join ', ')"
 Write-Host "licenses and sources: $(@($ports.Keys | Sort-Object) -join ', ')"

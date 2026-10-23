@@ -89,6 +89,11 @@ jobs:
         run: echo "name=$(tr -c 'a-z0-9\n' - <<<"$IMAGE")" >>"$GITHUB_OUTPUT"
         env:
           IMAGE: ${{ matrix.image }}
+      # The cross build runs plaa --version, through QEMU.
+      - if: matrix.cross
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.cross }}
       - name: Build and package
         run: packaging/linux/build.sh "$IMAGE" dist
         env:
@@ -158,10 +163,13 @@ jobs:
       - name: Check that it runs
         shell: pwsh
         run: |
-          $run = Start-Process target\release\plaa.exe -ArgumentList --version -Wait -PassThru -NoNewWindow -RedirectStandardOutput version.txt
+          $run = Start-Process target\release\plaa.exe -ArgumentList --version -Wait -PassThru -NoNewWindow -RedirectStandardOutput version.txt -RedirectStandardError errors.txt
           $version = Get-Content -Raw version.txt
           Write-Host $version
-          if ($run.ExitCode -ne 0 -or $version -notmatch '^plaa \d.*FFmpeg \d') { throw "plaa.exe --version failed" }
+          Get-Content errors.txt | Write-Host
+          if ($run.ExitCode -ne 0 -or $version -notmatch '^plaa \d.*FFmpeg \d') {
+            throw ('plaa.exe --version failed, exit code 0x{0:X8}' -f $run.ExitCode)
+          }
       - name: Collect the program and FFmpeg
         shell: pwsh
         run: |
