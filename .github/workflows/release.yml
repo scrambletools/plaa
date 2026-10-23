@@ -162,12 +162,24 @@ jobs:
       # for.
       - name: Check that it runs
         shell: pwsh
+        timeout-minutes: 10
         run: |
           $run = Start-Process target\release\plaa.exe -ArgumentList --version -Wait -PassThru -NoNewWindow -RedirectStandardOutput version.txt -RedirectStandardError errors.txt
           $version = Get-Content -Raw version.txt
           Write-Host $version
           Get-Content errors.txt | Write-Host
           if ($run.ExitCode -ne 0 -or $version -notmatch '^plaa \d.*FFmpeg \d') {
+            # Whether it reaches main, and where it crashed.
+            $help = Start-Process target\release\plaa.exe -ArgumentList --help -Wait -PassThru -NoNewWindow -RedirectStandardOutput help.txt
+            Write-Host ('plaa.exe --help: exit code 0x{0:X8}' -f $help.ExitCode)
+            $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\${{ matrix.arch }}\cdb.exe"
+            if (Test-Path $cdb) {
+              & $cdb -G -c 'sxe -c ".lastevent;r;kn 30;lm;q" av;g' target\release\plaa.exe --version
+            } else {
+              Write-Host "No debugger at $cdb"
+            }
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error' } -MaxEvents 2 -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host $_.Message }
             throw ('plaa.exe --version failed, exit code 0x{0:X8}' -f $run.ExitCode)
           }
       - name: Collect the program and FFmpeg
