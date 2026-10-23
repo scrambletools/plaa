@@ -1184,6 +1184,18 @@ impl Plaa {
             }
             Message::External(External::Control(call)) => self.control_call(call),
             Message::Assistant(id, message) => self.panel_update(id, message),
+            // A recording window narrows again as its panel closes.
+            Message::ToggleAssistant(id)
+                if self
+                    .windows
+                    .get(&id)
+                    .is_some_and(|window| matches!(window.content, Content::Recorder(_))) =>
+            {
+                self.recorder_control(
+                    id,
+                    crate::recorder::RecorderControl::Window(Control::ToggleAssistant),
+                )
+            }
             Message::ToggleAssistant(id) => self.toggle_assistant(id),
             Message::External(External::Assistant(id, heard)) => self.panel_heard(id, heard),
             Message::External(External::CastFound(found)) => {
@@ -1577,6 +1589,17 @@ impl Plaa {
         let Some(window) = self.windows.get_mut(&id) else {
             return Task::none();
         };
+        // A finished recording's name is being typed: Escape keeps the
+        // name it was saved with.
+        if let Content::Recorder(recorder) = &mut window.content
+            && recorder.naming.is_some()
+            && !window.settings_open
+        {
+            if shortcuts::is_escape(&key) {
+                return self.recorder_control(id, crate::recorder::RecorderControl::KeepName);
+            }
+            return Task::none();
+        }
         if shortcuts::is_escape(&key) {
             if window.settings_open {
                 window.settings_open = false;
@@ -1594,6 +1617,11 @@ impl Plaa {
             {
                 player.menu = None;
                 player.sheet = None;
+                return Task::none();
+            }
+            if let Content::Recorder(recorder) = &mut window.content
+                && recorder.menu.take().is_some()
+            {
                 return Task::none();
             }
             if let Some(mode) = window.player().and_then(|player| player.editor.mode) {
@@ -1919,7 +1947,14 @@ impl Plaa {
     }
 
     fn control(&mut self, id: window::Id, control: Control) -> Task<Message> {
-        if !matches!(control, Control::Hover(_) | Control::Activity) {
+        // Media keys go on acting on the player last used, not on a start
+        // or recording window's menus.
+        if !matches!(control, Control::Hover(_) | Control::Activity)
+            && self
+                .windows
+                .get(&id)
+                .is_some_and(|window| window.player().is_some())
+        {
             self.media_window = Some(id);
         }
         // What a menu chose closes it.

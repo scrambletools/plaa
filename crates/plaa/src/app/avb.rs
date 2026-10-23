@@ -98,6 +98,12 @@ impl Plaa {
         });
         let mut chosen = Vec::new();
         for window in self.windows.values() {
+            if let Content::Recorder(recorder) = &window.content {
+                listed |= recorder.network || recorder.menu == Some(Menu::Connect);
+                if recorder.network {
+                    chosen.extend(recorder.listener);
+                }
+            }
             let Some(player) = window.player() else {
                 continue;
             };

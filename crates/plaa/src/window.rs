@@ -584,41 +584,9 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
 /// window's tools at the other end. The file's name is the window's
 /// title, as tools would cover it in a narrow window.
 fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
-    let open = dropdown::icon_menu(
-        Icon::FolderOpen,
-        vec![
-            Entry::item(crate::fl!("open-file"), Control::Open).icon(Icon::FileOpen),
-            Entry::item(
-                crate::fl!("open-address"),
-                Control::Action(Action::OpenAddress),
-            )
-            .icon(Icon::Link),
-            Entry::divider(),
-            Entry::item(
-                crate::fl!("open-record-sound"),
-                Control::Action(Action::RecordSound),
-            )
-            .icon(Icon::Mic),
-            Entry::item(
-                crate::fl!("open-record-screen"),
-                Control::Action(Action::RecordScreen),
-            )
-            .icon(Icon::ScreenRecord),
-            Entry::item(
-                crate::fl!("open-record-camera"),
-                Control::Action(Action::RecordCamera),
-            )
-            .icon(Icon::Videocam),
-        ],
-    )
-    .size(button::Size::Small)
-    .tip(crate::fl!("action-open"))
-    .open(window.menu == Some(Menu::Open), |open| {
-        Control::Menu(Menu::Open, open)
-    });
-    let mut tools = vec![open.into()];
+    let mut tools = vec![open_menu(window.menu == Some(Menu::Open))];
     if let Some(snapshot) = &context.avb {
-        tools.push(connect_menu(window, snapshot));
+        tools.push(connect_menu(snapshot, window.menu == Some(Menu::Connect)));
     }
     tools.push(space().width(Fill).into());
     if let Some(menu) = edit_menu(window) {
@@ -1054,19 +1022,50 @@ fn visualizer_menu(window: &PlayerWindow) -> Element<'_, Control> {
         .into()
 }
 
+/// What a window can open or record, the menu `open` or not; a recording
+/// window has it too.
+pub fn open_menu<'a>(open: bool) -> Element<'a, Control> {
+    dropdown::icon_menu(
+        Icon::FolderOpen,
+        vec![
+            Entry::item(crate::fl!("open-file"), Control::Open).icon(Icon::FileOpen),
+            Entry::item(
+                crate::fl!("open-address"),
+                Control::Action(Action::OpenAddress),
+            )
+            .icon(Icon::Link),
+            Entry::divider(),
+            Entry::item(
+                crate::fl!("open-record-sound"),
+                Control::Action(Action::RecordSound),
+            )
+            .icon(Icon::Mic),
+            Entry::item(
+                crate::fl!("open-record-screen"),
+                Control::Action(Action::RecordScreen),
+            )
+            .icon(Icon::ScreenRecord),
+            Entry::item(
+                crate::fl!("open-record-camera"),
+                Control::Action(Action::RecordCamera),
+            )
+            .icon(Icon::Videocam),
+        ],
+    )
+    .size(button::Size::Small)
+    .tip(crate::fl!("action-open"))
+    .open(open, |open| Control::Menu(Menu::Open, open))
+    .into()
+}
+
 /// The talkers on the AVB network plaa can listen to, the one it listens
-/// to checked, and stopping.
-fn connect_menu<'a>(
-    window: &'a PlayerWindow,
-    snapshot: &plaa_avb::Snapshot,
-) -> Element<'a, Control> {
+/// to checked, and stopping, the menu `open` or not.
+pub fn connect_menu<'a>(snapshot: &plaa_avb::Snapshot, open: bool) -> Element<'a, Control> {
     dropdown::icon_menu(Icon::Cable, crate::network::connect_entries(snapshot))
         .size(button::Size::Small)
         .tip(crate::fl!("action-connect"))
         .selected(crate::network::listening_here(snapshot))
-        .open(window.menu == Some(Menu::Connect), |open| {
-            Control::Menu(Menu::Connect, open)
-        })
+        .open(open, |open| Control::Menu(Menu::Connect, open))
         .into()
 }
 

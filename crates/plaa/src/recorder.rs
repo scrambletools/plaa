@@ -4,18 +4,21 @@
 //! and stop, how long and how large the recording is, and what to record
 //! from and in.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
-use iced::widget::{container, image, progress_bar, slider, space, toggler};
+use iced::widget::{container, image, opaque, progress_bar, slider, space, stack, toggler};
 use iced::{Center, Element, Fill, Theme};
 use plaa_media::capture::{Camera, Capture, Preview};
 use plaa_media::export::{Format, Sound};
 use plaa_media::record::{InputDevice, Microphone};
 use scramble_ui::button;
+use scramble_ui::component::Backdrop;
 use scramble_ui::dropdown::{self, Entry};
 use scramble_ui::{Icon, Scheme, Type, column, component, icon, style};
 
 use crate::format;
+use crate::window::{Control, Menu};
 
 /// What the recording window's controls send.
 #[derive(Debug, Clone)]
@@ -54,7 +57,19 @@ pub enum RecorderControl {
     Cancel,
     Settings,
     Close,
+    /// What the toolbar's Open, Connect, Network Audio and assistant
+    /// tools send, as in a player window.
+    Window(Control),
+    /// The finished recording's name, as typed.
+    Name(String),
+    /// The finished recording takes the name typed.
+    Rename,
+    /// The finished recording keeps the name it was saved with.
+    KeepName,
 }
+
+/// The text field a finished recording's name is typed in.
+pub const NAME_FIELD: &str = "recording-name";
 
 /// How much louder an input can be taken, in decibels.
 const MOST_GAIN: f32 = 30.0;
@@ -81,6 +96,15 @@ pub struct Recorder {
     pub hiding: bool,
     /// The menu of what to record is open.
     pub choosing: bool,
+    /// The Open or Connect menu is open, or a listener's formats in the
+    /// Network Audio sheet.
+    pub menu: Option<Menu>,
+    /// The Network Audio sheet is open beside the controls.
+    pub network: bool,
+    /// The listener chosen in the Network Audio sheet.
+    pub listener: Option<(plaa_avb::EntityId, u16)>,
+    /// The recording just saved, asking for its name.
+    pub naming: Option<Naming>,
     /// A camera's latest picture as the window shows it, mirrored, and
     /// its count.
     pub preview: Option<(u64, image::Handle)>,
@@ -94,6 +118,16 @@ pub struct Offered {
     pub id: u64,
     pub window: bool,
     pub name: String,
+}
+
+/// A finished recording, waiting for the name the user gives it.
+pub struct Naming {
+    /// Where it was saved.
+    pub path: PathBuf,
+    /// The name as typed, without the file's extension.
+    pub name: String,
+    /// Why the name typed could not be given.
+    pub error: Option<String>,
 }
 
 /// How a recording that hides plaa is stopped, as its warning says.
@@ -128,6 +162,10 @@ impl Recorder {
             warning: None,
             hiding: false,
             choosing: false,
+            menu: None,
+            network: false,
+            listener: None,
+            naming: None,
             preview: None,
         }
     }
@@ -143,6 +181,10 @@ impl Recorder {
             warning: None,
             hiding: false,
             choosing: false,
+            menu: None,
+            network: false,
+            listener: None,
+            naming: None,
             preview: None,
         }
     }
@@ -237,6 +279,10 @@ pub struct Context<'a> {
     /// The cameras there are.
     pub cameras: &'a [Camera],
     pub close_button: bool,
+    /// The AVB network, while plaa is on one.
+    pub avb: Option<std::sync::Arc<plaa_avb::Snapshot>>,
+    /// The assistant's panel is open beside the window.
+    pub assistant_open: bool,
 }
 
 pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, RecorderControl> {
@@ -247,18 +293,44 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
         Some(_) => (Icon::ScreenRecord, crate::fl!("record-screen-title")),
         None => (Icon::Mic, crate::fl!("record-title")),
     };
+    // Opening and connecting first, as in a player window, so more can
+    // be opened from here.
     let mut tools: Vec<Element<'a, RecorderControl>> = vec![
+        crate::window::open_menu(recorder.menu == Some(Menu::Open)).map(RecorderControl::Window),
+    ];
+    if let Some(snapshot) = &context.avb {
+        tools.push(
+            crate::window::connect_menu(snapshot, recorder.menu == Some(Menu::Connect))
+                .map(RecorderControl::Window),
+        );
+    }
+    tools.extend([
         icon::icon(glyph, 20)
             .style(style::on_surface_variant)
             .into(),
         scramble_ui::styled(title, Type::TitleMedium).into(),
         space().width(Fill).into(),
-        component::tool(
-            Icon::Settings,
-            crate::fl!("action-settings"),
-            Some(RecorderControl::Settings),
-        ),
-    ];
+    ]);
+    // The player's tools that need no file, so they stay while recording.
+    if context.avb.is_some() {
+        tools.push(component::toggle_tool(
+            Icon::Lan,
+            crate::fl!("action-network"),
+            recorder.network,
+            RecorderControl::Window(Control::ToggleNetwork),
+        ));
+    }
+    tools.push(component::toggle_tool(
+        Icon::SmartToy,
+        crate::fl!("action-assistant"),
+        context.assistant_open,
+        RecorderControl::Window(Control::ToggleAssistant),
+    ));
+    tools.push(component::tool(
+        Icon::Settings,
+        crate::fl!("action-settings"),
+        Some(RecorderControl::Settings),
+    ));
     if context.close_button {
         tools.push(component::tool(
             Icon::Close,
@@ -278,14 +350,83 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
         (Some(screen), None) => screen_body(recorder, screen, context),
         (None, _) => sound_body(recorder, context),
     };
-    column![
-        toolbar,
-        container(body)
-            .width(Fill)
-            .height(Fill)
-            .style(style::surface)
+    let body = container(body)
+        .width(Fill)
+        .height(Fill)
+        .style(style::surface);
+    let body: Element<'a, RecorderControl> = match (&context.avb, recorder.network) {
+        (Some(snapshot), true) => iced::widget::row![
+            body,
+            crate::network::sheet(snapshot.clone(), recorder.menu, recorder.listener)
+                .map(RecorderControl::Window)
+        ]
+        .into(),
+        _ => body.into(),
+    };
+    let window = column![toolbar, body];
+    match &recorder.naming {
+        Some(naming) => stack![window, naming_dialog(naming)].into(),
+        None => window.into(),
+    }
+}
+
+/// Asks the name of the recording just saved: kept as it is, or the one
+/// typed, why it could not be given below it.
+fn naming_dialog(naming: &Naming) -> Element<'_, RecorderControl> {
+    let shown = |path: &std::path::Path| {
+        plaa_store::paths::abbreviate_home(path)
+            .display()
+            .to_string()
+    };
+    let note = crate::fl!(
+        "record-name-note",
+        name = naming
+            .path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        folder = naming.path.parent().map(shown).unwrap_or_default()
+    );
+    let field = component::text_field(
+        crate::fl!("record-name-label"),
+        &naming.name,
+        Backdrop::ContainerHigh,
+        |input| {
+            input
+                .id(NAME_FIELD)
+                .on_input(RecorderControl::Name)
+                .on_submit(RecorderControl::Rename)
+        },
+    );
+    let mut body = column![
+        scramble_ui::styled(crate::fl!("record-name-title"), Type::HeadlineSmall),
+        scramble_ui::aligned(
+            scramble_ui::styled(note, Type::BodyMedium).style(style::on_surface_variant)
+        ),
+        field,
     ]
-    .into()
+    .spacing(16);
+    if let Some(error) = &naming.error {
+        body = body.push(scramble_ui::aligned(
+            scramble_ui::styled(error, Type::BodyMedium).style(style::error_text),
+        ));
+    }
+    let actions = vec![
+        scramble_ui::button(button::Kind::Text, crate::fl!("record-name-keep"))
+            .on_press(RecorderControl::KeepName)
+            .into(),
+        scramble_ui::button(button::Kind::Filled, crate::fl!("record-name-rename"))
+            .on_press_maybe((!naming.name.trim().is_empty()).then_some(RecorderControl::Rename))
+            .into(),
+    ];
+    let body = body.push(container(scramble_ui::dir::row(actions).spacing(8)).align_right(Fill));
+    let card = container(body)
+        .padding(24)
+        .width(Fill)
+        .max_width(420)
+        .style(style::dialog);
+    // Nothing under it takes the pointer while it asks.
+    opaque(container(card).center(Fill).padding(16).style(style::scrim))
 }
 
 /// A sound recording's controls.

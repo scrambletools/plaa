@@ -22,7 +22,7 @@ use crate::External;
 use crate::control::{Call, Error};
 
 /// The panel's width.
-const WIDTH: f32 = 380.0;
+pub(crate) const WIDTH: f32 = 380.0;
 
 /// The widest a tool's picture shows in the panel.
 const PICTURE_WIDTH: f32 = 300.0;

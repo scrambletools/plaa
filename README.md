@@ -108,8 +108,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   monitors on Linux, every output on Windows and macOS), with a level
   meter, a quiet input made up to 30 dB louder (kept for each input) and
   its level evened out automatically if chosen, in any of the export's
-  sound formats, to the Recordings folder; the window then plays the
-  recording, ready to trim and export.
+  sound formats, to a folder of its own, Music unless Settings choose
+  another; once it stops, plaa asks what to name it, and the window then
+  plays the recording, ready to trim and export.
 - **Record the screen** (Ctrl+Alt+N): a screen, a window or (on Linux)
   a region, as the system's picker offers on Linux and plaa lists them
   on Windows and macOS, with the pointer, and the sound
@@ -125,7 +126,9 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 - **Record a camera** (Ctrl+Alt+M), as QuickTime Player's New Movie
   Recording: the camera's picture shows, mirrored, as it records, with
   the sound of a microphone if chosen, in the screen recording's formats
-  and rates; the recording itself is as the camera sees.
+  and rates; the recording itself is as the camera sees. Screen and
+  camera recordings go to a folder apart from sound's, Videos (Movies
+  on macOS) unless Settings choose another, and are named the same way.
 - **Send what plays over AVB** (Milan): on Linux plaa becomes a talker
   entity of its own, named as Settings say, with a stereo stream on gPTP
   time in the formats the avb crates set for every endpoint: the AVB

@@ -77,9 +77,13 @@ pub struct Settings {
     /// defaults.
     pub audio_languages: Vec<String>,
     pub subtitle_languages: Vec<String>,
-    /// Where recordings are saved.
+    /// Where sound recordings are saved.
     #[serde(with = "home_path")]
-    pub recordings: PathBuf,
+    pub sound_recordings: PathBuf,
+    /// Where screen and camera recordings are saved. `recordings` named
+    /// the one folder all of them went to before.
+    #[serde(with = "home_path", alias = "recordings")]
+    pub video_recordings: PathBuf,
     /// The sound input device recordings come from, by the id the system
     /// gives it; the system's default when none.
     pub microphone: Option<String>,
@@ -160,7 +164,8 @@ impl Default for Settings {
             web_pages: true,
             audio_languages: Vec::new(),
             subtitle_languages: Vec::new(),
-            recordings: paths::default_recordings(),
+            sound_recordings: paths::default_sound_recordings(),
+            video_recordings: paths::default_video_recordings(),
             microphone: None,
             recording_format: "aac".to_owned(),
             recording_quality: 256,
@@ -359,14 +364,27 @@ impl Settings {
             return Ok(settings);
         }
         let text = std::fs::read_to_string(path).map_err(LoadError::Io)?;
-        let settings: Self = toml::from_str(&text).map_err(LoadError::Parse)?;
+        let mut settings: Self = toml::from_str(&text).map_err(LoadError::Parse)?;
         let present = toml::from_str::<toml::Table>(&text).map_err(LoadError::Parse)?;
+        settings.split_recordings(&present);
         let all = toml::Table::try_from(&settings)
             .map_err(|error| LoadError::Io(io::Error::other(error)))?;
         if all.keys().any(|key| !present.contains_key(key)) {
             settings.save_to(path).map_err(LoadError::Io)?;
         }
         Ok(settings)
+    }
+
+    /// A file from before sound recordings had a folder of their own goes
+    /// on saving them where it saved every recording, unless that was the
+    /// default videos folder.
+    fn split_recordings(&mut self, present: &toml::Table) {
+        if present.contains_key("recordings")
+            && !present.contains_key("sound-recordings")
+            && self.video_recordings != paths::default_video_recordings()
+        {
+            self.sound_recordings = self.video_recordings.clone();
+        }
     }
 
     /// A missing file yields the defaults.
@@ -407,7 +425,8 @@ mod tests {
             overlay: false,
             volume: 0.5,
             subtitle_languages: vec!["en".to_owned(), "fr".to_owned()],
-            recordings: PathBuf::from("/srv/recordings"),
+            sound_recordings: PathBuf::from("/srv/sound"),
+            video_recordings: PathBuf::from("/srv/video"),
             ..Settings::default()
         };
         settings.save_to(&path).unwrap();
@@ -424,6 +443,27 @@ mod tests {
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("hardware-decoding"));
         assert!(text.contains("overlay = false"));
+    }
+
+    #[test]
+    fn one_recordings_folder_becomes_two() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("plaa.toml");
+        std::fs::write(&path, "recordings = \"/srv/recordings\"\n").unwrap();
+        let loaded = Settings::load_or_create(&path).unwrap();
+        assert_eq!(loaded.video_recordings, PathBuf::from("/srv/recordings"));
+        assert_eq!(loaded.sound_recordings, loaded.video_recordings);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("video-recordings"));
+        assert!(!text.lines().any(|line| line.starts_with("recordings")));
+
+        let mut table = toml::Table::new();
+        let videos = paths::default_video_recordings();
+        table.insert("recordings".into(), videos.display().to_string().into());
+        std::fs::write(&path, toml::to_string(&table).unwrap()).unwrap();
+        let loaded = Settings::load_or_create(&path).unwrap();
+        assert_eq!(loaded.video_recordings, videos);
+        assert_eq!(loaded.sound_recordings, paths::default_sound_recordings());
     }
 
     #[test]

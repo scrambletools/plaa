@@ -64,6 +64,9 @@ The first build.
 - Recording the screen or a window on Windows, through Windows.Graphics.
   Capture, and recording what the computer plays there through each
   output's loopback.
+- Each recording named as it finishes, and saved to the folder Settings
+  choose for its kind: sound to Music, screen and camera to Videos at
+  first.
 - A visualizer under a sound file's cover: the spectrum of what is
   heard, or the file's waveform, which seeks where it is clicked.
 - plaa as an AVB talker on Linux: a Milan entity of its own sending what

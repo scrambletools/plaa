@@ -1,8 +1,10 @@
 //! Recording sound or the screen in a window of its own: opening it, its
-//! controls, and playing the recording once it is saved.
+//! controls, and naming and playing the recording once it is saved.
 
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use iced::widget::operation;
 use iced::{Element, Size, Task, window};
 use plaa_media::capture::{Capture, VideoEncoding};
 use plaa_media::export::{Format, Sound};
@@ -14,6 +16,7 @@ use crate::External;
 use crate::playlist::Playlist;
 use crate::recorder::{self, Recorder, RecorderControl};
 use crate::shortcuts::Action;
+use crate::window::Control;
 
 /// The recording window's size.
 const RECORDER_SIZE: Size = Size::new(440.0, 460.0);
@@ -332,9 +335,89 @@ impl Plaa {
                 offers: &self.offers,
                 cameras: &self.cameras,
                 close_button,
+                avb: self.avb.as_ref().map(|_| self.avb_snapshot.clone()),
+                assistant_open: self
+                    .windows
+                    .get(&id)
+                    .and_then(|window| window.assistant.as_ref())
+                    .is_some_and(|panel| panel.open),
             },
         )
         .map(move |control| Message::Recorder(id, control))
+    }
+
+    /// The toolbar tools of recording window `id`, as a player window's: a
+    /// menu opening or closing, or what it chose, which closes it; the
+    /// Network Audio sheet and the assistant's panel, the window widening
+    /// for them.
+    fn recorder_menu(&mut self, id: window::Id, control: Control) -> Task<Message> {
+        let Some(window) = self.windows.get_mut(&id) else {
+            return Task::none();
+        };
+        let Content::Recorder(recorder) = &mut window.content else {
+            return Task::none();
+        };
+        match control {
+            Control::Menu(menu, open) => {
+                recorder.menu = open.then_some(menu);
+                Task::none()
+            }
+            Control::AvbChoose(listener) => {
+                recorder.listener = Some(listener);
+                Task::none()
+            }
+            Control::ToggleNetwork => {
+                recorder.network = !recorder.network;
+                let wider = if recorder.network { 1.0 } else { -1.0 };
+                widen(
+                    id,
+                    window.size,
+                    wider * scramble_ui::component::SIDE_SHEET_WIDTH,
+                )
+            }
+            Control::ToggleAssistant => {
+                let was_open = window.assistant.as_ref().is_some_and(|panel| panel.open);
+                let size = window.size;
+                let wider = if was_open { -1.0 } else { 1.0 };
+                self.toggle_assistant(id).chain(widen(
+                    id,
+                    size,
+                    wider * super::assistant::PANEL_WIDTH,
+                ))
+            }
+            control => {
+                recorder.menu = None;
+                self.control(id, control)
+            }
+        }
+    }
+
+    /// The name window `id`'s finished recording is given: the one typed,
+    /// or the one it was saved with. The window then plays it.
+    fn named(&mut self, id: window::Id, keep: bool) -> Task<Message> {
+        let Some(window) = self.windows.get_mut(&id) else {
+            return Task::none();
+        };
+        let Content::Recorder(recorder) = &mut window.content else {
+            return Task::none();
+        };
+        let Some(naming) = &mut recorder.naming else {
+            return Task::none();
+        };
+        let path = if keep {
+            naming.path.clone()
+        } else {
+            match renamed(&naming.path, &naming.name) {
+                Ok(path) => path,
+                Err(error) => {
+                    naming.error = Some(error);
+                    return Task::none();
+                }
+            }
+        };
+        recorder.naming = None;
+        self.play_recording(id, path);
+        Task::none()
     }
 
     pub(super) fn recorder_control(
@@ -345,6 +428,9 @@ impl Plaa {
         match control {
             RecorderControl::Settings => return self.perform(id, Action::Settings),
             RecorderControl::Close => return window::close(id),
+            RecorderControl::Window(control) => return self.recorder_menu(id, control),
+            RecorderControl::Rename => return self.named(id, false),
+            RecorderControl::KeepName => return self.named(id, true),
             RecorderControl::Reshare => return self.open_screen_recorder(id),
             // Windows and cameras come and go: the menu lists them as
             // they are.
@@ -374,7 +460,8 @@ impl Plaa {
             hardware: self.settings.hardware_decoding,
             rate: Some(self.settings.screen_rate).filter(|rate| *rate > 0),
         };
-        let folder = self.settings.recordings.clone();
+        let sound_folder = self.settings.sound_recordings.clone();
+        let video_folder = self.settings.video_recordings.clone();
         // One recording hides at a time.
         let can_hide = self.hidden.is_none();
         let Some(window) = self.windows.get_mut(&id) else {
@@ -412,7 +499,7 @@ impl Plaa {
                     return Task::none();
                 }
                 let after = if hides { HIDING } else { Duration::ZERO };
-                match record_screen(recorder, id, encoding, &folder, after) {
+                match record_screen(recorder, id, encoding, &video_folder, after) {
                     Ok(()) if hides => {
                         recorder.hiding = true;
                         return window::close(id);
@@ -424,6 +511,10 @@ impl Plaa {
                 }
             }
             RecorderControl::Toggle => {
+                // A recording being saved, or named, comes first.
+                if recorder.saving {
+                    return Task::none();
+                }
                 let Some(Ok(microphone)) = &mut recorder.microphone else {
                     return Task::none();
                 };
@@ -433,10 +524,10 @@ impl Plaa {
                     return Task::none();
                 }
                 let name = format!("{}.{}", crate::fl!("record-file-name"), sound.0.extension());
-                let started = std::fs::create_dir_all(&folder)
+                let started = std::fs::create_dir_all(&sound_folder)
                     .map_err(|error| error.to_string())
                     .and_then(|()| {
-                        let destination = crate::screenshot::unused(&folder.join(name));
+                        let destination = crate::screenshot::unused(&sound_folder.join(name));
                         microphone.record(destination, sound, move |event| {
                             crate::post(External::Recorded(id, event));
                         })
@@ -446,6 +537,12 @@ impl Plaa {
                 }
             }
             RecorderControl::Cancel => recorder.warning = None,
+            RecorderControl::Name(name) => {
+                if let Some(naming) = &mut recorder.naming {
+                    naming.name = name;
+                    naming.error = None;
+                }
+            }
             RecorderControl::Choosing(open) => recorder.choosing = open,
             RecorderControl::Camera(camera) => {
                 recorder.choosing = false;
@@ -549,7 +646,10 @@ impl Plaa {
             RecorderControl::Settings
             | RecorderControl::Close
             | RecorderControl::Reshare
-            | RecorderControl::Hide => {}
+            | RecorderControl::Hide
+            | RecorderControl::Window(_)
+            | RecorderControl::Rename
+            | RecorderControl::KeepName => {}
         }
         Task::none()
     }
@@ -589,7 +689,46 @@ impl Plaa {
         self.hidden.as_mut().map(|hidden| &mut *hidden.recorder)
     }
 
-    /// What window `id`'s recording says: once saved, the window plays it.
+    /// Window `id` plays its recording, saved as `path`, if it still shows
+    /// the recorder, and says where it was saved.
+    fn play_recording(&mut self, id: window::Id, path: PathBuf) {
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let folder = path
+            .parent()
+            .map(|folder| {
+                plaa_store::paths::abbreviate_home(folder)
+                    .display()
+                    .to_string()
+            })
+            .unwrap_or_default();
+        let recording = self
+            .windows
+            .get(&id)
+            .is_some_and(|window| matches!(window.content, Content::Recorder(_)));
+        if recording && let Some(list) = Playlist::new(vec![Source::File(path)], 0) {
+            self.open_player(
+                id,
+                list,
+                Opening {
+                    quality: Quality::Best,
+                    page: None,
+                    start: None,
+                    paused: true,
+                    moving_on: false,
+                },
+            );
+        }
+        self.notify(
+            id,
+            crate::fl!("notice-recorded", name = name, folder = folder),
+        );
+    }
+
+    /// What window `id`'s recording says: once saved, the window asks its
+    /// name, then plays it.
     pub(super) fn recorded(&mut self, id: window::Id, event: RecordEvent) -> Task<Message> {
         let RecordEvent::Finished(result) = event;
         // A recording that hid comes back in a window of its own, which
@@ -607,41 +746,26 @@ impl Plaa {
             (id, task) = self.show_recorder(id, *recorder, SCREEN_RECORDER_SIZE);
         }
         match result {
+            // A window still recording asks the recording's name first.
             Ok(path) => {
-                let name = path
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default();
-                let folder = path
-                    .parent()
-                    .map(|folder| {
-                        plaa_store::paths::abbreviate_home(folder)
-                            .display()
-                            .to_string()
-                    })
-                    .unwrap_or_default();
-                // Only a window still recording turns into a player.
-                let recording = self
-                    .windows
-                    .get(&id)
-                    .is_some_and(|window| matches!(window.content, Content::Recorder(_)));
-                if recording && let Some(list) = Playlist::new(vec![Source::File(path)], 0) {
-                    self.open_player(
-                        id,
-                        list,
-                        Opening {
-                            quality: Quality::Best,
-                            page: None,
-                            start: None,
-                            paused: true,
-                            moving_on: false,
-                        },
-                    );
+                if let Some(window) = self.windows.get_mut(&id)
+                    && let Content::Recorder(recorder) = &mut window.content
+                {
+                    let name = path
+                        .file_stem()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    recorder.naming = Some(recorder::Naming {
+                        path,
+                        name,
+                        error: None,
+                    });
+                    recorder.menu = None;
+                    return task
+                        .chain(operation::focus(recorder::NAME_FIELD))
+                        .chain(operation::select_all(recorder::NAME_FIELD));
                 }
-                self.notify(
-                    id,
-                    crate::fl!("notice-recorded", name = name, folder = folder),
-                );
+                self.play_recording(id, path);
             }
             Err(error) => {
                 if let Some(window) = self.windows.get_mut(&id)
@@ -658,5 +782,99 @@ impl Plaa {
             }
         }
         task
+    }
+}
+
+/// Window `id` `by` wider, or narrower when negative, from `size`.
+fn widen(id: window::Id, size: Size, by: f32) -> Task<Message> {
+    window::resize(id, Size::new((size.width + by).max(1.0), size.height))
+}
+
+/// Characters no file name can have on some system plaa runs on.
+const NOT_IN_NAMES: [char; 9] = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+
+/// Gives the recording at `path` the name `name`, keeping its extension:
+/// where it is then, or why it could not. A file there by that name stays.
+fn renamed(path: &Path, name: &str) -> Result<PathBuf, String> {
+    let extension = path
+        .extension()
+        .map(|extension| extension.to_string_lossy().into_owned());
+    let name = name.trim();
+    // Typed with the extension, it is not added again.
+    let stem = extension
+        .as_ref()
+        .and_then(|extension| {
+            name.len()
+                .checked_sub(extension.len() + 1)
+                .filter(|&at| name.is_char_boundary(at))
+                .filter(|&at| name[at..].eq_ignore_ascii_case(&format!(".{extension}")))
+                .map(|at| name[..at].trim_end())
+        })
+        .unwrap_or(name);
+    if stem.is_empty() || path.file_stem().is_some_and(|current| current == stem) {
+        return Ok(path.to_owned());
+    }
+    if stem.contains(NOT_IN_NAMES) || stem.chars().any(char::is_control) {
+        return Err(crate::fl!("record-name-invalid"));
+    }
+    let file = match &extension {
+        Some(extension) => format!("{stem}.{extension}"),
+        None => stem.to_owned(),
+    };
+    let destination = path.with_file_name(&file);
+    if destination.exists() {
+        return Err(crate::fl!("record-name-taken", name = file));
+    }
+    std::fs::rename(path, &destination)
+        .map_err(|error| crate::fl!("record-name-failed", error = error.to_string()))?;
+    Ok(destination)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn saved(dir: &tempfile::TempDir, file: &str) -> PathBuf {
+        let path = dir.path().join(file);
+        std::fs::write(&path, b"sound").unwrap();
+        path
+    }
+
+    #[test]
+    fn a_recording_takes_the_name_typed_and_keeps_its_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = saved(&dir, "Sound recording.m4a");
+        let renamed = renamed(&path, "  Interview  ").unwrap();
+        assert_eq!(renamed, dir.path().join("Interview.m4a"));
+        assert!(renamed.exists() && !path.exists());
+    }
+
+    #[test]
+    fn an_extension_typed_is_not_added_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = saved(&dir, "Sound recording.m4a");
+        let renamed = renamed(&path, "Interview.M4A").unwrap();
+        assert_eq!(renamed, dir.path().join("Interview.m4a"));
+    }
+
+    #[test]
+    fn the_same_name_or_none_leaves_the_recording_as_it_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = saved(&dir, "Sound recording.m4a");
+        assert_eq!(renamed(&path, "Sound recording").unwrap(), path);
+        assert_eq!(renamed(&path, "   ").unwrap(), path);
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn a_name_cannot_leave_the_folder_or_replace_a_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = saved(&dir, "Sound recording.m4a");
+        let other = saved(&dir, "Interview.m4a");
+        assert!(renamed(&path, "../Interview").is_err());
+        assert!(renamed(&path, "a\\b").is_err());
+        assert!(renamed(&path, "Interview").is_err());
+        assert_eq!(std::fs::read(&other).unwrap(), b"sound");
+        assert!(path.exists());
     }
 }

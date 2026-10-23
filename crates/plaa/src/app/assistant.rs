@@ -10,7 +10,7 @@ use crate::settings_view::SettingsMessage;
 
 mod panel;
 
-pub(crate) use panel::{Heard, Panel, PanelMessage};
+pub(crate) use panel::{Heard, Panel, PanelMessage, WIDTH as PANEL_WIDTH};
 
 /// The keychain service plaa's keys are under.
 fn keychain_service() -> &'static str {

@@ -19,6 +19,7 @@ pub enum SettingsTab {
     #[default]
     Appearance,
     Playback,
+    Storage,
     Network,
     Language,
     Agents,
@@ -28,7 +29,8 @@ pub enum SettingsTab {
 /// The folders Settings chooses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Folder {
-    Recordings,
+    SoundRecordings,
+    VideoRecordings,
     Screenshots,
 }
 
@@ -101,8 +103,8 @@ pub fn chosen_accent(settings: &Settings) -> Color {
 
 /// How tall the dialog is at most, so it keeps one height across tabs.
 const DIALOG_HEIGHT: f32 = 640.0;
-/// How wide it is, room for its six tabs.
-const DIALOG_WIDTH: f32 = 600.0;
+/// How wide it is at most, room for its seven tabs.
+const DIALOG_WIDTH: f32 = 720.0;
 
 fn note<'a>(text: String) -> Element<'a, SettingsMessage> {
     scramble_ui::aligned(
@@ -231,6 +233,7 @@ impl Plaa {
                 SettingsTab::Appearance,
             ),
             tab(crate::fl!("settings-tab-playback"), SettingsTab::Playback),
+            tab(crate::fl!("settings-tab-storage"), SettingsTab::Storage),
             tab(crate::fl!("settings-tab-network"), SettingsTab::Network),
             tab(crate::fl!("settings-tab-language"), SettingsTab::Language),
             tab(crate::fl!("settings-tab-agents"), SettingsTab::Agents),
@@ -254,6 +257,7 @@ impl Plaa {
         let mut content = match self.settings_tab {
             SettingsTab::Appearance => self.appearance_settings(),
             SettingsTab::Playback => self.playback_settings(),
+            SettingsTab::Storage => self.storage_settings(),
             SettingsTab::Network => self.network_settings(),
             SettingsTab::Language => self.language_settings(),
             SettingsTab::Agents => self.agent_settings(),
@@ -293,11 +297,14 @@ impl Plaa {
             left: 24.0,
         })
         .center_x(Fill);
-        let window_height = self
+        let window_size = self
             .windows
             .get(&id)
-            .map_or(DIALOG_HEIGHT, |window| window.size.height);
-        let height = (window_height - 48.0).clamp(240.0, DIALOG_HEIGHT);
+            .map_or(iced::Size::new(DIALOG_WIDTH, DIALOG_HEIGHT), |window| {
+                window.size
+            });
+        let height = (window_size.height - 48.0).clamp(240.0, DIALOG_HEIGHT);
+        let width = (window_size.width - 48.0).clamp(320.0, DIALOG_WIDTH);
         let card = container(column![
             container(header).padding(iced::Padding {
                 top: 24.0,
@@ -316,7 +323,7 @@ impl Plaa {
             .height(Fill),
             footer,
         ])
-        .width(Length::Fixed(DIALOG_WIDTH))
+        .width(Length::Fixed(width))
         .height(Length::Fixed(height))
         .style(style::dialog);
         // A click on the dimmed window around the dialog closes it.
@@ -447,7 +454,7 @@ impl Plaa {
         .spacing(12)
     }
 
-    /// Decoding, resuming, and where recordings and pictures go.
+    /// Decoding, resuming, folders played as lists, and streams.
     fn playback_settings(&self) -> iced::widget::Column<'_, SettingsMessage> {
         column![
             switch_row(
@@ -481,11 +488,23 @@ impl Plaa {
                 self.settings.web_pages,
                 SettingsMessage::WebPages,
             ),
+        ]
+        .spacing(12)
+    }
+
+    /// Where new recordings and screenshots go.
+    fn storage_settings(&self) -> iced::widget::Column<'_, SettingsMessage> {
+        column![
             component::section(crate::fl!("settings-folders")),
             folder_row(
-                crate::fl!("settings-recordings"),
-                &self.settings.recordings,
-                Folder::Recordings
+                crate::fl!("settings-sound-recordings"),
+                &self.settings.sound_recordings,
+                Folder::SoundRecordings
+            ),
+            folder_row(
+                crate::fl!("settings-video-recordings"),
+                &self.settings.video_recordings,
+                Folder::VideoRecordings
             ),
             folder_row(
                 crate::fl!("settings-screenshots"),
@@ -1271,9 +1290,13 @@ impl Plaa {
             }
             SettingsMessage::ChooseFolder(folder) => {
                 let (title, current) = match folder {
-                    Folder::Recordings => (
-                        crate::fl!("settings-recordings"),
-                        self.settings.recordings.clone(),
+                    Folder::SoundRecordings => (
+                        crate::fl!("settings-sound-recordings"),
+                        self.settings.sound_recordings.clone(),
+                    ),
+                    Folder::VideoRecordings => (
+                        crate::fl!("settings-video-recordings"),
+                        self.settings.video_recordings.clone(),
                     ),
                     Folder::Screenshots => (
                         crate::fl!("settings-screenshots"),
@@ -1287,7 +1310,8 @@ impl Plaa {
             }
             SettingsMessage::FolderChosen(folder, result) => match result {
                 Ok(Some(path)) => match folder {
-                    Folder::Recordings => self.settings.recordings = path,
+                    Folder::SoundRecordings => self.settings.sound_recordings = path,
+                    Folder::VideoRecordings => self.settings.video_recordings = path,
                     Folder::Screenshots => self.settings.screenshots = path,
                 },
                 Ok(None) => return Task::none(),

@@ -108,9 +108,15 @@ fn application_support() -> Option<PathBuf> {
     home().map(|home| home.join("Library/Application Support").join(APP_DIR))
 }
 
-/// The folder recordings go to by default: the user's videos folder
-/// (`Movies` on macOS), else the home folder.
-pub fn default_recordings() -> PathBuf {
+/// The folder sound recordings go to by default: the user's music
+/// folder, else the home folder.
+pub fn default_sound_recordings() -> PathBuf {
+    user_folder("XDG_MUSIC_DIR", "Music")
+}
+
+/// The folder screen and camera recordings go to by default: the user's
+/// videos folder (`Movies` on macOS), else the home folder.
+pub fn default_video_recordings() -> PathBuf {
     let videos = if cfg!(target_os = "macos") {
         "Movies"
     } else {
@@ -140,7 +146,7 @@ fn user_folder(variable: &str, name: &str) -> PathBuf {
 }
 
 /// Reads `$XDG_CONFIG_HOME/user-dirs.dirs`, where desktops say which
-/// folder holds videos or pictures in the user's language.
+/// folder holds music, videos or pictures in the user's language.
 #[cfg(not(any(windows, target_os = "macos")))]
 fn user_dirs_entry(home: &Path, variable: &str) -> Option<PathBuf> {
     let file = xdg_dir("XDG_CONFIG_HOME", ".config")?.join("user-dirs.dirs");
