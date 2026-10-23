@@ -70,6 +70,9 @@ pub struct Plaa {
     pub(crate) settings: Settings,
     settings_path: Option<PathBuf>,
     pub(crate) settings_error: Option<String>,
+    /// The assistant's models, as the file the apps share has them.
+    pub(crate) assistant_models: Vec<assistant::AssistantModel>,
+    models_path: Option<PathBuf>,
     positions: Positions,
     positions_path: Option<PathBuf>,
     positions_saved: Instant,
@@ -285,8 +288,9 @@ pub enum Message {
     SystemAccent(Option<(u8, u8, u8)>),
     AnimationsEnabled(Option<bool>),
     Settings(SettingsMessage),
-    /// The portal had no answer.
-    #[cfg(target_os = "linux")]
+    /// The assistant's models, saved again by plaa or another app.
+    Models(Result<Vec<assistant::AssistantModel>, String>),
+    /// Nothing to do, as when the portal had no answer.
     Nothing,
     /// What the system shared for a screen recording, if anything.
     #[cfg(target_os = "linux")]
@@ -352,6 +356,8 @@ impl Plaa {
             settings,
             settings_path,
             settings_error,
+            assistant_models: Vec::new(),
+            models_path: scramble_ui::assistant::file(plaa_store::paths::PRODUCTION),
             positions,
             positions_path,
             positions_saved: Instant::now(),
@@ -396,6 +402,7 @@ impl Plaa {
             model_form: assistant::ModelForm::default(),
             next_surface: 1,
         };
+        let models = plaa.load_models();
         plaa.apply_looks();
         plaa.apply_avb();
         plaa.reload_omarchy();
@@ -415,7 +422,7 @@ impl Plaa {
             Message::AnimationsEnabled,
         );
         let accent = Task::perform(scramble_ui::desktop::accent_color(), Message::SystemAccent);
-        (plaa, Task::batch([task, system, motion, accent]))
+        (plaa, Task::batch([task, system, motion, accent, models]))
     }
 
     /// Hands the settings that change how components look to scramble-ui.
@@ -1424,7 +1431,10 @@ impl Plaa {
                 Task::none()
             }
             Message::Settings(message) => self.settings_update(message),
-            #[cfg(target_os = "linux")]
+            Message::Models(models) => {
+                self.models_loaded(models);
+                Task::none()
+            }
             Message::Nothing => Task::none(),
         }
     }
@@ -2246,6 +2256,13 @@ impl Plaa {
             iced::system::theme_changes().map(Message::SystemTheme),
             Subscription::run(scramble_ui::desktop::accent_changes).map(Message::SystemAccent),
             Subscription::run(crate::external_events).map(Message::External),
+            match &self.models_path {
+                Some(path) => Subscription::run_with(path.clone(), |path| {
+                    scramble_ui::assistant::changes(path.clone())
+                })
+                .map(Message::Models),
+                None => Subscription::none(),
+            },
             window::close_events().map(Message::WindowClosed),
             window::close_requests().map(Message::CloseRequested),
             event::listen_with(|event, status, id| match (event, status) {

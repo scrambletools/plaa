@@ -125,10 +125,12 @@ pub struct Settings {
     pub allowed_agents: Vec<String>,
     /// What plaa asks about before an agent's tool runs.
     pub ask_before: AskBefore,
-    /// The models the assistant panel can use. Their keys are in the
-    /// system keychain, not here.
-    pub assistant_models: Vec<AssistantModel>,
-    /// The id of the model the panel uses.
+    /// Models set up before the apps shared them, which plaa moves to the
+    /// shared file as it starts; kept here only until they are there.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub assistant_models: Vec<toml::Table>,
+    /// The id of the model the panel uses, of those in the file the
+    /// apps share.
     pub assistant_model: Option<String>,
     /// How much louder each input is taken, in decibels, by the id the
     /// system gives it; "" for the system's default.
@@ -188,29 +190,6 @@ impl Default for Settings {
             keys: toml::Table::new(),
         }
     }
-}
-
-/// A model the assistant panel can use.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct AssistantModel {
-    /// Names the model's key in the keychain, and the model here.
-    pub id: String,
-    /// `anthropic`, `open-ai`, `gemini`, `ollama` or `open-ai-compatible`.
-    pub provider: String,
-    pub model: String,
-    /// The server's address, for a local or compatible server.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub address: Option<String>,
-    /// How much a local model reads at once, in tokens, when plaa sets it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<u32>,
-    /// The provider's name for the model, when it gives one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    /// Whether the model sees pictures, when the provider said.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vision: Option<bool>,
 }
 
 /// Whether plaa asks before an agent's tool of each kind runs. Nothing
@@ -464,6 +443,26 @@ mod tests {
         let loaded = Settings::load_or_create(&path).unwrap();
         assert_eq!(loaded.video_recordings, videos);
         assert_eq!(loaded.sound_recordings, paths::default_sound_recordings());
+    }
+
+    #[test]
+    fn models_from_before_sharing_are_read_until_moved() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("plaa.toml");
+        let text = "assistant-model = \"ollama-a\"\n\n[[assistant-models]]\nid = \"ollama-a\"\nprovider = \"ollama\"\nmodel = \"a\"\n";
+        std::fs::write(&path, text).unwrap();
+        let mut loaded = Settings::load_or_create(&path).unwrap();
+        assert_eq!(loaded.assistant_models.len(), 1);
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("[[assistant-models]]")
+        );
+        loaded.assistant_models.clear();
+        loaded.save_to(&path).unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(!saved.contains("assistant-models"));
+        assert!(saved.contains("assistant-model = \"ollama-a\""));
     }
 
     #[test]

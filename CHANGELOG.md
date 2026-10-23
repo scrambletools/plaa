@@ -124,3 +124,7 @@ The first build.
   clean system by the Release workflow before a release goes out.
 - `plaa --interfaces` says whether plaa may use raw Ethernet and which
   wired interfaces could send an AVB stream.
+- The assistant's models and keys shared with the other Scramble Tools
+  apps, such as prev, in `~/.config/scramble/assistant.toml`: set up in
+  one, they are there in the others, and a change reaches them while
+  they run.

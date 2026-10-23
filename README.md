@@ -175,7 +175,11 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
   streams or the picture shown, and plays, pauses, seeks or changes the
   sound for you. Use a local model that stays on your computer, such as
   Ollama's, or a cloud model from Anthropic, OpenAI or Google with your
-  own key, kept in the system's keychain.
+  own key, kept in the system's keychain. The models and keys are shared
+  with the other Scramble Tools apps, such as prev: set up in one, they
+  are there in the others, kept in `~/.config/scramble/assistant.toml`
+  (`%APPDATA%\scramble\` on Windows, `~/Library/Application Support/scramble/`
+  on macOS); each app chooses which one it uses.
 - **AI agents**: `plaa --mcp` serves plaa's tools over MCP, so Claude
   Code or a local model in an MCP client can see what plays in the plaa
   you are using, and play, pause, seek, loop, change the volume and
