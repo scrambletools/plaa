@@ -46,8 +46,8 @@ const INSTANCE: u8 = 0x70;
 /// plaa's entity model, under Scramble Tools' MA-S block, as triib's. Its
 /// revision, the last octet, goes up as the model changes, so controllers
 /// that keep models by their ID read it again: 2 brought the logos, 3 the
-/// stream input.
-const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0004);
+/// stream input, 4 the profiles' formats, 5 the new icon.
+const ENTITY_MODEL: EntityModelId = EntityModelId(0x8c1f_6436_c020_0005);
 
 /// plaa's app icon, which controllers show the entity with.
 const LOGO: &[u8] = include_bytes!("../../../data/icons/hicolor/128x128/apps/run.plaa.png");
