@@ -152,6 +152,10 @@ a part of another file, or play another file's sound or picture over a
 part, such as music under a video or a voice over it, or make a part
 silent or black. The clips show each file's pictures, and the edit plays
 and exports as it will be.</p>
+<p>They can also put the picture or the sound through FFmpeg's filters,
+for all of it or a part: black and white, color and contrast, a crop,
+sharpening, a title, less noise or an even loudness. plaa checks each
+filter before it runs, and the result plays at once.</p>
 
 <h2 id="exporting">Exporting</h2>
 <figure><img class="shot" src="screenshots/tour-export.webp" alt="The Export dialog over Big Buck Bunny looking up at a butterfly on a tree: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p" width="1360" height="850" loading="lazy"></figure>
@@ -256,6 +260,7 @@ listens on no network.</p>
 <tr><td><code>trim</code>, <code>cut</code>, <code>split</code>, <code>move_clip</code></td><td>Keeping a part, taking one out, splitting and ordering clips</td></tr>
 <tr><td><code>insert</code></td><td>Putting in part of another file, or of the same one</td></tr>
 <tr><td><code>replace</code></td><td>Another file's sound or picture over a part, or silence, or black</td></tr>
+<tr><td><code>apply_filter</code>, <code>remove_filters</code></td><td>FFmpeg's filters on the picture or sound, such as black and white, checked before they run</td></tr>
 <tr><td><code>turn_picture</code>, <code>undo</code></td><td>Turning or flipping the picture; undo, redo and undoing all</td></tr>
 <tr><td><code>export</code></td><td>Writing the edit to a new file, as the Export dialog does</td></tr>
 </tbody>

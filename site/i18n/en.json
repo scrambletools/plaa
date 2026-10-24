@@ -550,6 +550,10 @@
   "page": "tour.html",
   "text": "Ask the assistant, or an agent, and the edit can mix files too: put in a part of another file, or play another file's sound or picture over a part, such as music under a video or a voice over it, or make a part silent or black. The clips show each file's pictures, and the edit plays and exports as it will be."
  },
+ "14143300b3e3": {
+  "page": "tour.html",
+  "text": "They can also put the picture or the sound through FFmpeg's filters, for all of it or a part: black and white, color and contrast, a crop, sharpening, a title, less noise or an even loudness. plaa checks each filter before it runs, and the result plays at once."
+ },
  "c37343fbc2a7": {
   "page": "tour.html",
   "text": "Exporting"
@@ -765,6 +769,14 @@
  "12221a166e0f": {
   "page": "tour.html",
   "text": "Another file's sound or picture over a part, or silence, or black"
+ },
+ "2ce8dd0a2d1e": {
+  "page": "tour.html",
+  "text": "<code>apply_filter</code>, <code>remove_filters</code>"
+ },
+ "25249e13f856": {
+  "page": "tour.html",
+  "text": "FFmpeg's filters on the picture or sound, such as black and white, checked before they run"
  },
  "cf3b315170a3": {
   "page": "tour.html",
@@ -1363,6 +1375,14 @@
   "page": "specs.html",
   "text": "Trim, split into clips, arrange and remove clips, rotate, flip; undo and redo; nothing changes until you export"
  },
+ "96e578211aa2": {
+  "page": "specs.html",
+  "text": "Filters"
+ },
+ "5c63545dbe1a": {
+  "page": "specs.html",
+  "text": "Through agents and the assistant: FFmpeg's filters on the picture or sound, all of it or a part, such as black and white, color, crop, sharpening, titles, noise reduction and loudness; checked before they run, played at once and exported"
+ },
  "2eea3936b16f": {
   "page": "specs.html",
   "text": "Mixing files"
@@ -1627,13 +1647,13 @@
   "page": "specs.html",
   "text": "plaa asks before letting a new agent in, and remembers Allow; Settings lists allowed agents, and outside control can be turned off"
  },
- "516cb53f0b58": {
+ "0b04c9045823": {
   "page": "specs.html",
-  "text": "Tools (31)"
+  "text": "Tools (33)"
  },
- "a0492d72820e": {
+ "64dab8d5cee4": {
   "page": "specs.html",
-  "text": "<code>list_windows</code>, <code>get_status</code>, <code>get_info</code>, <code>get_frame</code>, <code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code>, <code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code>, <code>next_item</code>, <code>previous_item</code>, <code>set_fullscreen</code>, <code>focus_window</code>, <code>open</code> and <code>close_window</code>; <code>get_frames</code>, <code>get_levels</code>, <code>get_subtitles</code> and <code>get_sound</code>; <code>get_edit</code>, <code>trim</code>, <code>cut</code>, <code>split</code>, <code>move_clip</code>, <code>insert</code>, <code>replace</code>, <code>turn_picture</code>, <code>undo</code> and <code>export</code>"
+  "text": "<code>list_windows</code>, <code>get_status</code>, <code>get_info</code>, <code>get_frame</code>, <code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code>, <code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code>, <code>next_item</code>, <code>previous_item</code>, <code>set_fullscreen</code>, <code>focus_window</code>, <code>open</code> and <code>close_window</code>; <code>get_frames</code>, <code>get_levels</code>, <code>get_subtitles</code> and <code>get_sound</code>; <code>get_edit</code>, <code>trim</code>, <code>cut</code>, <code>split</code>, <code>move_clip</code>, <code>insert</code>, <code>replace</code>, <code>apply_filter</code>, <code>remove_filters</code>, <code>turn_picture</code>, <code>undo</code> and <code>export</code>"
  },
  "cffa2af0a3a6": {
   "page": "specs.html",
