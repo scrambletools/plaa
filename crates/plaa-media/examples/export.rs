@@ -5,7 +5,8 @@
 //! [--lines <lines>] [--software] [--clips <from>-<to>,...] [--turns
 //! <quarter turns>] [--mirror] [--streams <picture>,<sound>] [--insert
 //! <file>@<at>] [--sound <file>@<from>-<to>] [--picture <file>@<from>-<to>]
-//! <file> <to>
+//! [--picture-filter <filters>[@<from>-<to>]] [--sound-filter
+//! <filters>[@<from>-<to>]] <file> <to>
 //!
 //! The streams are the picture's and the sound's numbers in the file, 0
 //! and 1 unless given, `-` for none. --insert puts another file in at a
@@ -17,6 +18,7 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Instant;
 
+use plaa_media::edit::Filters;
 use plaa_media::export::{Export, ExportEvent, Format, Job, Sound};
 use plaa_media::{Clip, Edit, Feed, MediaInfo, Other, Track};
 
@@ -24,6 +26,19 @@ use plaa_media::{Clip, Edit, Feed, MediaInfo, Other, Track};
 enum Change {
     Insert(PathBuf, f64),
     Replace(Track, Option<PathBuf>, f64, f64),
+    Filter(Track, String, Option<(f64, f64)>),
+}
+
+/// `<filters>[@<from>-<to>]`.
+fn filtering(track: Track, text: &str) -> Change {
+    let range = text.rsplit_once('@').and_then(|(filters, range)| {
+        let (from, to) = range.split_once('-')?;
+        Some((filters.to_owned(), (from.parse().ok()?, to.parse().ok()?)))
+    });
+    match range {
+        Some((filters, range)) => Change::Filter(track, filters, Some(range)),
+        None => Change::Filter(track, text.to_owned(), None),
+    }
 }
 
 /// `<file>@<from>-<to>`, `-` for no file.
@@ -102,6 +117,14 @@ fn main() {
                     changes.push(Change::Insert(file, at));
                 }
             }
+            "--picture-filter" | "--sound-filter" => {
+                let track = if option == "--sound-filter" {
+                    Track::Sound
+                } else {
+                    Track::Picture
+                };
+                changes.extend(arguments.next().map(|text| filtering(track, &text)));
+            }
             "--sound" | "--picture" => {
                 let track = if option == "--sound" {
                     Track::Sound
@@ -148,6 +171,23 @@ fn main() {
                         ..Clip::new(0.0, length)
                     };
                     println!("insert at {at}: {}", edit.insert(at, clip));
+                }
+                Change::Filter(track, filters, range) => {
+                    let (from, to) = range.unwrap_or((0.0, edit.duration()));
+                    let added = match track {
+                        Track::Picture => Filters {
+                            picture: Some(filters),
+                            sound: None,
+                        },
+                        Track::Sound => Filters {
+                            picture: None,
+                            sound: Some(filters),
+                        },
+                    };
+                    println!(
+                        "filter {track:?} {from}-{to}: {}",
+                        edit.add_filters(from, to, &added)
+                    );
                 }
                 Change::Replace(track, path, from, to) => {
                     let feed = match path {

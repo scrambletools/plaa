@@ -3,7 +3,8 @@
 //!
 //! cargo run --release -p plaa-media --example play -- [--software]
 //! [--at-most <lines>] [--clips <from>-<to>,...] [--insert <file>@<at>]
-//! [--sound <file>@<from>-<to>] [--picture <file>@<from>-<to>] <file>
+//! [--sound <file>@<from>-<to>] [--picture <file>@<from>-<to>]
+//! [--picture-filter <filters>] [--sound-filter <filters>] <file>
 //! [seconds] [seek-to]
 //!
 //! --insert, --sound and --picture change the edit as the export
@@ -53,9 +54,12 @@ fn main() {
     };
     let mut clips_given = arguments.next_if_eq("--clips");
     let mut changes = Vec::new();
-    while let Some(option) = arguments
-        .next_if(|argument| matches!(argument.as_str(), "--insert" | "--sound" | "--picture"))
-    {
+    while let Some(option) = arguments.next_if(|argument| {
+        matches!(
+            argument.as_str(),
+            "--insert" | "--sound" | "--picture" | "--picture-filter" | "--sound-filter"
+        )
+    }) {
         if let Some(value) = arguments.next() {
             changes.push((option, value));
         }
@@ -85,7 +89,22 @@ fn main() {
                 let info = MediaInfo::probe(&path).expect("a file plaa reads");
                 edit.add_other(Other::new(path, &info))
             };
-            if option == "--insert" {
+            if option == "--picture-filter" || option == "--sound-filter" {
+                let duration = edit.duration();
+                let filters = Some(value.clone());
+                let added = if option == "--picture-filter" {
+                    plaa_media::edit::Filters {
+                        picture: filters,
+                        sound: None,
+                    }
+                } else {
+                    plaa_media::edit::Filters {
+                        picture: None,
+                        sound: filters,
+                    }
+                };
+                edit.add_filters(0.0, duration, &added);
+            } else if option == "--insert" {
                 let Some((file, at)) = value.rsplit_once('@') else {
                     continue;
                 };
@@ -232,11 +251,16 @@ fn main() {
         let step = (start.elapsed().as_secs_f64() * 4.0) as u64;
         if trace && step != traced {
             traced = step;
-            let heard = player
-                .heard(2048)
-                .map_or(0.0, |(samples, rate)| pitch(&samples, rate));
+            let (heard, level) = player.heard(2048).map_or((0.0, -120.0), |(samples, rate)| {
+                let power = samples.iter().map(|sample| sample * sample).sum::<f32>()
+                    / samples.len().max(1) as f32;
+                (
+                    pitch(&samples, rate),
+                    10.0 * f64::from(power.max(1e-12)).log10(),
+                )
+            });
             eprintln!(
-                "{:.2} {:?} {:?} {:?} pitch {heard:.0}",
+                "{:.2} {:?} {:?} {:?} pitch {heard:.0} level {level:.1}",
                 start.elapsed().as_secs_f64(),
                 status.position,
                 status.buffering,

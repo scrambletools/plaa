@@ -908,6 +908,167 @@ pub fn video_sources(format: &ffmpeg::format::Input) -> Vec<(String, String)> {
     }
 }
 
+/// The string options set on filter `context`, by name.
+///
+/// # Safety
+/// `context` is a filter context whose options were set.
+unsafe fn string_options(context: *const ffi::AVFilterContext) -> Vec<(String, String)> {
+    let mut options = Vec::new();
+    // SAFETY: as the caller says; values av_opt_get gives are copies,
+    // freed here.
+    unsafe {
+        let private = (*context).priv_;
+        if private.is_null() {
+            return options;
+        }
+        let mut option = ffi::av_opt_next(private, std::ptr::null());
+        while !option.is_null() {
+            if (*option).type_ == ffi::AVOptionType::AV_OPT_TYPE_STRING {
+                let mut value: *mut u8 = std::ptr::null_mut();
+                if ffi::av_opt_get(private, (*option).name, 0, &mut value) >= 0 && !value.is_null()
+                {
+                    let set = c_text(value as *const std::ffi::c_char);
+                    ffi::av_free(value.cast());
+                    if !set.is_empty() {
+                        options.push((c_text((*option).name), set));
+                    }
+                }
+            }
+            option = ffi::av_opt_next(private, option);
+        }
+    }
+    options
+}
+
+/// A C string as text, empty for none.
+fn c_text(pointer: *const std::ffi::c_char) -> String {
+    if pointer.is_null() {
+        return String::new();
+    }
+    // SAFETY: FFmpeg's names and values are NUL-terminated.
+    unsafe { std::ffi::CStr::from_ptr(pointer) }
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// Says whether a filter, by its name and the string options set on it,
+/// may run, or why not.
+pub type Allowed = dyn Fn(&str, &[(String, String)]) -> Result<(), String>;
+
+/// Parses `chain` into `graph`, between its filters named "in" and
+/// "out". `allowed` is asked of each filter's name before any is made,
+/// then again with the string options set on it, positional ones
+/// included, and only once it passes them all do the filters start, so
+/// none that would not runs any of its code.
+pub fn parse_checked(
+    graph: &mut ffmpeg::filter::Graph,
+    chain: &str,
+    allowed: &Allowed,
+) -> Result<(), String> {
+    let text = std::ffi::CString::new(chain).map_err(|_| "the filters hold a NUL".to_owned())?;
+    // SAFETY: the graph outlives the segment, freed here; every list and
+    // pointer read comes from FFmpeg's own structures of it.
+    unsafe {
+        let raw = graph.as_mut_ptr();
+        let mut segment: *mut ffi::AVFilterGraphSegment = std::ptr::null_mut();
+        let parsed = ffi::avfilter_graph_segment_parse(raw, text.as_ptr(), 0, &mut segment);
+        if parsed < 0 {
+            return Err(format!(
+                "FFmpeg cannot read the filters: {}",
+                ffmpeg::Error::from(parsed)
+            ));
+        }
+        let each = |segment: *mut ffi::AVFilterGraphSegment| {
+            let mut all = Vec::new();
+            for chain in 0..(*segment).nb_chains {
+                let chain = *(*segment).chains.add(chain);
+                for filter in 0..(*chain).nb_filters {
+                    all.push(*(*chain).filters.add(filter));
+                }
+            }
+            all
+        };
+        let outcome = (|| {
+            for params in each(segment) {
+                allowed(&c_text((*params).filter_name), &[])?;
+            }
+            if ffi::avfilter_graph_segment_create_filters(segment, 0) < 0 {
+                return Err("FFmpeg has no such filter".to_owned());
+            }
+            let applied = ffi::avfilter_graph_segment_apply_opts(segment, 0);
+            if applied < 0 {
+                return Err(format!(
+                    "a filter does not take an option given: {}",
+                    ffmpeg::Error::from(applied)
+                ));
+            }
+            // Made, a filter's name is its own; the parsed one is gone.
+            for params in each(segment) {
+                let context = (*params).filter;
+                if !context.is_null() && !(*context).filter.is_null() {
+                    allowed(&c_text((*(*context).filter).name), &string_options(context))?;
+                }
+            }
+            let started = ffi::avfilter_graph_segment_init(segment, 0);
+            if started < 0 {
+                return Err(format!(
+                    "a filter will not start: {}",
+                    ffmpeg::Error::from(started)
+                ));
+            }
+            let mut inputs: *mut ffi::AVFilterInOut = std::ptr::null_mut();
+            let mut outputs: *mut ffi::AVFilterInOut = std::ptr::null_mut();
+            let linked = ffi::avfilter_graph_segment_link(segment, 0, &mut inputs, &mut outputs);
+            let one = |list: *mut ffi::AVFilterInOut| !list.is_null() && (*list).next.is_null();
+            let source = ffi::avfilter_graph_get_filter(raw, c"in".as_ptr());
+            let sink = ffi::avfilter_graph_get_filter(raw, c"out".as_ptr());
+            let result = if linked < 0 {
+                Err(format!(
+                    "the filters do not link: {}",
+                    ffmpeg::Error::from(linked)
+                ))
+            } else if !one(inputs) || !one(outputs) {
+                Err("the filters must take one input and give one output".to_owned())
+            } else if source.is_null()
+                || sink.is_null()
+                || ffi::avfilter_link(source, 0, (*inputs).filter_ctx, (*inputs).pad_idx as u32) < 0
+                || ffi::avfilter_link((*outputs).filter_ctx, (*outputs).pad_idx as u32, sink, 0) < 0
+            {
+                Err("the filters do not take this kind of input".to_owned())
+            } else {
+                Ok(())
+            };
+            ffi::avfilter_inout_free(&mut inputs);
+            ffi::avfilter_inout_free(&mut outputs);
+            result
+        })();
+        ffi::avfilter_graph_segment_free(&mut segment);
+        outcome
+    }
+}
+
+/// The size and pixel shape of the pictures a buffer sink takes.
+pub fn sink_picture(context: &mut ffmpeg::filter::Context) -> (u32, u32, (i32, i32)) {
+    // SAFETY: a configured buffer sink.
+    unsafe {
+        let sink = context.as_ptr();
+        let aspect = ffi::av_buffersink_get_sample_aspect_ratio(sink);
+        (
+            u32::try_from(ffi::av_buffersink_get_w(sink)).unwrap_or(0),
+            u32::try_from(ffi::av_buffersink_get_h(sink)).unwrap_or(0),
+            (aspect.num, aspect.den),
+        )
+    }
+}
+
+/// The pixel format FFmpeg names `name`, if it knows one.
+pub fn pixel_named(name: &str) -> Option<ffmpeg::format::Pixel> {
+    let name = std::ffi::CString::new(name).ok()?;
+    // SAFETY: a NUL-terminated name; FFmpeg only reads it.
+    let format = unsafe { ffi::av_get_pix_fmt(name.as_ptr()) };
+    (format != ffi::AVPixelFormat::AV_PIX_FMT_NONE).then(|| ffmpeg::format::Pixel::from(format))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

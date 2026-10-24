@@ -207,6 +207,8 @@ pub(crate) fn spawn_video(
         needs_flush: false,
         downloads: ffi::Downloads::default(),
         black: (size.0.max(2), size.1.max(2)),
+        filter: crate::filter::PictureFilter::default(),
+        chain: Chain::default(),
     };
     let thread = std::thread::Builder::new()
         .name("plaa-video".into())
@@ -277,6 +279,45 @@ struct VideoDecoder {
     downloads: ffi::Downloads,
     /// The size a black picture is made at: the last picture's.
     black: (u32, u32),
+    /// The filters the part playing goes through, and their graph.
+    filter: crate::filter::PictureFilter,
+    chain: Chain,
+}
+
+/// The filter chain of the part playing, for picture or sound: looked up
+/// in the edit by its number once, as the part starts.
+#[derive(Default)]
+struct Chain {
+    of: Option<Option<usize>>,
+    chain: Option<String>,
+}
+
+impl Chain {
+    /// The chain filters number `filter` of `shared`'s edit give
+    /// pictures or, when `sound`, sound.
+    fn get(&mut self, shared: &Shared, filter: Option<usize>, sound: bool) -> Option<&str> {
+        if self.of != Some(filter) {
+            self.of = Some(filter);
+            self.chain = filter.and_then(|index| {
+                let edit = shared
+                    .edit
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let filters = edit.as_ref()?.filter(index)?;
+                if sound {
+                    filters.sound.clone()
+                } else {
+                    filters.picture.clone()
+                }
+            });
+        }
+        self.chain.as_deref()
+    }
+
+    fn forget(&mut self) {
+        self.of = None;
+        self.chain = None;
+    }
 }
 
 /// Converts pictures the shader cannot read: their format and size, and
@@ -304,6 +345,7 @@ impl VideoDecoder {
                         // come out before the next part's go in.
                         let _ = self.decoder.send_eof();
                         self.drain(&mut scaler);
+                        self.flush_filter(&mut scaler);
                         self.decoder.flush();
                         self.last_position = None;
                         self.span = span;
@@ -317,6 +359,7 @@ impl VideoDecoder {
                     self.renew(serial, self.span);
                     let _ = self.decoder.send_eof();
                     self.drain(&mut scaler);
+                    self.flush_filter(&mut scaler);
                     self.needs_flush = true;
                     let mut video = self.shared.video();
                     if video.serial() == serial {
@@ -332,6 +375,7 @@ impl VideoDecoder {
                     if span.index != self.span.index {
                         let _ = self.decoder.send_eof();
                         self.drain(&mut scaler);
+                        self.flush_filter(&mut scaler);
                         self.decoder.flush();
                         self.span = span;
                     }
@@ -348,6 +392,7 @@ impl VideoDecoder {
         if serial == self.serial && !self.needs_flush {
             let _ = self.decoder.send_eof();
             self.drain(scaler);
+            self.flush_filter(scaler);
         }
         self.needs_flush = true;
         let Setup::Picture {
@@ -422,6 +467,16 @@ impl VideoDecoder {
             self.span = span;
             self.needs_flush = false;
             self.last_position = None;
+            // What the filters hold is stale, and the edit may be another.
+            self.filter.reset();
+            self.chain.forget();
+        }
+    }
+
+    /// Shows what the filters still hold of the part that played.
+    fn flush_filter(&mut self, scaler: &mut Scaler) {
+        for (frame, seconds) in self.filter.flush() {
+            self.show(frame, seconds, 0, scaler);
         }
     }
 
@@ -476,14 +531,39 @@ impl VideoDecoder {
         } else {
             frame
         };
-        let aspect = display_aspect(&frame);
         self.black = (frame.width().max(2), frame.height().max(2));
-        let picture = match VideoFrame::wrap(frame, serial, position, aspect, self.quarter_turns) {
+        // The part's filters see the picture upright, and give it so.
+        let chain = self
+            .chain
+            .get(&self.shared, self.span.filter, false)
+            .map(str::to_owned);
+        if let Some(chain) = chain {
+            let rate = Some(((1000.0 / self.frame_duration).round() as i32, 1000));
+            if let Some(filtered) =
+                self.filter
+                    .run(&chain, self.quarter_turns, rate, &frame, position)
+            {
+                for (frame, seconds) in filtered {
+                    self.show(frame, seconds, 0, scaler);
+                }
+                return;
+            }
+        }
+        self.show(frame, position, self.quarter_turns, scaler);
+    }
+
+    /// Queues `frame` to show at `position`, turned `turns` quarter turns.
+    fn show(&mut self, frame: ffmpeg::frame::Video, position: f64, turns: u8, scaler: &mut Scaler) {
+        let serial = self.serial;
+        if serial != self.shared.serial.load(Ordering::Relaxed) {
+            return;
+        }
+        let aspect = display_aspect(&frame);
+        let picture = match VideoFrame::wrap(frame, serial, position, aspect, turns) {
             Ok(picture) => picture,
             Err(frame) => match convert(scaler, &frame) {
                 Some(converted) => {
-                    match VideoFrame::wrap(converted, serial, position, aspect, self.quarter_turns)
-                    {
+                    match VideoFrame::wrap(converted, serial, position, aspect, turns) {
                         Ok(picture) => picture,
                         Err(_) => return,
                     }
@@ -574,6 +654,8 @@ pub(crate) fn spawn_audio(
         graph: None,
         cursor: None,
         placed: None,
+        sound_filter: crate::filter::SoundFilter::default(),
+        chain: Chain::default(),
     };
     let thread = std::thread::Builder::new()
         .name("plaa-audio".into())
@@ -608,6 +690,9 @@ struct AudioDecoder {
     /// In an edit that mixes files, the edited time sound has been placed
     /// up to, so gaps are filled with silence and overlaps left out.
     placed: Option<f64>,
+    /// The filters the part playing goes through, and their graph.
+    sound_filter: crate::filter::SoundFilter,
+    chain: Chain,
 }
 
 /// The most silence pushed at once, in seconds.
@@ -683,6 +768,8 @@ impl AudioDecoder {
             self.needs_flush = false;
             self.graph = None;
             self.cursor = None;
+            self.sound_filter.reset();
+            self.chain.forget();
             // After a seek, sound is placed from where it lands.
             if fresh {
                 self.placed = self
@@ -766,10 +853,13 @@ impl AudioDecoder {
         }
     }
 
-    /// Takes everything left in the decoder and the graph.
+    /// Takes everything left in the decoder, the filters and the graph.
     fn finish_part(&mut self) {
         let _ = self.decoder.send_eof();
         self.drain();
+        for (frame, edited) in self.sound_filter.flush() {
+            self.filtered(frame, edited);
+        }
         if let Some(graph) = &mut self.graph
             && let Some(mut source) = graph.graph.get("in")
         {
@@ -781,11 +871,50 @@ impl AudioDecoder {
     fn drain(&mut self) {
         let mut decoded = ffmpeg::frame::Audio::empty();
         while self.decoder.receive_frame(&mut decoded).is_ok() {
-            self.filter(&decoded);
+            // The part's filters, in the edited time, then on as before.
+            let chain = self
+                .chain
+                .get(&self.shared, self.span.filter, true)
+                .map(str::to_owned);
+            let at = decoded
+                .timestamp()
+                .or(decoded.pts())
+                .and_then(|timestamp| info::seconds(timestamp, self.time_base))
+                .map(|seconds| seconds - self.start);
+            match (chain, at) {
+                (Some(chain), Some(at)) => {
+                    match self
+                        .sound_filter
+                        .run(&chain, &decoded, at + self.span.shift)
+                    {
+                        Some(filtered) => {
+                            for (frame, edited) in filtered {
+                                self.filtered(frame, edited);
+                            }
+                        }
+                        None => self.filter(&decoded),
+                    }
+                }
+                _ => self.filter(&decoded),
+            }
             if self.shared.stopping() {
                 return;
             }
         }
+    }
+
+    /// Plays sound the part's filters gave, starting at `edited` seconds
+    /// of the edited time.
+    fn filtered(&mut self, mut frame: ffmpeg::frame::Audio, edited: f64) {
+        let file = edited - self.span.shift;
+        let base = f64::from(self.time_base);
+        if base > 0.0 {
+            frame.set_pts(Some(((file + self.start) / base).round() as i64));
+        }
+        if self.cursor.is_none() {
+            self.cursor = Some(file);
+        }
+        self.filter(&frame);
     }
 
     fn filter(&mut self, frame: &ffmpeg::frame::Audio) {

@@ -10,6 +10,7 @@ mod decode;
 pub mod edit;
 pub mod export;
 mod ffi;
+pub mod filter;
 pub mod frame;
 pub mod info;
 mod inputs;

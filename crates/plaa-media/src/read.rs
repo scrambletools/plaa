@@ -43,6 +43,17 @@ impl Edited<'_> {
         has.then(|| (other.path.clone(), None))
     }
 
+    /// The filters `track` goes through at `seconds` of the edited time.
+    fn chain_at(&self, track: Track, seconds: f64) -> Option<String> {
+        let edit = self.edit?;
+        let (index, _) = edit.clip_at(seconds)?;
+        let filters = edit.filters_of(&edit.clips()[index])?;
+        match track {
+            Track::Picture => filters.picture.clone(),
+            Track::Sound => filters.sound.clone(),
+        }
+    }
+
     /// Where the picture or sound at `seconds` of the edited time comes
     /// from: a file and its time there, or none.
     fn shown_at(&self, track: Track, seconds: f64) -> Option<(usize, f64)> {
@@ -55,32 +66,48 @@ impl Edited<'_> {
 
 /// The pictures at `times` of the edited time, turned and flipped as they
 /// show, at most `side` pixels on their long side: none where it is black
-/// or a file will not read.
-pub fn pictures(edited: &Edited, times: &[f64], side: u32) -> Vec<Option<Picture>> {
+/// or a file will not read. `progress` hears the share done as it goes.
+pub fn pictures(
+    edited: &Edited,
+    times: &[f64],
+    side: u32,
+    progress: &dyn Fn(f64),
+) -> Vec<Option<Picture>> {
     crate::init();
     let transform = edited.edit.map(Edit::transform).unwrap_or_default();
     let mut found = vec![None; times.len()];
-    // Each file once, its times in order.
-    let mut wanted: Vec<(usize, f64, usize)> = times
+    // Each file once, its times in order, with the filters there.
+    let mut wanted: Vec<(usize, Wanted, usize)> = times
         .iter()
         .enumerate()
         .filter_map(|(slot, seconds)| {
             let (source, at) = edited.shown_at(Track::Picture, *seconds)?;
-            Some((source, at, slot))
+            let chain = edited.chain_at(Track::Picture, *seconds);
+            Some((source, (at, chain.map(|chain| (chain, *seconds))), slot))
         })
         .collect();
-    wanted.sort_by(|first, second| first.0.cmp(&second.0).then(first.1.total_cmp(&second.1)));
+    wanted.sort_by(|first, second| {
+        first
+            .0
+            .cmp(&second.0)
+            .then(first.1.0.total_cmp(&second.1.0))
+    });
     for group in wanted.chunk_by(|first, second| first.0 == second.0) {
         let source = group[0].0;
         let Some((path, stream)) = edited.file(source, Track::Picture) else {
             continue;
         };
-        let at: Vec<f64> = group.iter().map(|(_, at, _)| *at).collect();
-        match pictures_of(&path, stream, &at, side) {
-            Ok((pictures, turns)) => {
+        let at: Vec<Wanted> = group.iter().map(|(_, wanted, _)| wanted.clone()).collect();
+        let done = std::cell::Cell::new(0usize);
+        let read = || {
+            done.set(done.get() + 1);
+            progress(done.get() as f64 / times.len().max(1) as f64);
+        };
+        match pictures_of(&path, stream, &at, side, &read) {
+            Ok(pictures) => {
                 for ((_, _, slot), picture) in group.iter().zip(pictures) {
-                    found[*slot] =
-                        picture.map(|picture| picture.transformed(transform.after_turns(turns)));
+                    found[*slot] = picture
+                        .map(|(picture, turns)| picture.transformed(transform.after_turns(turns)));
                 }
             }
             Err(error) => eprintln!("plaa: pictures of {}: {error}", path.display()),
@@ -89,14 +116,20 @@ pub fn pictures(edited: &Edited, times: &[f64], side: u32) -> Vec<Option<Picture
     found
 }
 
+/// A picture wanted: its file's time, and the filters it goes through,
+/// with its edited time, which they count in.
+type Wanted = (f64, Option<(String, f64)>);
+
 /// The pictures of `path`'s stream `stream`, or its first, at `times` of
-/// it, in order, and the quarter turns it asks for.
+/// it, in order, through their filters; each with the quarter turns it
+/// still needs, as filtered pictures come upright.
 fn pictures_of(
     path: &Path,
     stream: Option<usize>,
-    times: &[f64],
+    times: &[Wanted],
     side: u32,
-) -> Result<(Vec<Option<Picture>>, u8), String> {
+    read: &dyn Fn(),
+) -> Result<Vec<Option<(Picture, u8)>>, String> {
     let mut input = ffmpeg::format::input(path).map_err(|error| error.to_string())?;
     let info = MediaInfo::read(&input);
     let index = stream
@@ -117,7 +150,9 @@ fn pictures_of(
     let mut last: Option<(f64, ffmpeg::frame::Video)> = None;
     let mut ended = false;
     let mut packet = ffmpeg::Packet::empty();
-    for &time in times {
+    let rate = Some(((1000.0 / frame_duration).round() as i32, 1000));
+    for (time, chain) in times {
+        let time = *time;
         let far = last
             .as_ref()
             .is_none_or(|(at, _)| time < *at - frame_duration / 2.0 || time > *at + 4.0);
@@ -169,9 +204,24 @@ fn pictures_of(
                 }
             }
         }
-        pictures.push(showing.and_then(|frame| rgba(&frame, side)));
+        // Through the filters there, alone: they give it upright.
+        let filtered = match (showing, chain) {
+            (Some(frame), Some((chain, edited))) => {
+                let mut filter = crate::filter::PictureFilter::default();
+                match filter.run(chain, turns, rate, &frame, *edited) {
+                    Some(mut out) => {
+                        out.extend(filter.flush());
+                        out.pop().map(|(frame, _)| (frame, 0))
+                    }
+                    None => Some((frame, turns)),
+                }
+            }
+            (showing, _) => showing.map(|frame| (frame, turns)),
+        };
+        pictures.push(filtered.and_then(|(frame, turns)| Some((rgba(&frame, side)?, turns))));
+        read();
     }
-    Ok((pictures, turns))
+    Ok(pictures)
 }
 
 /// `frame` as RGBA, at most `side` pixels on its long side, its pixels
@@ -297,7 +347,7 @@ pub fn sound(
     let parts = sound_parts(edited, from, to);
     let mut written = 0usize;
     let total = ((to - from).max(0.0) * f64::from(rate)).round() as usize;
-    for (at, length, file) in parts {
+    for (at, length, file, chain) in parts {
         // Where the part starts, in samples, past what came before.
         let first = (((at - from) * f64::from(rate)).round() as usize).min(total);
         let last = (((at + length - from) * f64::from(rate)).round() as usize).min(total);
@@ -312,7 +362,16 @@ pub fn sound(
         let got = match file {
             Some((path, stream, file_from)) => {
                 let skip = (written - first) as f64 / f64::from(rate);
-                sound_of(&path, stream, file_from + skip, wanted, rate, each)?
+                // The filters count in the edited time.
+                let filters = chain.as_deref().map(|chain| (chain, at - file_from));
+                sound_of(
+                    &path,
+                    stream,
+                    file_from + skip,
+                    (wanted, rate),
+                    filters,
+                    each,
+                )?
             }
             None => 0,
         };
@@ -328,9 +387,14 @@ pub fn sound(
 }
 
 /// The parts of the sound from `from` to `to`: where each starts in the
-/// edited time, how long it lasts, and the file, its stream and its time
-/// it plays from, if any.
-type SoundPart = (f64, f64, Option<(PathBuf, Option<usize>, f64)>);
+/// edited time, how long it lasts, the file, its stream and its time it
+/// plays from, if any, and the filters it goes through.
+type SoundPart = (
+    f64,
+    f64,
+    Option<(PathBuf, Option<usize>, f64)>,
+    Option<String>,
+);
 
 fn sound_parts(edited: &Edited, from: f64, to: f64) -> Vec<SoundPart> {
     let Some(edit) = edited.edit else {
@@ -340,6 +404,7 @@ fn sound_parts(edited: &Edited, from: f64, to: f64) -> Vec<SoundPart> {
             edited
                 .file(OWN, Track::Sound)
                 .map(|(path, stream)| (path, stream, from)),
+            None,
         )];
     };
     let mut parts = Vec::new();
@@ -355,7 +420,10 @@ fn sound_parts(edited: &Edited, from: f64, to: f64) -> Vec<SoundPart> {
                 .map(|(path, stream)| (path, stream, feed + (low - start))),
             Feed::Blank => None,
         };
-        parts.push((low, high - low, file));
+        let chain = edit
+            .filters_of(clip)
+            .and_then(|filters| filters.sound.clone());
+        parts.push((low, high - low, file, chain));
     }
     parts
 }
@@ -371,14 +439,15 @@ fn silence(count: usize, each: &mut dyn FnMut(&[f32])) {
 }
 
 /// Hands `each` up to `count` samples of `path`'s sound, stream `stream`
-/// or its first, from `from` seconds of it, mixed to one channel at
+/// or its first, from `from` seconds of it, through `filters` when given
+/// with what turns its time into the edited time, mixed to one channel at
 /// `rate`. Returns how many it had.
 fn sound_of(
     path: &Path,
     stream: Option<usize>,
     from: f64,
-    count: usize,
-    rate: u32,
+    (count, rate): (usize, u32),
+    filters: Option<(&str, f64)>,
     each: &mut dyn FnMut(&[f32]),
 ) -> Result<usize, String> {
     let failed = |error: ffmpeg::Error| error.to_string();
@@ -401,25 +470,56 @@ fn sound_of(
     let mut ended = false;
     // The file's time of the next sample out of the graph.
     let mut cursor: Option<f64> = None;
+    let mut filter = crate::filter::SoundFilter::default();
+    let mut flushed = false;
+    // Hands sound starting at the file's time `at` to the graph.
+    let feed = |frame: &ffmpeg::frame::Audio,
+                at: Option<f64>,
+                graph: &mut Option<ffmpeg::filter::Graph>,
+                cursor: &mut Option<f64>|
+     -> Result<(), String> {
+        if graph.is_none() {
+            *graph = Some(mono_graph(frame, rate).map_err(failed)?);
+        }
+        if cursor.is_none() {
+            *cursor = at;
+        }
+        if let Some(graph) = graph
+            && let Some(mut source) = graph.get("in")
+        {
+            let _ = source.source().add(frame);
+        }
+        Ok(())
+    };
     while handed < count {
         let mut decoded = ffmpeg::frame::Audio::empty();
         if decoder.receive_frame(&mut decoded).is_ok() {
-            if graph.is_none() {
-                graph = Some(mono_graph(&decoded, rate).map_err(failed)?);
-            }
-            if cursor.is_none() {
-                cursor = decoded
-                    .timestamp()
-                    .or(decoded.pts())
-                    .and_then(|timestamp| info::seconds(timestamp, time_base))
-                    .map(|seconds| seconds - start);
-            }
-            if let Some(graph) = &mut graph
-                && let Some(mut source) = graph.get("in")
-            {
-                let _ = source.source().add(&decoded);
+            let at = decoded
+                .timestamp()
+                .or(decoded.pts())
+                .and_then(|timestamp| info::seconds(timestamp, time_base))
+                .map(|seconds| seconds - start);
+            let filtered = filters
+                .zip(at)
+                .and_then(|((chain, shift), at)| filter.run(chain, &decoded, at + shift));
+            match (filtered, filters) {
+                (Some(filtered), Some((_, shift))) => {
+                    for (frame, edited) in filtered {
+                        feed(&frame, Some(edited - shift), &mut graph, &mut cursor)?;
+                    }
+                }
+                _ => feed(&decoded, at, &mut graph, &mut cursor)?,
             }
         } else if ended {
+            // What the filters hold first, then what the graph holds.
+            if !flushed {
+                flushed = true;
+                if let Some((_, shift)) = filters {
+                    for (frame, edited) in filter.flush() {
+                        feed(&frame, Some(edited - shift), &mut graph, &mut cursor)?;
+                    }
+                }
+            }
             if let Some(graph) = &mut graph
                 && let Some(mut source) = graph.get("in")
             {
@@ -483,7 +583,8 @@ fn sound_of(
     Ok(handed)
 }
 
-/// abuffer, then one channel of floats at `rate`.
+/// abuffer, then one channel of floats at `rate`, mixed down without
+/// going past full scale.
 fn mono_graph(
     frame: &ffmpeg::frame::Audio,
     rate: u32,
@@ -500,7 +601,7 @@ fn mono_graph(
     graph.add(&abuffer, "in", &arguments)?;
     graph.add(&abuffersink, "out", "")?;
     graph.output("in", 0)?.input("out", 0)?.parse(&format!(
-        "aformat=sample_fmts=flt:sample_rates={rate}:channel_layouts=mono"
+        "aresample={rate}:rematrix_maxval=1,aformat=sample_fmts=flt:sample_rates={rate}:channel_layouts=mono"
     ))?;
     graph.validate()?;
     Ok(graph)
@@ -508,7 +609,12 @@ fn mono_graph(
 
 /// The text of subtitle stream `stream` of the file at `path`, or of the
 /// subtitle file at `path` when `stream` is none, in the file's time.
-pub fn subtitle_text(path: &Path, stream: Option<usize>) -> Result<Vec<Cue>, String> {
+/// `progress` hears how far through the file it has read.
+pub fn subtitle_text(
+    path: &Path,
+    stream: Option<usize>,
+    progress: &dyn Fn(f64),
+) -> Result<Vec<Cue>, String> {
     crate::init();
     let Some(index) = stream else {
         return decode::read_subtitle_file(path)
@@ -524,9 +630,13 @@ pub fn subtitle_text(path: &Path, stream: Option<usize>) -> Result<Vec<Cue>, Str
         .map_err(|error| error.to_string())?;
     let mut cues = crate::subtitle::Cues::default();
     let mut pictures = false;
+    let size = std::fs::metadata(path).map_or(0, |metadata| metadata.len()) as f64;
     for (found, packet) in input.packets() {
         if found.index() != index {
             continue;
+        }
+        if size > 0.0 && packet.position() > 0 {
+            progress(packet.position() as f64 / size);
         }
         for decoded in decoder.decode(&packet) {
             match decoded {

@@ -702,8 +702,12 @@ fn run(
             "a file cannot be exported over itself".to_owned(),
         ));
     }
-    // Pictures or sound from other files are read apart.
-    if let Some(edit) = job.edit.as_deref().filter(|edit| edit.is_mixed()) {
+    // Pictures or sound from other files, and filters, are read apart.
+    if let Some(edit) = job
+        .edit
+        .as_deref()
+        .filter(|edit| edit.is_mixed() || edit.is_filtered())
+    {
         return crate::mix::run(job, edit, temporary, stop, events);
     }
     let mut input = ffmpeg::format::input(&job.source).map_err(failed)?;
@@ -920,7 +924,7 @@ pub(crate) fn picture_out(
     info: &MediaInfo,
     index: usize,
     job: &Job,
-    transform: Transform,
+    (transform, filters): (Transform, Option<&str>),
     context: &mut ffmpeg::format::context::Output,
     global_header: bool,
 ) -> Result<PictureOut, ExportError> {
@@ -936,7 +940,33 @@ pub(crate) fn picture_out(
     let hdr = track.hdr;
     let own = ffi::quarter_turns(&stream);
     let shown = transform.after_turns(own);
-    let size = output_size((width, height), aspect, shown, job.lines);
+    // Filters over the whole movie, as a crop, make its size theirs; they
+    // see the picture upright, so only the edit's turns come after.
+    let filtered = filters.and_then(|chain| {
+        crate::filter::picture_size(
+            chain,
+            own,
+            crate::filter::PictureInput {
+                width,
+                height,
+                format: Pixel::YUV420P,
+                sample: (1, 1),
+                rate: None,
+            },
+        )
+    });
+    let size = match filtered {
+        Some((across, down, (sample_across, sample_down))) if across > 0 && down > 0 => {
+            let sample = if sample_across > 0 && sample_down > 0 {
+                f64::from(sample_across) / f64::from(sample_down)
+            } else {
+                1.0
+            };
+            let aspect = f64::from(across) * sample / f64::from(down);
+            output_size((across, down), aspect, transform, job.lines)
+        }
+        _ => output_size((width, height), aspect, shown, job.lines),
+    };
     let rate = Some(stream.avg_frame_rate())
         .filter(|rate| rate.numerator() > 0 && rate.denominator() > 0)
         .unwrap_or_else(|| ffmpeg::Rational::new(30, 1));
@@ -1007,7 +1037,15 @@ fn video_side(
     context: &mut ffmpeg::format::context::Output,
     global_header: bool,
 ) -> Result<VideoSide, ExportError> {
-    let out = picture_out(input, info, index, job, transform, context, global_header)?;
+    let out = picture_out(
+        input,
+        info,
+        index,
+        job,
+        (transform, None),
+        context,
+        global_header,
+    )?;
     let (decoder, time_base, _) =
         crate::decode::video_decoder(input, index, job.hardware).map_err(failed)?;
     let filters = picture_filters(out.shown, out.size, out.encoder.format);

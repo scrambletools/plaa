@@ -76,7 +76,7 @@ pub(crate) fn run(
             &info,
             index,
             job,
-            edit.transform(),
+            (edit.transform(), edit.whole_picture_filters()),
             &mut context,
             global_header,
         )?),
@@ -237,6 +237,9 @@ struct Reader {
     /// The edited time read up to.
     reached: f64,
     done: bool,
+    /// The part's filters, with their graphs.
+    picture_filter: crate::filter::PictureFilter,
+    sound_filter: crate::filter::SoundFilter,
 }
 
 impl Reader {
@@ -252,6 +255,8 @@ impl Reader {
             last: None,
             reached: 0.0,
             done: false,
+            picture_filter: crate::filter::PictureFilter::default(),
+            sound_filter: crate::filter::SoundFilter::default(),
         }
     }
 
@@ -301,7 +306,7 @@ impl Reader {
                 }
             }
             Some(Doing::Reading(span)) => {
-                if !self.read(span, sinks)? {
+                if !self.read(span, edit, sinks)? {
                     self.doing = Some(Doing::Reading(span));
                 } else {
                     // Sound its file lacked is silence, so what comes
@@ -396,7 +401,7 @@ impl Reader {
     }
 
     /// Reads a packet of part `span`. Returns whether the part is done.
-    fn read(&mut self, span: Span, sinks: &mut Sinks) -> Result<bool, ExportError> {
+    fn read(&mut self, span: Span, edit: &Edit, sinks: &mut Sinks) -> Result<bool, ExportError> {
         let Some(source) = &mut self.source else {
             return Ok(true);
         };
@@ -412,7 +417,7 @@ impl Reader {
                 );
                 if !past {
                     if source.decoder.send_packet(&self.packet) {
-                        self.receive(span, sinks)?;
+                        self.receive(span, edit, sinks)?;
                     }
                     return Ok(false);
                 }
@@ -424,19 +429,32 @@ impl Reader {
         };
         if ended && let Some(source) = &mut self.source {
             source.decoder.send_eof();
-            self.receive(span, sinks)?;
+            self.receive(span, edit, sinks)?;
             if let Some(source) = &mut self.source {
                 source.decoder.flush();
+            }
+            // What the filters still hold of the part.
+            for (frame, edited) in self.picture_filter.flush() {
+                if let Some(sink) = sinks.picture.as_deref_mut() {
+                    sink.push(frame, edited, Kind::Filtered, sinks.output)?;
+                }
+            }
+            for (frame, edited) in self.sound_filter.flush() {
+                push_sound(frame, edited, sinks)?;
             }
         }
         Ok(ended)
     }
 
-    /// Takes what the decoder has of part `span` to the sinks.
-    fn receive(&mut self, span: Span, sinks: &mut Sinks) -> Result<(), ExportError> {
+    /// Takes what the decoder has of part `span` to the sinks, through
+    /// the part's filters.
+    fn receive(&mut self, span: Span, edit: &Edit, sinks: &mut Sinks) -> Result<(), ExportError> {
         let Some(source) = &mut self.source else {
             return Ok(());
         };
+        let filters = span.filter.and_then(|index| edit.filter(index));
+        let picture_chain = filters.and_then(|filters| filters.picture.as_deref());
+        let sound_chain = filters.and_then(|filters| filters.sound.as_deref());
         match &mut source.decoder {
             Decoder::Picture(decoder) => {
                 let mut decoded = ffmpeg::frame::Video::empty();
@@ -455,15 +473,36 @@ impl Reader {
                     }
                     let edited = at + span.shift;
                     let frame = std::mem::replace(&mut decoded, ffmpeg::frame::Video::empty());
-                    if let Some(sink) = sinks.picture.as_deref_mut() {
-                        let kind = if source.number == OWN {
-                            Kind::Own
-                        } else {
-                            Kind::Other(source.turns)
-                        };
-                        sink.push(frame, edited, kind, sinks.output)?;
-                    }
                     self.reached = self.reached.max(edited);
+                    let Some(sink) = sinks.picture.as_deref_mut() else {
+                        continue;
+                    };
+                    let frame = if ffi::is_hardware(&frame) {
+                        sink.downloads.download(&frame).map_err(failed)?
+                    } else {
+                        frame
+                    };
+                    // Filtered pictures come out upright.
+                    let rate = Some(((1000.0 / source.frame_duration).round() as i32, 1000));
+                    let filtered = picture_chain.and_then(|chain| {
+                        self.picture_filter
+                            .run(chain, source.turns, rate, &frame, edited)
+                    });
+                    match filtered {
+                        Some(filtered) => {
+                            for (frame, edited) in filtered {
+                                sink.push(frame, edited, Kind::Filtered, sinks.output)?;
+                            }
+                        }
+                        None => {
+                            let kind = if source.number == OWN {
+                                Kind::Own
+                            } else {
+                                Kind::Other(source.turns)
+                            };
+                            sink.push(frame, edited, kind, sinks.output)?;
+                        }
+                    }
                 }
             }
             Decoder::Sound(decoder) => {
@@ -503,15 +542,40 @@ impl Reader {
                         decoded.clone()
                     };
                     let edited = at + skip as f64 / rate + span.shift;
-                    frame.set_pts(Some((edited * rate).round() as i64));
-                    if let Some(sink) = sinks.sound.as_deref_mut() {
-                        sink.push(&frame, sinks.output)?;
-                    }
                     self.reached = self.reached.max(edited + (until - skip) as f64 / rate);
+                    let filtered =
+                        sound_chain.and_then(|chain| self.sound_filter.run(chain, &frame, edited));
+                    match filtered {
+                        Some(filtered) => {
+                            for (frame, edited) in filtered {
+                                push_sound(frame, edited, sinks)?;
+                            }
+                        }
+                        None => {
+                            frame.set_pts(Some((edited * rate).round() as i64));
+                            if let Some(sink) = sinks.sound.as_deref_mut() {
+                                sink.push(&frame, sinks.output)?;
+                            }
+                        }
+                    }
                 }
             }
         }
         Ok(())
+    }
+}
+
+/// Encodes sound starting at `edited` seconds of the edited time.
+fn push_sound(
+    mut frame: ffmpeg::frame::Audio,
+    edited: f64,
+    sinks: &mut Sinks,
+) -> Result<(), ExportError> {
+    let rate = f64::from(frame.rate());
+    frame.set_pts(Some((edited * rate).round() as i64));
+    match sinks.sound.as_deref_mut() {
+        Some(sink) => sink.push(&frame, sinks.output),
+        None => Ok(()),
     }
 }
 
@@ -537,6 +601,8 @@ enum Kind {
     Own,
     /// Another file's, with its own quarter turns: fitted in the output.
     Other(u8),
+    /// Through filters, which give it upright: fitted in the output.
+    Filtered,
     /// Black, the output's size.
     Black,
 }
@@ -567,11 +633,19 @@ impl PictureSink {
         info: &MediaInfo,
         index: usize,
         job: &Job,
-        transform: Transform,
+        (transform, filters): (Transform, Option<&str>),
         context: &mut ffmpeg::format::context::Output,
         global_header: bool,
     ) -> Result<Self, ExportError> {
-        let out = export::picture_out(input, info, index, job, transform, context, global_header)?;
+        let out = export::picture_out(
+            input,
+            info,
+            index,
+            job,
+            (transform, filters),
+            context,
+            global_header,
+        )?;
         Ok(Self {
             chosen: out.chosen,
             encoder: out.encoder,
@@ -664,6 +738,12 @@ impl PictureSink {
             Kind::Black => picture_filters(Transform::default(), self.size, self.encoder.format),
             Kind::Other(turns) => fit_filters(
                 self.transform.after_turns(turns),
+                (sample_across, sample_down),
+                self.size,
+                self.encoder.format,
+            ),
+            Kind::Filtered => fit_filters(
+                self.transform,
                 (sample_across, sample_down),
                 self.size,
                 self.encoder.format,

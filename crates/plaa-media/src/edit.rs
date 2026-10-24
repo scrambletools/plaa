@@ -52,6 +52,9 @@ pub struct Clip {
     pub picture: Option<Feed>,
     /// The sound heard in place of the clip's own, when replaced.
     pub sound: Option<Feed>,
+    /// The filters its picture and sound go through, by their number in
+    /// the edit's.
+    pub filter: Option<usize>,
 }
 
 impl Clip {
@@ -63,6 +66,7 @@ impl Clip {
             to,
             picture: None,
             sound: None,
+            filter: None,
         }
     }
 
@@ -86,8 +90,15 @@ impl Clip {
         })
     }
 
-    /// Whether it plays the file edited, its own picture and sound.
+    /// Whether it plays the file edited, its own picture and sound, as
+    /// they are.
     pub fn is_plain(&self) -> bool {
+        self.is_own() && self.filter.is_none()
+    }
+
+    /// Whether it plays the file edited, its own picture and sound, read
+    /// as one, filtered or not.
+    fn is_own(&self) -> bool {
         self.source == OWN && self.picture.is_none() && self.sound.is_none()
     }
 
@@ -99,7 +110,34 @@ impl Clip {
             to: self.from + high,
             picture: self.picture.map(|feed| feed.later(low)),
             sound: self.sound.map(|feed| feed.later(low)),
+            filter: self.filter,
         }
+    }
+}
+
+/// FFmpeg filter graphs a clip's picture and sound go through, as `-vf`
+/// and `-af` take them.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Filters {
+    pub picture: Option<String>,
+    pub sound: Option<String>,
+}
+
+impl Filters {
+    /// These filters, then `more` after them.
+    pub fn then(&self, more: &Filters) -> Filters {
+        let join = |first: &Option<String>, second: &Option<String>| match (first, second) {
+            (Some(first), Some(second)) => Some(format!("{first},{second}")),
+            (first, second) => first.clone().or_else(|| second.clone()),
+        };
+        Filters {
+            picture: join(&self.picture, &more.picture),
+            sound: join(&self.sound, &more.sound),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.picture.is_none() && self.sound.is_none()
     }
 }
 
@@ -182,6 +220,7 @@ pub struct Edit {
     clips: Vec<Clip>,
     transform: Transform,
     others: Vec<Other>,
+    filters: Vec<Filters>,
 }
 
 /// Part of a file read in one go: clips one after another in a file play
@@ -193,6 +232,8 @@ pub(crate) struct Span {
     /// The file read, numbered as [`Clip::source`] is; none for a black
     /// picture or silence, from `from` to `to` of the edited time.
     pub source: Option<usize>,
+    /// The filters it goes through, by their number in the edit's.
+    pub filter: Option<usize>,
     pub from: f64,
     pub to: f64,
     /// Added to the file's time to give the edited time.
@@ -204,6 +245,7 @@ impl Span {
     pub const WHOLE: Span = Span {
         index: 0,
         source: Some(OWN),
+        filter: None,
         from: f64::NEG_INFINITY,
         to: f64::INFINITY,
         shift: 0.0,
@@ -238,6 +280,7 @@ impl Edit {
             clips,
             transform: Transform::default(),
             others: Vec::new(),
+            filters: Vec::new(),
         }
     }
 
@@ -287,7 +330,106 @@ impl Edit {
     /// Whether a clip is from another file, or has its picture or sound
     /// replaced, so the picture and sound may be read apart.
     pub fn is_mixed(&self) -> bool {
-        self.clips.iter().any(|clip| !clip.is_plain())
+        self.clips.iter().any(|clip| !clip.is_own())
+    }
+
+    /// Whether a clip's picture or sound goes through filters.
+    pub fn is_filtered(&self) -> bool {
+        self.clips.iter().any(|clip| clip.filter.is_some())
+    }
+
+    /// Filters number `index` of the edit's, as clips and spans name them.
+    pub fn filter(&self, index: usize) -> Option<&Filters> {
+        self.filters.get(index)
+    }
+
+    /// The picture filters every clip goes through, when they all go
+    /// through the same: those of the whole movie.
+    pub fn whole_picture_filters(&self) -> Option<&str> {
+        let first = self.clips.first()?.filter?;
+        self.clips
+            .iter()
+            .all(|clip| clip.filter == Some(first))
+            .then(|| self.filters.get(first)?.picture.as_deref())
+            .flatten()
+    }
+
+    /// The filters clip `clip` goes through, if any.
+    pub fn filters_of(&self, clip: &Clip) -> Option<&Filters> {
+        clip.filter.and_then(|index| self.filters.get(index))
+    }
+
+    /// The filters the clips from `from` to `to` seconds of the edited
+    /// time would go through with `added` after their own: each set
+    /// once, to check them before adding them.
+    pub fn filters_with(&self, from: f64, to: f64, added: &Filters) -> Vec<Filters> {
+        let mut all: Vec<Filters> = Vec::new();
+        for (clip, start) in self.clips.iter().zip(self.starts()) {
+            if start + clip.length() <= from + SLIVER || start >= to - SLIVER {
+                continue;
+            }
+            let combined = match self.filters_of(clip) {
+                Some(own) => own.then(added),
+                None => added.clone(),
+            };
+            if !all.contains(&combined) {
+                all.push(combined);
+            }
+        }
+        all
+    }
+
+    /// Puts the picture and sound from `from` to `to` seconds of the
+    /// edited time through `added`, after the filters they have. Returns
+    /// whether that changed the edit.
+    pub fn add_filters(&mut self, from: f64, to: f64, added: &Filters) -> bool {
+        if added.is_empty() {
+            return false;
+        }
+        self.set_filters(from, to, |own| {
+            Some(match own {
+                Some(own) => own.then(added),
+                None => added.clone(),
+            })
+        })
+    }
+
+    /// Takes every filter off the picture and sound from `from` to `to`
+    /// seconds of the edited time. Returns whether that changed the edit.
+    pub fn remove_filters(&mut self, from: f64, to: f64) -> bool {
+        self.set_filters(from, to, |_| None)
+    }
+
+    /// Gives the clips from `from` to `to` the filters `filters` makes of
+    /// theirs, splitting clips at both ends.
+    fn set_filters(
+        &mut self,
+        from: f64,
+        to: f64,
+        filters: impl Fn(Option<&Filters>) -> Option<Filters>,
+    ) -> bool {
+        let (from, to) = (from.max(0.0), to.min(self.duration()));
+        if to - from < SLIVER {
+            return false;
+        }
+        let before = (self.clips.clone(), self.filters.clone());
+        let first = self.cut_at(from);
+        let last = self.cut_at(to);
+        for index in first..last {
+            let made = filters(self.filters_of(&self.clips[index])).filter(|made| !made.is_empty());
+            let number =
+                made.map(
+                    |made| match self.filters.iter().position(|known| *known == made) {
+                        Some(known) => known,
+                        None => {
+                            self.filters.push(made);
+                            self.filters.len() - 1
+                        }
+                    },
+                );
+            self.clips[index].filter = number;
+        }
+        (self.clips.clone(), self.filters.clone()) != before
     }
 
     /// How the picture is turned and flipped.
@@ -616,32 +758,35 @@ impl Edit {
         length: impl Fn(usize) -> Option<f64>,
     ) -> Vec<Span> {
         let mut spans: Vec<Span> = Vec::new();
-        let mut push = |source: Option<usize>, from: f64, to: f64, at: f64| {
-            if to - from <= 1e-9 {
-                return;
-            }
-            // Blank parts count in the edited time.
-            let (from, to, shift) = match source {
-                Some(_) => (from, to, at - from),
-                None => (at, at + (to - from), 0.0),
-            };
-            match spans.last_mut() {
-                Some(last)
-                    if last.source == source
-                        && (from - last.to).abs() < 1e-9
-                        && (last.shift - shift).abs() < 1e-9 =>
-                {
-                    last.to = to;
+        let mut push =
+            |source: Option<usize>, from: f64, to: f64, at: f64, filter: Option<usize>| {
+                if to - from <= 1e-9 {
+                    return;
                 }
-                _ => spans.push(Span {
-                    index: spans.len(),
-                    source,
-                    from,
-                    to,
-                    shift,
-                }),
-            }
-        };
+                // Blank parts count in the edited time.
+                let (from, to, shift) = match source {
+                    Some(_) => (from, to, at - from),
+                    None => (at, at + (to - from), 0.0),
+                };
+                match spans.last_mut() {
+                    Some(last)
+                        if last.source == source
+                            && last.filter == filter
+                            && (from - last.to).abs() < 1e-9
+                            && (last.shift - shift).abs() < 1e-9 =>
+                    {
+                        last.to = to;
+                    }
+                    _ => spans.push(Span {
+                        index: spans.len(),
+                        source,
+                        filter,
+                        from,
+                        to,
+                        shift,
+                    }),
+                }
+            };
         let mut at = 0.0;
         for clip in &self.clips {
             let span = clip.length();
@@ -649,11 +794,11 @@ impl Edit {
                 Feed::File { source, from } => {
                     let end =
                         length(source).map_or(from + span, |length| (from + span).min(length));
-                    push(Some(source), from, end.max(from), at);
+                    push(Some(source), from, end.max(from), at, clip.filter);
                     let read = (end - from).clamp(0.0, span);
-                    push(None, 0.0, span - read, at + read);
+                    push(None, 0.0, span - read, at + read, None);
                 }
-                Feed::Blank => push(None, 0.0, span, at),
+                Feed::Blank => push(None, 0.0, span, at, None),
             }
             at += span;
         }
@@ -898,6 +1043,44 @@ mod tests {
         assert_eq!(
             Edit::whole(10.0).spans(),
             Edit::whole(10.0).lanes((true, true)).picture
+        );
+    }
+
+    #[test]
+    fn filters_stack_on_a_part_and_come_off() {
+        let gray = Filters {
+            picture: Some("hue=s=0".to_owned()),
+            sound: None,
+        };
+        let louder = Filters {
+            picture: None,
+            sound: Some("volume=2".to_owned()),
+        };
+        let mut edit = Edit::whole(30.0);
+        assert!(edit.add_filters(0.0, 30.0, &gray));
+        assert!(edit.is_filtered() && !edit.is_mixed());
+        assert!(!edit.plays_whole(30.0), "the player plays the filters");
+        // A part gets more, after what it has.
+        assert_eq!(edit.filters_with(10.0, 20.0, &louder).len(), 1);
+        assert!(edit.add_filters(10.0, 20.0, &louder));
+        assert_eq!(froms(&edit), [(0.0, 10.0), (10.0, 20.0), (20.0, 30.0)]);
+        let middle = edit.filters_of(&edit.clips()[1]).unwrap();
+        assert_eq!(middle.picture.as_deref(), Some("hue=s=0"));
+        assert_eq!(middle.sound.as_deref(), Some("volume=2"));
+        // Spans part where filters change, though the file carries on.
+        let spans = edit.spans();
+        assert_eq!(spans.len(), 3);
+        assert_ne!(spans[0].filter, spans[1].filter);
+        assert_eq!(spans[0].filter, spans[2].filter);
+        // Splitting keeps each half's filters.
+        assert!(edit.split(15.0));
+        assert_eq!(edit.clips()[1].filter, edit.clips()[2].filter);
+        assert!(edit.remove_filters(0.0, 30.0));
+        assert!(!edit.is_filtered());
+        assert!(edit.plays_whole(30.0));
+        assert!(
+            !edit.add_filters(0.0, 5.0, &Filters::default()),
+            "nothing to add"
         );
     }
 
