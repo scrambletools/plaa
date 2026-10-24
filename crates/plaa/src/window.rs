@@ -32,6 +32,10 @@ pub const SPEEDS: [f64; 8] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
 /// How long opening may take before a spinner says it is under way.
 const OPENING_SHOWN: Duration = Duration::from_millis(300);
 
+/// The space the toolbar adds between its groups of buttons, beyond
+/// the space between any two.
+const TOOL_GROUP_GAP: f32 = 12.0;
+
 /// How far the skip buttons and arrow keys move, in seconds.
 pub const SKIP: f64 = 10.0;
 pub const SKIP_SHORT: f64 = 5.0;
@@ -589,76 +593,95 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
         tools.push(connect_menu(snapshot, window.menu == Some(Menu::Connect)));
     }
     tools.push(space().width(Fill).into());
+    // What plays: editing, the frame or the visualizer, looping and the
+    // list.
+    let mut playing = Vec::new();
     if let Some(menu) = edit_menu(window) {
-        tools.push(menu);
+        playing.push(menu);
     }
     if window.is_video() {
-        tools.push(component::tool(
+        playing.push(component::tool(
             Icon::Photo,
             crate::fl!("action-screenshot"),
             Some(Control::Screenshot),
         ));
     } else if window.info.is_some() {
-        tools.push(visualizer_menu(window));
+        playing.push(visualizer_menu(window));
     }
-    tools.push(component::toggle_tool(
+    playing.push(component::toggle_tool(
         Icon::Repeat,
         crate::fl!("action-loop"),
         window.looping,
         Control::ToggleLoop,
     ));
     if window.playlist.is_list() {
-        tools.push(component::toggle_tool(
+        playing.push(component::toggle_tool(
             Icon::PlaylistPlay,
             crate::fl!("action-playlist"),
             window.sheet == Some(Sheet::Playlist),
             Control::TogglePlaylist,
         ));
     }
+    // Where it plays: a TV or speaker, and the AVB network.
+    let mut elsewhere = Vec::new();
     // A stream plaa listens to plays here alone.
     if !window.source().is_live() {
-        tools.push(cast_menu(window, context));
+        elsewhere.push(cast_menu(window, context));
     }
     if context.avb.is_some() {
-        tools.push(component::toggle_tool(
+        elsewhere.push(component::toggle_tool(
             Icon::Lan,
             crate::fl!("action-network"),
             window.sheet == Some(Sheet::Network),
             Control::ToggleNetwork,
         ));
     }
-    tools.push(component::toggle_tool(
-        Icon::SmartToy,
-        crate::fl!("action-assistant"),
-        context.assistant_open,
-        Control::ToggleAssistant,
-    ));
-    tools.push(component::toggle_tool(
-        Icon::Info,
-        crate::fl!("action-info"),
-        window.sheet == Some(Sheet::Inspector),
-        Control::ToggleInspector,
-    ));
+    // The panels, and the window.
+    let mut window_tools = vec![
+        component::toggle_tool(
+            Icon::SmartToy,
+            crate::fl!("action-assistant"),
+            context.assistant_open,
+            Control::ToggleAssistant,
+        ),
+        component::toggle_tool(
+            Icon::Info,
+            crate::fl!("action-info"),
+            window.sheet == Some(Sheet::Inspector),
+            Control::ToggleInspector,
+        ),
+    ];
     if window.is_video() {
-        tools.push(component::toggle_tool(
+        window_tools.push(component::toggle_tool(
             Icon::PictureInPicture,
             crate::fl!("action-picture-in-picture"),
             context.pip,
             Control::TogglePip,
         ));
     }
-    tools.push(component::floating_bars_toggle(Control::ToggleOverlay));
-    tools.push(component::tool(
+    window_tools.push(component::floating_bars_toggle(Control::ToggleOverlay));
+    window_tools.push(component::tool(
         Icon::Settings,
         crate::fl!("action-settings"),
         Some(Control::Settings),
     ));
     if context.close_button {
-        tools.push(component::tool(
+        window_tools.push(component::tool(
             Icon::Close,
             crate::fl!("common-close"),
             Some(Control::Close),
         ));
+    }
+    let mut first = true;
+    for group in [playing, elsewhere, window_tools] {
+        if group.is_empty() {
+            continue;
+        }
+        if !first {
+            tools.push(space().width(TOOL_GROUP_GAP).into());
+        }
+        first = false;
+        tools.extend(group);
     }
     row(tools).spacing(4).align_y(Center).width(Fill).into()
 }
