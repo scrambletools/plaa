@@ -178,6 +178,13 @@ fn non_empty(value: Option<&str>) -> Option<String> {
 }
 
 impl MediaInfo {
+    /// What the file at `path` holds, as its header says.
+    pub fn probe(path: &std::path::Path) -> Result<Self, String> {
+        crate::init();
+        let input = ffmpeg::format::input(path).map_err(|error| crate::inputs::describe(&error))?;
+        Ok(Self::read(&input))
+    }
+
     pub(crate) fn read(input: &ffmpeg::format::context::Input) -> Self {
         let tags: Vec<(String, String)> = input
             .metadata()

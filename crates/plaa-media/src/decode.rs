@@ -116,6 +116,70 @@ fn open_decoder_with(
 /// A started decoder: its packet queue and its thread.
 pub(crate) type Started = (Arc<PacketQueue>, JoinHandle<()>);
 
+/// A decoder for another file's packets, which a decoder thread takes in
+/// place of its own, for an edit that mixes files.
+pub(crate) enum Setup {
+    Picture {
+        decoder: ffmpeg::decoder::Video,
+        time_base: ffmpeg::Rational,
+        start: f64,
+        frame_duration: f64,
+        quarter_turns: u8,
+        /// The file, numbered as the edit's clips number them.
+        source: usize,
+    },
+    Sound {
+        decoder: ffmpeg::decoder::Audio,
+        time_base: ffmpeg::Rational,
+        start: f64,
+        source: usize,
+    },
+}
+
+/// The frame rate of stream `index` of `input`, 25 when it does not say.
+pub(crate) fn frame_rate(input: &ffmpeg::format::context::Input, index: usize) -> f64 {
+    input
+        .stream(index)
+        .map(|stream| stream.avg_frame_rate())
+        .filter(|rate| rate.numerator() > 0 && rate.denominator() > 0)
+        .map_or(25.0, f64::from)
+}
+
+/// A setup for the picture of stream `index` of `input`, file `source`.
+pub(crate) fn picture_setup(
+    input: &ffmpeg::format::context::Input,
+    index: usize,
+    source: usize,
+    hardware: bool,
+) -> Result<Setup, ffmpeg::Error> {
+    let stream = input.stream(index).ok_or(ffmpeg::Error::StreamNotFound)?;
+    let quarter_turns = ffi::quarter_turns(&stream);
+    let (decoder, time_base, _) = video_decoder(input, index, hardware)?;
+    Ok(Setup::Picture {
+        decoder,
+        time_base,
+        start: start_seconds(input),
+        frame_duration: 1.0 / frame_rate(input, index),
+        quarter_turns,
+        source,
+    })
+}
+
+/// A setup for the sound of stream `index` of `input`, file `source`.
+pub(crate) fn sound_setup(
+    input: &ffmpeg::format::context::Input,
+    index: usize,
+    source: usize,
+) -> Result<Setup, ffmpeg::Error> {
+    let (decoder, time_base) = open_decoder(input, index)?;
+    Ok(Setup::Sound {
+        decoder: decoder.audio()?,
+        time_base,
+        start: start_seconds(input),
+        source,
+    })
+}
+
 pub(crate) fn spawn_video(
     input: &ffmpeg::format::context::Input,
     index: usize,
@@ -125,11 +189,9 @@ pub(crate) fn spawn_video(
 ) -> Result<(Started, Option<&'static str>), ffmpeg::Error> {
     let stream = input.stream(index).ok_or(ffmpeg::Error::StreamNotFound)?;
     let quarter_turns = ffi::quarter_turns(&stream);
-    let frame_rate = Some(stream.avg_frame_rate())
-        .filter(|rate| rate.numerator() > 0 && rate.denominator() > 0)
-        .map(f64::from)
-        .unwrap_or(25.0);
+    let frame_rate = frame_rate(input, index);
     let (decoder, time_base, device) = video_decoder(input, index, hardware)?;
+    let size = (decoder.width(), decoder.height());
     let queue = Arc::new(PacketQueue::default());
     let mut worker = VideoDecoder {
         decoder,
@@ -144,6 +206,7 @@ pub(crate) fn spawn_video(
         span: Span::WHOLE,
         needs_flush: false,
         downloads: ffi::Downloads::default(),
+        black: (size.0.max(2), size.1.max(2)),
     };
     let thread = std::thread::Builder::new()
         .name("plaa-video".into())
@@ -212,6 +275,8 @@ struct VideoDecoder {
     needs_flush: bool,
     /// Memory for pictures copied out of graphics memory.
     downloads: ffi::Downloads,
+    /// The size a black picture is made at: the last picture's.
+    black: (u32, u32),
 }
 
 /// Converts pictures the shader cannot read: their format and size, and
@@ -258,8 +323,94 @@ impl VideoDecoder {
                         video.finished = true;
                     }
                 }
+                Item::Switch(serial, setup) => self.switch(serial, *setup, &mut scaler),
+                Item::Blank(serial, span) => {
+                    self.renew(serial, span);
+                    if serial != self.shared.serial.load(Ordering::Relaxed) {
+                        continue;
+                    }
+                    if span.index != self.span.index {
+                        let _ = self.decoder.send_eof();
+                        self.drain(&mut scaler);
+                        self.decoder.flush();
+                        self.span = span;
+                    }
+                    self.last_position = None;
+                    self.show_black(span);
+                }
             }
         }
+    }
+
+    /// Decodes another file's packets from here on, as `setup` says, once
+    /// the last part's pictures are out; unless a seek made it stale.
+    fn switch(&mut self, serial: u64, setup: Setup, scaler: &mut Scaler) {
+        if serial == self.serial && !self.needs_flush {
+            let _ = self.decoder.send_eof();
+            self.drain(scaler);
+        }
+        self.needs_flush = true;
+        let Setup::Picture {
+            decoder,
+            time_base,
+            start,
+            frame_duration,
+            quarter_turns,
+            source,
+        } = setup
+        else {
+            return;
+        };
+        let mut decoding = self.queue.decoding();
+        if serial != self.shared.serial.load(Ordering::Relaxed) {
+            return;
+        }
+        self.decoder = decoder;
+        self.time_base = time_base;
+        self.start = start;
+        self.frame_duration = frame_duration;
+        self.quarter_turns = quarter_turns;
+        self.serial = serial;
+        self.needs_flush = false;
+        self.last_position = None;
+        *decoding = source;
+    }
+
+    /// Shows a black picture for `span` of the edited time, from where a
+    /// seek lands in it.
+    fn show_black(&mut self, span: Span) {
+        let serial = self.serial;
+        let position = self
+            .shared
+            .target(serial)
+            .map_or(span.from, |target| target.max(span.from));
+        if position >= span.to {
+            return;
+        }
+        let (width, height) = self.black;
+        let mut frame = ffmpeg::frame::Video::new(Pixel::YUV420P, width, height);
+        for (plane, value) in [(0, 16), (1, 128), (2, 128)] {
+            frame.data_mut(plane).fill(value);
+        }
+        let aspect = f64::from(width) / f64::from(height.max(1));
+        let Ok(picture) = VideoFrame::wrap(frame, serial, position, aspect, 0) else {
+            return;
+        };
+        *self
+            .shared
+            .decoded
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = (serial, position);
+        let mut video = self.shared.video();
+        while video.is_full() && video.serial() == serial && !self.shared.stopping() {
+            video = self
+                .shared
+                .video_room
+                .wait_timeout(video, Duration::from_millis(20))
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .0;
+        }
+        video.push(picture);
     }
 
     /// Resets the decoder for packets of a new serial, after a seek, from
@@ -326,6 +477,7 @@ impl VideoDecoder {
             frame
         };
         let aspect = display_aspect(&frame);
+        self.black = (frame.width().max(2), frame.height().max(2));
         let picture = match VideoFrame::wrap(frame, serial, position, aspect, self.quarter_turns) {
             Ok(picture) => picture,
             Err(frame) => match convert(scaler, &frame) {
@@ -421,6 +573,7 @@ pub(crate) fn spawn_audio(
         needs_flush: false,
         graph: None,
         cursor: None,
+        placed: None,
     };
     let thread = std::thread::Builder::new()
         .name("plaa-audio".into())
@@ -452,7 +605,13 @@ struct AudioDecoder {
     graph: Option<AudioGraph>,
     /// The file's time of the next sample out of the graph.
     cursor: Option<f64>,
+    /// In an edit that mixes files, the edited time sound has been placed
+    /// up to, so gaps are filled with silence and overlaps left out.
+    placed: Option<f64>,
 }
+
+/// The most silence pushed at once, in seconds.
+const SILENCE_CHUNK: f64 = 0.1;
 
 impl AudioDecoder {
     fn run(&mut self) {
@@ -473,6 +632,7 @@ impl AudioDecoder {
                         // The last part's sound plays out to its end
                         // before the next part's starts.
                         self.finish_part();
+                        self.fill_part();
                         self.decoder.flush();
                         self.graph = None;
                         self.cursor = None;
@@ -486,8 +646,29 @@ impl AudioDecoder {
                 Item::End(serial) => {
                     self.renew(serial, self.span);
                     self.finish_part();
+                    self.fill_part();
                     self.needs_flush = true;
                     self.output.finish(serial);
+                }
+                Item::Switch(serial, setup) => self.switch(serial, *setup),
+                Item::Blank(serial, span) => {
+                    self.renew(serial, span);
+                    if serial != self.shared.serial.load(Ordering::Relaxed) {
+                        continue;
+                    }
+                    if span.index != self.span.index {
+                        self.finish_part();
+                        self.fill_part();
+                        self.decoder.flush();
+                        self.graph = None;
+                        self.cursor = None;
+                        self.span = span;
+                    }
+                    let from = self
+                        .placed
+                        .or_else(|| self.shared.target(serial))
+                        .map_or(span.from, |from| from.max(span.from));
+                    self.silence(from, span.to);
                 }
             }
         }
@@ -495,12 +676,93 @@ impl AudioDecoder {
 
     fn renew(&mut self, serial: u64, span: Span) {
         if serial != self.serial || self.needs_flush {
+            let fresh = serial != self.serial;
             self.decoder.flush();
             self.serial = serial;
             self.span = span;
             self.needs_flush = false;
             self.graph = None;
             self.cursor = None;
+            // After a seek, sound is placed from where it lands.
+            if fresh {
+                self.placed = self
+                    .shared
+                    .mixed
+                    .load(Ordering::Relaxed)
+                    .then(|| self.shared.target(serial))
+                    .flatten();
+            }
+        }
+    }
+
+    /// Decodes another file's packets from here on, as `setup` says, once
+    /// the last part's sound is out; unless a seek made it stale.
+    fn switch(&mut self, serial: u64, setup: Setup) {
+        if serial == self.serial && !self.needs_flush {
+            self.finish_part();
+            self.fill_part();
+        }
+        self.needs_flush = true;
+        let Setup::Sound {
+            decoder,
+            time_base,
+            start,
+            source,
+        } = setup
+        else {
+            return;
+        };
+        let mut decoding = self.queue.decoding();
+        if serial != self.shared.serial.load(Ordering::Relaxed) {
+            return;
+        }
+        let fresh = serial != self.serial;
+        self.decoder = decoder;
+        self.time_base = time_base;
+        self.start = start;
+        self.serial = serial;
+        self.needs_flush = false;
+        self.graph = None;
+        self.cursor = None;
+        if fresh {
+            self.placed = self.shared.target(serial);
+        }
+        *decoding = source;
+    }
+
+    /// In an edit that mixes files, fills what the part playing lacks of
+    /// its sound with silence, to its end.
+    fn fill_part(&mut self) {
+        if !self.shared.mixed.load(Ordering::Relaxed) {
+            return;
+        }
+        let end = self.span.to + self.span.shift;
+        if let Some(placed) = self.placed
+            && placed < end - 0.005
+            && end.is_finite()
+        {
+            self.silence(placed, end);
+        }
+    }
+
+    /// Plays silence from `from` to `to` seconds of the edited time.
+    fn silence(&mut self, from: f64, to: f64) {
+        let channels = usize::from(self.output.channels.max(1));
+        let step = self.shared.speed() / f64::from(self.output.rate);
+        let mut at = from;
+        while at < to - step / 2.0 && !self.shared.stopping() {
+            let frames = (((to - at).min(SILENCE_CHUNK)) / step).round().max(1.0) as usize;
+            if !self.output.push(
+                self.serial,
+                at,
+                step,
+                vec![0.0; frames * channels],
+                &self.shared.stop,
+            ) {
+                return;
+            }
+            at += frames as f64 * step;
+            self.placed = Some(at);
         }
     }
 
@@ -646,12 +908,32 @@ impl AudioDecoder {
                     position += skip as f64 * step;
                 }
             }
+            // In an edit that mixes files, sound plays exactly where it
+            // belongs: silence fills a gap before it, and what overlaps
+            // the sound before is left out, so the clock never jumps.
+            if self.shared.mixed.load(Ordering::Relaxed)
+                && let Some(placed) = self.placed
+            {
+                if position > placed + step * 2.0 {
+                    self.silence(placed, position);
+                } else if position < placed - step / 2.0 {
+                    let skip = (((placed - position) / step).round() as usize)
+                        .min(samples.len() / channels);
+                    samples.drain(..skip * channels);
+                    position += skip as f64 * step;
+                }
+            }
+            if samples.is_empty() {
+                continue;
+            }
+            let frames = samples.len() / channels;
             if !self
                 .output
                 .push(self.serial, position, step, samples, &self.shared.stop)
             {
                 return;
             }
+            self.placed = Some(position + frames as f64 * step);
         }
     }
 }

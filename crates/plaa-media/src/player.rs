@@ -14,10 +14,11 @@ use ffmpeg_next as ffmpeg;
 use crate::audio;
 use crate::clock::Clock;
 use crate::decode::{self, Picture};
-use crate::edit::{Edit, Span};
+use crate::edit::{Edit, OWN, Span};
 use crate::frame::{self, VideoFrame};
 use crate::info::MediaInfo;
 use crate::inputs::{self, Inputs, SOUND_TRACKS};
+use crate::lanes::Mixed;
 use crate::queue::{Item, PacketQueue};
 use crate::subtitle::{self, Cue, Cues, PictureCues, SubtitlePicture};
 use crate::web::{Entry, Page};
@@ -215,9 +216,9 @@ pub(crate) enum Command {
     SelectVideo(usize),
     SelectAudio(Option<usize>),
     SelectSubtitles(Option<usize>),
-    /// Plays these parts of the file, or all of it when none, from this
+    /// Plays this edit of the file, or all of it when none, from this
     /// many seconds of the edited time.
-    SetEdit(Vec<Span>, f64),
+    SetEdit(Option<Arc<Edit>>, f64),
 }
 
 /// What the player's threads and its handle share.
@@ -261,6 +262,9 @@ pub(crate) struct Shared {
     /// The edit playing, if the file is edited: its time is what the
     /// clock, pictures and sound count in.
     pub edit: Mutex<Option<Arc<Edit>>>,
+    /// The edit playing mixes files, so its picture and sound are read
+    /// apart, and sound is placed exactly.
+    pub mixed: AtomicBool,
     pub state: Mutex<State>,
 }
 
@@ -343,11 +347,16 @@ impl Shared {
             .or_else(|| state.info.as_ref().and_then(|info| info.duration))
     }
 
-    /// The file's time at `seconds` of what plays.
-    pub fn source_time(&self, seconds: f64) -> f64 {
+    /// The file's time at `seconds` of what plays: none while a clip from
+    /// another file plays.
+    pub fn source_time(&self, seconds: f64) -> Option<f64> {
         match &*self.edit.lock().unwrap_or_else(PoisonError::into_inner) {
-            Some(edit) => edit.source_of(seconds),
-            None => seconds,
+            Some(edit) => match edit.locate(seconds) {
+                Some((OWN, time)) => Some(time),
+                Some(_) => None,
+                None => Some(seconds),
+            },
+            None => Some(seconds),
         }
     }
 
@@ -392,6 +401,7 @@ impl Player {
             speed: AtomicU64::new(1.0f64.to_bits()),
             quality: Mutex::new(options.quality),
             edit: Mutex::new(None),
+            mixed: AtomicBool::new(false),
             state: Mutex::new(State::default()),
         });
         let (commands, receiver) = mpsc::channel();
@@ -576,7 +586,6 @@ impl Player {
     /// of the edited time. Positions and the duration count in the
     /// edit's time from then on.
     pub fn set_edit(&self, edit: Option<Arc<Edit>>, position: Duration) {
-        let spans = edit.as_deref().map(Edit::spans).unwrap_or_default();
         {
             let mut state = self.shared.state();
             state.edited = edit
@@ -588,11 +597,11 @@ impl Player {
             .shared
             .edit
             .lock()
-            .unwrap_or_else(PoisonError::into_inner) = edit;
+            .unwrap_or_else(PoisonError::into_inner) = edit.clone();
         self.shared.seeks.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .commands
-            .send(Command::SetEdit(spans, position.as_secs_f64()));
+            .send(Command::SetEdit(edit, position.as_secs_f64()));
     }
 
     /// The media time now: of the edit, if the file is edited.
@@ -718,7 +727,7 @@ impl Player {
 
     /// The picture subtitle showing now.
     pub fn subtitle_picture(&self) -> Option<Arc<SubtitlePicture>> {
-        let now = self.shared.source_time(self.shared.clock.now());
+        let now = self.shared.source_time(self.shared.clock.now())?;
         if let Some(track) = self.shared.ass().as_mut() {
             return track.render(now);
         }
@@ -727,7 +736,7 @@ impl Player {
 
     /// The subtitle text showing now.
     pub fn subtitle(&self) -> Option<Cue> {
-        let now = self.shared.source_time(self.shared.clock.now());
+        let now = self.shared.source_time(self.shared.clock.now())?;
         let file = self
             .shared
             .file_cues
@@ -777,14 +786,17 @@ const STARVED: f64 = 0.1;
 const BUFFERING_SHOWN: Duration = Duration::from_millis(300);
 
 /// The streams being decoded, each with its packet queue and thread.
-struct Decoders {
-    video: Option<(usize, Arc<PacketQueue>, JoinHandle<()>)>,
-    audio: Option<(usize, Arc<PacketQueue>, JoinHandle<()>)>,
-    subtitles: Option<(usize, SubtitleSink)>,
+pub(crate) struct Decoders {
+    pub video: Option<(usize, Arc<PacketQueue>, JoinHandle<()>)>,
+    pub audio: Option<(usize, Arc<PacketQueue>, JoinHandle<()>)>,
+    pub subtitles: Option<(usize, SubtitleSink)>,
+    /// The picture and the sound are read apart, as for an edit that
+    /// mixes files.
+    pub apart: bool,
 }
 
 /// Where a subtitle track's packets go.
-enum SubtitleSink {
+pub(crate) enum SubtitleSink {
     Decoder(decode::SubtitleDecoder),
     /// To libass, through `Shared::ass`, by the stream's time base.
     Ass(ffmpeg::Rational),
@@ -815,7 +827,7 @@ impl Decoders {
     /// with nothing for a while would hold back the earliest. Inputs read
     /// apart get as far as the one behind.
     fn read_to(&self) -> Option<f64> {
-        if self.sound_apart() {
+        if self.sound_apart() || self.apart {
             self.queues().try_fold(f64::INFINITY, |earliest, queue| {
                 Some(earliest.min(queue.end()?))
             })
@@ -893,6 +905,9 @@ struct Reading {
     spans: Vec<Span>,
     current: usize,
     passed: Vec<usize>,
+    /// For an edit that mixes files, its lanes, read in place of these
+    /// parts.
+    mixed: Option<Mixed>,
 }
 
 impl Reading {
@@ -906,6 +921,7 @@ impl Reading {
             },
             current: 0,
             passed: Vec::new(),
+            mixed: None,
         }
     }
 
@@ -1107,6 +1123,7 @@ fn read(
         video: None,
         audio: None,
         subtitles: None,
+        apart: false,
     };
     start_video(
         video_stream,
@@ -1241,7 +1258,11 @@ fn read(
         }
         // Commands first, waiting for one only while there is nothing to
         // read for now, and not long while the timeline is dragged.
-        let idle = read_all || decoders.has_enough(network, now);
+        let idle = read_all
+            || match &reading.mixed {
+                Some(mixed) => mixed.has_enough(&decoders),
+                None => decoders.has_enough(network, now),
+            };
         let wait = if scrub.is_some() { 4 } else { 20 };
         let command = if idle {
             match commands.recv_timeout(Duration::from_millis(wait)) {
@@ -1321,6 +1342,7 @@ fn read(
                         );
                     }
                     decoders.skip_unused(&mut inputs);
+                    keep_other_sound(&reading, output.as_ref(), &shared, &mut decoders);
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
                         seek(&mut inputs, &mut reading, &shared, &mut decoders, now, true);
@@ -1366,6 +1388,7 @@ fn read(
                     shared.use_output(output.as_ref().map(|output| output.shared.clone()));
                     start_audio(playing, &inputs, output.as_ref(), &shared, &mut decoders);
                     decoders.skip_unused(&mut inputs);
+                    keep_other_sound(&reading, output.as_ref(), &shared, &mut decoders);
                     let now = shared.clock.now().max(0.0);
                     if info.seekable {
                         seek(&mut inputs, &mut reading, &shared, &mut decoders, now, true);
@@ -1373,11 +1396,79 @@ fn read(
                         shared.state().read_all = false;
                     }
                 }
-                Command::SetEdit(spans, position) => {
+                Command::SetEdit(edit, position) => {
                     // A web page's picture and sound read apart are not
                     // edited.
                     if inputs.sound.is_none() {
+                        let mixed = edit
+                            .clone()
+                            .filter(|edit| edit.is_mixed())
+                            .and_then(|edit| {
+                                let Source::File(path) = &source else {
+                                    return None;
+                                };
+                                Some(Mixed::new(
+                                    edit,
+                                    path.clone(),
+                                    options.hardware,
+                                    (decoders.video.is_some(), decoders.audio.is_some()),
+                                ))
+                            });
+                        let was_mixed = reading.mixed.is_some();
+                        let spans = edit
+                            .as_deref()
+                            .filter(|_| mixed.is_none())
+                            .map(Edit::spans)
+                            .unwrap_or_default();
                         reading = Reading::new(spans);
+                        if let Some(mixed) = mixed {
+                            // The sound of other files plays even where the
+                            // file edited has none.
+                            if decoders.audio.is_none()
+                                && let Some((path, number)) = mixed.first_sound()
+                            {
+                                if output.is_none() {
+                                    output = Some(open_output(&shared, &options, &*events));
+                                    shared.use_output(
+                                        output.as_ref().map(|output| output.shared.clone()),
+                                    );
+                                }
+                                start_other_audio(
+                                    &path,
+                                    number,
+                                    output.as_ref(),
+                                    &shared,
+                                    &mut decoders,
+                                );
+                            }
+                            shared.mixed.store(true, Ordering::Relaxed);
+                            decoders.apart = true;
+                            reading.mixed = Some(mixed);
+                        } else if was_mixed {
+                            // Back to the file's own streams.
+                            shared.mixed.store(false, Ordering::Relaxed);
+                            decoders.apart = false;
+                            let video = decoders.video.as_ref().map(|(index, ..)| *index);
+                            let audio = decoders.audio.as_ref().map(|(index, ..)| *index);
+                            decoders.stop();
+                            start_video(
+                                video,
+                                &inputs.main,
+                                start,
+                                options.hardware,
+                                &shared,
+                                &mut decoders,
+                                &events,
+                            );
+                            start_audio(
+                                audio.filter(|index| *index != OTHER_SOUND),
+                                &inputs,
+                                output.as_ref(),
+                                &shared,
+                                &mut decoders,
+                            );
+                            decoders.skip_unused(&mut inputs);
+                        }
                     }
                     if info.seekable {
                         seek(
@@ -1421,6 +1512,15 @@ fn read(
             if read_all && !announced_end && check_ended(&shared) {
                 announced_end = true;
                 events(Event::Ended);
+            }
+            continue;
+        }
+        if let Some(mixed) = &mut reading.mixed {
+            let serial = shared.serial.load(Ordering::Relaxed);
+            mixed.read(serial, &mut decoders, &shared);
+            if mixed.read_all() {
+                read_all = true;
+                shared.state().read_all = true;
             }
             continue;
         }
@@ -1479,40 +1579,8 @@ fn read(
                             shared.state().read_all = true;
                         }
                     }
-                } else if let Some((stream, sink)) = &mut decoders.subtitles
-                    && *stream == index
-                {
-                    match sink {
-                        SubtitleSink::Decoder(decoder) => {
-                            for decoded in decoder.decode(&packet) {
-                                match decoded {
-                                    decode::Decoded::Text(cue) => shared.cues().add(cue),
-                                    decode::Decoded::Picture(cue) => {
-                                        shared.picture_cues().add(cue);
-                                    }
-                                    decode::Decoded::Clear(at) => {
-                                        shared.picture_cues().clear_from(at);
-                                    }
-                                }
-                            }
-                        }
-                        SubtitleSink::Ass(time_base) => {
-                            let milliseconds = |value: i64| {
-                                crate::info::seconds(value, *time_base)
-                                    .map(|seconds| (seconds * 1000.0) as i64)
-                            };
-                            let begins = packet
-                                .pts()
-                                .and_then(milliseconds)
-                                .map(|begins| begins - (start * 1000.0) as i64);
-                            if let (Some(begins), Some(track), Some(data)) =
-                                (begins, shared.ass().as_mut(), packet.data())
-                            {
-                                let lasts = milliseconds(packet.duration()).unwrap_or(0);
-                                track.add(data, begins, lasts);
-                            }
-                        }
-                    }
+                } else if first == 0 {
+                    feed_subtitles(&mut decoders, &shared, &packet, start);
                 }
             }
             Err(ffmpeg::Error::Exit) => break,
@@ -1711,8 +1779,8 @@ fn decodes_on(
     scrub: &Scrub,
     wanted: f64,
 ) -> bool {
-    // Sound alone seeks quickly.
-    let Some(stream) = video_stream else {
+    // Sound alone seeks quickly, and an edit mixing files seeks each lane.
+    let Some(stream) = video_stream.filter(|_| reading.mixed.is_none()) else {
         return false;
     };
     let (part, wanted) = reading.locate(wanted);
@@ -1956,8 +2024,10 @@ fn seek(
     let serial = shared.serial.fetch_add(1, Ordering::Relaxed) + 1;
     *shared.target.lock().unwrap_or_else(PoisonError::into_inner) =
         exact.then_some((serial, position));
-    let (part, source) = reading.locate(position);
-    reading.go_to(part, inputs, source);
+    if reading.mixed.is_none() {
+        let (part, source) = reading.locate(position);
+        reading.go_to(part, inputs, source);
+    }
     for queue in decoders.queues() {
         queue.clear();
     }
@@ -1975,12 +2045,130 @@ fn seek(
     shared.clock.stall();
     shared.clock.wait();
     shared.state().ended = false;
+    // Each lane moves to its own part, and its decoder to that part's
+    // file.
+    if let Some(mixed) = &mut reading.mixed {
+        mixed.seek(position, serial, decoders);
+    }
+}
+
+/// The audio decoder's stream number when it decodes another file's sound,
+/// as the file edited has none.
+const OTHER_SOUND: usize = usize::MAX;
+
+/// Opens the sound output, or a silent one when none opens.
+fn open_output(shared: &Shared, options: &Options, events: &dyn Fn(Event)) -> audio::Output {
+    audio::Output::open(
+        shared.clock.clone(),
+        options.volume,
+        options.muted,
+        options.audio_device.as_deref(),
+    )
+    .unwrap_or_else(|error| {
+        events(Event::NoSound(error.to_string()));
+        audio::Output::silent(shared.clock.clone(), options.volume, options.muted)
+    })
+}
+
+/// Decodes the sound of file `number` of an edit, at `path`, where the
+/// file edited has none of its own.
+fn start_other_audio(
+    path: &Path,
+    number: usize,
+    output: Option<&audio::Output>,
+    shared: &Arc<Shared>,
+    decoders: &mut Decoders,
+) {
+    let Some(output) = output else {
+        return;
+    };
+    let input = match ffmpeg::format::input(path) {
+        Ok(input) => input,
+        Err(error) => {
+            eprintln!("plaa: opening {}: {error}", path.display());
+            return;
+        }
+    };
+    let info = MediaInfo::read(&input);
+    let Some(index) = info.audio.first().map(|track| track.track.index) else {
+        return;
+    };
+    let start = decode::start_seconds(&input);
+    match decode::spawn_audio(&input, index, start, output.shared.clone(), shared.clone()) {
+        Ok((queue, thread)) => {
+            *queue.decoding() = number;
+            decoders.audio = Some((OTHER_SOUND, queue, thread));
+            shared.state().has_audio = true;
+        }
+        Err(error) => eprintln!("plaa: sound of {}: {error}", path.display()),
+    }
+}
+
+/// In an edit that mixes files, decodes another file's sound again where
+/// the file edited has none, once the decoders started over.
+fn keep_other_sound(
+    reading: &Reading,
+    output: Option<&audio::Output>,
+    shared: &Arc<Shared>,
+    decoders: &mut Decoders,
+) {
+    if decoders.audio.is_none()
+        && let Some((path, number)) = reading.mixed.as_ref().and_then(Mixed::first_sound)
+    {
+        start_other_audio(&path, number, output, shared, decoders);
+    }
+}
+
+/// Hands `packet` to the subtitles showing, when it is theirs: the file
+/// edited's, whose timestamps start at `start`.
+pub(crate) fn feed_subtitles(
+    decoders: &mut Decoders,
+    shared: &Shared,
+    packet: &ffmpeg::Packet,
+    start: f64,
+) {
+    let Some((stream, sink)) = &mut decoders.subtitles else {
+        return;
+    };
+    if *stream != packet.stream() {
+        return;
+    }
+    match sink {
+        SubtitleSink::Decoder(decoder) => {
+            for decoded in decoder.decode(packet) {
+                match decoded {
+                    decode::Decoded::Text(cue) => shared.cues().add(cue),
+                    decode::Decoded::Picture(cue) => {
+                        shared.picture_cues().add(cue);
+                    }
+                    decode::Decoded::Clear(at) => {
+                        shared.picture_cues().clear_from(at);
+                    }
+                }
+            }
+        }
+        SubtitleSink::Ass(time_base) => {
+            let milliseconds = |value: i64| {
+                crate::info::seconds(value, *time_base).map(|seconds| (seconds * 1000.0) as i64)
+            };
+            let begins = packet
+                .pts()
+                .and_then(milliseconds)
+                .map(|begins| begins - (start * 1000.0) as i64);
+            if let (Some(begins), Some(track), Some(data)) =
+                (begins, shared.ass().as_mut(), packet.data())
+            {
+                let lasts = milliseconds(packet.duration()).unwrap_or(0);
+                track.add(data, begins, lasts);
+            }
+        }
+    }
 }
 
 /// Where `packet` comes in the file's time, in seconds from the start:
 /// by its decoding time where it has one, which is in order, else by its
 /// presentation time. Says which.
-fn packet_order(
+pub(crate) fn packet_order(
     input: &ffmpeg::format::context::Input,
     packet: &ffmpeg::Packet,
     start: f64,
@@ -1994,7 +2182,7 @@ fn packet_order(
 }
 
 /// The media time `packet` lasts until, in seconds from the start.
-fn packet_end(
+pub(crate) fn packet_end(
     input: &ffmpeg::format::context::Input,
     packet: &ffmpeg::Packet,
     start: f64,

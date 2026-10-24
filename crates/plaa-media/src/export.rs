@@ -597,7 +597,7 @@ pub fn output_size(
 }
 
 /// The filters that turn, flip and size pictures for the encoder.
-fn picture_filters(transform: Transform, size: (u32, u32), format: Pixel) -> String {
+pub(crate) fn picture_filters(transform: Transform, size: (u32, u32), format: Pixel) -> String {
     let mut filters = Vec::new();
     if transform.mirrored {
         filters.push("hflip".to_owned());
@@ -701,6 +701,10 @@ fn run(
         return Err(ExportError::Failed(
             "a file cannot be exported over itself".to_owned(),
         ));
+    }
+    // Pictures or sound from other files are read apart.
+    if let Some(edit) = job.edit.as_deref().filter(|edit| edit.is_mixed()) {
+        return crate::mix::run(job, edit, temporary, stop, events);
     }
     let mut input = ffmpeg::format::input(&job.source).map_err(failed)?;
     let start = ffi::start_time(&input);
@@ -859,7 +863,7 @@ fn run(
 }
 
 /// Whether two paths name the same file.
-fn same_file(first: &Path, second: &Path) -> bool {
+pub(crate) fn same_file(first: &Path, second: &Path) -> bool {
     match (first.canonicalize(), second.canonicalize()) {
         (Ok(first), Ok(second)) => first == second,
         _ => first == second,
@@ -868,7 +872,7 @@ fn same_file(first: &Path, second: &Path) -> bool {
 
 /// FFmpeg's muxer for a file named `path`, by its ending: MP4 when it has
 /// none it knows.
-fn muxer(path: &Path) -> &'static str {
+pub(crate) fn muxer(path: &Path) -> &'static str {
     let extension = path
         .extension()
         .map(|extension| extension.to_string_lossy().to_lowercase())
@@ -897,9 +901,21 @@ fn order(
     Some((info::seconds(time, time_base)? - start, decoding))
 }
 
-/// Sets up the picture's side: its decoder, an encoder that opens, and
-/// its stream in the output.
-fn video_side(
+/// A picture encoder opened for an export, and its stream in the output.
+pub(crate) struct PictureOut {
+    pub chosen: Encoder,
+    pub encoder: VideoEncoder,
+    pub output: usize,
+    pub size: (u32, u32),
+    pub frame_duration: f64,
+    /// How the stream's pictures are turned: the edit's way after their
+    /// own.
+    pub shown: Transform,
+}
+
+/// Opens an encoder for the pictures of stream `index`, turned as
+/// `transform` says, and adds its stream to the output.
+pub(crate) fn picture_out(
     input: &ffmpeg::format::context::Input,
     info: &MediaInfo,
     index: usize,
@@ -907,7 +923,7 @@ fn video_side(
     transform: Transform,
     context: &mut ffmpeg::format::context::Output,
     global_header: bool,
-) -> Result<VideoSide, ExportError> {
+) -> Result<PictureOut, ExportError> {
     let stream = input
         .stream(index)
         .ok_or_else(|| failed("the picture's stream is gone"))?;
@@ -970,22 +986,42 @@ fn video_side(
     if job.format == Format::Hevc {
         ffi::set_codec_tag(&mut out, b"hvc1");
     }
-    let output = out.index();
+    Ok(PictureOut {
+        chosen: candidate,
+        encoder,
+        output: out.index(),
+        size,
+        frame_duration: 1.0 / f64::from(rate).max(1.0),
+        shown,
+    })
+}
+
+/// Sets up the picture's side: its decoder, an encoder that opens, and
+/// its stream in the output.
+fn video_side(
+    input: &ffmpeg::format::context::Input,
+    info: &MediaInfo,
+    index: usize,
+    job: &Job,
+    transform: Transform,
+    context: &mut ffmpeg::format::context::Output,
+    global_header: bool,
+) -> Result<VideoSide, ExportError> {
+    let out = picture_out(input, info, index, job, transform, context, global_header)?;
     let (decoder, time_base, _) =
         crate::decode::video_decoder(input, index, job.hardware).map_err(failed)?;
-    let frame_duration = 1.0 / f64::from(rate).max(1.0);
-    let filters = picture_filters(shown, size, encoder.format);
+    let filters = picture_filters(out.shown, out.size, out.encoder.format);
     Ok(VideoSide {
         stream: index,
-        chosen: candidate,
+        chosen: out.chosen,
         decoder,
         time_base,
         downloads: ffi::Downloads::default(),
-        encoder,
-        output,
+        encoder: out.encoder,
+        output: out.output,
         graph: None,
         filters,
-        frame_duration,
+        frame_duration: out.frame_duration,
         last: None,
     })
 }

@@ -2,16 +2,44 @@
 //! as the interface does, and prints what happened.
 //!
 //! cargo run --release -p plaa-media --example play -- [--software]
-//! [--at-most <lines>] [--clips <from>-<to>,...] <file> [seconds] [seek-to]
+//! [--at-most <lines>] [--clips <from>-<to>,...] [--insert <file>@<at>]
+//! [--sound <file>@<from>-<to>] [--picture <file>@<from>-<to>] <file>
+//! [seconds] [seek-to]
 //!
-//! With PLAY_TRACE set, it prints its status four times a second, and
-//! each picture shown with the brightness of its first pixel, which a
-//! test video can count frames in.
+//! --insert, --sound and --picture change the edit as the export
+//! example's do. With PLAY_TRACE set, it prints its status four times a
+//! second, with the pitch heard, and each picture shown with the
+//! brightness of its first pixel, which a test video can count frames
+//! in.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use plaa_media::{Clip, Edit, Event, Options, Player, Quality, Source};
+use std::path::PathBuf;
+
+use plaa_media::{
+    Clip, Edit, Event, Feed, MediaInfo, Options, Other, Player, Quality, Source, Track,
+};
+
+/// `<file>@<from>-<to>`, `-` for no file.
+fn replacement(text: &str) -> Option<(Option<PathBuf>, f64, f64)> {
+    let (file, range) = text.rsplit_once('@')?;
+    let (from, to) = range.split_once('-')?;
+    Some((
+        (file != "-").then(|| PathBuf::from(file)),
+        from.parse().ok()?,
+        to.parse().ok()?,
+    ))
+}
+
+/// The pitch of `samples` at `rate`, by how often they cross zero.
+fn pitch(samples: &[f32], rate: u32) -> f64 {
+    let crossings = samples
+        .windows(2)
+        .filter(|pair| (pair[0] < 0.0) != (pair[1] < 0.0))
+        .count();
+    crossings as f64 / 2.0 / (samples.len() as f64 / f64::from(rate))
+}
 
 fn main() {
     let mut arguments = std::env::args().skip(1).peekable();
@@ -23,20 +51,69 @@ fn main() {
         },
         None => Quality::Best,
     };
-    let edit = arguments.next_if_eq("--clips").and_then(|_| {
+    let mut clips_given = arguments.next_if_eq("--clips");
+    let mut changes = Vec::new();
+    while let Some(option) = arguments
+        .next_if(|argument| matches!(argument.as_str(), "--insert" | "--sound" | "--picture"))
+    {
+        if let Some(value) = arguments.next() {
+            changes.push((option, value));
+        }
+    }
+    let edit = clips_given.take().and_then(|_| {
         let clips: Vec<Clip> = arguments
             .next()?
             .split(',')
             .filter_map(|clip| {
                 let (from, to) = clip.split_once('-')?;
-                Some(Clip {
-                    from: from.parse().ok()?,
-                    to: to.parse().ok()?,
-                })
+                Some(Clip::new(from.parse().ok()?, to.parse().ok()?))
             })
             .collect();
         Some(Arc::new(Edit::new(clips)))
     });
+    let edit = if changes.is_empty() {
+        edit
+    } else {
+        let source = arguments.peek().cloned().unwrap_or_default();
+        let duration = MediaInfo::probe(source.as_ref())
+            .ok()
+            .and_then(|info| info.duration)
+            .map_or(0.0, |duration| duration.as_secs_f64());
+        let mut edit = edit.map_or_else(|| Edit::whole(duration), |edit| (*edit).clone());
+        for (option, value) in changes {
+            let other = |edit: &mut Edit, path: PathBuf| {
+                let info = MediaInfo::probe(&path).expect("a file plaa reads");
+                edit.add_other(Other::new(path, &info))
+            };
+            if option == "--insert" {
+                let Some((file, at)) = value.rsplit_once('@') else {
+                    continue;
+                };
+                let source = other(&mut edit, PathBuf::from(file));
+                let length = edit.other(source).map_or(0.0, |other| other.duration);
+                let clip = Clip {
+                    source,
+                    ..Clip::new(0.0, length)
+                };
+                edit.insert(at.parse().unwrap_or(0.0), clip);
+            } else if let Some((file, from, to)) = replacement(&value) {
+                let track = if option == "--sound" {
+                    Track::Sound
+                } else {
+                    Track::Picture
+                };
+                let feed = match file {
+                    Some(file) => Feed::File {
+                        source: other(&mut edit, file),
+                        from: 0.0,
+                    },
+                    None => Feed::Blank,
+                };
+                edit.replace_track(track, from, to, Some(feed));
+            }
+        }
+        Some(Arc::new(edit))
+    };
     let Some(source) = arguments.next() else {
         eprintln!(
             "usage: play [--software] [--at-most <lines>] [--clips <from>-<to>,...] \
@@ -155,8 +232,11 @@ fn main() {
         let step = (start.elapsed().as_secs_f64() * 4.0) as u64;
         if trace && step != traced {
             traced = step;
+            let heard = player
+                .heard(2048)
+                .map_or(0.0, |(samples, rate)| pitch(&samples, rate));
             eprintln!(
-                "{:.2} {:?} {:?} {:?}",
+                "{:.2} {:?} {:?} {:?} pitch {heard:.0}",
                 start.elapsed().as_secs_f64(),
                 status.position,
                 status.buffering,

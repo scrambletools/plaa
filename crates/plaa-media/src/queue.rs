@@ -13,13 +13,19 @@ pub enum Item {
     Packet(u64, Span, ffmpeg::Packet),
     /// The end of the file, for packets of this serial.
     End(u64),
+    /// Packets from here on are another file's, for an edit that mixes
+    /// files: decoded as this says.
+    Switch(u64, Box<crate::decode::Setup>),
+    /// A part with nothing to decode: black, or silence, as long as it
+    /// lasts.
+    Blank(u64, Span),
 }
 
 impl Item {
     fn bytes(&self) -> usize {
         match self {
             Item::Packet(_, _, packet) => packet.size(),
-            Item::End(_) => 0,
+            Item::End(_) | Item::Switch(..) | Item::Blank(..) => 0,
         }
     }
 }
@@ -38,6 +44,9 @@ struct Inner {
 pub struct PacketQueue {
     inner: Mutex<Inner>,
     ready: Condvar,
+    /// The file the decoder decodes, numbered as an edit's clips number
+    /// them; held while it switches to another.
+    decoding: Mutex<usize>,
 }
 
 /// Packets worth holding per stream: enough to ride out a slow disk or
@@ -109,6 +118,12 @@ impl PacketQueue {
                 return if inner.closed { Err(Closed) } else { Ok(None) };
             }
         }
+    }
+
+    /// The file the decoder decodes, held so it does not switch while it
+    /// is looked at.
+    pub fn decoding(&self) -> MutexGuard<'_, usize> {
+        self.decoding.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     pub fn close(&self) {

@@ -1,7 +1,11 @@
 //! An edit of a file: the parts of it kept, in the order they play, and
 //! how its picture is turned and flipped. Clips are in seconds of the
-//! file, as plaa counts them from its start; the edited movie's own time
-//! runs through its clips one after another.
+//! file they are from, as plaa counts them from its start; the edited
+//! movie's own time runs through its clips one after another. A clip may
+//! be from another file, and its picture or sound may be another file's,
+//! or none.
+
+use std::path::{Path, PathBuf};
 
 /// The shortest clip trimming or splitting leaves.
 pub const SHORTEST: f64 = 0.1;
@@ -10,17 +14,123 @@ pub const SHORTEST: f64 = 0.1;
 /// kept as a clip.
 const SLIVER: f64 = 0.02;
 
-/// A part of the file, from and to seconds of it.
+/// The file edited, as clips number the files they are from.
+pub const OWN: usize = 0;
+
+/// Where a clip's picture or sound comes from in place of its own.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Feed {
+    /// From file `source`, numbered as [`Clip::source`] is, from `from`
+    /// seconds of it on.
+    File { source: usize, from: f64 },
+    /// A black picture, or silence.
+    Blank,
+}
+
+impl Feed {
+    /// The same feed `offset` seconds on.
+    fn later(self, offset: f64) -> Feed {
+        match self {
+            Feed::File { source, from } => Feed::File {
+                source,
+                from: from + offset,
+            },
+            Feed::Blank => Feed::Blank,
+        }
+    }
+}
+
+/// A part of a file, from and to seconds of it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Clip {
+    /// The file it is from: [`OWN`], or one of the edit's others,
+    /// numbered from 1.
+    pub source: usize,
     pub from: f64,
     pub to: f64,
+    /// The picture shown in place of the clip's own, when replaced.
+    pub picture: Option<Feed>,
+    /// The sound heard in place of the clip's own, when replaced.
+    pub sound: Option<Feed>,
 }
 
 impl Clip {
+    /// Part `from` to `to` of the file edited, as it is.
+    pub fn new(from: f64, to: f64) -> Self {
+        Self {
+            source: OWN,
+            from,
+            to,
+            picture: None,
+            sound: None,
+        }
+    }
+
     pub fn length(&self) -> f64 {
         (self.to - self.from).max(0.0)
     }
+
+    /// Where its picture comes from.
+    pub fn picture_feed(&self) -> Feed {
+        self.picture.unwrap_or(Feed::File {
+            source: self.source,
+            from: self.from,
+        })
+    }
+
+    /// Where its sound comes from.
+    pub fn sound_feed(&self) -> Feed {
+        self.sound.unwrap_or(Feed::File {
+            source: self.source,
+            from: self.from,
+        })
+    }
+
+    /// Whether it plays the file edited, its own picture and sound.
+    pub fn is_plain(&self) -> bool {
+        self.source == OWN && self.picture.is_none() && self.sound.is_none()
+    }
+
+    /// Its part from `low` to `high` seconds into it.
+    fn part(&self, low: f64, high: f64) -> Clip {
+        Clip {
+            source: self.source,
+            from: self.from + low,
+            to: self.from + high,
+            picture: self.picture.map(|feed| feed.later(low)),
+            sound: self.sound.map(|feed| feed.later(low)),
+        }
+    }
+}
+
+/// Another file an edit takes clips, pictures or sound from.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Other {
+    pub path: PathBuf,
+    /// How long it lasts, in seconds.
+    pub duration: f64,
+    /// Whether it has a picture, other than a cover.
+    pub picture: bool,
+    pub sound: bool,
+}
+
+impl Other {
+    /// The file at `path`, as `info` describes it.
+    pub fn new(path: PathBuf, info: &crate::info::MediaInfo) -> Self {
+        Self {
+            path,
+            duration: info.duration.map_or(0.0, |duration| duration.as_secs_f64()),
+            picture: info.has_video(),
+            sound: !info.audio.is_empty(),
+        }
+    }
+}
+
+/// A clip's picture or its sound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Track {
+    Picture,
+    Sound,
 }
 
 /// How a picture is turned and flipped as it shows.
@@ -71,14 +181,18 @@ impl Transform {
 pub struct Edit {
     clips: Vec<Clip>,
     transform: Transform,
+    others: Vec<Other>,
 }
 
-/// Part of the file read in one go: clips one after another in the file
-/// play as one. Its packets carry it, so decoders know which part they
-/// are in and where its pictures and sound go in the edited time.
+/// Part of a file read in one go: clips one after another in a file play
+/// as one. Its packets carry it, so decoders know which part they are in
+/// and where its pictures and sound go in the edited time.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Span {
     pub index: usize,
+    /// The file read, numbered as [`Clip::source`] is; none for a black
+    /// picture or silence, from `from` to `to` of the edited time.
+    pub source: Option<usize>,
     pub from: f64,
     pub to: f64,
     /// Added to the file's time to give the edited time.
@@ -89,6 +203,7 @@ impl Span {
     /// The whole file, played as it is.
     pub const WHOLE: Span = Span {
         index: 0,
+        source: Some(OWN),
         from: f64::NEG_INFINITY,
         to: f64::INFINITY,
         shift: 0.0,
@@ -102,16 +217,19 @@ impl Span {
     }
 }
 
+/// What the picture and the sound of an edit read: the parts of each
+/// file in order, apart when a clip is from another file or has its
+/// picture or sound replaced.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Lanes {
+    pub picture: Vec<Span>,
+    pub sound: Vec<Span>,
+}
+
 impl Edit {
     /// The whole file, `duration` seconds long, as it is.
     pub fn whole(duration: f64) -> Self {
-        Self {
-            clips: vec![Clip {
-                from: 0.0,
-                to: duration.max(0.0),
-            }],
-            transform: Transform::default(),
-        }
+        Self::new(vec![Clip::new(0.0, duration.max(0.0))])
     }
 
     /// `clips` of a file, played in that order, as they are.
@@ -119,11 +237,57 @@ impl Edit {
         Self {
             clips,
             transform: Transform::default(),
+            others: Vec::new(),
         }
     }
 
     pub fn clips(&self) -> &[Clip] {
         &self.clips
+    }
+
+    /// The other files the edit takes from, numbered from 1 in clips.
+    pub fn others(&self) -> &[Other] {
+        &self.others
+    }
+
+    /// File `source` of the clips, unless it is the file edited.
+    pub fn other(&self, source: usize) -> Option<&Other> {
+        source
+            .checked_sub(1)
+            .and_then(|index| self.others.get(index))
+    }
+
+    /// Adds `other` to the files the edit takes from, unless it is there
+    /// already. Returns its number in clips.
+    pub fn add_other(&mut self, other: Other) -> usize {
+        match self
+            .others
+            .iter()
+            .position(|known| known.path == other.path)
+        {
+            Some(index) => {
+                self.others[index] = other;
+                index + 1
+            }
+            None => {
+                self.others.push(other);
+                self.others.len()
+            }
+        }
+    }
+
+    /// The number of the other file at `path`, if the edit takes from it.
+    pub fn source_named(&self, path: &Path) -> Option<usize> {
+        self.others
+            .iter()
+            .position(|other| other.path == path)
+            .map(|index| index + 1)
+    }
+
+    /// Whether a clip is from another file, or has its picture or sound
+    /// replaced, so the picture and sound may be read apart.
+    pub fn is_mixed(&self) -> bool {
+        self.clips.iter().any(|clip| !clip.is_plain())
     }
 
     /// How the picture is turned and flipped.
@@ -136,7 +300,9 @@ impl Edit {
     pub fn is_whole(&self, duration: f64) -> bool {
         self.transform.is_identity()
             && matches!(self.clips.as_slice(), [only]
-                if only.from <= 1e-6 && (only.to - duration).abs() <= 1e-6)
+                if only.is_plain()
+                    && only.from <= 1e-6
+                    && (only.to - duration).abs() <= 1e-6)
     }
 
     /// Whether the clips, one after another, play the whole file `duration`
@@ -144,7 +310,7 @@ impl Edit {
     pub fn plays_whole(&self, duration: f64) -> bool {
         let mut at = 0.0;
         for clip in &self.clips {
-            if (clip.from - at).abs() > 1e-6 {
+            if !clip.is_plain() || (clip.from - at).abs() > 1e-6 {
                 return false;
             }
             at = clip.to;
@@ -184,7 +350,38 @@ impl Edit {
         None
     }
 
-    /// The file's time at edited time `seconds`.
+    /// The file the clip at edited time `seconds` is from, and its time
+    /// there.
+    pub fn locate(&self, seconds: f64) -> Option<(usize, f64)> {
+        let (index, start) = self.clip_at(seconds)?;
+        let clip = self.clips[index];
+        Some((
+            clip.source,
+            (clip.from + (seconds - start).max(0.0)).min(clip.to),
+        ))
+    }
+
+    /// Where `track` plays from at `seconds` of the edited time: a file
+    /// and its time there; none where it is black or silent, or past the
+    /// end of the file it plays.
+    pub fn fed_at(&self, track: Track, seconds: f64) -> Option<(usize, f64)> {
+        let (index, start) = self.clip_at(seconds)?;
+        let clip = self.clips[index];
+        let feed = match track {
+            Track::Picture => clip.picture_feed(),
+            Track::Sound => clip.sound_feed(),
+        };
+        match feed {
+            Feed::File { source, from } => {
+                let at = from + (seconds - start).clamp(0.0, clip.length());
+                let past = self.other(source).is_some_and(|other| at >= other.duration);
+                (!past).then_some((source, at))
+            }
+            Feed::Blank => None,
+        }
+    }
+
+    /// The time at edited time `seconds` in the file its clip is from.
     pub fn source_of(&self, seconds: f64) -> f64 {
         match self.clip_at(seconds) {
             Some((index, start)) => {
@@ -199,7 +396,7 @@ impl Edit {
     pub fn edited_of(&self, seconds: f64) -> Option<f64> {
         let mut start = 0.0;
         for clip in &self.clips {
-            if seconds >= clip.from - 1e-9 && seconds < clip.to {
+            if clip.source == OWN && seconds >= clip.from - 1e-9 && seconds < clip.to {
                 return Some(start + (seconds - clip.from).max(0.0));
             }
             start += clip.length();
@@ -220,14 +417,93 @@ impl Edit {
             let end = start + clip.length();
             let (low, high) = (from.max(start), to.min(end));
             if high - low >= SLIVER {
-                kept.push(Clip {
-                    from: clip.from + (low - start),
-                    to: clip.from + (high - start),
-                });
+                kept.push(clip.part(low - start, high - start));
             }
             start = end;
         }
         self.replace(kept)
+    }
+
+    /// Takes the edited movie from `from` to `to` seconds out. Returns
+    /// whether that changed it; it does not when too little would be
+    /// left.
+    pub fn cut(&mut self, from: f64, to: f64) -> bool {
+        let (from, to) = (from.max(0.0), to.min(self.duration()));
+        if to - from < SLIVER || self.duration() - (to - from) < SHORTEST - 1e-9 {
+            return false;
+        }
+        let mut kept = Vec::new();
+        let mut start = 0.0;
+        for clip in &self.clips {
+            let end = start + clip.length();
+            for (low, high) in [(start, end.min(from)), (start.max(to), end)] {
+                if high - low >= SLIVER {
+                    kept.push(clip.part(low - start, high - start));
+                }
+            }
+            start = end;
+        }
+        self.replace(kept)
+    }
+
+    /// Puts `clip` in at edited time `at`, splitting the clip there.
+    /// Returns whether it did: a clip shorter than [`SHORTEST`] is not
+    /// put in.
+    pub fn insert(&mut self, at: f64, clip: Clip) -> bool {
+        if clip.length() < SHORTEST - 1e-9 {
+            return false;
+        }
+        let index = self.cut_at(at);
+        self.clips.insert(index, clip);
+        true
+    }
+
+    /// Plays `feed` for `track` from `from` to `to` seconds of the edited
+    /// time, from its start there on, in place of what the clips there
+    /// have; none puts the clips' own back. Returns whether that changed
+    /// the edit.
+    pub fn replace_track(&mut self, track: Track, from: f64, to: f64, feed: Option<Feed>) -> bool {
+        let (from, to) = (from.max(0.0), to.min(self.duration()));
+        if to - from < SLIVER {
+            return false;
+        }
+        let before = self.clips.clone();
+        let first = self.cut_at(from);
+        let last = self.cut_at(to);
+        let starts = self.starts();
+        for (clip, start) in self.clips[first..last].iter_mut().zip(&starts[first..last]) {
+            let feed = feed.map(|feed| feed.later(start - from));
+            // A clip's own picture or sound is no replacement.
+            let own = matches!(feed, Some(Feed::File { source, from })
+                if source == clip.source && (from - clip.from).abs() < 1e-6);
+            let feed = if own { None } else { feed };
+            match track {
+                Track::Picture => clip.picture = feed,
+                Track::Sound => clip.sound = feed,
+            }
+        }
+        self.clips != before
+    }
+
+    /// Splits the clip playing at edited time `seconds` there, unless
+    /// that is within a sliver of its ends. Returns the number of the
+    /// clip that starts there, or would.
+    fn cut_at(&mut self, seconds: f64) -> usize {
+        let mut start = 0.0;
+        for (index, clip) in self.clips.iter().enumerate() {
+            let into = seconds - start;
+            if into < SLIVER {
+                return index;
+            }
+            if into <= clip.length() - SLIVER {
+                let clip = *clip;
+                self.clips[index] = clip.part(0.0, into);
+                self.clips.insert(index + 1, clip.part(into, clip.length()));
+                return index + 1;
+            }
+            start += clip.length();
+        }
+        self.clips.len()
     }
 
     /// Keeps clip `index` from `from` to `to` seconds of the edited time,
@@ -243,10 +519,7 @@ impl Edit {
             return false;
         }
         let mut clips = self.clips.clone();
-        clips[index] = Clip {
-            from: clip.from + low,
-            to: clip.from + high,
-        };
+        clips[index] = clip.part(low, high);
         self.replace(clips)
     }
 
@@ -261,15 +534,8 @@ impl Edit {
         if into < SHORTEST || clip.length() - into < SHORTEST {
             return false;
         }
-        let middle = clip.from + into;
-        self.clips[index].to = middle;
-        self.clips.insert(
-            index + 1,
-            Clip {
-                from: middle,
-                to: clip.to,
-            },
-        );
+        self.clips[index] = clip.part(0.0, into);
+        self.clips.insert(index + 1, clip.part(into, clip.length()));
         true
     }
 
@@ -304,21 +570,92 @@ impl Edit {
     }
 
     /// The parts of the file to read, in order: clips that carry on one
-    /// another read as one.
+    /// another read as one. Only for an edit that is not mixed.
     pub(crate) fn spans(&self) -> Vec<Span> {
+        self.lane(|clip| Feed::File {
+            source: OWN,
+            from: clip.from,
+        })
+    }
+
+    /// The parts of each file the picture and the sound read, in order:
+    /// none past another file's end, or of what it lacks. The file edited
+    /// has a picture and sound as `own` says.
+    pub(crate) fn lanes(&self, own: (bool, bool)) -> Lanes {
+        let has = |source: usize, track: Track| match self.other(source) {
+            Some(other) => match track {
+                Track::Picture => other.picture,
+                Track::Sound => other.sound,
+            },
+            None => match track {
+                Track::Picture => own.0,
+                Track::Sound => own.1,
+            },
+        };
+        let length = |source: usize| self.other(source).map(|other| other.duration);
+        let fed = |feed: Feed, track: Track| match feed {
+            Feed::File { source, .. } if !has(source, track) => Feed::Blank,
+            feed => feed,
+        };
+        Lanes {
+            picture: self.lane_within(|clip| fed(clip.picture_feed(), Track::Picture), length),
+            sound: self.lane_within(|clip| fed(clip.sound_feed(), Track::Sound), length),
+        }
+    }
+
+    /// The parts read for the feed `feed` gives each clip.
+    fn lane(&self, feed: impl Fn(&Clip) -> Feed) -> Vec<Span> {
+        self.lane_within(feed, |_| None)
+    }
+
+    /// The parts read for the feed `feed` gives each clip, blank past the
+    /// end of a file `length` gives.
+    fn lane_within(
+        &self,
+        feed: impl Fn(&Clip) -> Feed,
+        length: impl Fn(usize) -> Option<f64>,
+    ) -> Vec<Span> {
         let mut spans: Vec<Span> = Vec::new();
-        let mut at = 0.0;
-        for clip in &self.clips {
+        let mut push = |source: Option<usize>, from: f64, to: f64, at: f64| {
+            if to - from <= 1e-9 {
+                return;
+            }
+            // Blank parts count in the edited time.
+            let (from, to, shift) = match source {
+                Some(_) => (from, to, at - from),
+                None => (at, at + (to - from), 0.0),
+            };
             match spans.last_mut() {
-                Some(last) if (clip.from - last.to).abs() < 1e-9 => last.to = clip.to,
+                Some(last)
+                    if last.source == source
+                        && (from - last.to).abs() < 1e-9
+                        && (last.shift - shift).abs() < 1e-9 =>
+                {
+                    last.to = to;
+                }
                 _ => spans.push(Span {
                     index: spans.len(),
-                    from: clip.from,
-                    to: clip.to,
-                    shift: at - clip.from,
+                    source,
+                    from,
+                    to,
+                    shift,
                 }),
             }
-            at += clip.length();
+        };
+        let mut at = 0.0;
+        for clip in &self.clips {
+            let span = clip.length();
+            match feed(clip) {
+                Feed::File { source, from } => {
+                    let end =
+                        length(source).map_or(from + span, |length| (from + span).min(length));
+                    push(Some(source), from, end.max(from), at);
+                    let read = (end - from).clamp(0.0, span);
+                    push(None, 0.0, span - read, at + read);
+                }
+                Feed::Blank => push(None, 0.0, span, at),
+            }
+            at += span;
         }
         spans
     }
@@ -409,6 +746,159 @@ mod tests {
         assert_eq!(froms(&edit), [(0.0, 10.0), (12.0, 18.0)]);
         assert!(!edit.is_whole(30.0));
         assert!(Edit::whole(30.0).is_whole(30.0));
+    }
+
+    #[test]
+    fn cutting_takes_a_part_out() {
+        let mut edit = Edit::whole(30.0);
+        assert!(edit.cut(10.0, 20.0));
+        assert_eq!(froms(&edit), [(0.0, 10.0), (20.0, 30.0)]);
+        assert!(close(edit.duration(), 20.0));
+        // Across the cut just made.
+        assert!(edit.cut(5.0, 15.0));
+        assert_eq!(froms(&edit), [(0.0, 5.0), (25.0, 30.0)]);
+        // Not all of it.
+        assert!(!edit.cut(0.0, 10.0));
+        assert!(edit.cut(0.0, 5.0));
+        assert_eq!(froms(&edit), [(25.0, 30.0)]);
+    }
+
+    fn other(path: &str, duration: f64, picture: bool) -> Other {
+        Other {
+            path: PathBuf::from(path),
+            duration,
+            picture,
+            sound: true,
+        }
+    }
+
+    #[test]
+    fn inserting_puts_another_file_in() {
+        let mut edit = Edit::whole(30.0);
+        let intro = edit.add_other(other("/intro.mp4", 5.0, true));
+        assert_eq!(intro, 1);
+        assert_eq!(
+            edit.add_other(other("/intro.mp4", 5.0, true)),
+            1,
+            "known already"
+        );
+        let clip = Clip {
+            source: intro,
+            ..Clip::new(0.0, 5.0)
+        };
+        assert!(edit.insert(10.0, clip));
+        assert_eq!(froms(&edit), [(0.0, 10.0), (0.0, 5.0), (10.0, 30.0)]);
+        assert_eq!(edit.clips()[1].source, intro);
+        assert!(edit.is_mixed());
+        assert!(!edit.plays_whole(30.0));
+        assert!(close(edit.duration(), 35.0));
+        assert_eq!(edit.locate(12.0), Some((intro, 2.0)));
+        assert_eq!(edit.locate(16.0), Some((OWN, 11.0)));
+        // The file edited's time is found only in its own clips.
+        assert_eq!(edit.edited_of(2.0), Some(2.0));
+        assert_eq!(edit.edited_of(11.0), Some(16.0));
+        // At the start and at the end, nothing is split.
+        assert!(edit.insert(0.0, clip));
+        assert!(edit.insert(edit.duration(), clip));
+        assert_eq!(edit.clips().len(), 5);
+        assert!(!edit.insert(1.0, Clip::new(0.0, 0.05)), "too short");
+        let lanes = edit.lanes((true, true));
+        assert_eq!(lanes.picture, lanes.sound);
+        let sources: Vec<_> = lanes.picture.iter().map(|span| span.source).collect();
+        assert_eq!(
+            sources,
+            [Some(intro), Some(OWN), Some(intro), Some(OWN), Some(intro)]
+        );
+    }
+
+    #[test]
+    fn replacing_the_sound_leaves_the_picture() {
+        let mut edit = Edit::whole(60.0);
+        let music = edit.add_other(other("/music.flac", 25.0, false));
+        assert!(edit.replace_track(
+            Track::Sound,
+            10.0,
+            40.0,
+            Some(Feed::File {
+                source: music,
+                from: 0.0,
+            }),
+        ));
+        assert_eq!(froms(&edit), [(0.0, 10.0), (10.0, 40.0), (40.0, 60.0)]);
+        assert_eq!(edit.clips()[1].picture, None);
+        assert_eq!(
+            edit.clips()[1].sound,
+            Some(Feed::File {
+                source: music,
+                from: 0.0,
+            })
+        );
+        let lanes = edit.lanes((true, true));
+        assert_eq!(lanes.picture.len(), 1, "the picture reads on through");
+        let sound: Vec<_> = lanes
+            .sound
+            .iter()
+            .map(|span| (span.source, span.from, span.to, span.shift))
+            .collect();
+        // The music lasts 25 seconds of the 30: then silence.
+        assert_eq!(
+            sound,
+            [
+                (Some(OWN), 0.0, 10.0, 0.0),
+                (Some(music), 0.0, 25.0, 10.0),
+                (None, 35.0, 40.0, 0.0),
+                (Some(OWN), 40.0, 60.0, 0.0),
+            ]
+        );
+        // Splitting a replaced clip keeps each half's part of the music.
+        assert!(edit.split(20.0));
+        assert_eq!(
+            edit.clips()[2].sound,
+            Some(Feed::File {
+                source: music,
+                from: 10.0,
+            })
+        );
+        // Its own sound back.
+        assert!(edit.replace_track(Track::Sound, 0.0, 60.0, None));
+        assert!(edit.clips().iter().all(|clip| clip.sound.is_none()));
+        assert!(edit.plays_whole(60.0));
+        // A picture with no file is black, and not the clip's own.
+        assert!(edit.replace_track(Track::Picture, 50.0, 60.0, Some(Feed::Blank)));
+        let picture = edit.lanes((true, true)).picture;
+        assert_eq!(picture.last().unwrap().source, None);
+        assert!(close(picture.last().unwrap().from, 50.0));
+        // Its own sound as a replacement is none.
+        assert!(!edit.replace_track(
+            Track::Sound,
+            0.0,
+            10.0,
+            Some(Feed::File {
+                source: OWN,
+                from: 0.0,
+            }),
+        ));
+    }
+
+    #[test]
+    fn a_file_without_a_picture_shows_black() {
+        let mut edit = Edit::whole(10.0);
+        let song = edit.add_other(other("/song.mp3", 4.0, false));
+        edit.insert(
+            10.0,
+            Clip {
+                source: song,
+                ..Clip::new(0.0, 4.0)
+            },
+        );
+        let lanes = edit.lanes((true, true));
+        assert_eq!(lanes.picture.last().unwrap().source, None);
+        assert_eq!(lanes.sound.last().unwrap().source, Some(song));
+        // Plain clips read as before.
+        assert_eq!(
+            Edit::whole(10.0).spans(),
+            Edit::whole(10.0).lanes((true, true)).picture
+        );
     }
 
     /// Where a point of a square picture shows: mirrored, then turned
