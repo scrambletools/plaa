@@ -12,6 +12,19 @@
   Default apps, which the installer now registers.
 - `scripts/dev-ptp4l.sh` installs plaa's ptp4l services for dev builds,
   which then start ptp4l where none runs, as an installed plaa does.
+- Agents and the assistant read any part of what plays, as edited: its
+  pictures at any times (`get_frames`), how loud it is and where it is
+  silent (`get_levels`), its subtitles' text (`get_subtitles`), and its
+  sound for models that hear (`get_sound`).
+- Agents and the assistant edit: trim, cut out a part, split, move
+  clips, insert part of another file, play another file's sound or
+  picture over a part, or silence or black, turn the picture, undo, and
+  export (`get_edit`, `trim`, `cut`, `split`, `move_clip`, `insert`,
+  `replace`, `turn_picture`, `undo`, `export`). Settings has a switch
+  to be asked before an agent edits.
+- Edits that mix files play as they will be, picture and sound each
+  from its own file, and export the same way, other files' pictures
+  fitted in the movie's.
 
 ## [0.1.0] - 2026-10-23
 

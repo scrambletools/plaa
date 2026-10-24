@@ -88,7 +88,10 @@ Download it from [plaa.run](https://plaa.run#download) or the
   playing over and over meanwhile; **split** (Ctrl+Y) into clips, which
   can be moved, removed and trimmed one by one; **rotate** and **flip**
   (Ctrl+Shift+L, R, H and V); with undo and redo. The edit plays as it
-  will be, clip after clip without a gap.
+  will be, clip after clip without a gap. Agents and the assistant can
+  also put in parts of other files and play another file's sound or
+  picture over part of it, such as music under a video; the edit plays
+  and exports those too.
 - **Export** (Ctrl+E) to H.264, HEVC or AV1 with AAC sound, as edited,
   at the file's size or smaller: on the graphics card's encoder where
   one opens (NVENC, AMF, Quick Sync, VAAPI or VideoToolbox), else on the
@@ -165,8 +168,9 @@ Download it from [plaa.run](https://plaa.run#download) or the
   the file manager or the command line, go to the running one.
 - **An assistant beside what plays**: ask about it in a chat panel, and
   the assistant looks with plaa's own tools, at the status, the file's
-  streams or the picture shown, and plays, pauses, seeks or changes the
-  sound for you. Use a local model that stays on your computer, such as
+  streams, its pictures at any time, how loud it is and its subtitles'
+  text, and plays, pauses, seeks, changes the sound, or edits it for
+  you. Use a local model that stays on your computer, such as
   Ollama's, or a cloud model from Anthropic, OpenAI or Google with your
   own key, kept in the system's keychain. The models and keys are shared
   with the other Scramble Tools apps, such as prev: set up in one, they
@@ -175,8 +179,9 @@ Download it from [plaa.run](https://plaa.run#download) or the
   on macOS); each app chooses which one it uses.
 - **AI agents**: `plaa --mcp` serves plaa's tools over MCP, so Claude
   Code or a local model in an MCP client can see what plays in the plaa
-  you are using, and play, pause, seek, loop, change the volume and
-  tracks, open files and close windows, asking you first. plaa bundles
+  you are using and read any part of it, and play, pause, seek, loop,
+  change the volume and tracks, open files and close windows, edit and
+  export, asking you first. plaa bundles
   no model and listens on no network. See
   [Using plaa with AI agents](#using-plaa-with-ai-agents).
 
@@ -247,7 +252,8 @@ offers FFmpeg's test picture as a camera, first, for trying camera
 recording without one,
 `cargo run --release -p plaa-media --example play -- <file>` plays a file
 without a window and says what it showed, and the `export` example
-exports one as the Export dialog does.
+exports one as the Export dialog does. Both take `--insert`, `--sound`
+and `--picture` to try edits that mix files.
 
 ### AVB on Linux
 
@@ -382,9 +388,13 @@ calls to it over a socket only you can open (a named pipe on Windows).
 The first time an agent connects, plaa asks whether to let it in. The
 Agents tab of Settings turns outside control off, lists the agents
 allowed, and has a switch for each kind of tool (seeing what plays,
-controlling playback, and opening files or closing windows) that makes
-plaa ask before an agent's call runs. What the agent sees, the picture
-shown among it, goes to its model.
+controlling playback, opening files or closing windows, and editing or
+exporting) that makes plaa ask before an agent's call runs. What the
+agent sees, pictures and sound among it, goes to its model.
+
+Times are in seconds of what plays: the edited movie, once the file is
+edited. Every edit an agent makes shows in the window as it is made,
+and undo takes it back.
 
 | Tool | What it does |
 |---|---|
@@ -397,6 +407,16 @@ shown among it, goes to its model.
 | `next_item`, `previous_item` | Moving through a window's list |
 | `set_fullscreen`, `focus_window` | The window |
 | `open`, `close_window` | Opening a file or address, and closing a window |
+| `get_frames` | Pictures at any times, or spread over a part, as JPEGs, as edited |
+| `get_levels` | How loud each step is, and where it is silent |
+| `get_subtitles` | The subtitles' lines and their times, as they show in the edit |
+| `get_sound` | Up to a minute of sound as a WAV, for models that hear |
+| `get_edit` | The clips, the files they play, what replaces their picture or sound |
+| `trim`, `cut`, `split`, `move_clip` | Keeping a part, taking one out, splitting and ordering clips |
+| `insert` | Putting in part of another file, or of the same one |
+| `replace` | Another file's sound or picture over a part, or silence, or black |
+| `turn_picture`, `undo` | Turning or flipping the picture; undo, redo and undoing all |
+| `export` | Writing the edit to a new file, as the Export dialog does |
 
 ## License
 
