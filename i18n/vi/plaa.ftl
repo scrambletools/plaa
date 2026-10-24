@@ -588,6 +588,7 @@ agent-ask-read = Cho phép { $agent } xem nội dung đang phát ở đây?
 agent-ask-play = Cho phép { $agent } điều khiển việc phát ở đây?
 agent-ask-open = Cho phép { $agent } mở hoặc đóng cửa sổ?
 agent-ask-edit = Cho phép { $agent } sửa hoặc xuất tại đây?
+agent-working = { $agent } đang xử lý…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } yêu cầu dùng “{ $tool }”. Bạn có thể chọn những gì plaa sẽ hỏi trong Cài đặt.
 

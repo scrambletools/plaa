@@ -614,6 +614,7 @@ agent-ask-read = Разрешить агенту { $agent } видеть, что
 agent-ask-play = Разрешить агенту { $agent } управлять воспроизведением здесь?
 agent-ask-open = Разрешить агенту { $agent } открыть или закрыть окно?
 agent-ask-edit = Разрешить агенту { $agent } редактировать или экспортировать здесь?
+agent-working = { $agent } работает…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } просит использовать «{ $tool }». В настройках можно выбрать, о чём спрашивает plaa.
 

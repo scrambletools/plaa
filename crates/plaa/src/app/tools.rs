@@ -8,7 +8,7 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 use base64::Engine;
-use iced::{Task, window};
+use iced::{Element, Task, window};
 use plaa_media::Source;
 use plaa_store::settings::AskBefore;
 use schemars::JsonSchema;
@@ -131,9 +131,27 @@ impl Output {
 /// and answers later, with [`Answer::later`]; dropped unanswered, it tells
 /// the agent plaa did not answer.
 #[derive(Debug, Clone)]
-pub(crate) struct Answer(Call);
+pub(crate) struct Answer(Call, std::sync::Arc<str>);
 
 impl Answer {
+    /// The answer to `call`, from the agent the user knows as `agent`.
+    pub(super) fn new(call: Call, agent: &str) -> Self {
+        Self(call, agent.into())
+    }
+
+    /// The name the user knows the agent by.
+    pub(super) fn agent(&self) -> &str {
+        &self.1
+    }
+
+    /// Tells the agent `share` of the call is done, from 0 to 1.
+    fn share(&self, message: &str, share: f64) {
+        self.0.note(
+            super::agents::WAITING,
+            json!({ "message": message, "share": share.clamp(0.0, 1.0) }),
+        );
+    }
+
     pub(super) fn send(&self, result: Result<Output, Error>) {
         self.0.reply(result.map(Output::into_result));
     }
@@ -798,6 +816,141 @@ static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
 /// The longest side of the pictures get_frame gives.
 const FRAME_SIDE: u32 = 1280;
 
+/// How long a call works before the agent and the window are told how
+/// far it has come, and how often after that.
+const LONG: Duration = Duration::from_secs(2);
+const PROGRESS_STEP: Duration = Duration::from_millis(250);
+
+/// An agent's call working in a window, shown once it takes a while.
+#[derive(Debug, Clone)]
+pub(crate) struct Work {
+    agent: String,
+    started: std::time::Instant,
+    /// How much of it is done, from 0 to 1, once known.
+    share: Option<f64>,
+}
+
+impl Work {
+    pub(crate) fn set_share(&mut self, share: f64) {
+        self.share = Some(share);
+    }
+}
+
+/// Tells the agent, and the window, how far a long call has come: after
+/// it has worked [`LONG`], at most every [`PROGRESS_STEP`].
+#[derive(Clone)]
+pub(super) struct Progress {
+    answer: Answer,
+    window: window::Id,
+    message: &'static str,
+    started: std::time::Instant,
+    last: std::sync::Arc<std::sync::Mutex<Option<std::time::Instant>>>,
+}
+
+impl Progress {
+    /// Reports how far `answer`'s call working in window `id` has come,
+    /// saying `message` to the agent.
+    pub(super) fn new(answer: &Answer, id: window::Id, message: &'static str) -> Self {
+        Self {
+            answer: answer.clone(),
+            window: id,
+            message,
+            started: std::time::Instant::now(),
+            last: std::sync::Arc::default(),
+        }
+    }
+
+    /// Says `share` of the work is done, from 0 to 1.
+    pub(super) fn report(&self, share: f64) {
+        if self.started.elapsed() < LONG {
+            return;
+        }
+        let mut last = self
+            .last
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if last.is_some_and(|at| at.elapsed() < PROGRESS_STEP) {
+            return;
+        }
+        *last = Some(std::time::Instant::now());
+        self.answer.share(self.message, share);
+        crate::post(crate::External::Work(self.window, Some(share)));
+    }
+}
+
+impl Plaa {
+    /// Notes that `answer`'s call works in window `id`, saying `message`
+    /// to the agent as it goes; the window shows it once it takes a
+    /// while. Returns what reports how far it has come.
+    pub(super) fn begin_work(
+        &mut self,
+        id: window::Id,
+        answer: &Answer,
+        message: &'static str,
+    ) -> (Progress, Task<Message>) {
+        let started = std::time::Instant::now();
+        if let Some(window) = self.windows.get_mut(&id) {
+            window.work = Some(Work {
+                agent: answer.agent().to_owned(),
+                started,
+                share: None,
+            });
+        }
+        let progress = Progress::new(answer, id, message);
+        // Drawn again once it is long enough to show.
+        let shown = Task::perform(after(LONG), |()| Message::Nothing);
+        (progress, shown)
+    }
+}
+
+/// The card over a window while an agent's call works there a while.
+pub(super) fn work_card(work: &Work) -> Option<Element<'_, Message>> {
+    use iced::widget::{container, progress_bar, row};
+    use scramble_ui::{Icon, Scheme, Type, icon, style};
+    if work.started.elapsed() < LONG {
+        return None;
+    }
+    let mut details = iced::widget::column![
+        scramble_ui::styled(
+            crate::fl!("agent-working", agent = work.agent.as_str()),
+            Type::LabelLarge
+        )
+        .wrapping(iced::widget::text::Wrapping::None)
+    ]
+    .spacing(6)
+    .width(240);
+    let mut line = row![icon::icon(Icon::SmartToy, 20).style(style::on_surface_variant)]
+        .spacing(12)
+        .align_y(iced::Center);
+    if let Some(share) = work.share {
+        details = details.push(progress_bar(0.0..=1.0, share as f32).girth(4).style(
+            |theme: &iced::Theme| {
+                let scheme = Scheme::of(theme);
+                progress_bar::Style {
+                    background: scheme.secondary_container.into(),
+                    bar: scheme.primary.into(),
+                    border: iced::border::rounded(2),
+                }
+            },
+        ));
+        line = line.push(details).push(
+            scramble_ui::styled(format!("{}%", (share * 100.0).floor()), Type::LabelLarge)
+                .style(style::on_surface_variant),
+        );
+    } else {
+        line = line.push(details);
+    }
+    let card = container(line).padding([8, 16]).style(style::snackbar);
+    Some(
+        container(iced::widget::column![
+            iced::widget::space().height(scramble_ui::component::floating_room(true)),
+            card
+        ])
+        .center_x(iced::Fill)
+        .into(),
+    )
+}
+
 /// Answers `answer` with `result` at once.
 fn reply(answer: &Answer, result: Result<Output, Error>) -> Task<Message> {
     answer.send(result);
@@ -1245,12 +1398,13 @@ impl Plaa {
         match find(&name) {
             Some(tool) if outside && tool.kind.asks(&self.settings.ask_before) => {
                 // A window that cannot be found is the tool's to report.
+                let answer = Answer::new(call, &agent);
                 match self.tool_window(arguments["window"].as_u64()) {
-                    Ok(id) => self.ask_to_run(id, agent, tool, arguments, Answer(call)),
-                    Err(_) => tool.start(self, arguments, Answer(call)),
+                    Ok(id) => self.ask_to_run(id, agent, tool, arguments, answer),
+                    Err(_) => tool.start(self, arguments, answer),
                 }
             }
-            Some(tool) => tool.start(self, arguments, Answer(call)),
+            Some(tool) => tool.start(self, arguments, Answer::new(call, &agent)),
             None => {
                 call.reply(Err(Error::new(
                     code::INVALID_PARAMS,

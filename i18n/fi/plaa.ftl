@@ -603,6 +603,7 @@ agent-ask-read = Saako { $agent } nähdä, mitä täällä toistetaan?
 agent-ask-play = Saako { $agent } ohjata toistoa täällä?
 agent-ask-open = Saako { $agent } avata tai sulkea ikkunan?
 agent-ask-edit = Saako { $agent } muokata tai viedä tässä?
+agent-working = { $agent } työskentelee…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } pyytää käyttää toimintoa ”{ $tool }”. Asetuksissa valitset, mistä plaa kysyy.
 

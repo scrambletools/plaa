@@ -600,6 +600,7 @@ agent-ask-read = இங்கே இயங்குவதைப் பார்�
 agent-ask-play = இங்கே இயக்கத்தைக் கட்டுப்படுத்த { $agent } முகவரை அனுமதிக்கவா?
 agent-ask-open = சாளரத்தைத் திறக்க அல்லது மூட { $agent } முகவரை அனுமதிக்கவா?
 agent-ask-edit = இங்கே திருத்த அல்லது ஏற்றுமதி செய்ய { $agent } முகவரை அனுமதிக்கவா?
+agent-working = { $agent } வேலை செய்கிறது…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = “{ $tool }” என்பதைப் பயன்படுத்த { $agent } கேட்கிறது. plaa எவற்றைப் பற்றிக் கேட்கும் என்பதை அமைப்புகளில் தேர்ந்தெடுக்கலாம்.
 

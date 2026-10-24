@@ -593,6 +593,7 @@ agent-ask-read = { $agent } को देखने दें कि यहाँ
 agent-ask-play = { $agent } को यहाँ प्लेबैक नियंत्रित करने दें?
 agent-ask-open = { $agent } को विंडो खोलने या बंद करने दें?
 agent-ask-edit = { $agent } को यहाँ संपादित या एक्सपोर्ट करने दें?
+agent-working = { $agent } काम कर रहा है…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } “{ $tool }” का उपयोग करना चाहता है। plaa किन बातों पर पूछे, यह सेटिंग्स में चुना जाता है।
 

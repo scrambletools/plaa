@@ -602,6 +602,7 @@ agent-ask-read = Να επιτραπεί στο { $agent } να βλέπει τ�
 agent-ask-play = Να επιτραπεί στο { $agent } να ελέγχει την αναπαραγωγή εδώ;
 agent-ask-open = Να επιτραπεί στο { $agent } να ανοίξει ή να κλείσει ένα παράθυρο;
 agent-ask-edit = Να επιτραπεί στο { $agent } να κάνει επεξεργασία ή εξαγωγή εδώ;
+agent-working = Το { $agent } εργάζεται…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = Το { $agent } ζητά να χρησιμοποιήσει το «{ $tool }». Στις Ρυθμίσεις επιλέγετε για τι ρωτά το plaa.
 

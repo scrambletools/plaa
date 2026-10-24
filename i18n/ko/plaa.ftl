@@ -588,6 +588,7 @@ agent-ask-read = { $agent }이(가) 여기서 재생 중인 내용을 보도록 
 agent-ask-play = { $agent }이(가) 여기서 재생을 제어하도록 허용하시겠습니까?
 agent-ask-open = { $agent }이(가) 창을 열거나 닫도록 허용하시겠습니까?
 agent-ask-edit = { $agent }이(가) 여기서 편집하거나 내보내도록 허용하시겠습니까?
+agent-working = { $agent }이(가) 작업 중…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent }이(가) “{ $tool }”을(를) 사용하려고 합니다. plaa가 무엇을 물을지는 설정에서 선택합니다.
 

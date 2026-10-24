@@ -590,6 +590,7 @@ agent-ask-read = { $agent }-কে এখানে কী চলছে তা �
 agent-ask-play = { $agent }-কে এখানে প্লেব্যাক নিয়ন্ত্রণ করতে দেবেন?
 agent-ask-open = { $agent }-কে কোনো উইন্ডো খুলতে বা বন্ধ করতে দেবেন?
 agent-ask-edit = { $agent }-কে এখানে সম্পাদনা বা রপ্তানি করতে দেবেন?
+agent-working = { $agent } কাজ করছে…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } “{ $tool }” ব্যবহার করতে চায়। plaa কোন বিষয়ে জিজ্ঞাসা করবে, তা সেটিংসে বেছে নেওয়া যায়।
 

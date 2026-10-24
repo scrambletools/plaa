@@ -590,6 +590,7 @@ agent-ask-read = { $agent } burada neyin oynatıldığını görebilsin mi?
 agent-ask-play = { $agent } buradaki oynatmayı denetleyebilsin mi?
 agent-ask-open = { $agent } bir pencere açabilsin veya kapatabilsin mi?
 agent-ask-edit = { $agent } burada düzenleme veya dışa aktarma yapabilsin mi?
+agent-working = { $agent } çalışıyor…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent }, “{ $tool }” aracını kullanmak istiyor. plaa'nın neleri soracağını Ayarlar'dan seçebilirsiniz.
 

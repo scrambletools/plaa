@@ -589,6 +589,7 @@ agent-ask-read = Benarkan { $agent } melihat apa yang dimainkan di sini?
 agent-ask-play = Benarkan { $agent } mengawal main balik di sini?
 agent-ask-open = Benarkan { $agent } membuka atau menutup tetingkap?
 agent-ask-edit = Benarkan { $agent } mengedit atau mengeksport di sini?
+agent-working = { $agent } sedang bekerja…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } meminta untuk menggunakan “{ $tool }”. Tetapan menentukan perkara yang ditanya oleh plaa.
 

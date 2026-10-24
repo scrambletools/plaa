@@ -83,6 +83,9 @@ pub enum External {
     StopHidden,
     /// What a window's export says.
     Export(iced::window::Id, plaa_media::export::ExportEvent),
+    /// How far an agent's call working in a window has come, from 0 to 1;
+    /// none once it is done.
+    Work(iced::window::Id, Option<f64>),
     /// The encoder an export of this format, size and depth would use,
     /// once found.
     Encoder(

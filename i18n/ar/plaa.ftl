@@ -626,6 +626,7 @@ agent-ask-read = هل تسمح لـ { $agent } برؤية ما يُشغَّل ه
 agent-ask-play = هل تسمح لـ { $agent } بالتحكم في التشغيل هنا؟
 agent-ask-open = هل تسمح لـ { $agent } بفتح نافذة أو إغلاقها؟
 agent-ask-edit = هل تسمح لـ { $agent } بالتحرير أو التصدير هنا؟
+agent-working = { $agent } يعمل على ذلك…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = يطلب { $agent } استخدام “{ $tool }”. تحدد الإعدادات ما يسأل عنه plaa.
 

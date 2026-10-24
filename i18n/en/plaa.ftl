@@ -591,6 +591,7 @@ agent-ask-read = Let { $agent } see what plays here?
 agent-ask-play = Let { $agent } control playback here?
 agent-ask-open = Let { $agent } open or close a window?
 agent-ask-edit = Let { $agent } edit or export here?
+agent-working = { $agent } is working…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } asks to use “{ $tool }”. Settings chooses what plaa asks about.
 

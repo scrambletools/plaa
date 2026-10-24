@@ -602,6 +602,7 @@ agent-ask-read = Vil du lade { $agent } se, hvad der afspilles her?
 agent-ask-play = Vil du lade { $agent } styre afspilningen her?
 agent-ask-open = Vil du lade { $agent } åbne eller lukke et vindue?
 agent-ask-edit = Vil du lade { $agent } redigere eller eksportere her?
+agent-working = { $agent } arbejder…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } beder om at bruge “{ $tool }”. I Indstillinger vælger du, hvad plaa spørger om.
 

@@ -587,6 +587,7 @@ agent-ask-read = 要允許 { $agent } 查看這裡正在播放的內容嗎？
 agent-ask-play = 要允許 { $agent } 控制這裡的播放嗎？
 agent-ask-open = 要允許 { $agent } 開啟或關閉視窗嗎？
 agent-ask-edit = 要允許 { $agent } 在此編輯或輸出嗎？
+agent-working = { $agent } 正在處理…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } 要求使用「{ $tool }」。你可以在「設定」中選擇 plaa 要詢問哪些操作。
 

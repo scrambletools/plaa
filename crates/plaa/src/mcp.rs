@@ -24,8 +24,10 @@ const INSTRUCTIONS: &str = "Controls plaa, the media player and editor, on the u
 where the user may be watching or listening. list_windows gives the windows; other tools take a \
 window number, or act on the window in front. Times are in seconds of what plays: the edited \
 movie, once the file is edited. get_frames, get_levels, get_subtitles and get_sound read any part \
-of it; the editing tools change it as the user would, each change undoable, and export writes \
-the result to a new file. The user's settings may make plaa ask them before an agent acts.";
+of it; the editing tools change it as the user would, each change undoable, apply_filter puts its \
+picture or sound through FFmpeg filters, and export writes the result to a new file. Calls that \
+take a while report their progress. The user's settings may make plaa ask them before an agent \
+acts.";
 
 /// How long to wait for a plaa this command started to open the control
 /// channel.
@@ -138,7 +140,7 @@ impl Relay {
         &self,
         method: &'static str,
         params: Value,
-        notes: Option<UnboundedSender<String>>,
+        notes: Option<UnboundedSender<(String, Option<f64>)>>,
     ) -> Result<Result<Value, control::Error>, ErrorData> {
         let client = self.client.clone();
         let answer = tokio::task::spawn_blocking(move || {
@@ -147,7 +149,7 @@ impl Relay {
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .call_noting(method, params, &mut |_, note| {
                     if let (Some(notes), Some(message)) = (&notes, note["message"].as_str()) {
-                        let _ = notes.send(message.to_owned());
+                        let _ = notes.send((message.to_owned(), note["share"].as_f64()));
                     }
                 })
         })
@@ -213,21 +215,28 @@ impl ServerHandler for Relay {
     ) -> Result<CallToolResponse, ErrorData> {
         // What plaa says while the call waits, such as that the user must
         // allow it, goes to the agent as progress, if it asked for that.
-        let (notes, mut noted) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (notes, mut noted) = tokio::sync::mpsc::unbounded_channel::<(String, Option<f64>)>();
         let peer = context.peer.clone();
         let token = context.meta.get_progress_token();
         let forward = tokio::spawn(async move {
-            let mut progress = 0.0;
-            while let Some(message) = noted.recv().await {
-                progress += 1.0;
-                if let Some(token) = &token {
-                    let _ = peer
-                        .notify_progress(
-                            ProgressNotificationParam::new(token.clone(), progress)
-                                .with_message(message),
-                        )
-                        .await;
-                }
+            // Progress only grows: a note of a share done counts in
+            // hundredths of the whole, others one more each.
+            let mut progress: f64 = 0.0;
+            while let Some((message, share)) = noted.recv().await {
+                let Some(token) = &token else {
+                    continue;
+                };
+                let note = match share {
+                    Some(share) => {
+                        progress = progress.max((share * 100.0).min(100.0));
+                        ProgressNotificationParam::new(token.clone(), progress).with_total(100.0)
+                    }
+                    None => {
+                        progress += 1.0;
+                        ProgressNotificationParam::new(token.clone(), progress)
+                    }
+                };
+                let _ = peer.notify_progress(note.with_message(message)).await;
             }
         });
         let agent = self

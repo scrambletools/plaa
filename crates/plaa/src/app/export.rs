@@ -39,8 +39,8 @@ pub(crate) struct Exporting {
     /// The file and the edit exported, noted as kept once it is done.
     source: Source,
     edit: Option<Edit>,
-    /// The agent that asked for it, told once it is done.
-    answer: Option<super::tools::Answer>,
+    /// The agent that asked for it, told how it goes and once it is done.
+    answer: Option<(super::tools::Answer, super::tools::Progress)>,
 }
 
 /// An export's format, picture size and whether the picture is HDR,
@@ -238,7 +238,8 @@ impl Plaa {
                 }
             }
         };
-        self.export_with(id, choice, destination, Some(answer.clone()));
+        let progress = super::tools::Progress::new(answer, id, "Exporting.");
+        self.export_with(id, choice, destination, Some((answer.clone(), progress)));
         Ok(())
     }
 
@@ -249,7 +250,7 @@ impl Plaa {
         id: window::Id,
         choice: Choice,
         destination: PathBuf,
-        answer: Option<super::tools::Answer>,
+        answer: Option<(super::tools::Answer, super::tools::Progress)>,
     ) {
         let hardware = self.settings.hardware_decoding;
         let Some(window) = self.windows.get_mut(&id) else {
@@ -299,13 +300,16 @@ impl Plaa {
             ExportEvent::Progress(share) => {
                 if let Some(exporting) = &mut window.exporting {
                     exporting.progress = share;
+                    if let Some((_, progress)) = &exporting.answer {
+                        progress.report(share);
+                    }
                 }
             }
             ExportEvent::Finished(result) => {
                 let Some(exporting) = window.exporting.take() else {
                     return;
                 };
-                if let Some(answer) = &exporting.answer {
+                if let Some((answer, _)) = &exporting.answer {
                     answer.send(match &result {
                         Ok(path) => Ok(super::tools::Output::Json(serde_json::json!({
                             "exported": path.display().to_string(),

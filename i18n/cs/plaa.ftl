@@ -614,6 +614,7 @@ agent-ask-read = Povolit agentovi { $agent } vidět, co se zde přehrává?
 agent-ask-play = Povolit agentovi { $agent } ovládat zde přehrávání?
 agent-ask-open = Povolit agentovi { $agent } otevřít nebo zavřít okno?
 agent-ask-edit = Povolit agentovi { $agent } zde upravovat nebo exportovat?
+agent-working = { $agent } pracuje…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } žádá o použití nástroje „{ $tool }“. V Nastavení zvolíte, na co se plaa ptá.
 

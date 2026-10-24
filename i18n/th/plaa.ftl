@@ -588,6 +588,7 @@ agent-ask-read = อนุญาตให้ { $agent } ดูสิ่งที
 agent-ask-play = อนุญาตให้ { $agent } ควบคุมการเล่นที่นี่หรือไม่
 agent-ask-open = อนุญาตให้ { $agent } เปิดหรือปิดหน้าต่างหรือไม่
 agent-ask-edit = อนุญาตให้ { $agent } แก้ไขหรือส่งออกที่นี่หรือไม่
+agent-working = { $agent } กำลังทำงาน…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } ขอใช้ “{ $tool }” คุณเลือกได้ในการตั้งค่าว่าจะให้ plaa ถามเรื่องใดบ้าง
 

@@ -602,6 +602,7 @@ agent-ask-read = ¿Permitir que { $agent } vea lo que se reproduce aquí?
 agent-ask-play = ¿Permitir que { $agent } controle la reproducción aquí?
 agent-ask-open = ¿Permitir que { $agent } abra o cierre una ventana?
 agent-ask-edit = ¿Permitir que { $agent } edite o exporte aquí?
+agent-working = { $agent } está trabajando…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } pide usar “{ $tool }”. En Ajustes eliges sobre qué pregunta plaa.
 

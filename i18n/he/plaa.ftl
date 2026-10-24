@@ -607,6 +607,7 @@ agent-ask-read = לאפשר ל-{ $agent } לראות מה מתנגן כאן?
 agent-ask-play = לאפשר ל-{ $agent } לשלוט בניגון כאן?
 agent-ask-open = לאפשר ל-{ $agent } לפתוח או לסגור חלון?
 agent-ask-edit = לאפשר ל-{ $agent } לערוך או לייצא כאן?
+agent-working = { $agent } עובד על זה…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } מבקש להשתמש ב-"{ $tool }". בהגדרות אפשר לבחור על מה plaa שואל.
 

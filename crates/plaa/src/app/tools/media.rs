@@ -8,13 +8,15 @@
 use std::path::{Path, PathBuf};
 
 use iced::{Task, window};
+use plaa_media::edit::Filters;
+use plaa_media::filter::{self, PictureInput};
 use plaa_media::read::{self, Edited};
 use plaa_media::{Clip, Edit, Feed, MediaInfo, OWN, Other, Source, Track};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{Answer, Kind, Output, Part, Tool, number, reply, round, tool};
+use super::{Answer, Kind, Output, Part, Progress, Tool, number, reply, round, tool};
 use crate::app::{Message, Plaa};
 use crate::control::{Error, code};
 use crate::window::PlayerWindow;
@@ -248,6 +250,24 @@ struct ExportTo {
     replace: Option<bool>,
 }
 
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct ApplyFilter {
+    /// The window's number from list_windows; the one in front if left out.
+    window: Option<u64>,
+    /// FFmpeg filters for the picture, as -vf takes them, such as
+    /// "hue=s=0" for black and white.
+    picture: Option<String>,
+    /// FFmpeg filters for the sound, as -af takes them, such as
+    /// "highpass=f=80,loudnorm".
+    sound: Option<String>,
+    /// Where they start, in seconds of the edited movie; the start if
+    /// left out.
+    from: Option<f64>,
+    /// Where they end, in seconds; the end if left out.
+    to: Option<f64>,
+}
+
 /// A change to a window's edit waiting on what another file holds.
 #[derive(Debug, Clone)]
 pub(crate) enum FileChange {
@@ -435,6 +455,46 @@ pub(super) fn tools() -> Vec<Tool> {
             },
         ),
         tool(
+            "apply_filter",
+            "Apply filters",
+            Kind::Edit,
+            "Puts a window's picture, sound or both through FFmpeg filters from `from` to `to` \
+             seconds, the whole movie if left out, as an edit that plays at once and that undo \
+             takes back. `picture` and `sound` are filter graphs as -vf and -af take them: \
+             \"hue=s=0\" makes it black and white, \"eq=contrast=1.2:brightness=0.05:saturation=1.3\", \
+             \"colortemperature=temperature=5000\", \"crop=ih:ih\", \"unsharp\", \"hqdn3d\", \
+             \"vignette\", \"drawtext=text='Title':fontsize=64:fontcolor=white:x=(w-tw)/2:y=h/8\", \
+             \"fade=t=in:st=0:d=2\"; \"highpass=f=80,acompressor,loudnorm\", \"afftdn\", \
+             \"volume=0.5\", \"afade=t=out:st=55:d=5\". They add to filters already there. Times in \
+             filters are seconds of the edited movie; the picture is upright. Only filters that \
+             change each frame as it comes are allowed: none that read or write files, reach \
+             devices or the network, or change timing, which trim, cut and the other tools do. \
+             plaa checks them first and says why it will not run one.",
+            |app, apply: ApplyFilter, answer| apply_filter(app, apply, answer),
+        ),
+        tool(
+            "remove_filters",
+            "Remove filters",
+            Kind::Edit,
+            "Takes every filter off a window's picture and sound from `from` to `to` seconds, the \
+             whole movie if left out.",
+            |app, range: Range, answer| {
+                let length = match reading(app, range.window) {
+                    Ok((_, reading)) => reading.length,
+                    Err(error) => return reply(answer, Err(error)),
+                };
+                let (from, to) = match span("remove_filters", range.from, range.to, length) {
+                    Ok(span) => span,
+                    Err(error) => return reply(answer, Err(error)),
+                };
+                edit(app, range.window, answer, |edit| {
+                    edit.remove_filters(from, to)
+                        .then_some("Took the filters off")
+                        .ok_or("remove_filters: there are no filters there")
+                })
+            },
+        ),
+        tool(
             "undo",
             "Undo",
             Kind::Edit,
@@ -524,18 +584,26 @@ fn span(tool: &str, from: Option<f64>, to: Option<f64>, length: f64) -> Result<(
     Ok((from, to))
 }
 
-/// Does `work` on a thread of its own, and answers with what it gives.
+/// Does `work` on a thread of its own for window `id`, which tells the
+/// agent, saying `message`, and the window how far it has come once it
+/// takes a while; answers with what it gives.
 fn on_thread(
+    app: &mut Plaa,
+    id: window::Id,
     answer: &Answer,
-    work: impl FnOnce() -> Result<Output, Error> + Send + 'static,
+    message: &'static str,
+    work: impl FnOnce(&Progress) -> Result<Output, Error> + Send + 'static,
 ) -> Task<Message> {
-    answer.clone().later(Task::perform(
+    let (progress, shown) = app.begin_work(id, answer, message);
+    let task = answer.clone().later(Task::perform(
         async move {
             let (sender, receiver) = iced::futures::channel::oneshot::channel();
             let spawned = std::thread::Builder::new()
                 .name("plaa-tool".into())
                 .spawn(move || {
-                    let _ = sender.send(work());
+                    let result = work(&progress);
+                    crate::post(crate::External::Work(id, None));
+                    let _ = sender.send(result);
                 });
             if let Err(error) = spawned {
                 return Err(Error::new(code::INTERNAL_ERROR, error.to_string()));
@@ -545,7 +613,8 @@ fn on_thread(
                 .unwrap_or_else(|_| Err(Error::new(code::INTERNAL_ERROR, "the tool stopped")))
         },
         |result| result,
-    ))
+    ));
+    Task::batch([task, shown])
 }
 
 fn get_frames(app: &mut Plaa, frames: Frames, answer: &Answer) -> Task<Message> {
@@ -592,8 +661,10 @@ fn get_frames(app: &mut Plaa, frames: Frames, answer: &Answer) -> Task<Message> 
     };
     let side = frames.size.unwrap_or(512).clamp(160, 1280);
     let window = number(id);
-    on_thread(answer, move || {
-        let pictures = read::pictures(&reading.edited(), &times, side);
+    on_thread(app, id, answer, "Reading the pictures.", move |progress| {
+        let pictures = read::pictures(&reading.edited(), &times, side, &|share| {
+            progress.report(share);
+        });
         let mut parts = Vec::new();
         for (time, picture) in times.iter().zip(pictures) {
             match picture.map(|picture| read::jpeg(&picture, 4)) {
@@ -630,10 +701,12 @@ fn get_sound(app: &mut Plaa, range: Range, answer: &Answer) -> Task<Message> {
         );
     }
     let window = number(id);
-    on_thread(answer, move || {
+    on_thread(app, id, answer, "Reading the sound.", move |progress| {
         let mut samples = Vec::new();
+        let total = ((to - from) * f64::from(SOUND_RATE)).max(1.0);
         read::sound(&reading.edited(), from, to, SOUND_RATE, &mut |chunk| {
             samples.extend_from_slice(chunk);
+            progress.report(samples.len() as f64 / total);
         })
         .map_err(|error| Error::new(code::INTERNAL_ERROR, error))?;
         Ok(Output::Parts(vec![
@@ -811,14 +884,15 @@ fn get_levels(app: &mut Plaa, levels: Levels, answer: &Answer) -> Task<Message> 
         .max(0.05);
     let threshold = levels.silence.unwrap_or(-45.0).clamp(-100.0, 0.0);
     let shortest = levels.shortest.unwrap_or(0.5).max(0.05);
-    if to - from > 600.0 {
-        answer.note("Measuring the sound, which takes a while for a long movie.");
-    }
     let window = number(id);
-    on_thread(answer, move || {
+    on_thread(app, id, answer, "Measuring the sound.", move |progress| {
         let mut meter = Meter::new(LEVELS_RATE, from, step, threshold, shortest);
+        let total = ((to - from) * f64::from(LEVELS_RATE)).max(1.0);
+        let mut read_so_far = 0usize;
         read::sound(&reading.edited(), from, to, LEVELS_RATE, &mut |chunk| {
             meter.feed(chunk);
+            read_so_far += chunk.len();
+            progress.report(read_so_far as f64 / total);
         })
         .map_err(|error| Error::new(code::INTERNAL_ERROR, error))?;
         let (steps, whole, silences) = meter.finish();
@@ -884,10 +958,11 @@ fn get_subtitles(app: &mut Plaa, subtitles: Subtitles, answer: &Answer) -> Task<
         return reply(answer, Err(super::no_stream(id, stream, "subtitles")));
     };
     let window = number(id);
-    on_thread(answer, move || {
+    on_thread(app, id, answer, "Reading the subtitles.", move |progress| {
+        let report = |share: f64| progress.report(share);
         let cues = match &track.file {
-            Some(file) => read::subtitle_text(file, None),
-            None => read::subtitle_text(&reading.path, Some(stream)),
+            Some(file) => read::subtitle_text(file, None, &report),
+            None => read::subtitle_text(&reading.path, Some(stream), &report),
         }
         .map_err(|error| Error::new(code::INVALID_PARAMS, error))?;
         let lines: Vec<Value> = read::edited_cues(reading.edit.as_ref(), &cues)
@@ -930,6 +1005,10 @@ fn edit_of(app: &Plaa, window: Option<u64>) -> Result<Value, Error> {
         Some(other) => other.path.display().to_string(),
         None => path.display().to_string(),
     };
+    let filters = |clip: &Clip| match edit.filters_of(clip) {
+        Some(filters) => json!({ "picture": filters.picture, "sound": filters.sound }),
+        None => Value::Null,
+    };
     let feed = |feed: Option<Feed>, nothing: &str| match feed {
         None => Value::Null,
         Some(Feed::Blank) => json!(nothing),
@@ -953,6 +1032,7 @@ fn edit_of(app: &Plaa, window: Option<u64>) -> Result<Value, Error> {
                 "to": round(clip.to),
                 "picture": feed(clip.picture, "black"),
                 "sound": feed(clip.sound, "silence"),
+                "filters": filters(clip),
             })
         })
         .collect();
@@ -1232,6 +1312,83 @@ fn is_own(player: &PlayerWindow, path: &Path) -> bool {
         (Ok(own), Ok(path)) => own == path,
         _ => own == path,
     }
+}
+
+fn apply_filter(app: &mut Plaa, apply: ApplyFilter, answer: &Answer) -> Task<Message> {
+    let id = match editable(app, apply.window) {
+        Ok(id) => id,
+        Err(error) => return reply(answer, Err(error)),
+    };
+    let Ok((_, player)) = app.player_window(Some(number(id))) else {
+        return reply(answer, Err(super::no_window()));
+    };
+    let given = |chain: Option<String>| {
+        chain
+            .map(|chain| chain.trim().to_owned())
+            .filter(|chain| !chain.is_empty())
+    };
+    let added = Filters {
+        picture: given(apply.picture),
+        sound: given(apply.sound),
+    };
+    if added.is_empty() {
+        return reply(
+            answer,
+            Err(invalid("apply_filter: give `picture` or `sound` filters")),
+        );
+    }
+    let Some(info) = player.info.clone() else {
+        return reply(answer, Err(invalid("The file is still opening.")));
+    };
+    let picture = info
+        .picture(player.status.video)
+        .filter(|_| player.is_video());
+    if added.picture.is_some() && picture.is_none() {
+        return reply(
+            answer,
+            Err(invalid(
+                "apply_filter: this window plays sound alone, with no picture",
+            )),
+        );
+    }
+    let sound = info
+        .audio
+        .iter()
+        .find(|track| Some(track.track.index) == player.status.audio)
+        .or(info.audio.first());
+    let mixed = player.editor.edit().is_some_and(Edit::is_mixed);
+    if added.sound.is_some() && sound.is_none() && !mixed {
+        return reply(
+            answer,
+            Err(invalid("apply_filter: this window has no sound")),
+        );
+    }
+    let edit_now = player.editor.working(player.file_duration().unwrap_or(0.0));
+    let (from, to) = match span("apply_filter", apply.from, apply.to, edit_now.duration()) {
+        Ok(span) => span,
+        Err(error) => return reply(answer, Err(error)),
+    };
+    // Each set of filters a part would then go through, checked first.
+    let (rate, channels) = sound.map_or((48000, 2), |track| (track.sample_rate, track.channels));
+    for combined in edit_now.filters_with(from, to, &added) {
+        if let (Some(chain), Some(track)) = (&combined.picture, picture) {
+            let checked =
+                filter::check_picture(chain, track.quarter_turns, PictureInput::of_track(track));
+            if let Err(why) = checked {
+                return reply(answer, Err(invalid(format!("apply_filter: {why}"))));
+            }
+        }
+        if let Some(chain) = &combined.sound
+            && let Err(why) = filter::check_sound(chain, rate, channels)
+        {
+            return reply(answer, Err(invalid(format!("apply_filter: {why}"))));
+        }
+    }
+    edit(app, Some(number(id)), answer, |edit| {
+        edit.add_filters(from, to, &added)
+            .then_some("Filtered")
+            .ok_or("apply_filter: the part must be within the movie")
+    })
 }
 
 fn undo_edit(app: &mut Plaa, undo: Undo, answer: &Answer) -> Task<Message> {

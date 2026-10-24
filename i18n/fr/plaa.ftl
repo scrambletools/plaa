@@ -602,6 +602,7 @@ agent-ask-read = Autoriser { $agent } à voir ce qui est lu ici ?
 agent-ask-play = Autoriser { $agent } à contrôler la lecture ici ?
 agent-ask-open = Autoriser { $agent } à ouvrir ou fermer une fenêtre ?
 agent-ask-edit = Autoriser { $agent } à modifier ou exporter ici ?
+agent-working = { $agent } travaille…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } demande à utiliser « { $tool } ». Dans les Réglages, vous choisissez ce que plaa demande.
 

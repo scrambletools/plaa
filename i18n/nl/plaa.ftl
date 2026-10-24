@@ -600,6 +600,7 @@ agent-ask-read = { $agent } toestaan te zien wat hier speelt?
 agent-ask-play = { $agent } toestaan het afspelen hier te besturen?
 agent-ask-open = { $agent } toestaan een venster te openen of te sluiten?
 agent-ask-edit = { $agent } toestaan hier te bewerken of te exporteren?
+agent-working = { $agent } is bezig…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } vraagt om ‘{ $tool }’ te gebruiken. In Instellingen kies je waarnaar plaa vraagt.
 

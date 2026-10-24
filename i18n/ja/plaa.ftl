@@ -588,6 +588,7 @@ agent-ask-read = { $agent }に、ここで再生中の内容の確認を許可�
 agent-ask-play = { $agent }に、ここでの再生の操作を許可しますか？
 agent-ask-open = { $agent }に、ウインドウを開いたり閉じたりすることを許可しますか？
 agent-ask-edit = { $agent }に、ここで編集や書き出しをすることを許可しますか？
+agent-working = { $agent } が作業中…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent }が「{ $tool }」を使おうとしています。plaaが確認する操作は「設定」で選べます。
 

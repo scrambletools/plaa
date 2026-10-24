@@ -218,6 +218,8 @@ pub(crate) struct Window {
     export: Option<export::Choice>,
     /// An export under way from the window.
     exporting: Option<export::Exporting>,
+    /// An agent's call working in the window.
+    work: Option<tools::Work>,
     /// Closing waits for an answer, as it would lose changes.
     closing: Option<export::Closing>,
     /// The window's Wayland surface, which drops name it by, or its
@@ -757,6 +759,7 @@ impl Plaa {
                 screen_lines: None,
                 export: None,
                 exporting: None,
+                work: None,
                 closing: None,
                 assistant: None,
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -1095,6 +1098,19 @@ impl Plaa {
                 } else {
                     window::close(id)
                 }
+            }
+            Message::External(External::Work(id, share)) => {
+                if let Some(window) = self.windows.get_mut(&id) {
+                    match share {
+                        Some(share) => {
+                            if let Some(work) = &mut window.work {
+                                work.set_share(share);
+                            }
+                        }
+                        None => window.work = None,
+                    }
+                }
+                Task::none()
             }
             Message::External(External::Export(id, event)) => {
                 self.export_event(id, event);
@@ -2407,7 +2423,11 @@ impl Plaa {
         };
         let exporting = match &window.exporting {
             Some(exporting) => export::progress(id, exporting),
-            None => full(),
+            None => window
+                .work
+                .as_ref()
+                .and_then(tools::work_card)
+                .unwrap_or_else(full),
         };
         let export_dialog = match (window.export, window.player()) {
             (Some(choice), Some(player)) => export::dialog(id, choice, player, &self.encoders),

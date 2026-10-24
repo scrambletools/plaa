@@ -33,7 +33,8 @@ it and to edit it; they act on the user's window unless you give another window'
 need list_windows only when the user speaks of other windows. You get only what you ask for, so \
 look with get_status, get_info, get_frame or get_frames before you answer about what plays; \
 get_levels and get_subtitles read its sound and words. Edits change what plays at once, and undo \
-takes them back. Times are in seconds of what plays, as edited. Answer briefly, in the user's \
+takes them back; apply_filter changes its look or sound with FFmpeg's filters, such as hue=s=0 \
+for black and white. Times are in seconds of what plays, as edited. Answer briefly, in the user's \
 language; you may use Markdown.";
 
 /// What the panel heard from its chat's thread or a tool call, through

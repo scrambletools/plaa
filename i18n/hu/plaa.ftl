@@ -590,6 +590,7 @@ agent-ask-read = Engedélyezi, hogy { $agent } lássa az itt lejátszott tartalm
 agent-ask-play = Engedélyezi, hogy { $agent } vezérelje az itteni lejátszást?
 agent-ask-open = Engedélyezi, hogy { $agent } megnyisson vagy bezárjon egy ablakot?
 agent-ask-edit = Engedélyezi, hogy { $agent } itt szerkesszen vagy exportáljon?
+agent-working = { $agent } dolgozik…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } szeretné használni ezt: „{ $tool }”. A Beállításokban választhatja ki, mire kérdez rá a plaa.
 

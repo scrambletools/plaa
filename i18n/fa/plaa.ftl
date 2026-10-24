@@ -590,6 +590,7 @@ agent-ask-read = به { $agent } اجازه داده شود ببیند اینج�
 agent-ask-play = به { $agent } اجازهٔ کنترل پخش در اینجا داده شود؟
 agent-ask-open = به { $agent } اجازهٔ باز کردن یا بستن پنجره داده شود؟
 agent-ask-edit = به { $agent } اجازهٔ ویرایش یا صادر کردن در اینجا داده شود؟
+agent-working = { $agent } در حال کار است…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } می‌خواهد از «{ $tool }» استفاده کند. در تنظیمات انتخاب می‌کنید plaa دربارهٔ چه چیزهایی بپرسد.
 

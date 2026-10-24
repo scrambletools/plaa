@@ -594,6 +594,7 @@ agent-ask-read = Ruhusu { $agent } kuona kinachocheza hapa?
 agent-ask-play = Ruhusu { $agent } kudhibiti uchezaji hapa?
 agent-ask-open = Ruhusu { $agent } kufungua au kufunga dirisha?
 agent-ask-edit = Ruhusu { $agent } kuhariri au kuhamisha hapa?
+agent-working = { $agent } inafanya kazi…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } anaomba kutumia “{ $tool }”. Katika Mipangilio unachagua mambo ambayo plaa huuliza.
 

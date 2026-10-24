@@ -600,6 +600,7 @@ agent-ask-read = { $agent } erlauben, zu sehen, was hier läuft?
 agent-ask-play = { $agent } erlauben, die Wiedergabe hier zu steuern?
 agent-ask-open = { $agent } erlauben, ein Fenster zu öffnen oder zu schließen?
 agent-ask-edit = { $agent } erlauben, hier zu bearbeiten oder zu exportieren?
+agent-working = { $agent } arbeitet…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } möchte „{ $tool }“ verwenden. In den Einstellungen legen Sie fest, wonach plaa fragt.
 

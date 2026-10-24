@@ -589,6 +589,7 @@ agent-ask-read = Izinkan { $agent } melihat yang diputar di sini?
 agent-ask-play = Izinkan { $agent } mengendalikan pemutaran di sini?
 agent-ask-open = Izinkan { $agent } membuka atau menutup jendela?
 agent-ask-edit = Izinkan { $agent } mengedit atau mengekspor di sini?
+agent-working = { $agent } sedang bekerja…
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } meminta untuk memakai “{ $tool }”. Pengaturan menentukan apa saja yang ditanyakan plaa.
 
