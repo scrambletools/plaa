@@ -35,7 +35,7 @@ alsa-sys 0.4.0, android-build 0.1.4, android-properties 0.2.2, ashpd 0.13.13, as
 
 ### Apache-2.0 OR MIT
 
-async-channel 2.5.0, async-executor 1.14.0, async-io 2.6.0, async-lock 3.4.2, async-process 2.5.0, async-signal 0.2.14, async-task 4.7.1, atomic-waker 1.1.2, autocfg 1.5.1, bit-set 0.8.0, bit-vec 0.8.0, blocking 1.7.0, cmov 0.5.4, concurrent-queue 2.5.0, const-oid 0.10.2, ctor 0.10.1, ctutils 0.4.3, dtor 0.8.1, equivalent 1.0.3, event-listener 5.4.2, event-listener-strategy 0.5.4, fastrand 2.5.0, find-crate 0.6.3, fluent 0.17.0, fluent-bundle 0.16.0, fluent-langneg 0.13.1, fluent-syntax 0.12.0, futures-lite 2.6.1, idna_adapter 1.2.2, indexmap 2.14.2, intl-memoizer 0.5.3, linebender_resource_handle 0.1.1, muda 0.20.0, multiversion_no_op 1.0.0, parking 2.2.1, pin-project 1.1.13, pin-project-internal 1.1.13, pin-project-lite 0.2.17, polling 3.11.0, portable-atomic 1.15.0, portable-atomic-util 0.2.8, rustc-hash 2.1.3, simd_cesu8 1.2.0, swash 0.2.10, utf8_iter 1.0.4, uuid 1.28.0, yazi 0.2.1, zeno 0.3.3, zeroize 1.9.1
+async-channel 2.5.0, async-executor 1.14.0, async-io 2.6.0, async-lock 3.4.2, async-process 2.5.0, async-signal 0.2.14, async-task 4.7.1, atomic-waker 1.1.2, autocfg 1.5.1, bit-set 0.8.0, bit-vec 0.8.0, blocking 1.7.0, cmov 0.5.4, concurrent-queue 2.5.0, const-oid 0.10.2, ctor 0.10.1, ctutils 0.4.5, dtor 0.8.1, equivalent 1.0.3, event-listener 5.4.2, event-listener-strategy 0.5.4, fastrand 2.5.0, find-crate 0.6.3, fluent 0.17.0, fluent-bundle 0.16.0, fluent-langneg 0.13.1, fluent-syntax 0.12.0, futures-lite 2.6.1, idna_adapter 1.2.2, indexmap 2.14.2, intl-memoizer 0.5.3, linebender_resource_handle 0.1.1, muda 0.20.0, multiversion_no_op 1.0.0, parking 2.2.1, pin-project 1.1.13, pin-project-internal 1.1.13, pin-project-lite 0.2.17, polling 3.11.0, portable-atomic 1.15.0, portable-atomic-util 0.2.8, rustc-hash 2.1.3, simd_cesu8 1.2.0, swash 0.2.10, utf8_iter 1.0.4, uuid 1.28.0, yazi 0.2.1, zeno 0.3.3, zeroize 1.9.1
 
 ### Zlib OR Apache-2.0 OR MIT
 
@@ -111,7 +111,7 @@ num_enum 0.7.6, num_enum_derive 0.7.6
 
 ### BSL-1.0
 
-clipboard-win 5.4.1, error-code 3.4.0
+clipboard-win 5.4.3, error-code 3.4.0
 
 ### MIT OR Apache-2.0 OR LGPL-2.1-or-later
 
