@@ -32,10 +32,6 @@ pub const SPEEDS: [f64; 8] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
 /// How long opening may take before a spinner says it is under way.
 const OPENING_SHOWN: Duration = Duration::from_millis(300);
 
-/// The space the toolbar adds between its groups of buttons, beyond
-/// the space between any two.
-const TOOL_GROUP_GAP: f32 = 12.0;
-
 /// How far the skip buttons and arrow keys move, in seconds.
 pub const SKIP: f64 = 10.0;
 pub const SKIP_SHORT: f64 = 5.0;
@@ -678,7 +674,13 @@ fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Contr
             continue;
         }
         if !first {
-            tools.push(space().width(TOOL_GROUP_GAP).into());
+            // triib's divider, as far from the buttons as in triib, whose
+            // toolbar spaces them 8 apart rather than 4.
+            tools.push(
+                container(component::toolbar_divider())
+                    .padding([0, 4])
+                    .into(),
+            );
         }
         first = false;
         tools.extend(group);
