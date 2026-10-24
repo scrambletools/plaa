@@ -83,7 +83,11 @@ are development builds, which keep their own.
   beside them too, keeping Microsoft's signatures. The MSI installs for
   the current user, with no administrator prompt, adds plaa to the
   Start menu, and offers it in Open With for video and audio files
-  without taking them over.
+  without taking them over. It also gives plaa a page in Settings'
+  Default apps, with file types of its own, plaa.Video, plaa.Audio and
+  plaa.Playlist, which Make Default in plaa's Settings opens; the file
+  types are listed once, at the top of `plaa.wxs`, and a test checks
+  that `default_app.rs` counts the same ones.
 
 The release offers the corresponding source of everything GPL it
 carries: the macOS job attaches the sources Homebrew built from; the
@@ -148,7 +152,7 @@ window.
 |---|---|---|
 | .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, and of the Debian and Ubuntu releases for RISC-V under QEMU, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
 | Arch | A fresh Arch container | `build-arch.sh` builds the PKGBUILD from this tree, then the same test |
-| MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa, FFmpeg and libass import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, the version line and the FFmpeg and libass it names, the window and the clip played; then that uninstalling leaves nothing |
+| MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa, FFmpeg and libass import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, Default apps, the version line and the FFmpeg and libass it names, the window and the clip played; then that uninstalling leaves nothing |
 | MSI, x64 | A Windows Server 2022 container, which has nothing installed | The same, without the window and the clip |
 | .pkg | Fresh macOS 14, 15 and 26 runners | `packaging/tests/macos/test-pkg.sh`: Gatekeeper's verdict on a downloaded copy, that plaa and every library it carries link only macOS's own libraries and each other, look nowhere outside the app, and run on the oldest macOS the app claims, then installs and checks the app, the version line, the BPF launch daemon and access for the user, the window and the clip played; then that the uninstall script leaves nothing |
 

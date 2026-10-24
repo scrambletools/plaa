@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- A Make Default button in Settings, under Playback, makes plaa the
+  system's default app for the video and sound files it plays, as
+  prev's does for its files, with a dot showing whether none, some or
+  all of them open with plaa. On macOS it asks for the common types,
+  which macOS confirms one by one; on Windows it opens plaa's page in
+  Default apps, which the installer now registers.
+- `scripts/dev-ptp4l.sh` installs plaa's ptp4l services for dev builds,
+  which then start ptp4l where none runs, as an installed plaa does.
+
 ## [0.1.0] - 2026-10-23
 
 The first release.

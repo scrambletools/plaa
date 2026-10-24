@@ -13,6 +13,7 @@ use scramble_ui::dropdown;
 use scramble_ui::{Icon, Scheme, Type, button, column, row, style};
 
 use crate::app::{Message, Plaa};
+use crate::default_app;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SettingsTab {
@@ -72,6 +73,11 @@ pub enum SettingsMessage {
     AskBefore(crate::app::tools::Kind, bool),
     /// What the Assistant tab asks of the models.
     Model(crate::app::assistant::ModelMessage),
+    /// Make Default, and what it did.
+    MakeDefaultApp,
+    DefaultAppDone(Result<default_app::Outcome, default_app::Failure>),
+    /// How many file types plaa opens, read again.
+    DefaultAppStatus(Option<default_app::Status>),
 }
 
 /// The colors offered when the system's accent is not used.
@@ -192,6 +198,32 @@ fn accent_swatch<'a>(color: Color, selected: bool) -> Element<'a, SettingsMessag
             .on_press(SettingsMessage::Accent(hex.clone())),
         hex,
     )
+}
+
+/// Reads again how many file types plaa opens.
+pub(crate) fn refresh_default_app_status() -> Task<Message> {
+    Task::perform(default_app::status(), |status| {
+        Message::Settings(SettingsMessage::DefaultAppStatus(status))
+    })
+}
+
+/// A dot for how many file types plaa opens: red for none, amber for
+/// some, green for all. The same in every theme, as traffic lights are.
+fn status_dot<'a>(status: default_app::Status) -> Element<'a, SettingsMessage> {
+    let color = if status.set == 0 {
+        Color::from_rgb8(0xd9, 0x30, 0x25)
+    } else if status.set < status.total {
+        Color::from_rgb8(0xf2, 0xa9, 0x00)
+    } else {
+        Color::from_rgb8(0x1e, 0x8e, 0x3e)
+    };
+    container(space().width(12).height(12))
+        .style(move |_: &Theme| container::Style {
+            background: Some(color.into()),
+            border: iced::border::rounded(6),
+            ..container::Style::default()
+        })
+        .into()
 }
 
 /// A folder setting: where it is, and a button to choose another.
@@ -488,8 +520,82 @@ impl Plaa {
                 self.settings.web_pages,
                 SettingsMessage::WebPages,
             ),
+            component::section(crate::fl!("settings-default-app")),
+            self.default_app_view(),
         ]
         .spacing(12)
+    }
+
+    /// The button that makes plaa the system's default app, and how the
+    /// last try went. Windows lets only the user choose, in its Settings.
+    fn default_app_view(&self) -> Element<'_, SettingsMessage> {
+        let (explanation, button) = if cfg!(windows) {
+            (
+                crate::fl!("settings-default-app-note-windows"),
+                crate::fl!("settings-default-app-button-windows"),
+            )
+        } else if cfg!(target_os = "macos") {
+            (
+                crate::fl!("settings-default-app-note-macos"),
+                crate::fl!("settings-default-app-button"),
+            )
+        } else {
+            (
+                crate::fl!("settings-default-app-note"),
+                crate::fl!("settings-default-app-button"),
+            )
+        };
+        let summary = self.default_app_status.map(|status| {
+            crate::fl!(
+                "settings-default-app-status",
+                set = status.set,
+                total = status.total
+            )
+        });
+        let mut action = row![].spacing(12).align_y(Center);
+        if let (Some(status), Some(summary)) = (self.default_app_status, &summary) {
+            action = action.push(component::tip(status_dot(status), summary.clone()));
+        }
+        action = action.push(
+            scramble_ui::button(Kind::Tonal, button).on_press(SettingsMessage::MakeDefaultApp),
+        );
+        let mut rows = column![
+            row![
+                column![
+                    scramble_ui::styled(crate::fl!("settings-default-app-label"), Type::BodyLarge),
+                    note(explanation),
+                ]
+                .spacing(2)
+                .width(Fill),
+                action,
+            ]
+            .spacing(16)
+            .align_y(Center)
+        ]
+        .spacing(8);
+        let problem = match &self.default_app {
+            Some(Err(default_app::Failure::NoDesktopEntry)) => {
+                Some(crate::fl!("settings-default-app-no-entry"))
+            }
+            Some(Err(default_app::Failure::NoBundle)) => {
+                Some(crate::fl!("settings-default-app-no-bundle"))
+            }
+            Some(Err(default_app::Failure::Other(error))) => Some(crate::fl!(
+                "settings-default-app-failed",
+                error = error.as_str()
+            )),
+            _ => None,
+        };
+        if let Some(problem) = problem {
+            rows = rows.push(scramble_ui::aligned(
+                scramble_ui::styled(problem, Type::BodySmall).style(style::error_text),
+            ));
+        } else if let Some(summary) = summary {
+            rows = rows.push(scramble_ui::aligned(
+                scramble_ui::styled(summary, Type::BodySmall).style(style::on_surface_variant),
+            ));
+        }
+        rows.into()
     }
 
     /// Where new recordings and screenshots go.
@@ -1217,6 +1323,20 @@ impl Plaa {
                 return self.assistant_tab_shown();
             }
             SettingsMessage::Model(message) => return self.model_settings(message),
+            SettingsMessage::MakeDefaultApp => {
+                self.default_app = None;
+                return Task::perform(default_app::make_default(), |result| {
+                    Message::Settings(SettingsMessage::DefaultAppDone(result))
+                });
+            }
+            SettingsMessage::DefaultAppDone(result) => {
+                self.default_app = Some(result);
+                return refresh_default_app_status();
+            }
+            SettingsMessage::DefaultAppStatus(status) => {
+                self.default_app_status = status;
+                return Task::none();
+            }
             SettingsMessage::Appearance(appearance) => {
                 self.settings.appearance = appearance;
                 self.refresh_theme();

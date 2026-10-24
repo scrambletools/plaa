@@ -6,13 +6,19 @@
       -ext WixToolset.Util.wixext -d Version=0.1.0 -d Source=dist -o plaa.msi
 
   It installs for the current user, with no administrator prompt, into
-  %LOCALAPPDATA%\Programs\plaa, adds plaa to the Start menu, and offers it
-  in Open With for video and audio files without taking them over.
+  %LOCALAPPDATA%\Programs\plaa, adds plaa to the Start menu, offers it in
+  Open With for video and audio files without taking them over, and gives
+  it a page in Settings' Default apps, which Settings in plaa opens.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <?define AppKey = Software\Scramble Tools\plaa ?>
   <?define OpenWith = Software\Classes\Applications\plaa.exe ?>
+  <!-- The file types plaa is offered for, which default_app.rs counts as
+       Settings shows how many open with plaa. -->
+  <?define VideoExtensions = .3g2;.3gp;.avi;.flv;.m2ts;.m4v;.mkv;.mov;.mp4;.mpeg;.mpg;.mts;.ogv;.ts;.webm;.wmv ?>
+  <?define AudioExtensions = .aac;.ac3;.aif;.aiff;.ape;.dts;.flac;.m4a;.mka;.mp3;.mpc;.oga;.ogg;.opus;.wav;.wma;.wv ?>
+  <?define PlaylistExtensions = .m3u;.m3u8;.pls ?>
 
   <Package Name="plaa" Manufacturer="Scramble Tools" Version="$(var.Version)"
            UpgradeCode="9e4b7c21-3a6d-4f58-b1c2-7d8e0f4a5b63" Scope="perUser"
@@ -50,8 +56,44 @@
         <RegistryValue Root="HKCU" Key="$(var.OpenWith)" Name="FriendlyAppName" Type="string" Value="plaa" KeyPath="yes" />
         <RegistryValue Root="HKCU" Key="$(var.OpenWith)\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot; &quot;%1&quot;" />
         <RegistryValue Root="HKCU" Key="$(var.OpenWith)\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot;,0" />
-        <?foreach Extension in .3g2;.3gp;.aac;.ac3;.aif;.aiff;.ape;.avi;.dts;.flac;.flv;.m2ts;.m3u;.m3u8;.m4a;.m4v;.mka;.mkv;.mov;.mp3;.mp4;.mpeg;.mpg;.mpc;.mts;.oga;.ogg;.ogv;.opus;.pls;.ts;.wav;.webm;.wma;.wmv;.wv ?>
+        <?foreach Extension in $(var.VideoExtensions) ?>
         <RegistryValue Root="HKCU" Key="$(var.OpenWith)\SupportedTypes" Name="$(Extension)" Type="string" Value="" />
+        <?endforeach ?>
+        <?foreach Extension in $(var.AudioExtensions) ?>
+        <RegistryValue Root="HKCU" Key="$(var.OpenWith)\SupportedTypes" Name="$(Extension)" Type="string" Value="" />
+        <?endforeach ?>
+        <?foreach Extension in $(var.PlaylistExtensions) ?>
+        <RegistryValue Root="HKCU" Key="$(var.OpenWith)\SupportedTypes" Name="$(Extension)" Type="string" Value="" />
+        <?endforeach ?>
+      </Component>
+      <!-- Default apps: plaa's page in Settings, where the user can make it
+           the default for these files, as Windows lets only the user do,
+           with file types of plaa's own naming them. -->
+      <Component Id="DefaultApps" Guid="29724707-b4df-46a8-97df-4f24e2faf2ab">
+        <RegistryValue Root="HKCU" Key="$(var.AppKey)" Name="DefaultApps" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="$(var.AppKey)\Capabilities" Name="ApplicationName" Type="string" Value="plaa" />
+        <RegistryValue Root="HKCU" Key="$(var.AppKey)\Capabilities" Name="ApplicationDescription" Type="string" Value="Play video and audio files and streams" />
+        <RegistryValue Root="HKCU" Key="Software\RegisteredApplications" Name="plaa" Type="string" Value="$(var.AppKey)\Capabilities" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Video" Type="string" Value="Video (plaa)" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Video\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot;,0" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Video\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot; &quot;%1&quot;" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Audio" Type="string" Value="Audio (plaa)" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Audio\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot;,0" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Audio\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot; &quot;%1&quot;" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Playlist" Type="string" Value="Playlist (plaa)" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Playlist\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot;,0" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\plaa.Playlist\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]plaa.exe&quot; &quot;%1&quot;" />
+        <?foreach Extension in $(var.VideoExtensions) ?>
+        <RegistryValue Root="HKCU" Key="Software\Classes\$(Extension)\OpenWithProgids" Name="plaa.Video" Type="string" Value="" />
+        <RegistryValue Root="HKCU" Key="$(var.AppKey)\Capabilities\FileAssociations" Name="$(Extension)" Type="string" Value="plaa.Video" />
+        <?endforeach ?>
+        <?foreach Extension in $(var.AudioExtensions) ?>
+        <RegistryValue Root="HKCU" Key="Software\Classes\$(Extension)\OpenWithProgids" Name="plaa.Audio" Type="string" Value="" />
+        <RegistryValue Root="HKCU" Key="$(var.AppKey)\Capabilities\FileAssociations" Name="$(Extension)" Type="string" Value="plaa.Audio" />
+        <?endforeach ?>
+        <?foreach Extension in $(var.PlaylistExtensions) ?>
+        <RegistryValue Root="HKCU" Key="Software\Classes\$(Extension)\OpenWithProgids" Name="plaa.Playlist" Type="string" Value="" />
+        <RegistryValue Root="HKCU" Key="$(var.AppKey)\Capabilities\FileAssociations" Name="$(Extension)" Type="string" Value="plaa.Playlist" />
         <?endforeach ?>
       </Component>
       <ComponentGroupRef Id="Libraries" />

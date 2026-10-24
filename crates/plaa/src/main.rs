@@ -3,6 +3,7 @@
 
 mod app;
 mod control;
+mod default_app;
 mod dialog;
 mod edit_bar;
 mod editing;

@@ -94,6 +94,12 @@ pub struct Plaa {
     pub(crate) audio_devices: Vec<plaa_media::OutputDevice>,
     /// Whether yt-dlp was installed when Settings last opened.
     pub(crate) yt_dlp_found: bool,
+    /// How the last try at making plaa the system's default app went. Not
+    /// a setting: only the system's own setting changes.
+    pub(crate) default_app:
+        Option<Result<crate::default_app::Outcome, crate::default_app::Failure>>,
+    /// How many of the file types plaa opens now, as last read.
+    pub(crate) default_app_status: Option<crate::default_app::Status>,
     /// The encoder each format and size of export would use, once found,
     /// and those being looked for.
     encoders: HashMap<export::Encoding, Option<plaa_media::export::Encoder>>,
@@ -373,6 +379,8 @@ impl Plaa {
             language_drafts,
             audio_devices: Vec::new(),
             yt_dlp_found: false,
+            default_app: None,
+            default_app_status: None,
             encoders: HashMap::new(),
             probing: HashSet::new(),
             export_choice: None,
@@ -1187,7 +1195,17 @@ impl Plaa {
             }
             Message::Focused(id) => {
                 self.focused = Some(id);
-                Task::none()
+                // Back from the system's own settings, where the default
+                // app may have changed.
+                if self
+                    .windows
+                    .get(&id)
+                    .is_some_and(|window| window.settings_open)
+                {
+                    crate::settings_view::refresh_default_app_status()
+                } else {
+                    Task::none()
+                }
             }
             Message::External(External::Control(call)) => self.control_call(call),
             Message::Assistant(id, message) => self.panel_update(id, message),
@@ -1741,7 +1759,7 @@ impl Plaa {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.settings_open = true;
                 }
-                return Task::none();
+                return crate::settings_view::refresh_default_app_status();
             }
             Action::PictureInPicture => return self.toggle_pip(id),
             Action::RecordSound => return self.open_recorder(id),

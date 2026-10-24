@@ -220,6 +220,19 @@ foreach ($extension in @('.mkv', '.mp4', '.webm', '.flac', '.mp3')) {
         Fail "Open With does not offer plaa for $extension"
     }
 }
+# Default apps: plaa's page in Settings, and its own file types there.
+$registered = (Get-ItemProperty 'HKCU:\Software\RegisteredApplications' -Name plaa -ErrorAction SilentlyContinue).plaa
+if ($registered -ne 'Software\Scramble Tools\plaa\Capabilities') { Fail "Default apps finds plaa at '$registered'" }
+foreach ($pair in @(@('.mkv', 'plaa.Video'), @('.mp4', 'plaa.Video'), @('.flac', 'plaa.Audio'), @('.mp3', 'plaa.Audio'), @('.m3u8', 'plaa.Playlist'))) {
+    $extension, $type = $pair
+    $offered = (Get-ItemProperty 'HKCU:\Software\Scramble Tools\plaa\Capabilities\FileAssociations' -Name $extension -ErrorAction SilentlyContinue).$extension
+    if ($offered -ne $type) { Fail "Default apps offers plaa for $extension as '$offered'" }
+    if ($null -eq (Get-ItemProperty "HKCU:\Software\Classes\$extension\OpenWithProgids" -Name $type -ErrorAction SilentlyContinue)) {
+        Fail "$extension does not list $type"
+    }
+    $command = (Get-ItemProperty "HKCU:\Software\Classes\$type\shell\open\command" -ErrorAction SilentlyContinue).'(default)'
+    if ($command -ne "`"$(Join-Path $folder 'plaa.exe')`" `"%1`"") { Fail "$type runs '$command'" }
+}
 Write-Host 'all there'
 
 # Its version line names the FFmpeg and the libass it found, so their
@@ -354,6 +367,15 @@ if (Test-Path $folder) { $leftovers += $folder }
 if (Test-Path $shortcut) { $leftovers += $shortcut }
 if (Test-Path 'HKCU:\Software\Scramble Tools\plaa') { $leftovers += 'HKCU\Software\Scramble Tools\plaa' }
 if (Test-Path $openWith) { $leftovers += 'HKCU\Software\Classes\Applications\plaa.exe' }
+if ($null -ne (Get-ItemProperty 'HKCU:\Software\RegisteredApplications' -Name plaa -ErrorAction SilentlyContinue)) {
+    $leftovers += 'plaa in RegisteredApplications'
+}
+foreach ($type in @('plaa.Video', 'plaa.Audio', 'plaa.Playlist')) {
+    if (Test-Path "HKCU:\Software\Classes\$type") { $leftovers += "HKCU\Software\Classes\$type" }
+}
+if ($null -ne (Get-ItemProperty 'HKCU:\Software\Classes\.mkv\OpenWithProgids' -Name plaa.Video -ErrorAction SilentlyContinue)) {
+    $leftovers += 'plaa.Video in .mkv''s OpenWithProgids'
+}
 if (@(Get-Entries).Count -ne 0) { $leftovers += 'the entry in Apps' }
 if ($leftovers) { Fail "uninstalling left $($leftovers -join ', ')" }
 Write-Host 'nothing left'
