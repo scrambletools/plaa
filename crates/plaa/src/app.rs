@@ -312,6 +312,13 @@ pub enum Message {
     AgentPromptReady,
     /// A tool's answer, once what it waited on is done.
     ToolAnswer(tools::Answer, Result<tools::Output, crate::control::Error>),
+    /// What another file holds, read for a change a tool makes with it.
+    ToolFile(
+        tools::Answer,
+        tools::FileChange,
+        std::path::PathBuf,
+        Box<Result<plaa_media::MediaInfo, String>>,
+    ),
     /// What a window's assistant panel asks for.
     Assistant(window::Id, assistant::PanelMessage),
     ToggleAssistant(window::Id),
@@ -1237,6 +1244,9 @@ impl Plaa {
                 answer.send(result);
                 Task::none()
             }
+            Message::ToolFile(answer, change, path, info) => {
+                self.file_change(answer, change, path, *info)
+            }
             #[cfg(target_os = "macos")]
             Message::TitleBarDoubleClicked(id) => {
                 if let Some(view) = self.windows.get(&id).and_then(|window| window.surface) {
@@ -1316,10 +1326,10 @@ impl Plaa {
                 self.avb_changed();
                 self.follow_listening()
             }
-            Message::External(External::Thumbnail(id, thumbnail)) => {
+            Message::External(External::Thumbnail(id, file, thumbnail)) => {
                 if let Some(player) = self.player_mut(id) {
                     if thumbnail.strip {
-                        player.add_still(thumbnail.asked, thumbnail.picture);
+                        player.add_still(file, thumbnail.asked, thumbnail.picture);
                     } else {
                         let picture = (*thumbnail.picture).clone().transformed(player.transform());
                         let aspect = picture.width as f32 / picture.height.max(1) as f32;
@@ -1511,8 +1521,14 @@ impl Plaa {
                     let width = (crate::timeline::THUMBNAIL_SIZE * scale).round() as u32;
                     player.thumbnails =
                         Some(Thumbnails::open(path.clone(), width, move |thumbnail| {
-                            crate::post(External::Thumbnail(id, thumbnail));
+                            crate::post(External::Thumbnail(id, 0, thumbnail));
                         }));
+                    // Other files an edit takes pictures from have their own.
+                    player.open_thumbnails = Some(Box::new(move |file, path| {
+                        Thumbnails::open(path, width, move |thumbnail| {
+                            crate::post(External::Thumbnail(id, file, thumbnail));
+                        })
+                    }));
                 }
                 player.info = Some(info);
                 read_waveform(id, player, visualizer);
@@ -2160,13 +2176,23 @@ impl Plaa {
             }
             Control::SkipBy(seconds) => player.player.seek_by(seconds),
             Control::Hover(seconds) => {
-                match (seconds, &player.thumbnails) {
-                    (Some(seconds), Some(thumbnails)) => {
-                        thumbnails.request(player.editor.source_of(seconds));
+                match seconds {
+                    Some(seconds) if player.thumbnails.is_some() => {
+                        // The picture of the file that shows there, if any.
+                        match player.editor.picture_at(seconds) {
+                            Some((source, time)) => {
+                                if let Some(file) = player.still_file(source)
+                                    && let Some(thumbnails) = player.thumbnails_of(file)
+                                {
+                                    thumbnails.request(time);
+                                }
+                            }
+                            None => player.thumbnail = None,
+                        }
                     }
                     // Gone, so pointing again shows no picture from before.
-                    (None, _) => player.thumbnail = None,
-                    _ => {}
+                    None => player.thumbnail = None,
+                    Some(_) => {}
                 }
                 // The overlay stays while the timeline is pointed at.
                 return Task::none();

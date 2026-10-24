@@ -589,6 +589,7 @@ settings-ask-before-note = முகவர் இவற்றைச் செய
 settings-ask-reading = இயங்குவதை அல்லது படத்தைப் பார்த்தல்
 settings-ask-playing = இயக்கம், ஒலி அல்லது முழுத்திரையைக் கட்டுப்படுத்துதல்
 settings-ask-opening = கோப்பைத் திறத்தல் அல்லது சாளரத்தை மூடுதல்
+settings-ask-editing = கோப்பைத் திருத்துதல் அல்லது ஏற்றுமதி செய்தல்
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = plaa-வைக் கட்டுப்படுத்த { $agent } முகவரை அனுமதிக்கவா?
 agent-prompt-body = இயங்குவதைப் பார்க்கவும் அதைக் கட்டுப்படுத்தவும் plaa-வின் வெளிக் கட்டுப்பாட்டைப் பயன்படுத்த { $agent } கேட்கிறது. அமைப்புகளில் வெளிக் கட்டுப்பாட்டை முடக்கலாம்.
@@ -598,6 +599,7 @@ agent-prompt-deny = அனுமதிக்காதே
 agent-ask-read = இங்கே இயங்குவதைப் பார்க்க { $agent } முகவரை அனுமதிக்கவா?
 agent-ask-play = இங்கே இயக்கத்தைக் கட்டுப்படுத்த { $agent } முகவரை அனுமதிக்கவா?
 agent-ask-open = சாளரத்தைத் திறக்க அல்லது மூட { $agent } முகவரை அனுமதிக்கவா?
+agent-ask-edit = இங்கே திருத்த அல்லது ஏற்றுமதி செய்ய { $agent } முகவரை அனுமதிக்கவா?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = “{ $tool }” என்பதைப் பயன்படுத்த { $agent } கேட்கிறது. plaa எவற்றைப் பற்றிக் கேட்கும் என்பதை அமைப்புகளில் தேர்ந்தெடுக்கலாம்.
 

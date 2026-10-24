@@ -579,6 +579,7 @@ settings-ask-before-note = Rákérdezés az ügynök alábbi műveletei előtt:
 settings-ask-reading = A lejátszott tartalom vagy a kép megtekintése
 settings-ask-playing = A lejátszás, a hang vagy a teljes képernyő vezérlése
 settings-ask-opening = Fájl megnyitása vagy ablak bezárása
+settings-ask-editing = Fájl szerkesztése vagy exportálása
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Engedélyezi, hogy { $agent } vezérelje a plaa alkalmazást?
 agent-prompt-body = { $agent } szeretné használni a plaa külső vezérlését, hogy lássa a lejátszott tartalmat, és vezérelhesse az alkalmazást. A külső vezérlést a Beállításokban kapcsolhatja ki.
@@ -588,6 +589,7 @@ agent-prompt-deny = Tiltás
 agent-ask-read = Engedélyezi, hogy { $agent } lássa az itt lejátszott tartalmat?
 agent-ask-play = Engedélyezi, hogy { $agent } vezérelje az itteni lejátszást?
 agent-ask-open = Engedélyezi, hogy { $agent } megnyisson vagy bezárjon egy ablakot?
+agent-ask-edit = Engedélyezi, hogy { $agent } itt szerkesszen vagy exportáljon?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } szeretné használni ezt: „{ $tool }”. A Beállításokban választhatja ki, mire kérdez rá a plaa.
 

@@ -592,6 +592,7 @@ settings-ask-before-note = Kysy ennen kuin agentti:
 settings-ask-reading = Näkee, mitä toistetaan, tai kuvan
 settings-ask-playing = Ohjaa toistoa, ääntä tai koko näytön tilaa
 settings-ask-opening = Avaa tiedoston tai sulkee ikkunan
+settings-ask-editing = Muokkaa tiedostoa tai vie sen
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Saako { $agent } ohjata plaata?
 agent-prompt-body = { $agent } pyytää käyttää plaan ulkoista ohjausta nähdäkseen, mitä toistetaan, ja ohjatakseen sitä. Voit poistaa ulkoisen ohjauksen käytöstä Asetuksissa.
@@ -601,6 +602,7 @@ agent-prompt-deny = Älä salli
 agent-ask-read = Saako { $agent } nähdä, mitä täällä toistetaan?
 agent-ask-play = Saako { $agent } ohjata toistoa täällä?
 agent-ask-open = Saako { $agent } avata tai sulkea ikkunan?
+agent-ask-edit = Saako { $agent } muokata tai viedä tässä?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } pyytää käyttää toimintoa ”{ $tool }”. Asetuksissa valitset, mistä plaa kysyy.
 

@@ -360,6 +360,7 @@ impl Plaa {
             tools::Kind::Read => crate::fl!("agent-ask-read", agent = agent),
             tools::Kind::Play => crate::fl!("agent-ask-play", agent = agent),
             tools::Kind::Open => crate::fl!("agent-ask-open", agent = agent),
+            tools::Kind::Edit => crate::fl!("agent-ask-edit", agent = agent),
         };
         let body = crate::fl!("agent-ask-body", agent = agent, tool = asked.tool.title);
         let ready = ready(asked.shown_at);

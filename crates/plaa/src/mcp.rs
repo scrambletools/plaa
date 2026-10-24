@@ -20,10 +20,12 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::control::{self, Client};
 
 /// What agents read first about plaa's tools.
-const INSTRUCTIONS: &str = "Controls plaa, the media player, on the user's desktop, where the \
-user may be watching or listening. list_windows gives the windows; other tools take a window \
-number, or act on the window in front. Times are in seconds from the start of the file. The \
-user's settings may make plaa ask them before an agent acts.";
+const INSTRUCTIONS: &str = "Controls plaa, the media player and editor, on the user's desktop, \
+where the user may be watching or listening. list_windows gives the windows; other tools take a \
+window number, or act on the window in front. Times are in seconds of what plays: the edited \
+movie, once the file is edited. get_frames, get_levels, get_subtitles and get_sound read any part \
+of it; the editing tools change it as the user would, each change undoable, and export writes \
+the result to a new file. The user's settings may make plaa ask them before an agent acts.";
 
 /// How long to wait for a plaa this command started to open the control
 /// channel.

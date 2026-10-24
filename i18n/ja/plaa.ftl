@@ -577,6 +577,7 @@ settings-ask-before-note = エージェントが次の操作を行う前に確�
 settings-ask-reading = 再生中の内容や映像の確認
 settings-ask-playing = 再生、サウンド、フルスクリーンの操作
 settings-ask-opening = ファイルを開く操作やウインドウを閉じる操作
+settings-ask-editing = ファイルを編集する操作や書き出す操作
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = { $agent }にplaaの操作を許可しますか？
 agent-prompt-body = { $agent }が、再生中の内容を確認して操作するために、plaaの外部からの操作を使おうとしています。外部からの操作は「設定」でオフにできます。
@@ -586,6 +587,7 @@ agent-prompt-deny = 許可しない
 agent-ask-read = { $agent }に、ここで再生中の内容の確認を許可しますか？
 agent-ask-play = { $agent }に、ここでの再生の操作を許可しますか？
 agent-ask-open = { $agent }に、ウインドウを開いたり閉じたりすることを許可しますか？
+agent-ask-edit = { $agent }に、ここで編集や書き出しをすることを許可しますか？
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent }が「{ $tool }」を使おうとしています。plaaが確認する操作は「設定」で選べます。
 

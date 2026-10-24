@@ -591,6 +591,7 @@ settings-ask-before-note = Pregunta abans que un agent:
 settings-ask-reading = Vegi què es reprodueix, o la imatge
 settings-ask-playing = Controli la reproducció, el so o la pantalla completa
 settings-ask-opening = Obri un fitxer o tanqui una finestra
+settings-ask-editing = Editi un fitxer o l'exporti
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Vols permetre que { $agent } controli el plaa?
 agent-prompt-body = { $agent } demana fer servir el control extern del plaa per veure què es reprodueix i controlar-lo. Pots desactivar el control extern a Configuració.
@@ -600,6 +601,7 @@ agent-prompt-deny = No permetis
 agent-ask-read = Vols permetre que { $agent } vegi què es reprodueix aquí?
 agent-ask-play = Vols permetre que { $agent } controli la reproducció aquí?
 agent-ask-open = Vols permetre que { $agent } obri o tanqui una finestra?
+agent-ask-edit = Vols permetre que { $agent } editi o exporti aquí?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } demana fer servir «{ $tool }». A Configuració pots triar què pregunta el plaa.
 

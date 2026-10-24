@@ -130,6 +130,15 @@ impl Editor {
         }
     }
 
+    /// The picture showing at `seconds` of the edited time: the file, as
+    /// the edit numbers it, and its time there; none where it is black.
+    pub fn picture_at(&self, seconds: f64) -> Option<(usize, f64)> {
+        match &self.edit {
+            Some(edit) => edit.fed_at(plaa_media::Track::Picture, seconds),
+            None => Some((plaa_media::OWN, seconds)),
+        }
+    }
+
     /// Where the file's time `seconds` plays in the edited time, if it is
     /// kept.
     pub fn edited_of(&self, seconds: f64) -> Option<f64> {

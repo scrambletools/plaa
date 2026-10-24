@@ -579,6 +579,7 @@ settings-ask-before-note = Bir ajan şunları yapmadan önce sor:
 settings-ask-reading = Oynatılanı veya görüntüyü görme
 settings-ask-playing = Oynatmayı, sesi veya tam ekranı denetleme
 settings-ask-opening = Dosya açma veya pencere kapatma
+settings-ask-editing = Dosya düzenleme veya dışa aktarma
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = { $agent } plaa'yı denetleyebilsin mi?
 agent-prompt-body = { $agent }, neyin oynatıldığını görmek ve onu denetlemek için plaa'nın dışarıdan denetimini kullanmak istiyor. Dışarıdan denetimi Ayarlar'dan kapatabilirsiniz.
@@ -588,6 +589,7 @@ agent-prompt-deny = İzin verme
 agent-ask-read = { $agent } burada neyin oynatıldığını görebilsin mi?
 agent-ask-play = { $agent } buradaki oynatmayı denetleyebilsin mi?
 agent-ask-open = { $agent } bir pencere açabilsin veya kapatabilsin mi?
+agent-ask-edit = { $agent } burada düzenleme veya dışa aktarma yapabilsin mi?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent }, “{ $tool }” aracını kullanmak istiyor. plaa'nın neleri soracağını Ayarlar'dan seçebilirsiniz.
 

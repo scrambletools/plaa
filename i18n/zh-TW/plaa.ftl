@@ -576,6 +576,7 @@ settings-ask-before-note = 代理程式執行以下操作前先詢問：
 settings-ask-reading = 查看正在播放的內容或畫面
 settings-ask-playing = 控制播放、聲音或全螢幕
 settings-ask-opening = 開啟檔案或關閉視窗
+settings-ask-editing = 編輯或輸出檔案
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = 要允許 { $agent } 控制 plaa 嗎？
 agent-prompt-body = { $agent } 要求使用 plaa 的外部控制，以查看正在播放的內容並加以控制。你可以在「設定」中關閉外部控制。
@@ -585,6 +586,7 @@ agent-prompt-deny = 不允許
 agent-ask-read = 要允許 { $agent } 查看這裡正在播放的內容嗎？
 agent-ask-play = 要允許 { $agent } 控制這裡的播放嗎？
 agent-ask-open = 要允許 { $agent } 開啟或關閉視窗嗎？
+agent-ask-edit = 要允許 { $agent } 在此編輯或輸出嗎？
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } 要求使用「{ $tool }」。你可以在「設定」中選擇 plaa 要詢問哪些操作。
 

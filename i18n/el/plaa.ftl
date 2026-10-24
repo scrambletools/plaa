@@ -591,6 +591,7 @@ settings-ask-before-note = Ερώτηση πριν από τις εξής ενέ
 settings-ask-reading = Προβολή αυτού που αναπαράγεται ή της εικόνας
 settings-ask-playing = Έλεγχος της αναπαραγωγής, του ήχου ή της πλήρους οθόνης
 settings-ask-opening = Άνοιγμα αρχείου ή κλείσιμο παραθύρου
+settings-ask-editing = Επεξεργασία ή εξαγωγή αρχείου
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Να επιτραπεί στο { $agent } να ελέγχει το plaa;
 agent-prompt-body = Το { $agent } ζητά να χρησιμοποιήσει τον εξωτερικό έλεγχο του plaa, για να βλέπει τι αναπαράγεται και να το ελέγχει. Μπορείτε να απενεργοποιήσετε τον εξωτερικό έλεγχο στις Ρυθμίσεις.
@@ -600,6 +601,7 @@ agent-prompt-deny = Να μην επιτραπεί
 agent-ask-read = Να επιτραπεί στο { $agent } να βλέπει τι αναπαράγεται εδώ;
 agent-ask-play = Να επιτραπεί στο { $agent } να ελέγχει την αναπαραγωγή εδώ;
 agent-ask-open = Να επιτραπεί στο { $agent } να ανοίξει ή να κλείσει ένα παράθυρο;
+agent-ask-edit = Να επιτραπεί στο { $agent } να κάνει επεξεργασία ή εξαγωγή εδώ;
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = Το { $agent } ζητά να χρησιμοποιήσει το «{ $tool }». Στις Ρυθμίσεις επιλέγετε για τι ρωτά το plaa.
 

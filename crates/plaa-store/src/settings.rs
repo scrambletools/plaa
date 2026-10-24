@@ -203,6 +203,8 @@ pub struct AskBefore {
     pub playing: bool,
     /// Opening files and addresses, and closing windows.
     pub opening: bool,
+    /// Editing a window's file, and exporting it.
+    pub editing: bool,
 }
 
 impl Settings {

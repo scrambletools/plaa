@@ -577,6 +577,7 @@ settings-ask-before-note = ถามก่อนเมื่อเอเจน�
 settings-ask-reading = ดูสิ่งที่กำลังเล่นหรือภาพ
 settings-ask-playing = ควบคุมการเล่น เสียง หรือโหมดเต็มหน้าจอ
 settings-ask-opening = เปิดไฟล์หรือปิดหน้าต่าง
+settings-ask-editing = แก้ไขหรือส่งออกไฟล์
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = อนุญาตให้ { $agent } ควบคุม plaa หรือไม่
 agent-prompt-body = { $agent } ขอใช้การควบคุมจากภายนอกของ plaa เพื่อดูสิ่งที่กำลังเล่นและควบคุม plaa คุณปิดการควบคุมจากภายนอกได้ในการตั้งค่า
@@ -586,6 +587,7 @@ agent-prompt-deny = ไม่อนุญาต
 agent-ask-read = อนุญาตให้ { $agent } ดูสิ่งที่กำลังเล่นที่นี่หรือไม่
 agent-ask-play = อนุญาตให้ { $agent } ควบคุมการเล่นที่นี่หรือไม่
 agent-ask-open = อนุญาตให้ { $agent } เปิดหรือปิดหน้าต่างหรือไม่
+agent-ask-edit = อนุญาตให้ { $agent } แก้ไขหรือส่งออกที่นี่หรือไม่
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } ขอใช้ “{ $tool }” คุณเลือกได้ในการตั้งค่าว่าจะให้ plaa ถามเรื่องใดบ้าง
 

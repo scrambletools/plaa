@@ -576,6 +576,7 @@ settings-ask-before-note = 智能体执行以下操作前先询问：
 settings-ask-reading = 查看正在播放的内容或画面
 settings-ask-playing = 控制播放、声音或全屏幕
 settings-ask-opening = 打开文件或关闭窗口
+settings-ask-editing = 编辑或导出文件
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = 允许 { $agent } 控制 plaa？
 agent-prompt-body = { $agent } 请求使用 plaa 的外部控制，以查看正在播放的内容并加以控制。你可以在“设置”中关闭外部控制。
@@ -585,6 +586,7 @@ agent-prompt-deny = 不允许
 agent-ask-read = 允许 { $agent } 查看这里正在播放的内容？
 agent-ask-play = 允许 { $agent } 控制这里的播放？
 agent-ask-open = 允许 { $agent } 打开或关闭窗口？
+agent-ask-edit = 允许 { $agent } 在此编辑或导出？
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } 请求使用“{ $tool }”。你可以在“设置”中选择 plaa 询问哪些操作。
 

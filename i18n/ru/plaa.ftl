@@ -603,6 +603,7 @@ settings-ask-before-note = Спрашивать, прежде чем агент:
 settings-ask-reading = Увидит, что воспроизводится, или изображение
 settings-ask-playing = Будет управлять воспроизведением, звуком или полноэкранным режимом
 settings-ask-opening = Откроет файл или закроет окно
+settings-ask-editing = Изменит файл или экспортирует его
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Разрешить агенту { $agent } управлять plaa?
 agent-prompt-body = { $agent } просит доступ к внешнему управлению plaa, чтобы видеть, что воспроизводится, и управлять им. Внешнее управление можно отключить в настройках.
@@ -612,6 +613,7 @@ agent-prompt-deny = Не разрешать
 agent-ask-read = Разрешить агенту { $agent } видеть, что здесь воспроизводится?
 agent-ask-play = Разрешить агенту { $agent } управлять воспроизведением здесь?
 agent-ask-open = Разрешить агенту { $agent } открыть или закрыть окно?
+agent-ask-edit = Разрешить агенту { $agent } редактировать или экспортировать здесь?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } просит использовать «{ $tool }». В настройках можно выбрать, о чём спрашивает plaa.
 

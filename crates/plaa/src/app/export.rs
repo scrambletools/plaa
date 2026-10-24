@@ -39,6 +39,8 @@ pub(crate) struct Exporting {
     /// The file and the edit exported, noted as kept once it is done.
     source: Source,
     edit: Option<Edit>,
+    /// The agent that asked for it, told once it is done.
+    answer: Option<super::tools::Answer>,
 }
 
 /// An export's format, picture size and whether the picture is HDR,
@@ -172,14 +174,87 @@ impl Plaa {
     /// Starts exporting window `id`'s file to `destination` as its dialog
     /// chose.
     pub(super) fn start_export(&mut self, id: window::Id, destination: PathBuf) {
+        let Some(choice) = self
+            .windows
+            .get_mut(&id)
+            .and_then(|window| window.export.take())
+        else {
+            return;
+        };
+        self.export_choice = Some(choice);
+        self.export_with(id, choice, destination, None);
+    }
+
+    /// Exports window `id`'s file to `destination` as an agent asks, in
+    /// `format`, `lines` tall, the sound at `quality`; tells `answer` once
+    /// it is done.
+    pub(super) fn export_for_agent(
+        &mut self,
+        id: window::Id,
+        destination: PathBuf,
+        format: Format,
+        lines: Option<u32>,
+        quality: Option<u32>,
+        answer: &super::tools::Answer,
+    ) -> Result<(), String> {
+        let Some(window) = self.windows.get(&id) else {
+            return Err("the window is gone".to_owned());
+        };
+        if window.exporting.is_some() {
+            return Err("the window is exporting already".to_owned());
+        }
+        let Some(player) = window.player() else {
+            return Err("the window plays nothing".to_owned());
+        };
+        let has_sound =
+            player.status.audio.is_some() || player.editor.edit().is_some_and(Edit::is_mixed);
+        let choice = match format {
+            Format::Sound(sound) => {
+                if !has_sound {
+                    return Err("there is no sound to export".to_owned());
+                }
+                if !sound.available() {
+                    return Err("this system has no encoder for that sound".to_owned());
+                }
+                let quality = quality
+                    .filter(|quality| sound.qualities().contains(quality))
+                    .unwrap_or_else(|| usual_quality(player, sound));
+                Choice {
+                    format,
+                    lines: None,
+                    sound,
+                    quality,
+                }
+            }
+            _ => {
+                if !player.is_video() {
+                    return Err("the window plays sound alone: export it as sound".to_owned());
+                }
+                Choice {
+                    format,
+                    lines,
+                    sound: Sound::Aac,
+                    quality: 192,
+                }
+            }
+        };
+        self.export_with(id, choice, destination, Some(answer.clone()));
+        Ok(())
+    }
+
+    /// Starts exporting window `id`'s file to `destination` as `choice`
+    /// says.
+    fn export_with(
+        &mut self,
+        id: window::Id,
+        choice: Choice,
+        destination: PathBuf,
+        answer: Option<super::tools::Answer>,
+    ) {
         let hardware = self.settings.hardware_decoding;
         let Some(window) = self.windows.get_mut(&id) else {
             return;
         };
-        let Some(choice) = window.export.take() else {
-            return;
-        };
-        self.export_choice = Some(choice);
         let Content::Player(player) = &window.content else {
             return;
         };
@@ -210,6 +285,7 @@ impl Plaa {
             progress: 0.0,
             source: player.source().clone(),
             edit,
+            answer,
         });
     }
 
@@ -229,6 +305,17 @@ impl Plaa {
                 let Some(exporting) = window.exporting.take() else {
                     return;
                 };
+                if let Some(answer) = &exporting.answer {
+                    answer.send(match &result {
+                        Ok(path) => Ok(super::tools::Output::Json(serde_json::json!({
+                            "exported": path.display().to_string(),
+                        }))),
+                        Err(error) => Err(crate::control::Error::new(
+                            crate::control::code::INTERNAL_ERROR,
+                            format!("export: {error}"),
+                        )),
+                    });
+                }
                 let notice = match result {
                     Ok(_) => {
                         // Its changes are kept, unless it plays another

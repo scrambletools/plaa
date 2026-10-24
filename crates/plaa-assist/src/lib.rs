@@ -16,8 +16,8 @@ use base64::Engine;
 use futures::StreamExt;
 use rig_core::DynModel;
 use rig_core::completion::message::{
-    AssistantContent, DocumentSourceKind, Image, ImageMediaType, Message, ToolResultContent,
-    UserContent,
+    AssistantContent, Audio, AudioMediaType, DocumentSourceKind, Image, ImageMediaType, Message,
+    ToolResultContent, UserContent,
 };
 use rig_core::completion::{CompletionRequest, ToolDefinition};
 use rig_core::error::ProviderError;
@@ -51,6 +51,16 @@ impl Provider {
         Provider::Ollama,
         Provider::OpenAiCompatible,
     ];
+
+    /// Whether a tool's pictures can go in its result: Ollama refuses
+    /// them there, as do the Chat Completions servers compatible with
+    /// OpenAI speak, while OpenAI's own Responses API takes them.
+    fn pictures_in_results(self) -> bool {
+        matches!(
+            self,
+            Provider::Anthropic | Provider::OpenAi | Provider::Gemini
+        )
+    }
 
     /// Whether the provider needs an API key.
     pub fn needs_key(self) -> bool {
@@ -269,6 +279,20 @@ pub struct ToolSpec {
 pub enum Content {
     Text(String),
     Png(Vec<u8>),
+    Jpeg(Vec<u8>),
+    /// Sound, as a WAV file.
+    Wav(Vec<u8>),
+}
+
+impl Content {
+    /// A picture as rig sends it on, if this is one.
+    fn image(&self) -> Option<Image> {
+        match self {
+            Content::Png(png) => Some(image(png, ImageMediaType::PNG)),
+            Content::Jpeg(jpeg) => Some(image(jpeg, ImageMediaType::JPEG)),
+            Content::Text(_) | Content::Wav(_) => None,
+        }
+    }
 }
 
 /// A call the model asks plaa to run.
@@ -455,7 +479,8 @@ impl Chat {
                     params: choice.request_params(),
                     max_tokens: choice.max_tokens(),
                     vision: choice.vision != Some(false),
-                    pictures_in_results: choice.provider != Provider::Ollama,
+                    pictures_in_results: choice.provider.pictures_in_results(),
+                    hears: choice.provider == Provider::Gemini,
                     context: choice.context(),
                     last_input: 0,
                     instructions,
@@ -545,9 +570,12 @@ struct Conversation {
     max_tokens: Option<u64>,
     /// Whether the model gets the tools' pictures.
     vision: bool,
-    /// Whether pictures can go in a tool result, which Ollama refuses; there
-    /// they follow the results in the same message.
+    /// Whether pictures can go in a tool result; where they cannot, they
+    /// follow the results in the same message.
     pictures_in_results: bool,
+    /// Whether the model hears the tools' sound, which follows the
+    /// results in the same message.
+    hears: bool,
     /// The model's context, where known, and how much of it the last
     /// request took.
     context: Option<u64>,
@@ -594,7 +622,8 @@ impl Conversation {
                             self.params = choice.request_params();
                             self.max_tokens = choice.max_tokens();
                             self.vision = choice.vision != Some(false);
-                            self.pictures_in_results = choice.provider != Provider::Ollama;
+                            self.pictures_in_results = choice.provider.pictures_in_results();
+                            self.hears = choice.provider == Provider::Gemini;
                             self.context = choice.context();
                             self.forget_reasoning();
                         }
@@ -604,22 +633,34 @@ impl Conversation {
                 }
                 Command::Results(results) => {
                     let mut pictures = Vec::new();
+                    let mut sounds = Vec::new();
                     let mut content: Vec<UserContent> = results
                         .into_iter()
                         .filter_map(|result| {
                             let call = self.waiting.remove(&result.id)?;
                             let mut result = result;
-                            // Pictures that cannot go in a tool result follow it.
-                            if self.vision && !self.pictures_in_results {
-                                for part in &mut result.content {
-                                    if let Content::Png(png) = part {
-                                        pictures.push(std::mem::take(png));
-                                        *part = Content::Text(
-                                            "(The picture is in the message after the tool \
-                                             results.)"
-                                                .to_owned(),
-                                        );
-                                    }
+                            // Pictures that cannot go in a tool result follow it,
+                            // as does sound.
+                            for part in &mut result.content {
+                                if self.vision
+                                    && !self.pictures_in_results
+                                    && let Some(image) = part.image()
+                                {
+                                    pictures.push(image);
+                                    *part = Content::Text(
+                                        "(The picture is in the message after the tool \
+                                         results.)"
+                                            .to_owned(),
+                                    );
+                                } else if self.hears
+                                    && let Content::Wav(wav) = part
+                                {
+                                    sounds.push(std::mem::take(wav));
+                                    *part = Content::Text(
+                                        "(The sound is in the message after the tool \
+                                         results.)"
+                                            .to_owned(),
+                                    );
                                 }
                             }
                             Some(UserContent::tool_result(
@@ -634,11 +675,19 @@ impl Conversation {
                     }
                     if !pictures.is_empty() {
                         content.push(UserContent::text("The pictures the tools gave:"));
-                        content.extend(
-                            pictures
-                                .into_iter()
-                                .map(|png| UserContent::Image(png_image(png))),
-                        );
+                        content.extend(pictures.into_iter().map(UserContent::Image));
+                    }
+                    if !sounds.is_empty() {
+                        content.push(UserContent::text("The sound the tools gave:"));
+                        content.extend(sounds.into_iter().map(|wav| {
+                            UserContent::Audio(Audio {
+                                data: DocumentSourceKind::Base64(
+                                    base64::engine::general_purpose::STANDARD.encode(wav),
+                                ),
+                                media_type: Some(AudioMediaType::WAV),
+                                additional_params: None,
+                            })
+                        }));
                     }
                     self.history.push(Message::User { content });
                 }
@@ -919,6 +968,10 @@ fn shorten_old_results(history: &mut [Message], keep: usize) -> bool {
                     *part = UserContent::text("(A picture, left out to make room.)");
                     shortened = true;
                 }
+                UserContent::Audio(_) => {
+                    *part = UserContent::text("(A sound, left out to make room.)");
+                    shortened = true;
+                }
                 _ => {}
             }
         }
@@ -944,11 +997,11 @@ fn long(content: &[ToolResultContent]) -> bool {
     length > OLD_RESULT_LIMIT
 }
 
-/// A PNG as rig sends it on.
-fn png_image(png: Vec<u8>) -> Image {
+/// A picture as rig sends it on.
+fn image(bytes: &[u8], media_type: ImageMediaType) -> Image {
     Image {
-        data: DocumentSourceKind::Base64(base64::engine::general_purpose::STANDARD.encode(png)),
-        media_type: Some(ImageMediaType::PNG),
+        data: DocumentSourceKind::Base64(base64::engine::general_purpose::STANDARD.encode(bytes)),
+        media_type: Some(media_type),
         detail: None,
         additional_params: None,
     }
@@ -961,11 +1014,15 @@ fn tool_content(result: ToolResult, vision: bool) -> Vec<ToolResultContent> {
         .into_iter()
         .map(|part| match part {
             Content::Text(text) => ToolResultContent::text(text),
-            Content::Png(_) if !vision => ToolResultContent::text(
-                "(A picture, left out: this model cannot see pictures. Read the text with \
-                 page_text or search instead.)",
-            ),
-            Content::Png(png) => ToolResultContent::Image(png_image(png)),
+            Content::Wav(_) => {
+                ToolResultContent::text("(A sound, left out: this model cannot hear sound.)")
+            }
+            Content::Png(_) | Content::Jpeg(_) if !vision => {
+                ToolResultContent::text("(A picture, left out: this model cannot see pictures.)")
+            }
+            picture => picture
+                .image()
+                .map_or_else(|| ToolResultContent::text(""), ToolResultContent::Image),
         })
         .collect();
     if content.is_empty() {
@@ -1174,6 +1231,15 @@ mod tests {
         let content = tool_content(result.clone(), true);
         assert_eq!(content.len(), 2);
         assert!(matches!(&content[1], ToolResultContent::Image(_)));
+        let jpeg = ToolResult {
+            content: vec![Content::Jpeg(vec![1]), Content::Wav(vec![2])],
+            ..result.clone()
+        };
+        let content = tool_content(jpeg, true);
+        assert!(matches!(&content[0], ToolResultContent::Image(image)
+            if image.media_type == Some(ImageMediaType::JPEG)));
+        // Sound left in a result is a line saying so.
+        assert!(matches!(&content[1], ToolResultContent::Text(_)));
         // A model that cannot see gets a line in the picture's place.
         let content = tool_content(result, false);
         assert_eq!(content.len(), 2);

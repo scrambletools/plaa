@@ -596,6 +596,7 @@ settings-ask-before-note = לשאול לפני פעולות אלה של סוכן
 settings-ask-reading = צפייה במה שמתנגן, או בתמונה
 settings-ask-playing = שליטה בניגון, בשמע או במסך מלא
 settings-ask-opening = פתיחת קובץ או סגירת חלון
+settings-ask-editing = עריכת קובץ או ייצוא שלו
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = לאפשר ל-{ $agent } לשלוט ב-plaa?
 agent-prompt-body = { $agent } מבקש להשתמש בשליטה מבחוץ של plaa, כדי לראות מה מתנגן ולשלוט בו. אפשר לכבות את השליטה מבחוץ בהגדרות.
@@ -605,6 +606,7 @@ agent-prompt-deny = דחייה
 agent-ask-read = לאפשר ל-{ $agent } לראות מה מתנגן כאן?
 agent-ask-play = לאפשר ל-{ $agent } לשלוט בניגון כאן?
 agent-ask-open = לאפשר ל-{ $agent } לפתוח או לסגור חלון?
+agent-ask-edit = לאפשר ל-{ $agent } לערוך או לייצא כאן?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } מבקש להשתמש ב-"{ $tool }". בהגדרות אפשר לבחור על מה plaa שואל.
 

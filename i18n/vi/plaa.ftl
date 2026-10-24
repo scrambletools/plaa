@@ -577,6 +577,7 @@ settings-ask-before-note = Hỏi trước khi tác nhân:
 settings-ask-reading = Xem nội dung đang phát hoặc hình ảnh
 settings-ask-playing = Điều khiển việc phát, âm thanh hoặc chế độ toàn màn hình
 settings-ask-opening = Mở tệp hoặc đóng cửa sổ
+settings-ask-editing = Sửa hoặc xuất tệp
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Cho phép { $agent } điều khiển plaa?
 agent-prompt-body = { $agent } yêu cầu dùng tính năng điều khiển từ bên ngoài của plaa để xem nội dung đang phát và điều khiển nó. Bạn có thể tắt điều khiển từ bên ngoài trong Cài đặt.
@@ -586,6 +587,7 @@ agent-prompt-deny = Không cho phép
 agent-ask-read = Cho phép { $agent } xem nội dung đang phát ở đây?
 agent-ask-play = Cho phép { $agent } điều khiển việc phát ở đây?
 agent-ask-open = Cho phép { $agent } mở hoặc đóng cửa sổ?
+agent-ask-edit = Cho phép { $agent } sửa hoặc xuất tại đây?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } yêu cầu dùng “{ $tool }”. Bạn có thể chọn những gì plaa sẽ hỏi trong Cài đặt.
 

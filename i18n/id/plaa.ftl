@@ -578,6 +578,7 @@ settings-ask-before-note = Tanya dulu sebelum agen:
 settings-ask-reading = Melihat yang diputar, atau gambarnya
 settings-ask-playing = Mengendalikan pemutaran, suara, atau layar penuh
 settings-ask-opening = Membuka berkas atau menutup jendela
+settings-ask-editing = Mengedit berkas atau mengekspornya
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Izinkan { $agent } mengendalikan plaa?
 agent-prompt-body = { $agent } meminta untuk memakai kendali luar plaa, untuk melihat yang diputar dan mengendalikannya. Anda dapat menonaktifkan kendali luar di Pengaturan.
@@ -587,6 +588,7 @@ agent-prompt-deny = Jangan izinkan
 agent-ask-read = Izinkan { $agent } melihat yang diputar di sini?
 agent-ask-play = Izinkan { $agent } mengendalikan pemutaran di sini?
 agent-ask-open = Izinkan { $agent } membuka atau menutup jendela?
+agent-ask-edit = Izinkan { $agent } mengedit atau mengekspor di sini?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } meminta untuk memakai “{ $tool }”. Pengaturan menentukan apa saja yang ditanyakan plaa.
 

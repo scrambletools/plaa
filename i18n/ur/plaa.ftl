@@ -582,6 +582,7 @@ settings-ask-before-note = ایجنٹ کے یہ کام کرنے سے پہلے پ
 settings-ask-reading = جو چل رہا ہے یا تصویر دیکھنا
 settings-ask-playing = پلے بیک، آواز یا پوری اسکرین کو کنٹرول کرنا
 settings-ask-opening = فائل کھولنا یا ونڈو بند کرنا
+settings-ask-editing = فائل میں ترمیم کرنا یا برآمد کرنا
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = کیا { $agent } کو plaa کنٹرول کرنے کی اجازت دیں؟
 agent-prompt-body = { $agent } plaa کا بیرونی کنٹرول استعمال کرنا چاہتا ہے، تاکہ دیکھ سکے کہ کیا چل رہا ہے اور اسے کنٹرول کر سکے۔ آپ بیرونی کنٹرول کو ترتیبات میں بند کر سکتے ہیں۔
@@ -591,6 +592,7 @@ agent-prompt-deny = اجازت نہ دیں
 agent-ask-read = کیا { $agent } کو یہ دیکھنے دیں کہ یہاں کیا چل رہا ہے؟
 agent-ask-play = کیا { $agent } کو یہاں پلے بیک کنٹرول کرنے دیں؟
 agent-ask-open = کیا { $agent } کو ونڈو کھولنے یا بند کرنے دیں؟
+agent-ask-edit = کیا { $agent } کو یہاں ترمیم یا برآمد کرنے دیں؟
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } “{ $tool }” استعمال کرنا چاہتا ہے۔ plaa کن باتوں پر پوچھے، یہ ترتیبات میں منتخب کیا جاتا ہے۔
 

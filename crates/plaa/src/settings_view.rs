@@ -850,6 +850,7 @@ impl Plaa {
                 ToolKind::Read => crate::fl!("settings-ask-reading"),
                 ToolKind::Play => crate::fl!("settings-ask-playing"),
                 ToolKind::Open => crate::fl!("settings-ask-opening"),
+                ToolKind::Edit => crate::fl!("settings-ask-editing"),
             };
             asks = asks.push(
                 row![

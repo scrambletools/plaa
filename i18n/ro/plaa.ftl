@@ -601,6 +601,7 @@ settings-ask-before-note = Întreabă înainte ca un agent să:
 settings-ask-reading = Vadă ce se redă sau imaginea
 settings-ask-playing = Controleze redarea, sunetul sau ecranul complet
 settings-ask-opening = Deschidă un fișier sau închidă o fereastră
+settings-ask-editing = Editeze un fișier sau să-l exporte
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Permiți ca { $agent } să controleze plaa?
 agent-prompt-body = { $agent } cere să folosească controlul extern al plaa, pentru a vedea ce se redă și a-l controla. Poți dezactiva controlul extern în Configurări.
@@ -610,6 +611,7 @@ agent-prompt-deny = Nu permite
 agent-ask-read = Permiți ca { $agent } să vadă ce se redă aici?
 agent-ask-play = Permiți ca { $agent } să controleze redarea aici?
 agent-ask-open = Permiți ca { $agent } să deschidă sau să închidă o fereastră?
+agent-ask-edit = Permiți ca { $agent } să editeze sau să exporte aici?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } cere să folosească „{ $tool }”. În Configurări alegi despre ce întreabă plaa.
 

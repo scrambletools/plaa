@@ -164,6 +164,37 @@ impl Plaa {
         Task::none()
     }
 
+    /// Changes window `id`'s edit as an agent asks, with `apply`, which
+    /// says whether it changed it; it plays on from where it was.
+    pub(super) fn tool_edit(
+        &mut self,
+        id: window::Id,
+        apply: impl FnOnce(&mut Edit) -> bool,
+    ) -> Task<Message> {
+        let Some(player) = self.player_mut(id) else {
+            return Task::none();
+        };
+        let Some(duration) = player.file_duration() else {
+            return Task::none();
+        };
+        let turns = player.transform().turns;
+        let position = player.player.position().as_secs_f64();
+        let mut edit = player.editor.working(duration);
+        if !apply(&mut edit) {
+            return Task::none();
+        }
+        // A part being trimmed is no longer where it was.
+        if let Some(Mode::Trim { clip, .. }) = player.editor.mode {
+            end_trim(player, clip);
+        }
+        let fallback = position.min(edit.duration());
+        change(player, |editor| editor.commit(edit, duration), fallback);
+        if player.transform().turns % 2 != turns % 2 {
+            return self.fit_turned(id);
+        }
+        Task::none()
+    }
+
     /// Fits window `id` to its picture once it turned on its side, unless
     /// it fills the screen or is in picture in picture.
     fn fit_turned(&mut self, id: window::Id) -> Task<Message> {
@@ -283,20 +314,29 @@ fn change(
     }
 }
 
-/// Asks for pictures along the edited movie for the filmstrips.
-fn request_strip(player: &PlayerWindow) {
-    let Some(thumbnails) = &player.thumbnails else {
+/// Asks for pictures along the edited movie for the filmstrips, of each
+/// file they show.
+fn request_strip(player: &mut PlayerWindow) {
+    if player.thumbnails.is_none() {
         return;
-    };
+    }
     let length = edited_length(player);
     if length <= 0.0 {
         return;
     }
-    let editor = &player.editor;
-    thumbnails.request_strip(
-        (0..STRIP_STILLS)
-            .map(|index| editor.source_of((index as f64 + 0.5) * length / STRIP_STILLS as f64)),
-    );
+    let mut wanted: Vec<(usize, f64)> = (0..STRIP_STILLS)
+        .filter_map(|index| {
+            let seconds = (index as f64 + 0.5) * length / STRIP_STILLS as f64;
+            let (source, time) = player.editor.picture_at(seconds)?;
+            Some((player.still_file(source)?, time))
+        })
+        .collect();
+    wanted.sort_by_key(|(file, _)| *file);
+    for group in wanted.chunk_by(|first, second| first.0 == second.0) {
+        if let Some(thumbnails) = player.thumbnails_of(group[0].0) {
+            thumbnails.request_strip(group.iter().map(|(_, time)| *time));
+        }
+    }
 }
 
 /// How long the edited movie lasts, or the file when it is not edited.

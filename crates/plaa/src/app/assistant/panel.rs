@@ -27,12 +27,14 @@ pub(crate) const WIDTH: f32 = 380.0;
 const PICTURE_WIDTH: f32 = 300.0;
 
 /// What the model is told about plaa and the panel.
-const INSTRUCTIONS: &str = "You are the assistant in plaa, a video and audio player, chatting \
-with the user in a panel beside what plays. Use the tools to see what plays and to control it; \
-they act on the user's window unless you give another window's number, so you need list_windows \
-only when the user speaks of other windows. You get only what you ask for, so look with \
-get_status, get_info or get_frame before you answer about what plays. Times are in seconds from \
-the start of the file. Answer briefly, in the user's language; you may use Markdown.";
+const INSTRUCTIONS: &str = "You are the assistant in plaa, a video and audio player and editor, \
+chatting with the user in a panel beside what plays. Use the tools to see what plays, to control \
+it and to edit it; they act on the user's window unless you give another window's number, so you \
+need list_windows only when the user speaks of other windows. You get only what you ask for, so \
+look with get_status, get_info, get_frame or get_frames before you answer about what plays; \
+get_levels and get_subtitles read its sound and words. Edits change what plays at once, and undo \
+takes them back. Times are in seconds of what plays, as edited. Answer briefly, in the user's \
+language; you may use Markdown.";
 
 /// What the panel heard from its chat's thread or a tool call, through
 /// [`crate::post`].
@@ -577,7 +579,16 @@ impl Plaa {
         let result = tool_result(call.clone(), outcome);
         let picture = result.content.iter().find_map(|part| match part {
             Content::Png(png) => picture(png),
-            Content::Text(_) => None,
+            Content::Jpeg(jpeg) => {
+                let decoded = plaa_media::read::jpeg_picture(jpeg)?;
+                let shown = tools::shrunk(decoded, PICTURE_WIDTH as u32);
+                Some(image::Handle::from_rgba(
+                    shown.width,
+                    shown.height,
+                    shown.rgba,
+                ))
+            }
+            Content::Text(_) | Content::Wav(_) => None,
         });
         let state = if result.failed {
             let text = result
@@ -585,7 +596,7 @@ impl Plaa {
                 .iter()
                 .find_map(|part| match part {
                     Content::Text(text) => Some(text.clone()),
-                    Content::Png(_) => None,
+                    Content::Png(_) | Content::Jpeg(_) | Content::Wav(_) => None,
                 })
                 .unwrap_or_default();
             ToolState::Failed(text)
@@ -1092,13 +1103,19 @@ fn tool_result(id: String, outcome: Result<Value, Error>) -> ToolResult {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .filter_map(|part| match part["type"].as_str()? {
-                    "text" => Some(Content::Text(part["text"].as_str()?.to_owned())),
-                    "image" => base64::engine::general_purpose::STANDARD
-                        .decode(part["data"].as_str()?)
-                        .ok()
-                        .map(Content::Png),
-                    _ => None,
+                .filter_map(|part| {
+                    let decoded = || {
+                        base64::engine::general_purpose::STANDARD
+                            .decode(part["data"].as_str()?)
+                            .ok()
+                    };
+                    match part["type"].as_str()? {
+                        "text" => Some(Content::Text(part["text"].as_str()?.to_owned())),
+                        "image" if part["mimeType"] == "image/jpeg" => decoded().map(Content::Jpeg),
+                        "image" => decoded().map(Content::Png),
+                        "audio" => decoded().map(Content::Wav),
+                        _ => None,
+                    }
                 })
                 .collect();
             ToolResult {

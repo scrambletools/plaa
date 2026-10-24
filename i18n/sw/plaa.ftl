@@ -583,6 +583,7 @@ settings-ask-before-note = Uliza kwanza wakala anapotaka:
 settings-ask-reading = Kuona kinachocheza, au picha
 settings-ask-playing = Kudhibiti uchezaji, sauti au skrini nzima
 settings-ask-opening = Kufungua faili au kufunga dirisha
+settings-ask-editing = Kuhariri faili au kuihamisha
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Ruhusu { $agent } kudhibiti plaa?
 agent-prompt-body = { $agent } anaomba kutumia udhibiti wa nje wa plaa, ili kuona kinachocheza na kukidhibiti. Unaweza kuzima udhibiti wa nje katika Mipangilio.
@@ -592,6 +593,7 @@ agent-prompt-deny = Usiruhusu
 agent-ask-read = Ruhusu { $agent } kuona kinachocheza hapa?
 agent-ask-play = Ruhusu { $agent } kudhibiti uchezaji hapa?
 agent-ask-open = Ruhusu { $agent } kufungua au kufunga dirisha?
+agent-ask-edit = Ruhusu { $agent } kuhariri au kuhamisha hapa?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } anaomba kutumia “{ $tool }”. Katika Mipangilio unachagua mambo ambayo plaa huuliza.
 

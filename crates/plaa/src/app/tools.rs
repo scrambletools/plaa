@@ -20,6 +20,10 @@ use super::{Content, Message, Plaa};
 use crate::control::{Call, Error, code};
 use crate::window::{Control, PlayerWindow, SPEEDS};
 
+mod media;
+
+pub(crate) use media::FileChange;
+
 /// What a tool does, which decides whether plaa asks first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -30,10 +34,12 @@ pub(crate) enum Kind {
     Play,
     /// Opens files and addresses, and closes or raises windows.
     Open,
+    /// Edits a window's file, and exports it.
+    Edit,
 }
 
 impl Kind {
-    pub(crate) const ALL: [Kind; 3] = [Kind::Read, Kind::Play, Kind::Open];
+    pub(crate) const ALL: [Kind; 4] = [Kind::Read, Kind::Play, Kind::Open, Kind::Edit];
 
     /// Its switch in Settings: whether plaa asks before a tool of this
     /// kind runs.
@@ -42,6 +48,7 @@ impl Kind {
             Kind::Read => ask.reading,
             Kind::Play => ask.playing,
             Kind::Open => ask.opening,
+            Kind::Edit => ask.editing,
         }
     }
 
@@ -50,6 +57,7 @@ impl Kind {
             Kind::Read => &mut ask.reading,
             Kind::Play => &mut ask.playing,
             Kind::Open => &mut ask.opening,
+            Kind::Edit => &mut ask.editing,
         } = asks;
     }
 }
@@ -63,6 +71,17 @@ pub(crate) enum Output {
     Text(String),
     /// A picture, with a line saying what it shows.
     Png(Vec<u8>, String),
+    /// Lines, pictures and sound, in order.
+    Parts(Vec<Part>),
+}
+
+/// A part of a tool's answer.
+#[derive(Debug, Clone)]
+pub(crate) enum Part {
+    Text(String),
+    Jpeg(Vec<u8>),
+    /// Sound, as a WAV file.
+    Wav(Vec<u8>),
 }
 
 impl Output {
@@ -84,6 +103,26 @@ impl Output {
                     { "type": "text", "text": note },
                 ],
             }),
+            Output::Parts(parts) => {
+                let encode = |bytes: &[u8]| base64::engine::general_purpose::STANDARD.encode(bytes);
+                let content: Vec<Value> = parts
+                    .iter()
+                    .map(|part| match part {
+                        Part::Text(text) => json!({ "type": "text", "text": text }),
+                        Part::Jpeg(jpeg) => json!({
+                            "type": "image",
+                            "data": encode(jpeg),
+                            "mimeType": "image/jpeg",
+                        }),
+                        Part::Wav(wav) => json!({
+                            "type": "audio",
+                            "data": encode(wav),
+                            "mimeType": "audio/wav",
+                        }),
+                    })
+                    .collect();
+                json!({ "content": content })
+            }
         }
     }
 }
@@ -316,7 +355,7 @@ struct Open {
 
 /// Every tool, in the order agents see them.
 static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
-    vec![
+    let mut tools = vec![
         tool(
             "list_windows",
             "List windows",
@@ -751,7 +790,9 @@ static TOOLS: LazyLock<Vec<Tool>> = LazyLock::new(|| {
                 Err(error) => reply(answer, Err(error)),
             },
         ),
-    ]
+    ];
+    tools.extend(media::tools());
+    tools
 });
 
 /// The longest side of the pictures get_frame gives.
@@ -1151,7 +1192,9 @@ pub(super) fn takes_window(name: &str) -> bool {
 fn annotations(kind: Kind) -> Value {
     match kind {
         Kind::Read => json!({ "readOnlyHint": true }),
-        Kind::Play | Kind::Open => json!({ "readOnlyHint": false, "destructiveHint": false }),
+        Kind::Play | Kind::Open | Kind::Edit => {
+            json!({ "readOnlyHint": false, "destructiveHint": false })
+        }
     }
 }
 

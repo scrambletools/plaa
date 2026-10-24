@@ -192,10 +192,15 @@ pub struct PlayerWindow {
     pub zoom: crate::video::Zoom,
     /// The file's chapters as they fall in the edit.
     pub chapters: Vec<Chapter>,
-    /// Pictures along the file for the editing bars' filmstrips, by the
-    /// file's time, as they come and as they show.
-    pub strip: Vec<(f64, Arc<Picture>)>,
+    /// Pictures along the files for the editing bars' filmstrips, by file,
+    /// 0 for the window's own, and time, as they come and as they show.
+    pub strip: Vec<(usize, f64, Arc<Picture>)>,
     pub stills: Vec<Still>,
+    /// The other files an edit has taken pictures from, numbered from 1
+    /// in the stills.
+    pub files: Vec<OtherFile>,
+    /// Opens another file's thumbnails, numbered as `files` numbers it.
+    pub open_thumbnails: Option<Box<dyn Fn(usize, std::path::PathBuf) -> Thumbnails>>,
     /// Reads a sound file's waveform, once it is to be shown.
     pub waveform: Option<Waveform>,
     /// The waveform read so far.
@@ -241,6 +246,8 @@ impl PlayerWindow {
             chapters: Vec::new(),
             strip: Vec::new(),
             stills: Vec::new(),
+            files: Vec::new(),
+            open_thumbnails: None,
             waveform: None,
             shape: None,
             visualizer: Visualizer::default(),
@@ -301,15 +308,21 @@ impl PlayerWindow {
         self.chapters = self.editor.chapters(chapters);
     }
 
-    /// Notes a picture for the filmstrips, as it shows.
-    pub fn add_still(&mut self, seconds: f64, picture: Arc<Picture>) {
-        let at = self.strip.partition_point(|(time, _)| *time < seconds);
-        if self.strip.get(at).is_some_and(|(time, _)| *time == seconds) {
+    /// Notes a picture of file `file` for the filmstrips, as it shows.
+    pub fn add_still(&mut self, file: usize, seconds: f64, picture: Arc<Picture>) {
+        let at = self
+            .strip
+            .partition_point(|(of, time, _)| *of < file || (*of == file && *time < seconds));
+        if self
+            .strip
+            .get(at)
+            .is_some_and(|(of, time, _)| *of == file && *time == seconds)
+        {
             return;
         }
         self.stills
-            .insert(at, still(seconds, &picture, self.transform()));
-        self.strip.insert(at, (seconds, picture));
+            .insert(at, still(file, seconds, &picture, self.transform()));
+        self.strip.insert(at, (file, seconds, picture));
     }
 
     /// Turns the filmstrips' pictures again after the edit turned or
@@ -319,8 +332,35 @@ impl PlayerWindow {
         self.stills = self
             .strip
             .iter()
-            .map(|(seconds, picture)| still(*seconds, picture, transform))
+            .map(|(file, seconds, picture)| still(*file, *seconds, picture, transform))
             .collect();
+    }
+
+    /// The number the stills know file `source` of the edit by, 0 for the
+    /// window's own, opening its thumbnails the first time.
+    pub fn still_file(&mut self, source: usize) -> Option<usize> {
+        if source == plaa_media::OWN {
+            return Some(0);
+        }
+        let path = self.editor.edit()?.other(source)?.path.clone();
+        if let Some(index) = self.files.iter().position(|file| file.path == path) {
+            return Some(index + 1);
+        }
+        let open = self.open_thumbnails.as_ref()?;
+        let number = self.files.len() + 1;
+        self.files.push(OtherFile {
+            thumbnails: open(number, path.clone()),
+            path,
+        });
+        Some(number)
+    }
+
+    /// The thumbnails of file `file`, as the stills number them.
+    pub fn thumbnails_of(&self, file: usize) -> Option<&Thumbnails> {
+        match file.checked_sub(1) {
+            None => self.thumbnails.as_ref(),
+            Some(index) => self.files.get(index).map(|file| &file.thumbnails),
+        }
     }
 
     /// The name to show: for a stream, its title as the page, the stream
@@ -987,7 +1027,7 @@ fn edit_bar(window: &PlayerWindow, mode: Mode) -> Element<'_, Control> {
                 TrimBar::new(
                     &window.player,
                     &window.editor,
-                    &window.stills,
+                    (&window.stills, &window.files),
                     span,
                     (from, to),
                     Control::TrimTo,
@@ -1011,7 +1051,7 @@ fn edit_bar(window: &PlayerWindow, mode: Mode) -> Element<'_, Control> {
                 ClipStrip::new(
                     &window.player,
                     &window.editor,
-                    &window.stills,
+                    (&window.stills, &window.files),
                     selected,
                     Control::SelectClip,
                     Control::SeekTo,
@@ -1935,10 +1975,17 @@ fn inspector<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Con
     )
 }
 
+/// Another file an edit takes pictures from, and its thumbnails.
+pub struct OtherFile {
+    pub path: std::path::PathBuf,
+    pub thumbnails: Thumbnails,
+}
+
 /// A filmstrip's picture, turned and flipped as `transform` says.
-fn still(seconds: f64, picture: &Picture, transform: Transform) -> Still {
+fn still(file: usize, seconds: f64, picture: &Picture, transform: Transform) -> Still {
     let shown = picture.clone().transformed(transform);
     Still {
+        file,
         seconds,
         aspect: shown.width as f32 / shown.height.max(1) as f32,
         handle: image::Handle::from_rgba(shown.width, shown.height, shown.rgba),

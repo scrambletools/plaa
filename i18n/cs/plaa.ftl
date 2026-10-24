@@ -603,6 +603,7 @@ settings-ask-before-note = Zeptat se, než agent:
 settings-ask-reading = Uvidí, co se přehrává, nebo obraz
 settings-ask-playing = Bude ovládat přehrávání, zvuk nebo režim celé obrazovky
 settings-ask-opening = Otevře soubor nebo zavře okno
+settings-ask-editing = Upraví soubor nebo ho exportuje
 # $agent is the agent's name, such as Claude Code.
 agent-prompt-title = Povolit agentovi { $agent } ovládat plaa?
 agent-prompt-body = { $agent } žádá o použití vnějšího ovládání plaa, aby viděl, co plaa přehrává, a mohl ho ovládat. Vnější ovládání můžete vypnout v Nastavení.
@@ -612,6 +613,7 @@ agent-prompt-deny = Nepovolit
 agent-ask-read = Povolit agentovi { $agent } vidět, co se zde přehrává?
 agent-ask-play = Povolit agentovi { $agent } ovládat zde přehrávání?
 agent-ask-open = Povolit agentovi { $agent } otevřít nebo zavřít okno?
+agent-ask-edit = Povolit agentovi { $agent } zde upravovat nebo exportovat?
 # $tool is the name of what the agent asks to do, such as Seek.
 agent-ask-body = { $agent } žádá o použití nástroje „{ $tool }“. V Nastavení zvolíte, na co se plaa ptá.
 

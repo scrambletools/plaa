@@ -16,11 +16,15 @@ use plaa_media::edit::SHORTEST;
 use scramble_ui::Scheme;
 
 use crate::editing::Editor;
+use crate::window::OtherFile;
+use plaa_media::OWN;
 
-/// A picture of the movie for a filmstrip: the file's time it was asked
-/// for, and the picture as it shows, turned and flipped as edited.
+/// A picture of the movie for a filmstrip: the file it is of, 0 for the
+/// window's own, the file's time it was asked for, and the picture as it
+/// shows, turned and flipped as edited.
 #[derive(Debug, Clone)]
 pub struct Still {
+    pub file: usize,
     pub seconds: f64,
     pub handle: image::Handle,
     /// Its width over its height.
@@ -43,11 +47,17 @@ const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 /// redraw the window as they show.
 const PLAYHEAD_REDRAW: Duration = Duration::from_millis(33);
 
-/// The still nearest the file's time `seconds`, of stills in time order.
-fn nearest(stills: &[Still], seconds: f64) -> Option<&Still> {
-    let after = stills.partition_point(|still| still.seconds < seconds);
-    let before = after.checked_sub(1).and_then(|index| stills.get(index));
-    match (before, stills.get(after)) {
+/// The still of file `file` nearest its time `seconds`, of stills in
+/// order of file, then time.
+fn nearest(stills: &[Still], file: usize, seconds: f64) -> Option<&Still> {
+    let after = stills.partition_point(|still| {
+        still.file < file || (still.file == file && still.seconds < seconds)
+    });
+    let before = after
+        .checked_sub(1)
+        .and_then(|index| stills.get(index))
+        .filter(|still| still.file == file);
+    match (before, stills.get(after).filter(|still| still.file == file)) {
         (Some(before), Some(after)) => {
             Some(if seconds - before.seconds <= after.seconds - seconds {
                 before
@@ -66,7 +76,7 @@ fn filmstrip(
     renderer: &mut iced::Renderer,
     bounds: Rectangle,
     (from, to): (f64, f64),
-    stills: &[Still],
+    (stills, files): (&[Still], &[OtherFile]),
     editor: &Editor,
     empty: Color,
 ) {
@@ -96,19 +106,37 @@ fn filmstrip(
             let x = bounds.x + index as f32 * tile;
             let share = ((index as f32 + 0.5) * tile / bounds.width).min(1.0);
             let middle = from + (to - from) * f64::from(share);
-            let Some(still) = nearest(stills, editor.source_of(middle)) else {
+            let place = Rectangle {
+                x,
+                y: bounds.y,
+                width: tile,
+                height: bounds.height,
+            };
+            // What shows there: a part made black, or a file's picture.
+            let Some((source, seconds)) = editor.picture_at(middle) else {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: place,
+                        snap: true,
+                        ..renderer::Quad::default()
+                    },
+                    Color::BLACK,
+                );
                 continue;
             };
-            renderer.draw_image(
-                image::Image::new(still.handle.clone()),
-                Rectangle {
-                    x,
-                    y: bounds.y,
-                    width: tile,
-                    height: bounds.height,
-                },
-                bounds,
-            );
+            let file = if source == OWN {
+                Some(0)
+            } else {
+                editor
+                    .edit()
+                    .and_then(|edit| edit.other(source))
+                    .and_then(|other| files.iter().position(|file| file.path == other.path))
+                    .map(|index| index + 1)
+            };
+            let Some(still) = file.and_then(|file| nearest(stills, file, seconds)) else {
+                continue;
+            };
+            renderer.draw_image(image::Image::new(still.handle.clone()), place, bounds);
         }
     });
 }
@@ -182,7 +210,7 @@ struct TrimState {
 pub struct TrimBar<'a, Message> {
     player: &'a Player,
     editor: &'a Editor,
-    stills: &'a [Still],
+    stills: (&'a [Still], &'a [OtherFile]),
     span: (f64, f64),
     kept: (f64, f64),
     on_trim: Box<dyn Fn(f64, f64, f64) -> Message + 'a>,
@@ -200,7 +228,7 @@ impl<'a, Message> TrimBar<'a, Message> {
     pub fn new(
         player: &'a Player,
         editor: &'a Editor,
-        stills: &'a [Still],
+        stills: (&'a [Still], &'a [OtherFile]),
         span: (f64, f64),
         kept: (f64, f64),
         on_trim: impl Fn(f64, f64, f64) -> Message + 'a,
@@ -578,7 +606,7 @@ struct ClipState {
 pub struct ClipStrip<'a, Message> {
     player: &'a Player,
     editor: &'a Editor,
-    stills: &'a [Still],
+    stills: (&'a [Still], &'a [OtherFile]),
     selected: Option<usize>,
     on_select: Box<dyn Fn(Option<usize>) -> Message + 'a>,
     on_seek: Box<dyn Fn(f64) -> Message + 'a>,
@@ -592,7 +620,7 @@ impl<'a, Message> ClipStrip<'a, Message> {
     pub fn new(
         player: &'a Player,
         editor: &'a Editor,
-        stills: &'a [Still],
+        stills: (&'a [Still], &'a [OtherFile]),
         selected: Option<usize>,
         on_select: impl Fn(Option<usize>) -> Message + 'a,
         on_seek: impl Fn(f64) -> Message + 'a,

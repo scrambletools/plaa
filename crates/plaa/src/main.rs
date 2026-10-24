@@ -66,7 +66,8 @@ pub enum External {
     /// The files dropped on a window have all arrived.
     DropsGathered(iced::window::Id),
     /// A picture for a window's timeline.
-    Thumbnail(iced::window::Id, plaa_media::Thumbnail),
+    /// A picture of window's file, 0, or of another its edit takes from.
+    Thumbnail(iced::window::Id, usize, plaa_media::Thumbnail),
     /// The AVB network changed, as plaa's controller sees it.
     Avb,
     /// The waveform of a window's sound file, as far as it is read.
