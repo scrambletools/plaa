@@ -354,19 +354,18 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
         .width(Fill)
         .height(Fill)
         .style(style::surface);
-    let body: Element<'a, RecorderControl> = match (&context.avb, recorder.network) {
+    let window: Element<'a, RecorderControl> = match (&context.avb, recorder.network) {
         (Some(snapshot), true) => iced::widget::row![
-            body,
+            column![toolbar, body],
             crate::network::sheet(snapshot.clone(), recorder.menu, recorder.listener)
                 .map(RecorderControl::Window)
         ]
         .into(),
-        _ => body.into(),
+        _ => column![toolbar, body].into(),
     };
-    let window = column![toolbar, body];
     match &recorder.naming {
         Some(naming) => stack![window, naming_dialog(naming)].into(),
-        None => window.into(),
+        None => window,
     }
 }
 

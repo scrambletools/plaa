@@ -163,6 +163,10 @@ impl Plaa {
         });
         panel.open = !panel.open;
         let (open, input) = (panel.open, panel.input_id.clone());
+        // The side has room for one panel: a sheet open closes.
+        if open && let super::super::Content::Player(player) = &mut window.content {
+            player.sheet = None;
+        }
         if open {
             operation::focus(input)
         } else {

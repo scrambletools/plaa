@@ -38,6 +38,12 @@
   fades; it plays at once, exports, and is heard by `get_sound` and
   `get_levels`. `remove_mix` takes it out.
 
+### Changed
+
+- One panel at a time at a window's side: the inspector, the playlist,
+  the network sheet and the assistant each close the one open before,
+  and each runs the window's full height, beside the toolbars.
+
 ## [0.1.0] - 2026-10-23
 
 The first release.

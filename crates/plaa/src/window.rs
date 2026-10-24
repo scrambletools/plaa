@@ -610,18 +610,7 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
         Some(cue) => stack![picture, subtitle_view(cue, window, context)].into(),
         None => picture.into(),
     };
-    let with_subtitles = with_spinner(with_subtitles, window);
-    let body: Element<'a, Control> = match sheet(window, context) {
-        Some(sheet) => {
-            let sheet = component::between_bars(
-                sheet,
-                component::floating_room(true),
-                component::floating_room(true),
-            );
-            iced::widget::row![with_subtitles, sheet].into()
-        }
-        None => with_subtitles,
-    };
+    let body = with_spinner(with_subtitles, window);
     component::window_bars(
         component::toolbar(toolbar(window, context)),
         Some(component::toolbar(transport(window, context))),
@@ -1569,10 +1558,6 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
     let body = container(middle).center(Fill).style(style::surface);
     let body = with_spinner(body.into(), window);
     if !component::floating_bars_enabled() {
-        let body: Element<'a, Control> = match sheet(window, context) {
-            Some(sheet) => iced::widget::row![body, sheet].into(),
-            None => body,
-        };
         return column![
             docked(toolbar(window, context)),
             body,
@@ -1582,17 +1567,6 @@ fn audio_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
     }
     // Floating, the bars come and go as over a picture.
     let body = crate::watch::watch(body, window.activity.clone(), Control::Activity);
-    let body: Element<'a, Control> = match sheet(window, context) {
-        Some(sheet) => {
-            let sheet = component::between_bars(
-                sheet,
-                component::floating_room(true),
-                component::floating_room(true),
-            );
-            iced::widget::row![body, sheet].into()
-        }
-        None => body,
-    };
     component::window_bars(
         component::toolbar(toolbar(window, context)),
         Some(component::toolbar(transport(window, context))),
@@ -1665,17 +1639,6 @@ fn prism_view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Co
         .height(Fill)
         .align_bottom(Fill);
     let body = with_spinner(stack![scene, tag].into(), window);
-    let body: Element<'a, Control> = match sheet(window, context) {
-        Some(sheet) => {
-            let sheet = component::between_bars(
-                sheet,
-                component::floating_room(true),
-                component::floating_room(true),
-            );
-            iced::widget::row![body, sheet].into()
-        }
-        None => body,
-    };
     component::window_bars(
         component::toolbar(toolbar(window, context)),
         Some(component::toolbar(transport(window, context))),
@@ -1755,8 +1718,12 @@ fn docked<'a>(content: Element<'a, Control>) -> Element<'a, Control> {
         .into()
 }
 
-/// The sheet beside the picture, if one is open.
-fn sheet<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, Control>> {
+/// The sheet beside the window, the whole of its height, if one is open:
+/// none in picture in picture.
+pub fn side_sheet<'a>(window: &'a PlayerWindow, context: &Context) -> Option<Element<'a, Control>> {
+    if context.pip {
+        return None;
+    }
     match window.sheet? {
         Sheet::Inspector => Some(inspector(window, context)),
         Sheet::Playlist => Some(playlist_sheet(window)),

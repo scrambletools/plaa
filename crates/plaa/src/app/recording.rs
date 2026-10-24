@@ -368,22 +368,29 @@ impl Plaa {
             }
             Control::ToggleNetwork => {
                 recorder.network = !recorder.network;
-                let wider = if recorder.network { 1.0 } else { -1.0 };
-                widen(
-                    id,
-                    window.size,
-                    wider * scramble_ui::component::SIDE_SHEET_WIDTH,
-                )
+                // The side has room for one panel: the assistant's closes,
+                // and the sheet takes its place.
+                let mut wider = scramble_ui::component::SIDE_SHEET_WIDTH;
+                if !recorder.network {
+                    wider = -wider;
+                } else if let Some(panel) = window.assistant.as_mut().filter(|panel| panel.open) {
+                    panel.open = false;
+                    wider -= super::assistant::PANEL_WIDTH;
+                }
+                widen(id, window.size, wider)
             }
             Control::ToggleAssistant => {
                 let was_open = window.assistant.as_ref().is_some_and(|panel| panel.open);
                 let size = window.size;
-                let wider = if was_open { -1.0 } else { 1.0 };
-                self.toggle_assistant(id).chain(widen(
-                    id,
-                    size,
-                    wider * super::assistant::PANEL_WIDTH,
-                ))
+                let mut wider = super::assistant::PANEL_WIDTH;
+                if was_open {
+                    wider = -wider;
+                } else if recorder.network {
+                    // The Network Audio sheet gives the assistant its place.
+                    recorder.network = false;
+                    wider -= scramble_ui::component::SIDE_SHEET_WIDTH;
+                }
+                self.toggle_assistant(id).chain(widen(id, size, wider))
             }
             control => {
                 recorder.menu = None;

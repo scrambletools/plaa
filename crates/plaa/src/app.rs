@@ -1795,6 +1795,14 @@ impl Plaa {
                 return crate::settings_view::refresh_default_app_status();
             }
             Action::PictureInPicture => return self.toggle_pip(id),
+            Action::Info => {
+                self.toggle_sheet(id, Sheet::Inspector);
+                return Task::none();
+            }
+            Action::Playlist => {
+                self.toggle_sheet(id, Sheet::Playlist);
+                return Task::none();
+            }
             Action::RecordSound => return self.open_recorder(id),
             Action::RecordScreen => return self.open_screen_recorder(id),
             Action::RecordCamera => return self.open_camera_recorder(id),
@@ -1837,12 +1845,6 @@ impl Plaa {
             .and_then(|track| track.frame_rate)
             .map_or(1.0 / 25.0, |rate| 1.0 / rate);
         match action {
-            Action::Info => player.toggle_sheet(Sheet::Inspector),
-            Action::Playlist => {
-                if player.playlist.is_list() {
-                    player.toggle_sheet(Sheet::Playlist);
-                }
-            }
             Action::PlayPause => player.player.toggle(),
             Action::Back => player.player.seek_by(-player_window::SKIP_SHORT),
             Action::Forward => player.player.seek_by(player_window::SKIP_SHORT),
@@ -2007,7 +2009,37 @@ impl Plaa {
         )
     }
 
+    /// Opens sheet `sheet` beside window `id`, or closes it. The side has
+    /// room for one panel, so the assistant's closes as a sheet opens.
+    fn toggle_sheet(&mut self, id: window::Id, sheet: Sheet) {
+        let Some(window) = self.windows.get_mut(&id) else {
+            return;
+        };
+        let Content::Player(player) = &mut window.content else {
+            return;
+        };
+        if sheet == Sheet::Playlist && !player.playlist.is_list() {
+            return;
+        }
+        player.toggle_sheet(sheet);
+        if player.sheet.is_some()
+            && let Some(panel) = &mut window.assistant
+        {
+            panel.open = false;
+        }
+    }
+
     fn control(&mut self, id: window::Id, control: Control) -> Task<Message> {
+        let sheet = match control {
+            Control::ToggleInspector => Some(Sheet::Inspector),
+            Control::TogglePlaylist => Some(Sheet::Playlist),
+            Control::ToggleNetwork => Some(Sheet::Network),
+            _ => None,
+        };
+        if let Some(sheet) = sheet {
+            self.toggle_sheet(id, sheet);
+            return Task::none();
+        }
         // Media keys go on acting on the player last used, not on a start
         // or recording window's menus.
         if !matches!(control, Control::Hover(_) | Control::Activity)
@@ -2244,9 +2276,6 @@ impl Plaa {
                 player.menu = if open { Some(menu) } else { None::<Menu> };
             }
             Control::Overflow(open) => player.overflow_open = open,
-            Control::ToggleInspector => player.toggle_sheet(Sheet::Inspector),
-            Control::TogglePlaylist => player.toggle_sheet(Sheet::Playlist),
-            Control::ToggleNetwork => player.toggle_sheet(Sheet::Network),
             Control::AvbChoose(listener) => player.listener = Some(listener),
             Control::ToggleLoop => player.looping = !player.looping,
             Control::Activity => {}
@@ -2358,6 +2387,16 @@ impl Plaa {
             return space().into();
         };
         let close_button = !scramble_ui::desktop::draws_title_bars();
+        let player_context = player_window::Context {
+            fullscreen: window.fullscreen,
+            pip: window.pip.is_some(),
+            width: window.size.width,
+            scale: window.scale,
+            close_button,
+            avb: self.avb.as_ref().map(|_| self.avb_snapshot.clone()),
+            renderers: self.renderers.clone(),
+            assistant_open: window.assistant.as_ref().is_some_and(|panel| panel.open),
+        };
         let body: Element<'_, Message> = match &window.content {
             Content::Start => {
                 let connect = self
@@ -2367,20 +2406,8 @@ impl Plaa {
                 start_view(id, close_button, connect)
             }
             Content::Recorder(recorder) => self.recorder_view(id, recorder, close_button),
-            Content::Player(player) => player_window::view(
-                player,
-                &player_window::Context {
-                    fullscreen: window.fullscreen,
-                    pip: window.pip.is_some(),
-                    width: window.size.width,
-                    scale: window.scale,
-                    close_button,
-                    avb: self.avb.as_ref().map(|_| self.avb_snapshot.clone()),
-                    renderers: self.renderers.clone(),
-                    assistant_open: window.assistant.as_ref().is_some_and(|panel| panel.open),
-                },
-            )
-            .map(move |control| Message::Control(id, control)),
+            Content::Player(player) => player_window::view(player, &player_context)
+                .map(move |control| Message::Control(id, control)),
         };
         // Layers over the window are always in the tree, empty when not
         // shown, so opening one keeps the state underneath.
@@ -2462,8 +2489,16 @@ impl Plaa {
         } else {
             body
         };
-        // The assistant's panel beside what plays, when open.
-        let body: Element<'_, Message> = match self.panel_view(id) {
+        // The one panel at the side, the window's whole height: the
+        // assistant's, or a sheet such as the inspector.
+        let side = self.panel_view(id).or_else(|| {
+            let player = window.player()?;
+            Some(
+                player_window::side_sheet(player, &player_context)?
+                    .map(move |control| Message::Control(id, control)),
+            )
+        });
+        let body: Element<'_, Message> = match side {
             Some(panel) => iced::widget::row![body, panel].into(),
             None => body,
         };
