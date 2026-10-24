@@ -261,7 +261,9 @@ hardware clock, as triib's units run it. Where none runs, plaa starts
 its own, `plaa-ptp4l@<interface>`, which its packages install with a
 polkit rule letting the person at the computer start it, and which
 gives way to triib's; Network Audio says when ptp4l keeps no time for
-plaa's stream, and why. Where triib's entity service
+plaa's stream, and why. For dev builds, `scripts/dev-ptp4l.sh` installs
+the services and the rule under `/usr/local` and `/etc`, and
+`scripts/dev-ptp4l.sh remove` takes them out before a package goes in. Where triib's entity service
 runs on the interface, plaa reserves its stream in the service's MRP
 participant, which the service shares, as two on one port withdraw each
 other's declarations; beside an older service, which does not share it,
