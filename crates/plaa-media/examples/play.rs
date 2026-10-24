@@ -57,7 +57,7 @@ fn main() {
     while let Some(option) = arguments.next_if(|argument| {
         matches!(
             argument.as_str(),
-            "--insert" | "--sound" | "--picture" | "--picture-filter" | "--sound-filter"
+            "--insert" | "--sound" | "--picture" | "--picture-filter" | "--sound-filter" | "--mix"
         )
     }) {
         if let Some(value) = arguments.next() {
@@ -89,7 +89,22 @@ fn main() {
                 let info = MediaInfo::probe(&path).expect("a file plaa reads");
                 edit.add_other(Other::new(path, &info))
             };
-            if option == "--picture-filter" || option == "--sound-filter" {
+            if option == "--mix" {
+                let Some((file, at)) = value.rsplit_once('@') else {
+                    continue;
+                };
+                let source = other(&mut edit, PathBuf::from(file));
+                let length = edit.other(source).map_or(0.0, |other| other.duration);
+                edit.add_layer(plaa_media::edit::Layer {
+                    source,
+                    at: at.parse().unwrap_or(0.0),
+                    from: 0.0,
+                    to: length,
+                    volume: -6.0,
+                    fade_in: 0.5,
+                    fade_out: 0.5,
+                });
+            } else if option == "--picture-filter" || option == "--sound-filter" {
                 let duration = edit.duration();
                 let filters = Some(value.clone());
                 let added = if option == "--picture-filter" {

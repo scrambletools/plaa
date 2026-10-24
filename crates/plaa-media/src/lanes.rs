@@ -77,10 +77,9 @@ impl Mixed {
     /// has no sound.
     pub fn first_sound(&self) -> Option<(PathBuf, usize)> {
         let lane = self.lanes.iter().find(|lane| lane.track == Track::Sound)?;
-        lane.spans.iter().find_map(|span| {
-            let source = span.source.filter(|source| *source != OWN)?;
-            Some((self.edit.other(source)?.path.clone(), source))
-        })
+        let sources: Vec<usize> = lane.spans.iter().filter_map(|span| span.source).collect();
+        let source = self.edit.first_other_sound(&sources)?;
+        Some((self.edit.other(source)?.path.clone(), source))
     }
 
     /// Moves every lane to `position` of the edited time, for the seek

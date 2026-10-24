@@ -656,6 +656,7 @@ pub(crate) fn spawn_audio(
         placed: None,
         sound_filter: crate::filter::SoundFilter::default(),
         chain: Chain::default(),
+        layers: None,
     };
     let thread = std::thread::Builder::new()
         .name("plaa-audio".into())
@@ -693,6 +694,8 @@ struct AudioDecoder {
     /// The filters the part playing goes through, and their graph.
     sound_filter: crate::filter::SoundFilter,
     chain: Chain,
+    /// Sound the edit mixes in, read from its files once needed.
+    layers: Option<crate::layer::Layers>,
 }
 
 /// The most silence pushed at once, in seconds.
@@ -770,6 +773,8 @@ impl AudioDecoder {
             self.cursor = None;
             self.sound_filter.reset();
             self.chain.forget();
+            // The edit, and so what it mixes in, may be another.
+            self.layers = None;
             // After a seek, sound is placed from where it lands.
             if fresh {
                 self.placed = self
@@ -832,20 +837,44 @@ impl AudioDecoder {
         }
     }
 
-    /// Plays silence from `from` to `to` seconds of the edited time.
+    /// Adds the sound the edit mixes in to `samples`, from `position`
+    /// seconds of the edited time on, `step` seconds apart.
+    fn mix_layers(&mut self, samples: &mut [f32], position: f64, step: f64) {
+        if self.layers.is_none() {
+            let edit = self
+                .shared
+                .edit
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            self.layers = Some(crate::layer::Layers::new(
+                edit.as_deref(),
+                self.shared.file.as_deref(),
+                self.output.rate,
+                self.output.channels,
+            ));
+        }
+        if let Some(layers) = &mut self.layers
+            && !layers.is_empty()
+        {
+            layers.add(samples, position, step, self.shared.speed());
+        }
+    }
+
+    /// Plays silence from `from` to `to` seconds of the edited time, and
+    /// what the edit mixes in there.
     fn silence(&mut self, from: f64, to: f64) {
         let channels = usize::from(self.output.channels.max(1));
         let step = self.shared.speed() / f64::from(self.output.rate);
         let mut at = from;
         while at < to - step / 2.0 && !self.shared.stopping() {
             let frames = (((to - at).min(SILENCE_CHUNK)) / step).round().max(1.0) as usize;
-            if !self.output.push(
-                self.serial,
-                at,
-                step,
-                vec![0.0; frames * channels],
-                &self.shared.stop,
-            ) {
+            let mut samples = vec![0.0; frames * channels];
+            self.mix_layers(&mut samples, at, step);
+            if !self
+                .output
+                .push(self.serial, at, step, samples, &self.shared.stop)
+            {
                 return;
             }
             at += frames as f64 * step;
@@ -1056,6 +1085,7 @@ impl AudioDecoder {
                 continue;
             }
             let frames = samples.len() / channels;
+            self.mix_layers(&mut samples, position, step);
             if !self
                 .output
                 .push(self.serial, position, step, samples, &self.shared.stop)
@@ -1069,7 +1099,7 @@ impl AudioDecoder {
 
 /// abuffer, then `atempo` for any speed but normal, then the output's
 /// sample format, rate and channels.
-fn build_graph(
+pub(crate) fn build_graph(
     frame: &ffmpeg::frame::Audio,
     time_base: ffmpeg::Rational,
     tempo: f64,

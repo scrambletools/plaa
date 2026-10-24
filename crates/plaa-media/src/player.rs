@@ -265,6 +265,8 @@ pub(crate) struct Shared {
     /// The edit playing mixes files, so its picture and sound are read
     /// apart, and sound is placed exactly.
     pub mixed: AtomicBool,
+    /// The file playing, if it is one, for sound an edit mixes in from it.
+    pub file: Option<PathBuf>,
     pub state: Mutex<State>,
 }
 
@@ -402,6 +404,10 @@ impl Player {
             quality: Mutex::new(options.quality),
             edit: Mutex::new(None),
             mixed: AtomicBool::new(false),
+            file: match &source {
+                Source::File(path) => Some(path.clone()),
+                _ => None,
+            },
             state: Mutex::new(State::default()),
         });
         let (commands, receiver) = mpsc::channel();

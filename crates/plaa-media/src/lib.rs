@@ -15,6 +15,7 @@ pub mod frame;
 pub mod info;
 mod inputs;
 mod lanes;
+mod layer;
 mod mix;
 pub mod player;
 mod queue;

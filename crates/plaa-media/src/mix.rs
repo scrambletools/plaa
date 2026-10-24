@@ -46,11 +46,8 @@ pub(crate) fn run(
     let lanes = edit.lanes((picture_stream.is_some(), own_sound.is_some()));
     // Sound from another file needs a sound stream, even where the file
     // edited has none.
-    let other_sound = lanes
-        .sound
-        .iter()
-        .filter_map(|span| span.source)
-        .find(|source| *source != OWN);
+    let sources: Vec<usize> = lanes.sound.iter().filter_map(|span| span.source).collect();
+    let other_sound = edit.first_other_sound(&sources);
     let sound_from = match (own_sound, other_sound) {
         (Some(index), _) => Some(Opened::Own(index)),
         (None, Some(source)) => edit
@@ -93,9 +90,9 @@ pub(crate) fn run(
     let mut sound_sink = match sound_from {
         Some(from) => Some(SoundSink::new(
             &from,
-            &main,
-            &info,
+            (&main, &info),
             (sound, quality),
+            (edit, &job.source),
             &mut context,
             global_header,
         )?),
@@ -863,14 +860,16 @@ struct SoundSink {
     graph: ffmpeg::filter::Graph,
     /// The edited time sound has been placed up to, in samples.
     next: i64,
+    /// Sound the edit mixes in.
+    layers: crate::layer::Layers,
 }
 
 impl SoundSink {
     fn new(
         from: &Opened,
-        main: &ffmpeg::format::context::Input,
-        info: &MediaInfo,
+        (main, info): (&ffmpeg::format::context::Input, &MediaInfo),
         (sound, quality): (Sound, u32),
+        (edit, file): (&Edit, &Path),
         context: &mut ffmpeg::format::context::Output,
         global_header: bool,
     ) -> Result<Self, ExportError> {
@@ -923,6 +922,7 @@ impl SoundSink {
             converter: None,
             graph,
             next: 0,
+            layers: crate::layer::Layers::new(Some(edit), Some(file), rate, channels),
         })
     }
 
@@ -1011,7 +1011,18 @@ impl SoundSink {
         frame: &ffmpeg::frame::Audio,
         output: &mut Output,
     ) -> Result<(), ExportError> {
-        self.next = frame.pts().unwrap_or(self.next) + frame.samples() as i64;
+        let at = frame.pts().unwrap_or(self.next);
+        self.next = at + frame.samples() as i64;
+        // What the edit mixes in joins it here.
+        let mixed;
+        let frame = if self.layers.is_empty() {
+            frame
+        } else {
+            let mut copy = frame.clone();
+            self.layers.add_planar(&mut copy, at);
+            mixed = copy;
+            &mixed
+        };
         if let Some(mut source) = self.graph.get("in") {
             source.source().add(frame).map_err(failed)?;
         }

@@ -344,6 +344,21 @@ pub fn sound(
     each: &mut dyn FnMut(&[f32]),
 ) -> Result<(), String> {
     crate::init();
+    // Sound the edit mixes in joins what is read, as it comes.
+    let mut layers = crate::layer::Layers::new(edited.edit, Some(edited.path), rate, 1);
+    let mut at = from;
+    let step = 1.0 / f64::from(rate);
+    let mut mixed = |chunk: &[f32]| {
+        if layers.is_empty() {
+            each(chunk);
+        } else {
+            let mut chunk = chunk.to_vec();
+            layers.add(&mut chunk, at, step, 1.0);
+            each(&chunk);
+        }
+        at += chunk.len() as f64 * step;
+    };
+    let each: &mut dyn FnMut(&[f32]) = &mut mixed;
     let parts = sound_parts(edited, from, to);
     let mut written = 0usize;
     let total = ((to - from).max(0.0) * f64::from(rate)).round() as usize;

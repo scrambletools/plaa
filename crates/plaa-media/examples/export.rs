@@ -6,7 +6,7 @@
 //! <quarter turns>] [--mirror] [--streams <picture>,<sound>] [--insert
 //! <file>@<at>] [--sound <file>@<from>-<to>] [--picture <file>@<from>-<to>]
 //! [--picture-filter <filters>[@<from>-<to>]] [--sound-filter
-//! <filters>[@<from>-<to>]] <file> <to>
+//! <filters>[@<from>-<to>]] [--mix <file>@<at>] <file> <to>
 //!
 //! The streams are the picture's and the sound's numbers in the file, 0
 //! and 1 unless given, `-` for none. --insert puts another file in at a
@@ -27,6 +27,7 @@ enum Change {
     Insert(PathBuf, f64),
     Replace(Track, Option<PathBuf>, f64, f64),
     Filter(Track, String, Option<(f64, f64)>),
+    Mix(PathBuf, f64),
 }
 
 /// `<filters>[@<from>-<to>]`.
@@ -117,6 +118,14 @@ fn main() {
                     changes.push(Change::Insert(file, at));
                 }
             }
+            "--mix" => {
+                if let Some((file, at)) = arguments.next().as_deref().and_then(|text| {
+                    let (file, at) = text.rsplit_once('@')?;
+                    Some((PathBuf::from(file), at.parse().ok()?))
+                }) {
+                    changes.push(Change::Mix(file, at));
+                }
+            }
             "--picture-filter" | "--sound-filter" => {
                 let track = if option == "--sound-filter" {
                     Track::Sound
@@ -171,6 +180,20 @@ fn main() {
                         ..Clip::new(0.0, length)
                     };
                     println!("insert at {at}: {}", edit.insert(at, clip));
+                }
+                Change::Mix(path, at) => {
+                    let source = other(&mut edit, path).unwrap_or_default();
+                    let length = edit.other(source).map_or(0.0, |other| other.duration);
+                    let layer = plaa_media::edit::Layer {
+                        source,
+                        at,
+                        from: 0.0,
+                        to: length,
+                        volume: -6.0,
+                        fade_in: 0.5,
+                        fade_out: 0.5,
+                    };
+                    println!("mix at {at}: {}", edit.add_layer(layer));
                 }
                 Change::Filter(track, filters, range) => {
                     let (from, to) = range.unwrap_or((0.0, edit.duration()));

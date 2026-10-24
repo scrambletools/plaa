@@ -221,6 +221,48 @@ pub struct Edit {
     transform: Transform,
     others: Vec<Other>,
     filters: Vec<Filters>,
+    layers: Vec<Layer>,
+}
+
+/// Sound mixed in over the edit: part of a file, heard with what plays
+/// from `at` seconds of the edited time, where it stays as clips change.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Layer {
+    /// The file, numbered as [`Clip::source`] is.
+    pub source: usize,
+    pub at: f64,
+    /// The part of the file, from and to seconds of it.
+    pub from: f64,
+    pub to: f64,
+    /// How much louder, in decibels: negative is quieter.
+    pub volume: f64,
+    /// Seconds it fades in over at its start, and out over at its end.
+    pub fade_in: f64,
+    pub fade_out: f64,
+}
+
+impl Layer {
+    /// Where it ends in the edited time.
+    pub fn end(&self) -> f64 {
+        self.at + (self.to - self.from).max(0.0)
+    }
+
+    /// How loud it is at `seconds` of the edited time, as a factor: its
+    /// volume, faded in and out; nothing outside it.
+    pub fn gain(&self, seconds: f64) -> f32 {
+        let end = self.end();
+        if seconds < self.at || seconds >= end {
+            return 0.0;
+        }
+        let mut gain = 10f64.powf(self.volume / 20.0);
+        if self.fade_in > 0.0 {
+            gain *= ((seconds - self.at) / self.fade_in).min(1.0);
+        }
+        if self.fade_out > 0.0 {
+            gain *= ((end - seconds) / self.fade_out).min(1.0);
+        }
+        gain as f32
+    }
 }
 
 /// Part of a file read in one go: clips one after another in a file play
@@ -281,6 +323,7 @@ impl Edit {
             transform: Transform::default(),
             others: Vec::new(),
             filters: Vec::new(),
+            layers: Vec::new(),
         }
     }
 
@@ -330,7 +373,43 @@ impl Edit {
     /// Whether a clip is from another file, or has its picture or sound
     /// replaced, so the picture and sound may be read apart.
     pub fn is_mixed(&self) -> bool {
-        self.clips.iter().any(|clip| !clip.is_own())
+        self.clips.iter().any(|clip| !clip.is_own()) || !self.layers.is_empty()
+    }
+
+    /// The sound mixed in over the edit, in the order it was added.
+    pub fn layers(&self) -> &[Layer] {
+        &self.layers
+    }
+
+    /// Mixes `layer` in. Returns whether it did: it must last at least
+    /// [`SHORTEST`] and start within the edit.
+    pub fn add_layer(&mut self, layer: Layer) -> bool {
+        if layer.to - layer.from < SHORTEST - 1e-9 || layer.at < 0.0 || layer.at >= self.duration()
+        {
+            return false;
+        }
+        self.layers.push(layer);
+        true
+    }
+
+    /// Takes mixed-in sound number `index` out.
+    pub fn remove_layer(&mut self, index: usize) -> bool {
+        if index >= self.layers.len() {
+            return false;
+        }
+        self.layers.remove(index);
+        true
+    }
+
+    /// A file the edit's sound may come from other than the file edited:
+    /// one its sound reads, else one mixed in.
+    pub fn first_other_sound(&self, sound_lane: &[usize]) -> Option<usize> {
+        sound_lane
+            .iter()
+            .copied()
+            .find(|source| *source != OWN)
+            .or_else(|| self.layers.first().map(|layer| layer.source))
+            .filter(|source| *source != OWN)
     }
 
     /// Whether a clip's picture or sound goes through filters.
@@ -441,6 +520,7 @@ impl Edit {
     /// is.
     pub fn is_whole(&self, duration: f64) -> bool {
         self.transform.is_identity()
+            && self.layers.is_empty()
             && matches!(self.clips.as_slice(), [only]
                 if only.is_plain()
                     && only.from <= 1e-6
@@ -457,7 +537,7 @@ impl Edit {
             }
             at = clip.to;
         }
-        (at - duration).abs() <= 1e-6
+        (at - duration).abs() <= 1e-6 && self.layers.is_empty()
     }
 
     /// How long the edited movie lasts.
@@ -1082,6 +1162,35 @@ mod tests {
             !edit.add_filters(0.0, 5.0, &Filters::default()),
             "nothing to add"
         );
+    }
+
+    #[test]
+    fn sound_mixed_in_keeps_its_place_and_fades() {
+        let mut edit = Edit::whole(30.0);
+        let music = edit.add_other(other("/music.flac", 60.0, false));
+        let layer = Layer {
+            source: music,
+            at: 5.0,
+            from: 10.0,
+            to: 20.0,
+            volume: -6.0,
+            fade_in: 2.0,
+            fade_out: 4.0,
+        };
+        assert!(edit.add_layer(layer));
+        assert!(edit.is_mixed() && !edit.plays_whole(30.0) && !edit.is_whole(30.0));
+        assert_eq!(edit.layers()[0].end(), 15.0);
+        // Silent outside it, half way in half way through its fade in.
+        assert_eq!(layer.gain(4.9), 0.0);
+        assert!((layer.gain(6.0) - 0.5 * 0.501).abs() < 0.01);
+        assert!((layer.gain(10.0) - 0.501).abs() < 0.01);
+        assert!((layer.gain(14.0) - 0.501 / 4.0).abs() < 0.01);
+        assert_eq!(layer.gain(15.0), 0.0);
+        // Cutting clips leaves it where it was.
+        edit.cut(0.0, 3.0);
+        assert_eq!(edit.layers()[0].at, 5.0);
+        assert!(!edit.add_layer(Layer { at: 40.0, ..layer }), "past the end");
+        assert!(edit.remove_layer(0) && !edit.remove_layer(0));
     }
 
     /// Where a point of a square picture shows: mirrored, then turned
