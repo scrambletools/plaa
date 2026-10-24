@@ -107,9 +107,9 @@
   "page": "index.html",
   "text": "AI agents"
  },
- "88b19d0961ab": {
+ "66067483b579": {
   "page": "index.html",
-  "text": "Agents such as Claude Code see what plays and control the plaa you are using over MCP, only once you allow them, and asking before the steps you choose."
+  "text": "Agents such as Claude Code see what plays, read any part of it, and control and edit the plaa you are using over MCP, only once you allow them, and asking before the steps you choose."
  },
  "c4595dc0f71f": {
   "page": "index.html",
@@ -546,6 +546,10 @@
   "page": "tour.html",
   "text": "The edit plays as it will be, clip after clip without a gap. Nothing changes in the file: the edit is kept until you export it, and closing the window with an edit not exported asks first."
  },
+ "16262e5c9802": {
+  "page": "tour.html",
+  "text": "Ask the assistant, or an agent, and the edit can mix files too: put in a part of another file, or play another file's sound or picture over a part, such as music under a video or a voice over it, or make a part silent or black. The clips show each file's pictures, and the edit plays and exports as it will be."
+ },
  "c37343fbc2a7": {
   "page": "tour.html",
   "text": "Exporting"
@@ -602,21 +606,21 @@
   "page": "tour.html",
   "text": "The assistant"
  },
- "0c93fb4ce109": {
+ "ca9d0cf44e78": {
   "page": "tour.html",
-  "text": "The assistant button opens a chat panel beside what plays. Ask about it, and the assistant looks with plaa's own tools, at the status, the file's streams or the picture shown, and plays, pauses, seeks or changes the sound for you, each step shown as it goes."
+  "text": "The assistant button opens a chat panel beside what plays. Ask about it, and the assistant looks with plaa's own tools, at the status, the file's streams, its pictures at any time, how loud it is and its subtitles, and plays, pauses, seeks, changes the sound or edits it for you, each step shown as it goes."
  },
  "bcfe366f6e93": {
   "page": "tour.html",
   "text": "Use a local model that stays on your computer, such as Ollama's or one behind an OpenAI-compatible server, or a cloud model from Anthropic, OpenAI or Google with your own key, kept in the system's keychain. Add models in Settings, Assistant; they are shared with the other Scramble Tools apps, such as <a1>prev</a1>."
  },
- "38702dc61ea6": {
+ "c360200a4f5b": {
   "page": "tour.html",
-  "text": "Agents such as Claude Code can see what plays and control the plaa you are using, through MCP. Add plaa to an agent as an MCP server that runs <code>plaa --mcp</code>; for Claude Code:"
+  "text": "Agents such as Claude Code can see what plays, read any part of it, and control and edit the plaa you are using, through MCP. Add plaa to an agent as an MCP server that runs <code>plaa --mcp</code>; for Claude Code:"
  },
- "af4669f0b795": {
+ "f112d44f5eca": {
   "page": "tour.html",
-  "text": "The first time an agent connects, plaa asks whether to let it in. Settings, Agents, turns outside control off, lists the agents allowed, and has a switch for each kind of tool, seeing what plays, controlling playback, and opening files or closing windows, that makes plaa ask before an agent's call runs. plaa bundles no model and listens on no network."
+  "text": "The first time an agent connects, plaa asks whether to let it in. Settings, Agents, turns outside control off, lists the agents allowed, and has a switch for each kind of tool, seeing what plays, controlling playback, opening files or closing windows, and editing or exporting, that makes plaa ask before an agent's call runs. Every edit shows in the window as it is made, and undo takes it back. plaa bundles no model and listens on no network."
  },
  "9a830c714bb2": {
   "page": "tour.html",
@@ -697,6 +701,86 @@
  "6386fba01e71": {
   "page": "tour.html",
   "text": "Opening a file or address, and closing a window"
+ },
+ "55e574b4bfcf": {
+  "page": "tour.html",
+  "text": "<code>get_frames</code>"
+ },
+ "da6caf9d3cbd": {
+  "page": "tour.html",
+  "text": "Pictures at any times, or spread over a part, as JPEGs, as edited"
+ },
+ "cff390f3a447": {
+  "page": "tour.html",
+  "text": "<code>get_levels</code>"
+ },
+ "e4430a69f1e7": {
+  "page": "tour.html",
+  "text": "How loud each step is, and where it is silent"
+ },
+ "a081569146c7": {
+  "page": "tour.html",
+  "text": "<code>get_subtitles</code>"
+ },
+ "5afa4cb64c0d": {
+  "page": "tour.html",
+  "text": "The subtitles' lines and their times, as they show in the edit"
+ },
+ "eb88dc3d00ff": {
+  "page": "tour.html",
+  "text": "<code>get_sound</code>"
+ },
+ "f5929e64d321": {
+  "page": "tour.html",
+  "text": "Up to a minute of sound, for models that hear"
+ },
+ "e6af52e7515c": {
+  "page": "tour.html",
+  "text": "<code>get_edit</code>"
+ },
+ "0413e9b74b51": {
+  "page": "tour.html",
+  "text": "The clips, the files they play, and what replaces their picture or sound"
+ },
+ "576ecb9dcbf0": {
+  "page": "tour.html",
+  "text": "<code>trim</code>, <code>cut</code>, <code>split</code>, <code>move_clip</code>"
+ },
+ "ffbf68407598": {
+  "page": "tour.html",
+  "text": "Keeping a part, taking one out, splitting and ordering clips"
+ },
+ "8cfba7836a84": {
+  "page": "tour.html",
+  "text": "<code>insert</code>"
+ },
+ "68c3afb3dcd6": {
+  "page": "tour.html",
+  "text": "Putting in part of another file, or of the same one"
+ },
+ "dd6a3c27b549": {
+  "page": "tour.html",
+  "text": "<code>replace</code>"
+ },
+ "12221a166e0f": {
+  "page": "tour.html",
+  "text": "Another file's sound or picture over a part, or silence, or black"
+ },
+ "cf3b315170a3": {
+  "page": "tour.html",
+  "text": "<code>turn_picture</code>, <code>undo</code>"
+ },
+ "7bc91cf9d256": {
+  "page": "tour.html",
+  "text": "Turning or flipping the picture; undo, redo and undoing all"
+ },
+ "e388decab40d": {
+  "page": "tour.html",
+  "text": "<code>export</code>"
+ },
+ "0ad5714bc5f5": {
+  "page": "tour.html",
+  "text": "Writing the edit to a new file, as the Export dialog does"
  },
  "61e6dcca7656": {
   "page": "tour.html",
@@ -1279,6 +1363,14 @@
   "page": "specs.html",
   "text": "Trim, split into clips, arrange and remove clips, rotate, flip; undo and redo; nothing changes until you export"
  },
+ "2eea3936b16f": {
+  "page": "specs.html",
+  "text": "Mixing files"
+ },
+ "058b6449eeef": {
+  "page": "specs.html",
+  "text": "Through agents and the assistant: parts of other files put in, and another file's sound or picture, or silence or black, over a part; played and exported as edited, other pictures fitted in the movie's"
+ },
  "f72f94dbc067": {
   "page": "specs.html",
   "text": "Video export"
@@ -1535,21 +1627,29 @@
   "page": "specs.html",
   "text": "plaa asks before letting a new agent in, and remembers Allow; Settings lists allowed agents, and outside control can be turned off"
  },
- "28499def4bad": {
+ "516cb53f0b58": {
   "page": "specs.html",
-  "text": "Tools (17)"
+  "text": "Tools (31)"
  },
- "8aa9ab29d0a4": {
+ "a0492d72820e": {
   "page": "specs.html",
-  "text": "<code>list_windows</code>, <code>get_status</code>, <code>get_info</code>, <code>get_frame</code>, <code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code>, <code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code>, <code>next_item</code>, <code>previous_item</code>, <code>set_fullscreen</code>, <code>focus_window</code>, and <code>open</code> and <code>close_window</code>"
+  "text": "<code>list_windows</code>, <code>get_status</code>, <code>get_info</code>, <code>get_frame</code>, <code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code>, <code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code>, <code>next_item</code>, <code>previous_item</code>, <code>set_fullscreen</code>, <code>focus_window</code>, <code>open</code> and <code>close_window</code>; <code>get_frames</code>, <code>get_levels</code>, <code>get_subtitles</code> and <code>get_sound</code>; <code>get_edit</code>, <code>trim</code>, <code>cut</code>, <code>split</code>, <code>move_clip</code>, <code>insert</code>, <code>replace</code>, <code>turn_picture</code>, <code>undo</code> and <code>export</code>"
+ },
+ "cffa2af0a3a6": {
+  "page": "specs.html",
+  "text": "Reading"
+ },
+ "6058d1c089ba": {
+  "page": "specs.html",
+  "text": "Any part of what plays, as edited: pictures at any times as JPEGs, how loud it is and where it is silent, the subtitles' text, and the sound itself for models that hear, such as Gemini"
  },
  "97fa19250695": {
   "page": "specs.html",
   "text": "Asking first"
  },
- "b16943de6e5b": {
+ "7cf7c525867d": {
   "page": "specs.html",
-  "text": "A switch each for seeing what plays, controlling playback, and opening files or closing windows"
+  "text": "A switch each for seeing what plays, controlling playback, opening files or closing windows, and editing or exporting"
  },
  "d018b082e8a3": {
   "page": "specs.html",

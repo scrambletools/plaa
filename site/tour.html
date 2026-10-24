@@ -147,6 +147,11 @@ picture, and undo and redo cover every step.</p>
 <p>The edit plays as it will be, clip after clip without a gap. Nothing
 changes in the file: the edit is kept until you export it, and closing
 the window with an edit not exported asks first.</p>
+<p>Ask the assistant, or an agent, and the edit can mix files too: put in
+a part of another file, or play another file's sound or picture over a
+part, such as music under a video or a voice over it, or make a part
+silent or black. The clips show each file's pictures, and the edit plays
+and exports as it will be.</p>
 
 <h2 id="exporting">Exporting</h2>
 <figure><img class="shot" src="screenshots/tour-export.webp" alt="The Export dialog over Big Buck Bunny looking up at a butterfly on a tree: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p" width="1360" height="850" loading="lazy"></figure>
@@ -209,8 +214,9 @@ says what each system needs.</p>
 <figure><img class="shot" src="screenshots/tour-assistant.webp" alt="The assistant panel beside Big Buck Bunny: asked to skip ahead a minute and turn it down to 60%, it ran Seek, Set the volume and Get the status, and says it did both" width="1360" height="850" loading="lazy"></figure>
 <p>The assistant button opens a chat panel beside what plays. Ask about it,
 and the assistant looks with plaa's own tools, at the status, the file's
-streams or the picture shown, and plays, pauses, seeks or changes the
-sound for you, each step shown as it goes.</p>
+streams, its pictures at any time, how loud it is and its subtitles, and
+plays, pauses, seeks, changes the sound or edits it for you, each step
+shown as it goes.</p>
 <p>Use a local model that stays on your computer, such as Ollama's or one
 behind an OpenAI-compatible server, or a cloud model from Anthropic,
 OpenAI or Google with your own key, kept in the system's keychain. Add
@@ -218,16 +224,18 @@ models in Settings, Assistant; they are shared with the other Scramble
 Tools apps, such as <a href="https://prev.run">prev</a>.</p>
 
 <h2 id="agents">AI agents</h2>
-<p>Agents such as Claude Code can see what plays and control the plaa you
-are using, through MCP. Add plaa to an agent as an MCP server that runs
-<code>plaa --mcp</code>; for Claude Code:</p>
+<p>Agents such as Claude Code can see what plays, read any part of it, and
+control and edit the plaa you are using, through MCP. Add plaa to an
+agent as an MCP server that runs <code>plaa --mcp</code>; for Claude
+Code:</p>
 <pre><code>claude mcp add plaa -- plaa --mcp</code></pre>
 <p>The first time an agent connects, plaa asks whether to let it in.
 Settings, Agents, turns outside control off, lists the agents allowed,
 and has a switch for each kind of tool, seeing what plays, controlling
-playback, and opening files or closing windows, that makes plaa ask
-before an agent's call runs. plaa bundles no model and listens on no
-network.</p>
+playback, opening files or closing windows, and editing or exporting,
+that makes plaa ask before an agent's call runs. Every edit shows in the
+window as it is made, and undo takes it back. plaa bundles no model and
+listens on no network.</p>
 <div class="table"><table>
 <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
 <tbody>
@@ -240,6 +248,16 @@ network.</p>
 <tr><td><code>next_item</code>, <code>previous_item</code></td><td>Moving through a window's list</td></tr>
 <tr><td><code>set_fullscreen</code>, <code>focus_window</code></td><td>The window</td></tr>
 <tr><td><code>open</code>, <code>close_window</code></td><td>Opening a file or address, and closing a window</td></tr>
+<tr><td><code>get_frames</code></td><td>Pictures at any times, or spread over a part, as JPEGs, as edited</td></tr>
+<tr><td><code>get_levels</code></td><td>How loud each step is, and where it is silent</td></tr>
+<tr><td><code>get_subtitles</code></td><td>The subtitles' lines and their times, as they show in the edit</td></tr>
+<tr><td><code>get_sound</code></td><td>Up to a minute of sound, for models that hear</td></tr>
+<tr><td><code>get_edit</code></td><td>The clips, the files they play, and what replaces their picture or sound</td></tr>
+<tr><td><code>trim</code>, <code>cut</code>, <code>split</code>, <code>move_clip</code></td><td>Keeping a part, taking one out, splitting and ordering clips</td></tr>
+<tr><td><code>insert</code></td><td>Putting in part of another file, or of the same one</td></tr>
+<tr><td><code>replace</code></td><td>Another file's sound or picture over a part, or silence, or black</td></tr>
+<tr><td><code>turn_picture</code>, <code>undo</code></td><td>Turning or flipping the picture; undo, redo and undoing all</td></tr>
+<tr><td><code>export</code></td><td>Writing the edit to a new file, as the Export dialog does</td></tr>
 </tbody>
 </table></div>
 
