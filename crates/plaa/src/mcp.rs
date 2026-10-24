@@ -25,7 +25,7 @@ where the user may be watching or listening. list_windows gives the windows; oth
 window number, or act on the window in front. Times are in seconds of what plays: the edited \
 movie, once the file is edited. get_frames, get_levels, get_subtitles and get_sound read any part \
 of it; the editing tools change it as the user would, each change undoable, apply_filter puts its \
-picture or sound through FFmpeg filters, and export writes the result to a new file. Calls that \
+picture or sound through FFmpeg filters, mix_in mixes another file's sound in with it, and export writes the result to a new file. Calls that \
 take a while report their progress. The user's settings may make plaa ask them before an agent \
 acts.";
 

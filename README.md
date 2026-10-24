@@ -428,6 +428,7 @@ things play. The filters play at once, export, and show in what
 | `trim`, `cut`, `split`, `move_clip` | Keeping a part, taking one out, splitting and ordering clips |
 | `insert` | Putting in part of another file, or of the same one |
 | `replace` | Another file's sound or picture over a part, or silence, or black |
+| `mix_in`, `remove_mix` | Another file's sound mixed in with what plays, at a volume, with fades |
 | `apply_filter`, `remove_filters` | FFmpeg filters on the picture or sound, all of it or a part, checked first |
 | `turn_picture`, `undo` | Turning or flipping the picture; undo, redo and undoing all |
 | `export` | Writing the edit to a new file, as the Export dialog does |

@@ -33,6 +33,10 @@
   exports at its size.
 - Agents' calls that take more than two seconds report how far they
   have come, and the window shows it.
+- `mix_in` mixes another file's sound in with what plays, such as music
+  under a video, from a time of the edit, at a volume in decibels, with
+  fades; it plays at once, exports, and is heard by `get_sound` and
+  `get_levels`. `remove_mix` takes it out.
 
 ## [0.1.0] - 2026-10-23
 

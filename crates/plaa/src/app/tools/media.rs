@@ -268,6 +268,39 @@ struct ApplyFilter {
     to: Option<f64>,
 }
 
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct MixIn {
+    /// The window's number from list_windows; the one in front if left out.
+    window: Option<u64>,
+    /// The full path of the file whose sound to mix in.
+    file: String,
+    /// Where it starts, in seconds of the edited movie; the start if left
+    /// out.
+    at: Option<f64>,
+    /// The part of the file to mix in, from this many seconds of it; its
+    /// start if left out.
+    from: Option<f64>,
+    /// To this many seconds of it; its end if left out.
+    to: Option<f64>,
+    /// How loud it is, in decibels: 0 as it is, negative quieter, such as
+    /// -12 for music under speech; 0 if left out.
+    volume: Option<f64>,
+    /// Seconds it fades in over; none if left out.
+    fade_in: Option<f64>,
+    /// Seconds it fades out over at its end; none if left out.
+    fade_out: Option<f64>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct RemoveMix {
+    /// The window's number from list_windows; the one in front if left out.
+    window: Option<u64>,
+    /// The sound mixed in to take out, by its number from get_edit.
+    mix: usize,
+}
+
 /// A change to a window's edit waiting on what another file holds.
 #[derive(Debug, Clone)]
 pub(crate) enum FileChange {
@@ -283,6 +316,14 @@ pub(crate) enum FileChange {
         from: f64,
         to: f64,
         file_from: f64,
+    },
+    Mix {
+        window: window::Id,
+        at: Option<f64>,
+        from: Option<f64>,
+        to: Option<f64>,
+        volume: f64,
+        fades: (f64, f64),
     },
 }
 
@@ -424,6 +465,35 @@ pub(super) fn tools() -> Vec<Tool> {
              or black; with `original`, the clips' own back. Where the file runs out, \
              silence or black.",
             |app, replace: Replace, answer| start_replace(app, replace, answer),
+        ),
+        tool(
+            "mix_in",
+            "Mix in sound",
+            Kind::Edit,
+            "Mixes a file's sound into a window's, heard together with what plays: music \
+             under a video, a voice over it, or a sound effect. Part of the file, `from` to \
+             `to` seconds of it, all of it if left out, starts at `at` seconds of the movie, \
+             the start if left out, at `volume` decibels, with fades. It stays at its time as \
+             clips change, and stops at the movie's end. To lower the window's own sound under \
+             it, add a volume filter there with apply_filter. remove_mix takes it out.",
+            |app, mix: MixIn, answer| start_mix(app, mix, answer),
+        ),
+        tool(
+            "remove_mix",
+            "Remove mixed-in sound",
+            Kind::Edit,
+            "Takes sound mixed in with mix_in out of a window's movie, by its number from \
+             get_edit.",
+            |app, remove: RemoveMix, answer| {
+                edit(app, remove.window, answer, |edit| {
+                    remove
+                        .mix
+                        .checked_sub(1)
+                        .is_some_and(|index| edit.remove_layer(index))
+                        .then_some("Took the mixed-in sound out of")
+                        .ok_or("remove_mix: there is no such sound mixed in; see get_edit")
+                })
+            },
         ),
         tool(
             "turn_picture",
@@ -1036,6 +1106,24 @@ fn edit_of(app: &Plaa, window: Option<u64>) -> Result<Value, Error> {
             })
         })
         .collect();
+    let mixed: Vec<Value> = edit
+        .layers()
+        .iter()
+        .enumerate()
+        .map(|(index, layer)| {
+            json!({
+                "mix": index + 1,
+                "file": file_of(layer.source),
+                "at": round(layer.at),
+                "end": round(layer.end()),
+                "from": round(layer.from),
+                "to": round(layer.to),
+                "volume": round(layer.volume),
+                "fade_in": round(layer.fade_in),
+                "fade_out": round(layer.fade_out),
+            })
+        })
+        .collect();
     let transform = edit.transform();
     Ok(json!({
         "window": number(id),
@@ -1043,6 +1131,7 @@ fn edit_of(app: &Plaa, window: Option<u64>) -> Result<Value, Error> {
         "edited": player.editor.is_edited(),
         "duration": round(edit.duration()),
         "clips": clips,
+        "mixed_in": mixed,
         "quarter_turns": transform.turns,
         "mirrored": transform.mirrored,
         "can_undo": player.editor.can_undo(),
@@ -1205,6 +1294,37 @@ fn start_replace(app: &mut Plaa, replace: Replace, answer: &Answer) -> Task<Mess
     )
 }
 
+fn start_mix(app: &mut Plaa, mix: MixIn, answer: &Answer) -> Task<Message> {
+    let id = match editable(app, mix.window) {
+        Ok(id) => id,
+        Err(error) => return reply(answer, Err(error)),
+    };
+    let path = match existing("mix_in", &mix.file) {
+        Ok(path) => path,
+        Err(error) => return reply(answer, Err(error)),
+    };
+    let volume = mix.volume.unwrap_or(0.0);
+    if !(-60.0..=24.0).contains(&volume) {
+        return reply(
+            answer,
+            Err(invalid("mix_in: the volume is from -60 to 24 decibels")),
+        );
+    }
+    let fade = |seconds: Option<f64>| seconds.unwrap_or(0.0).clamp(0.0, 60.0);
+    with_file(
+        path,
+        FileChange::Mix {
+            window: id,
+            at: mix.at,
+            from: mix.from,
+            to: mix.to,
+            volume,
+            fades: (fade(mix.fade_in), fade(mix.fade_out)),
+        },
+        answer,
+    )
+}
+
 impl Plaa {
     /// Makes `change` to a window's edit, with what the file at `path`
     /// holds, once read.
@@ -1225,7 +1345,9 @@ impl Plaa {
             }
         };
         let window = match &change {
-            FileChange::Insert { window, .. } | FileChange::Replace { window, .. } => *window,
+            FileChange::Insert { window, .. }
+            | FileChange::Replace { window, .. }
+            | FileChange::Mix { window, .. } => *window,
         };
         let Some(player) = self.player_mut(window) else {
             return reply(&answer, Err(super::no_window()));
@@ -1262,6 +1384,44 @@ impl Plaa {
                     edit.insert(at, clip)
                         .then_some("Inserted in")
                         .ok_or("insert: too short")
+                })
+            }
+            FileChange::Mix {
+                at,
+                from,
+                to,
+                volume,
+                fades: (fade_in, fade_out),
+                ..
+            } => {
+                if !other.sound {
+                    return reply(&answer, Err(invalid("mix_in: the file has no sound")));
+                }
+                let from = from.unwrap_or(0.0).max(0.0);
+                let to = to.unwrap_or(length).min(length);
+                if to - from < plaa_media::edit::SHORTEST {
+                    return reply(
+                        &answer,
+                        Err(invalid(format!(
+                            "mix_in: the part must be at least 0.1 seconds, within the file's {} seconds",
+                            round(length)
+                        ))),
+                    );
+                }
+                edit(self, Some(number(window)), &answer, |edit| {
+                    let source = if own { OWN } else { edit.add_other(other) };
+                    let layer = plaa_media::edit::Layer {
+                        source,
+                        at: at.unwrap_or(0.0),
+                        from,
+                        to,
+                        volume,
+                        fade_in,
+                        fade_out,
+                    };
+                    edit.add_layer(layer)
+                        .then_some("Mixed sound into")
+                        .ok_or("mix_in: `at` must be within the movie")
                 })
             }
             FileChange::Replace {
