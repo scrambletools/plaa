@@ -530,9 +530,9 @@
   "page": "tour.html",
   "text": "Inspector"
  },
- "089173fd6301": {
+ "09af2b7ec14b": {
   "page": "tour.html",
-  "text": "The inspector (Ctrl+I) shows what a file is made of: its name, folder, size, format, duration and bit rate, its tags, and each of its streams, with the codec, frame rate and colors of the video and how it is decoded, and the sound's channels and rate."
+  "text": "The inspector (Ctrl+I) shows what a file is made of: its name, folder, size, format, duration and bit rate, its tags, and each of its streams, with the video's codec, size, frame rate and pixel format and how it is decoded, and the sound's codec, rate, channels and language."
  },
  "ecb454920a65": {
   "page": "tour.html",
@@ -1251,9 +1251,13 @@
   "page": "specs.html",
   "text": "Up to 16 times at the pointer, dragged to look around"
  },
- "b90b9ad7b0a1": {
+ "80862a89e60d": {
   "page": "specs.html",
-  "text": "One per file, full screen, picture in picture"
+  "text": "Viewing"
+ },
+ "d36ef98e8b08": {
+  "page": "specs.html",
+  "text": "One window per file, full screen, picture in picture"
  },
  "7177c76604a1": {
   "page": "specs.html",
