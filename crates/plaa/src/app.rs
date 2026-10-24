@@ -1641,9 +1641,10 @@ impl Plaa {
                 return Task::none();
             }
             if let Content::Player(player) = &mut window.content
-                && (player.menu.is_some() || player.sheet.is_some())
+                && (player.menu.is_some() || player.overflow_open || player.sheet.is_some())
             {
                 player.menu = None;
+                player.overflow_open = false;
                 player.sheet = None;
                 return Task::none();
             }
@@ -2200,6 +2201,7 @@ impl Plaa {
             Control::Menu(menu, open) => {
                 player.menu = if open { Some(menu) } else { None::<Menu> };
             }
+            Control::Overflow(open) => player.overflow_open = open,
             Control::ToggleInspector => player.toggle_sheet(Sheet::Inspector),
             Control::TogglePlaylist => player.toggle_sheet(Sheet::Playlist),
             Control::ToggleNetwork => player.toggle_sheet(Sheet::Network),

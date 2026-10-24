@@ -32,6 +32,11 @@ pub const SPEEDS: [f64; 8] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
 /// How long opening may take before a spinner says it is under way.
 const OPENING_SHOWN: Duration = Duration::from_millis(300);
 
+/// The space between the toolbar's buttons, and the width a divider
+/// between its groups takes with its padding.
+const TOOL_SPACING: f32 = 4.0;
+const GROUP_DIVIDER_WIDTH: f32 = 17.0;
+
 /// How far the skip buttons and arrow keys move, in seconds.
 pub const SKIP: f64 = 10.0;
 pub const SKIP_SHORT: f64 = 5.0;
@@ -152,6 +157,8 @@ pub struct PlayerWindow {
     pub pointer_inside: bool,
     pub overlay_shown: bool,
     pub menu: Option<Menu>,
+    /// The toolbar's More menu, with the tools that do not fit, is open.
+    pub overflow_open: bool,
     pub sheet: Option<Sheet>,
     /// The renderer the window casts to, whose playback its controls
     /// drive and its timeline shows while it does.
@@ -214,6 +221,7 @@ impl PlayerWindow {
             pointer_inside: true,
             overlay_shown: true,
             menu: None,
+            overflow_open: false,
             sheet: None,
             listener: None,
             looping: false,
@@ -354,7 +362,7 @@ impl PlayerWindow {
         if self.info.is_none() || self.error.is_some() {
             return true;
         }
-        if self.menu.is_some() || self.dragging.is_some() {
+        if self.menu.is_some() || self.overflow_open || self.dragging.is_some() {
             return true;
         }
         if !self.pointer_inside {
@@ -438,6 +446,8 @@ pub enum Control {
     Audio(Option<usize>),
     Subtitles(Option<usize>),
     Menu(Menu, bool),
+    /// The toolbar's More menu opens or closes.
+    Overflow(bool),
     ToggleFullScreen,
     ToggleInspector,
     TogglePlaylist,
@@ -584,108 +594,194 @@ pub fn view<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Cont
 /// window's tools at the other end. The file's name is the window's
 /// title, as tools would cover it in a narrow window.
 fn toolbar<'a>(window: &'a PlayerWindow, context: &Context) -> Element<'a, Control> {
-    let mut tools = vec![open_menu(window.menu == Some(Menu::Open))];
+    let mut left = vec![open_menu(window.menu == Some(Menu::Open))];
     if let Some(snapshot) = &context.avb {
-        tools.push(connect_menu(snapshot, window.menu == Some(Menu::Connect)));
+        left.push(connect_menu(snapshot, window.menu == Some(Menu::Connect)));
     }
-    tools.push(space().width(Fill).into());
+    // The tools on the right, each with its group, which dividers set
+    // apart, and its place in the order they move into More as the window
+    // narrows, lowest first; settings never moves.
+    let mut slots: Vec<(Element<'a, Control>, u8, Option<u8>)> = Vec::new();
     // What plays: editing, the frame or the visualizer, looping and the
     // list.
-    let mut playing = Vec::new();
     if let Some(menu) = edit_menu(window) {
-        playing.push(menu);
+        slots.push((menu, 0, Some(8)));
     }
     if window.is_video() {
-        playing.push(component::tool(
-            Icon::Photo,
-            crate::fl!("action-screenshot"),
-            Some(Control::Screenshot),
+        slots.push((
+            component::tool(
+                Icon::Photo,
+                crate::fl!("action-screenshot"),
+                Some(Control::Screenshot),
+            ),
+            0,
+            Some(2),
         ));
     } else if window.info.is_some() {
-        playing.push(visualizer_menu(window));
+        slots.push((visualizer_menu(window), 0, Some(2)));
     }
-    playing.push(component::toggle_tool(
-        Icon::Repeat,
-        crate::fl!("action-loop"),
-        window.looping,
-        Control::ToggleLoop,
+    slots.push((
+        component::toggle_tool(
+            Icon::Repeat,
+            crate::fl!("action-loop"),
+            window.looping,
+            Control::ToggleLoop,
+        ),
+        0,
+        Some(3),
     ));
     if window.playlist.is_list() {
-        playing.push(component::toggle_tool(
-            Icon::PlaylistPlay,
-            crate::fl!("action-playlist"),
-            window.sheet == Some(Sheet::Playlist),
-            Control::TogglePlaylist,
+        slots.push((
+            component::toggle_tool(
+                Icon::PlaylistPlay,
+                crate::fl!("action-playlist"),
+                window.sheet == Some(Sheet::Playlist),
+                Control::TogglePlaylist,
+            ),
+            0,
+            Some(9),
         ));
     }
-    // Where it plays: a TV or speaker, and the AVB network.
-    let mut elsewhere = Vec::new();
-    // A stream plaa listens to plays here alone.
+    // Where it plays: a TV or speaker, and the AVB network. A stream plaa
+    // listens to plays here alone.
     if !window.source().is_live() {
-        elsewhere.push(cast_menu(window, context));
+        slots.push((cast_menu(window, context), 1, Some(5)));
     }
     if context.avb.is_some() {
-        elsewhere.push(component::toggle_tool(
-            Icon::Lan,
-            crate::fl!("action-network"),
-            window.sheet == Some(Sheet::Network),
-            Control::ToggleNetwork,
+        slots.push((
+            component::toggle_tool(
+                Icon::Lan,
+                crate::fl!("action-network"),
+                window.sheet == Some(Sheet::Network),
+                Control::ToggleNetwork,
+            ),
+            1,
+            Some(4),
         ));
     }
     // The panels, and the window.
-    let mut window_tools = vec![
-        component::toggle_tool(
-            Icon::SmartToy,
-            crate::fl!("action-assistant"),
-            context.assistant_open,
-            Control::ToggleAssistant,
-        ),
+    slots.push((
         component::toggle_tool(
             Icon::Info,
             crate::fl!("action-info"),
             window.sheet == Some(Sheet::Inspector),
             Control::ToggleInspector,
         ),
-    ];
+        2,
+        Some(6),
+    ));
+    slots.push((
+        component::toggle_tool(
+            Icon::SmartToy,
+            crate::fl!("action-assistant"),
+            context.assistant_open,
+            Control::ToggleAssistant,
+        ),
+        2,
+        Some(7),
+    ));
     if window.is_video() {
-        window_tools.push(component::toggle_tool(
-            Icon::PictureInPicture,
-            crate::fl!("action-picture-in-picture"),
-            context.pip,
-            Control::TogglePip,
+        slots.push((
+            component::toggle_tool(
+                Icon::PictureInPicture,
+                crate::fl!("action-picture-in-picture"),
+                context.pip,
+                Control::TogglePip,
+            ),
+            2,
+            Some(0),
         ));
     }
-    window_tools.push(component::floating_bars_toggle(Control::ToggleOverlay));
-    window_tools.push(component::tool(
-        Icon::Settings,
-        crate::fl!("action-settings"),
-        Some(Control::Settings),
+    slots.push((
+        component::floating_bars_toggle(Control::ToggleOverlay),
+        2,
+        Some(1),
     ));
+    slots.push((
+        component::tool(
+            Icon::Settings,
+            crate::fl!("action-settings"),
+            Some(Control::Settings),
+        ),
+        2,
+        None,
+    ));
+
+    // The room the right side has: the window's width, less the
+    // assistant's panel beside it, the bar's insets, what is on the left
+    // and the close button, and the dividers. Tools here are TOOL_SPACING
+    // apart, where fitting_slots counts TOOLBAR_GAP.
+    let panel = if context.assistant_open {
+        crate::app::assistant::PANEL_WIDTH
+    } else {
+        0.0
+    };
+    let inset = if component::floating_bars_enabled() {
+        2.0 * (component::FLOATING_MARGIN + 12.0)
+    } else {
+        16.0
+    };
+    let tool = component::TOOL_WIDTH + TOOL_SPACING;
+    let groups = 1 + slots.iter().map(|(_, group, _)| *group).max().unwrap_or(0) as usize;
+    let room = context.width
+        - panel
+        - inset
+        - tool * (left.len() + usize::from(context.close_button)) as f32
+        - (groups - 1) as f32 * (GROUP_DIVIDER_WIDTH + TOOL_SPACING);
+    let widths: Vec<(f32, Option<u8>)> = slots
+        .iter()
+        .map(|(_, _, order)| {
+            (
+                component::TOOL_WIDTH - (component::TOOLBAR_GAP - TOOL_SPACING),
+                *order,
+            )
+        })
+        .collect();
+    let shown = component::fitting_slots(room, &widths);
+
+    let mut tools = left;
+    tools.push(space().width(Fill).into());
+    let mut hidden = Vec::new();
+    let mut last_group = None;
+    for ((element, group, _), shown) in slots.into_iter().zip(shown) {
+        if !shown {
+            hidden.push(element);
+            continue;
+        }
+        if last_group.is_some_and(|last| last != group) {
+            tools.push(group_divider());
+        }
+        last_group = Some(group);
+        tools.push(element);
+    }
+    if !hidden.is_empty() {
+        tools.push(component::overflow(
+            hidden,
+            window.overflow_open,
+            Control::Overflow(!window.overflow_open),
+            Control::Overflow(false),
+        ));
+    }
     if context.close_button {
-        window_tools.push(component::tool(
+        tools.push(component::tool(
             Icon::Close,
             crate::fl!("common-close"),
             Some(Control::Close),
         ));
     }
-    let mut first = true;
-    for group in [playing, elsewhere, window_tools] {
-        if group.is_empty() {
-            continue;
-        }
-        if !first {
-            // triib's divider, as far from the buttons as in triib, whose
-            // toolbar spaces them 8 apart rather than 4.
-            tools.push(
-                container(component::toolbar_divider())
-                    .padding([0, 4])
-                    .into(),
-            );
-        }
-        first = false;
-        tools.extend(group);
-    }
-    row(tools).spacing(4).align_y(Center).width(Fill).into()
+    row(tools)
+        .spacing(TOOL_SPACING)
+        .align_y(Center)
+        .width(Fill)
+        .into()
+}
+
+/// triib's divider between the toolbar's groups, as far from the buttons
+/// as in triib, whose toolbar spaces them 8 apart rather than 4.
+fn group_divider<'a>() -> Element<'a, Control> {
+    container(component::toolbar_divider())
+        .padding([0, 4])
+        .into()
 }
 
 /// The playback controls: play, between the list's previous and next
