@@ -383,8 +383,10 @@ jobs:
         run: |
           mkdir -p sources
           cp dist/plaa.app/Contents/Resources/licenses/libraries.txt sources/
+          # Retrying any error, as some addresses lead to a mirror picked at
+          # random, which once had an expired certificate.
           awk '$1 ~ /^https?:/ {print $1}' sources/libraries.txt | sort -u | while read -r url; do
-            curl -sSLf -o "sources/$(basename "$url")" "$url"
+            curl -sSLf --retry 3 --retry-all-errors -o "sources/$(basename "$url")" "$url"
           done
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           tar -cf "dist/plaa-$version-macos-library-sources.tar" -C sources .
