@@ -42,7 +42,9 @@
 
 - One panel at a time at a window's side: the inspector, the playlist,
   the network sheet and the assistant each close the one open before,
-  and each runs the window's full height, beside the toolbars.
+  and each runs the window's full height, beside the toolbars. A panel
+  slides in only when none was open; one taking another's place shows
+  at once. The assistant's slides in too.
 
 ## [0.1.0] - 2026-10-23
 

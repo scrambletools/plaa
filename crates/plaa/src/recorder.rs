@@ -354,19 +354,24 @@ pub fn view<'a>(recorder: &'a Recorder, context: &Context<'_>) -> Element<'a, Re
         .width(Fill)
         .height(Fill)
         .style(style::surface);
-    let window: Element<'a, RecorderControl> = match (&context.avb, recorder.network) {
-        (Some(snapshot), true) => iced::widget::row![
-            column![toolbar, body],
-            crate::network::sheet(snapshot.clone(), recorder.menu, recorder.listener)
-                .map(RecorderControl::Window)
-        ]
-        .into(),
-        _ => column![toolbar, body].into(),
-    };
+    let window = column![toolbar, body];
     match &recorder.naming {
         Some(naming) => stack![window, naming_dialog(naming)].into(),
-        None => window,
+        None => window.into(),
     }
+}
+
+/// The Network Audio sheet beside the window, the whole of its height,
+/// when open on an AVB network.
+pub fn side_sheet<'a>(
+    recorder: &Recorder,
+    avb: Option<std::sync::Arc<plaa_avb::Snapshot>>,
+) -> Option<Element<'a, RecorderControl>> {
+    let snapshot = avb.filter(|_| recorder.network)?;
+    Some(
+        crate::network::sheet(snapshot, recorder.menu, recorder.listener)
+            .map(RecorderControl::Window),
+    )
 }
 
 /// Asks the name of the recording just saved: kept as it is, or the one

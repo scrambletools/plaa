@@ -2490,13 +2490,18 @@ impl Plaa {
             body
         };
         // The one panel at the side, the window's whole height: the
-        // assistant's, or a sheet such as the inspector.
-        let side = self.panel_view(id).or_else(|| {
-            let player = window.player()?;
-            Some(
+        // assistant's, or a sheet such as the inspector. Each is in the
+        // same place, so one taking another's keeps its slide in.
+        let side = self.panel_view(id).or_else(|| match &window.content {
+            Content::Player(player) => Some(
                 player_window::side_sheet(player, &player_context)?
                     .map(move |control| Message::Control(id, control)),
-            )
+            ),
+            Content::Recorder(recorder) => Some(
+                crate::recorder::side_sheet(recorder, player_context.avb.clone())?
+                    .map(move |control| Message::Recorder(id, control)),
+            ),
+            Content::Start => None,
         });
         let body: Element<'_, Message> = match side {
             Some(panel) => iced::widget::row![body, panel].into(),
