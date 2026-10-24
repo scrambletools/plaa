@@ -98,8 +98,22 @@ function Get-MsiProperty([string] $Path, [string] $Name) {
     $value
 }
 
+# Waits for a started program for at most $Minutes, failing past them
+# so a hang shows rather than holding the runner.
+function Wait-Run($Process, [string] $Name, [int] $Minutes) {
+    if (-not $Process.WaitForExit($Minutes * 60000)) {
+        Stop-Process -Id $Process.Id -ErrorAction SilentlyContinue
+        Fail "$Name did not finish in $Minutes minutes"
+    }
+}
+
+# Never restarting Windows, which /qn alone would do when a file is in
+# use.
 function Invoke-Msiexec([string[]] $Arguments, [string] $Log) {
-    $run = Start-Process msiexec.exe -ArgumentList ($Arguments + @('/qn', '/l*v', "`"$Log`"")) -Wait -PassThru
+    $run = Start-Process msiexec.exe -ArgumentList ($Arguments + @('/qn', '/norestart', '/l*v', "`"$Log`"")) -PassThru
+    # Keeps the exit code, which Windows PowerShell loses without it.
+    $null = $run.Handle
+    Wait-Run $run "msiexec $($Arguments -join ' ')" 10
     if ($run.ExitCode -notin @(0, 3010)) {
         # The verbose log's lines around the failing action.
         Select-String -Path $Log -Pattern 'Return value 3' -Context 30, 2 | Select-Object -First 1 | Out-Host
@@ -120,7 +134,9 @@ function Get-Entries {
 # A GUI program's output, which PowerShell neither waits for nor shows.
 function Get-Printed([string] $Program, [string] $Argument) {
     $printed = Join-Path $work 'printed.txt'
-    $run = Start-Process $Program -ArgumentList $Argument -Wait -PassThru -NoNewWindow -RedirectStandardOutput $printed
+    $run = Start-Process $Program -ArgumentList $Argument -PassThru -NoNewWindow -RedirectStandardOutput $printed
+    $null = $run.Handle
+    Wait-Run $run "$Program $Argument" 2
     if ($run.ExitCode -ne 0) {
         Fail "$Program $Argument ended with $($run.ExitCode) ($('0x{0:X8}' -f $run.ExitCode))"
     }
