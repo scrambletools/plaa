@@ -286,7 +286,15 @@ fn change(
         return;
     }
     let after = player.editor.for_player(duration);
-    if after.as_deref().map(Edit::clips) != before.as_deref().map(Edit::clips) {
+    // The player plays the edit again when anything it hears or shows
+    // changed, as sound mixed in or filters, not only the clips.
+    let plays_differently = match (before.as_deref(), after.as_deref()) {
+        (Some(before), Some(after)) => !before.plays_like(after),
+        (None, None) => false,
+        _ => true,
+    };
+    if plays_differently {
+        let clips_changed = after.as_deref().map(Edit::clips) != before.as_deref().map(Edit::clips);
         let length = after.as_deref().map_or(duration, Edit::duration);
         let position = player
             .editor
@@ -296,9 +304,11 @@ fn change(
         player
             .player
             .set_edit(after, Duration::from_secs_f64(position));
-        // A loop no longer falls where it was set.
-        player.ab_loop = None;
-        player.player.set_ab_loop(None);
+        // A loop no longer falls where it was set once the clips move.
+        if clips_changed {
+            player.ab_loop = None;
+            player.player.set_ab_loop(None);
+        }
     }
     // Clips mode needs clips, and the clip chosen to be there.
     let clips = player.editor.clips().map_or(1, <[_]>::len);

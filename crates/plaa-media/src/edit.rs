@@ -376,6 +376,16 @@ impl Edit {
         self.clips.iter().any(|clip| !clip.is_own()) || !self.layers.is_empty()
     }
 
+    /// Whether `other` plays as this does: the same clips, through the
+    /// same filters, from the same files, with the same sound mixed in.
+    /// Turning and flipping are the picture's alone, so they may differ.
+    pub fn plays_like(&self, other: &Edit) -> bool {
+        self.clips == other.clips
+            && self.filters == other.filters
+            && self.others == other.others
+            && self.layers == other.layers
+    }
+
     /// The sound mixed in over the edit, in the order it was added.
     pub fn layers(&self) -> &[Layer] {
         &self.layers
@@ -1190,6 +1200,14 @@ mod tests {
         edit.cut(0.0, 3.0);
         assert_eq!(edit.layers()[0].at, 5.0);
         assert!(!edit.add_layer(Layer { at: 40.0, ..layer }), "past the end");
+        // Playing differently once mixed in, though the clips are the same.
+        let mut quieter = edit.clone();
+        quieter.layers[0].volume = -12.0;
+        assert_eq!(quieter.clips(), edit.clips());
+        assert!(!quieter.plays_like(&edit));
+        let mut turned = edit.clone();
+        turned.rotate(true);
+        assert!(turned.plays_like(&edit), "turning is the picture's alone");
         assert!(edit.remove_layer(0) && !edit.remove_layer(0));
     }
 
