@@ -15,5 +15,7 @@ version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1)
 tag=$(gh release view --json tagName --jq .tagName 2>/dev/null) || exit 0
 [ "$tag" != "v$version" ] || exit 0
 pattern=${package//"$version"/*}
+# GitHub names uploads with a dot for a tilde.
+pattern=${pattern//'~'/.}
 gh release download "$tag" --pattern "$pattern" --dir "$dir" --clobber >/dev/null 2>&1 || exit 0
 find "$dir" -maxdepth 1 -name "$pattern" | head -1

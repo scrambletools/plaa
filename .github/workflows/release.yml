@@ -604,6 +604,12 @@ jobs:
           cp artifacts/linux-*/* artifacts/windows-*/* artifacts/macos-*/* upload/
           # The PKGBUILD and its install file, to build the Arch package.
           cp artifacts/aur/* upload/
+          # GitHub names uploads with a dot for a tilde, so the .debs take
+          # those names before their checksums are written.
+          for file in upload/*~*; do
+            [ -e "$file" ] || continue
+            mv "$file" "${file//'~'/.}"
+          done
           (cd upload && sha256sum * >SHA256SUMS)
           version=${GITHUB_REF_NAME#v}
           # This version's section of the changelog, without its heading.
