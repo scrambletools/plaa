@@ -11,12 +11,12 @@
 <body>
 
 <header class="top">
-  <a class="brand" href="#"><img src="icon.svg" alt="" width="32" height="32">plaa</a>
+  <a class="brand" href="./"><img src="icon.svg" alt="" width="32" height="32">plaa</a>
   <nav>
     <a href="#features">Features</a>
-    <a href="#tour">Tour</a>
-    <a href="#network">Network audio</a>
     <a href="#download">Download</a>
+    <a href="tour.html">Tour</a>
+    <a href="specs.html">Specs</a>
     <a class="repo" href="https://github.com/scrambletools/plaa">Source on GitHub</a>
   </nav>
 </header>
@@ -29,7 +29,7 @@
       <span class="lede-rest">Video, audio, streams and web video, trimmed, exported and recorded, on your screen,
       on a TV or speaker, or across an AVB network, by yourself or with your favorite AI&nbsp;agent.</span></p>
     <p class="actions">
-      <a class="button filled" href="#download">Download plaa</a>
+      <a class="button filled" href="#download">Download plaa 0.1.0</a>
       <a class="button tonal" href="https://github.com/scrambletools/plaa">Source on GitHub</a>
     </p>
     <p class="small">Free and open source under the GPL 3 on Linux, Windows and macOS. In 38 languages, including right-to-left.</p>
@@ -80,82 +80,13 @@
         <p>Media keys and the system's now-playing controls, a single running plaa that takes the files you open, Finder and Open With, and the Mac's own menu bar.</p>
       </article>
     </div>
-  </section>
-
-  <section id="tour" class="tour">
-    <h2>A tour</h2>
-    <p class="section-lede">From the file you open to the speaker across the room, a step at a time.</p>
-    <ol class="steps">
-      <li class="step">
-        <img class="shot" src="screenshots/tour-play.webp" alt="plaa in dark mode, paused on Big Buck Bunny holding an apple in a meadow, with the toolbar and controls floating over the picture and, above the timeline, a preview of the scene at 5:29" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Play</h3>
-          <p>Open a file, an address or a web page, or drop one on the window. The controls float over the picture and slide away as you watch, and the timeline shows the moment under the pointer before you go there.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/inspector.webp" alt="The inspector beside the picture, listing the file's name, folder, size, format, duration and bit rate, its H.264 video decoded on the graphics card, and its MP3 sound" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Look inside</h3>
-          <p>The inspector tells what a file is made of: its format, size and bit rate, and each of its streams, with how the video is decoded.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/sound.webp" alt="plaa in light mode playing a sound file: its cover, a still of Big Buck Bunny frowning, its title and artist, and its spectrum below" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Listen</h3>
-          <p>A sound file shows its cover and tags, with a spectrum of what you hear or the file's waveform below.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/prism.webp" alt="Prism: a glowing sphere with rainbow cutouts over a neon grid, with bars of the spectrum streaming past it" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>See the music</h3>
-          <p>Or choose Prism, a scene in three dimensions that moves with the music.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/edit.webp" alt="Editing Big Buck Bunny: the film as a strip of pictures below a flying squirrel, cut into three clips with the middle one chosen, beside the cut and delete buttons and Done" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Trim and split</h3>
-          <p>The film becomes a strip of pictures. Cut it into clips, put them in order, turn or flip them, and undo any step. Nothing changes until you export.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/tour-export.webp" alt="The Export dialog over Big Buck Bunny looking up at a butterfly on a tree: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Export</h3>
-          <p>Save the result as H.264, HEVC or AV1, at its own size or smaller, on the graphics card's encoder where there is one, or the sound alone, compressed or lossless.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/tour-record.webp" alt="Sound recording at 7.7 seconds: the input's level in two bars, the Louder slider, Level automatically, AAC at 256 kb/s and the stop button" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Record</h3>
-          <p>Record a microphone or what the computer plays, with a level meter, a quiet input made louder and its level evened out if you like. Or record the screen, a window or a camera.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/tour-cast.webp" alt="The Cast menu open over Big Buck Bunny among flowers, playing on Living Room TV, with Kitchen Speaker listed too and a button to stop" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Cast</h3>
-          <p>Send what plays to a Chromecast, or a TV or speaker that plays DLNA, and keep playing, pausing and seeking it from plaa.</p>
-        </div>
-      </li>
-      <li class="step">
-        <img class="shot" src="screenshots/tour-assistant.webp" alt="The assistant panel beside Big Buck Bunny: asked to skip ahead a minute and turn it down to 60%, it ran Seek, Set the volume and Get the status, and says it did both" width="1360" height="850" loading="lazy">
-        <div>
-          <h3>Ask the assistant</h3>
-          <p>Ask in a panel beside the picture. The assistant looks at what plays and plays, pauses, seeks or changes the sound for you, with a model on your computer or one in the cloud.</p>
-        </div>
-      </li>
-      <li class="step next">
-        <div>
-          <h3>Play on the network</h3>
-          <p>plaa sends what it plays to the speakers and amplifiers on your AVB network, and plays what they send. <a href="#network">Network audio, built in</a></p>
-        </div>
-      </li>
-    </ol>
+    <div class="gallery">
+      <figure><img class="shot" src="screenshots/edit.webp" alt="Editing Big Buck Bunny: the film as a strip of pictures below a flying squirrel, cut into three clips with the middle one chosen, beside the cut and delete buttons and Done" width="1360" height="850" loading="lazy"><figcaption>Trim, split and arrange clips</figcaption></figure>
+      <figure><img class="shot" src="screenshots/inspector.webp" alt="The inspector beside the picture, listing the file's name, folder, size, format, duration and bit rate, its H.264 video decoded on the graphics card, and its MP3 sound" width="1360" height="850" loading="lazy"><figcaption>The inspector: the file and its streams</figcaption></figure>
+      <figure><img class="shot" src="screenshots/sound.webp" alt="plaa in light mode playing a sound file: its cover, a still of Big Buck Bunny frowning, its title and artist, and its spectrum below" width="1360" height="850" loading="lazy"><figcaption>A sound file's cover, tags and spectrum</figcaption></figure>
+      <figure><img class="shot" src="screenshots/prism.webp" alt="Prism: a glowing sphere with rainbow cutouts over a neon grid, with bars of the spectrum streaming past it" width="1360" height="850" loading="lazy"><figcaption>Prism, moved by the music</figcaption></figure>
+    </div>
+    <p class="more"><a class="button tonal" href="tour.html">Take the tour</a></p>
   </section>
 
   <section id="network" class="features">
@@ -187,21 +118,23 @@
 
   <section id="download" class="download">
     <h2>Download</h2>
-    <p>plaa for Linux and Windows on x86_64 and ARM64, Linux on RISC-V, and macOS on Apple Silicon. Every file is on the <a href="https://github.com/scrambletools/plaa/releases/latest">release page</a>, with checksums. On Linux each package uses its release's own FFmpeg; on Windows and macOS plaa carries its own.</p>
+    <p>plaa 0.1.0 for Linux and Windows on x86_64 and ARM64, Linux on RISC-V, and macOS on Apple Silicon. Every file is on the <a href="https://github.com/scrambletools/plaa/releases/latest">release page</a>, with <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/SHA256SUMS">checksums</a>. On Linux each package uses its release's own FFmpeg; on Windows and macOS plaa carries its own.</p>
     <div class="table">
       <table>
-        <thead><tr><th>System</th><th>Package</th><th>Install</th></tr></thead>
+        <thead><tr><th>System</th><th>Download</th><th>Install</th></tr></thead>
         <tbody>
-          <tr><td>Windows 10 and 11</td><td>Installer (.msi) for x64 and ARM64</td><td>Open it: it installs for you alone, with no administrator prompt</td></tr>
-          <tr><td>Windows, portable</td><td>.zip for x64 and ARM64</td><td>Unpack it anywhere and run <code>plaa.exe</code></td></tr>
-          <tr><td>macOS 14 and later, Apple Silicon</td><td>Installer package (.pkg)</td><td>Open it. It lets plaa reach your AVB network too</td></tr>
-          <tr><td>Debian 13, Ubuntu 24.04 and 26.04</td><td>.deb for x86_64, ARM64 and RISC-V, one for each release</td><td><code>sudo apt install ./plaa_*.deb</code></td></tr>
-          <tr><td>Fedora 44</td><td>.rpm for x86_64 and ARM64</td><td><code>sudo dnf install ./plaa-*.rpm</code></td></tr>
-          <tr><td>Arch</td><td>PKGBUILD and plaa.install</td><td><code>makepkg -si</code> in a folder with both</td></tr>
+          <tr><td>Windows 10 and 11</td><td>Installer (.msi): <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa-0.1.0-x64.msi">x64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa-0.1.0-arm64.msi">ARM64</a></td><td>Open it: it installs for you alone, with no administrator prompt</td></tr>
+          <tr><td>Windows, portable</td><td>.zip: <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa-0.1.0-x64-windows.zip">x64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa-0.1.0-arm64-windows.zip">ARM64</a></td><td>Unpack it anywhere and run <code>plaa.exe</code></td></tr>
+          <tr><td>macOS 14 and later, Apple Silicon</td><td>Installer package (.pkg): <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa-0.1.0-arm64.pkg">Apple Silicon</a></td><td>Open it. It lets plaa reach your AVB network too</td></tr>
+          <tr><td>Debian 13</td><td>.deb: <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.debian13_amd64.deb">x86_64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.debian13_arm64.deb">ARM64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.debian13_riscv64.deb">RISC-V</a></td><td><code>sudo apt install ./plaa_0.1.0-1.debian13_*.deb</code></td></tr>
+          <tr><td>Ubuntu 24.04</td><td>.deb: <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.ubuntu24.04_amd64.deb">x86_64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.ubuntu24.04_arm64.deb">ARM64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.ubuntu24.04_riscv64.deb">RISC-V</a></td><td><code>sudo apt install ./plaa_0.1.0-1.ubuntu24.04_*.deb</code></td></tr>
+          <tr><td>Ubuntu 26.04</td><td>.deb: <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.ubuntu26.04_amd64.deb">x86_64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.ubuntu26.04_arm64.deb">ARM64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa_0.1.0-1.ubuntu26.04_riscv64.deb">RISC-V</a></td><td><code>sudo apt install ./plaa_0.1.0-1.ubuntu26.04_*.deb</code></td></tr>
+          <tr><td>Fedora 44</td><td>.rpm: <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa-0.1.0-1.fc44.x86_64.rpm">x86_64</a> · <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa-0.1.0-1.fc44.aarch64.rpm">ARM64</a></td><td><code>sudo dnf install ./plaa-0.1.0-1.fc44.*.rpm</code></td></tr>
+          <tr><td>Arch</td><td><a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/PKGBUILD">PKGBUILD</a> and <a href="https://github.com/scrambletools/plaa/releases/download/v0.1.0/plaa.install">plaa.install</a></td><td><code>makepkg -si</code> in a folder with both</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="small">Each package is installed, upgraded, run, made to play a video and removed in a clean system before a release goes out. See the <a href="https://github.com/scrambletools/plaa#packages">install notes</a> for what differs between them.</p>
+    <p class="small">The Windows installer and <code>plaa.exe</code> are signed by Scramble Tools LLC, and the macOS package with its Developer ID, notarized by Apple. Each package is installed, upgraded, run, made to play a video and removed in a clean system before a release goes out. See the <a href="https://github.com/scrambletools/plaa#packages">install notes</a> for what differs between them, and the release for the sources of the libraries the Windows and macOS packages carry.</p>
   </section>
 
   <section id="code-signing" class="policy">

@@ -1,12 +1,17 @@
 name: Site
 
 # Publishes plaa's website, plaa.run, from site/ to GitHub Pages
-# whenever it changes on main.
+# whenever it or what it shows changes on main.
 on:
   push:
     branches: [main]
     paths:
       - site/**
+      - scripts/build-site.sh
+      - scripts/site-i18n.py
+      # The language names and the menu's label come from the app's.
+      - i18n/*/plaa.ftl
+      - data/icons/**
       - .github/workflows/site.yml
   workflow_dispatch:
 
@@ -27,9 +32,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - run: scripts/build-site.sh "$RUNNER_TEMP/site"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: ${{ runner.temp }}/site
       - id: deployment
         uses: actions/deploy-pages@v4

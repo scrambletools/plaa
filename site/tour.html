@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A tour of plaa</title>
+<meta name="description" content="A tour of plaa: opening files, streams and web videos, playing, subtitles, sound files, editing and exporting, recording, casting, network audio, the assistant and AI agents.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="./"><img src="icon.svg" alt="" width="32" height="32">plaa</a>
+  <nav>
+    <a href="./#features">Features</a>
+    <a href="./#download">Download</a>
+    <a href="tour.html">Tour</a>
+    <a href="specs.html">Specs</a>
+    <a class="repo" href="https://github.com/scrambletools/plaa">Source on GitHub</a>
+  </nav>
+</header>
+
+<main class="guide">
+  <h1>A tour of plaa</h1>
+  <nav class="contents" aria-label="Contents">
+<ul>
+<li><a href="#opening">Opening</a></li>
+<li><a href="#playing">Playing</a></li>
+<li><a href="#tracks">Tracks and subtitles</a></li>
+<li><a href="#streams">Streams and web videos</a></li>
+<li><a href="#playlists">Playlists</a></li>
+<li><a href="#sound">Sound files</a></li>
+<li><a href="#inspector">Inspector</a></li>
+<li><a href="#editing">Trimming and splitting</a></li>
+<li><a href="#exporting">Exporting</a></li>
+<li><a href="#recording">Recording</a></li>
+<li><a href="#casting">Casting</a></li>
+<li><a href="#network-audio">Network audio</a></li>
+<li><a href="#assistant">The assistant</a></li>
+<li><a href="#agents">AI agents</a></li>
+<li><a href="#system">On each system</a></li>
+<li><a href="#settings">Settings</a></li>
+<li><a href="#shortcuts">Keyboard shortcuts</a></li>
+</ul>
+  </nav>
+<p>This tour walks through what plaa does, in the order you are likely to
+meet it. On macOS, use ⌘ where it says Ctrl. The
+<a href="#shortcuts">keyboard shortcuts</a> are listed at the end, and
+can be changed in the settings file.</p>
+<p class="small">The screenshots show <a href="https://peach.blender.org/">Big Buck Bunny</a>, © 2008 Blender Foundation, under
+<a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>.</p>
+
+<h2 id="opening">Opening</h2>
+<figure><img class="shot" src="screenshots/tour-start.webp" alt="plaa's start window: the plaa clapperboard, Open and Open Address, Record Sound, Record Screen and Record Camera, and the keyboard shortcuts for each" width="1360" height="850" loading="lazy"></figure>
+<p>Started on its own, plaa offers to open a file or an address, or to
+record. Open a file with Ctrl+O, from the file manager's Open With, from
+the command line (<code>plaa film.mkv</code>), or by dropping it on a
+window. Open Address (Ctrl+U) takes a stream or a web page, and offers
+the addresses opened lately again.</p>
+<p>Each file plays in a window of its own, and there is one running plaa:
+a file opened again from the file manager or the command line goes to
+the running one, as files opened from Finder do on macOS. To have video
+and sound files open in plaa, use Make Default in
+<a href="#settings">Settings</a>.</p>
+
+<h2 id="playing">Playing</h2>
+<figure><img class="shot" src="screenshots/tour-play.webp" alt="plaa in dark mode, paused on Big Buck Bunny holding an apple in a meadow, with the toolbar and controls floating over the picture and, above the timeline, a preview of the scene at 5:29" width="1360" height="850" loading="lazy"></figure>
+<p>The toolbar and the playback controls float over the picture and slide
+away once the pointer rests or leaves the window, and come back when it
+moves. The floating bars button docks them above and below the picture
+instead, and on a narrow window the tools that do not fit go into the
+More menu.</p>
+<p>Pointing at the timeline shows a picture from there, its time and its
+chapter; dragging it moves the picture with the handle, exactly. The arrow
+keys skip 5 seconds, J and L 10, and the comma and period keys step a
+frame. Speed goes from a quarter to three times, keeping the sound's
+pitch, and the volume and full screen are at the right of the controls.</p>
+<p>Ctrl and the mouse wheel zoom in on the picture at the pointer, up to
+16 times, and dragging it looks around. Picture in picture
+(Ctrl+Shift+P) keeps a small window over the others in a corner. plaa
+resumes each file where you left off, keeps the screen on while video
+plays, and keeps the computer awake while sound does.</p>
+<p>Video is decoded on the graphics card where it can be, 8K at 60 frames
+a second included, and drawn by plaa's own shader: BT.601, BT.709 and
+BT.2020 colors, 8 to 16 bits, HDR10 and HLG tone mapped for an ordinary
+screen, and phone videos turned upright. The sound keeps in step with
+the picture by the output device's own clock.</p>
+
+<h2 id="tracks">Tracks and subtitles</h2>
+<p>plaa picks the audio and subtitle tracks in the languages Settings
+prefer, and the menu at the right of the controls changes them. It shows
+text subtitles (SubRip, WebVTT, MP4 text and more), ASS and SSA styled
+as made through libass, and Blu-ray, DVD and DVB picture subtitles.
+Subtitle files beside the video, such as <code>Film.en.srt</code>, or in a
+<code>Subs</code> folder, are offered too.</p>
+<p>A file's chapters are marked on the timeline and listed in a menu, and
+Page Up and Page Down move between them. Loop (Ctrl+L) plays the file
+over and over; B marks where an A-B loop starts, and B again where it
+ends.</p>
+
+<h2 id="streams">Streams and web videos</h2>
+<p>plaa plays HTTP, HLS, DASH, RTSP and SRT addresses. Streams read ahead,
+and wait to read on rather than stutter over a slow network, marking on
+the timeline how far they have read; a spinner shows while they wait.</p>
+<p>With <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a> installed,
+plaa also plays the videos on web pages such as YouTube's, with their
+titles, channels, chapters and thumbnails, and a web playlist becomes a
+plaa playlist. A stream or web video plays in the quality that fits your
+screen, or the one chosen from the quality menu, which also offers the
+sound alone.</p>
+
+<h2 id="playlists">Playlists</h2>
+<p>Files opened or dropped together play one after another, as do M3U and
+PLS lists, and in Settings plaa can list the other files in the opened
+file's folder. The playlist (Ctrl+P) shows beside the picture; P and N
+go to the previous and next item, and the next one plays when one
+ends.</p>
+
+<h2 id="sound">Sound files</h2>
+<figure><img class="shot" src="screenshots/sound.webp" alt="plaa in light mode playing a sound file: its cover, a still of Big Buck Bunny frowning, its title and artist, and its spectrum below" width="1360" height="850" loading="lazy"></figure>
+<p>A sound file shows its cover, title, artist and album, with the
+spectrum of what you hear below them, as bars that rise with it and fall
+back slowly, or the file's waveform from start to end, the part played
+in the accent color, which a click or a drag seeks along.</p>
+<figure><img class="shot" src="screenshots/prism.webp" alt="Prism: a glowing sphere with rainbow cutouts over a neon grid, with bars of the spectrum streaming past it" width="1360" height="850" loading="lazy"></figure>
+<p>Or choose Prism from the visualizer menu: a scene in three dimensions
+that fills the window and moves with the music, a lace orb around a core
+that swells on each beat, ringed by glass shards rising with the
+spectrum, over a rippling grid of light.</p>
+
+<h2 id="inspector">Inspector</h2>
+<figure><img class="shot" src="screenshots/inspector.webp" alt="The inspector beside the picture, listing the file's name, folder, size, format, duration and bit rate, its H.264 video decoded on the graphics card, and its MP3 sound" width="1360" height="850" loading="lazy"></figure>
+<p>The inspector (Ctrl+I) shows what a file is made of: its name, folder,
+size, format, duration and bit rate, its tags, and each of its streams,
+with the codec, frame rate and colors of the video and how it is decoded,
+and the sound's channels and rate.</p>
+
+<h2 id="editing">Trimming and splitting</h2>
+<figure><img class="shot" src="screenshots/edit.webp" alt="Editing Big Buck Bunny: the film as a strip of pictures below a flying squirrel, cut into three clips with the middle one chosen, beside the cut and delete buttons and Done" width="1360" height="850" loading="lazy"></figure>
+<p>Trim (Ctrl+T) shows the file as a strip of pictures with a handle at
+each end, and plays the part kept over and over while you move them; I
+and O set them to where it plays. Split (Ctrl+Y) cuts the file into clips
+at the playhead, which you can drag into another order, trim one by one,
+or remove with Delete. Rotate and flip (Ctrl+Shift+L, R, H and V) turn the
+picture, and undo and redo cover every step.</p>
+<p>The edit plays as it will be, clip after clip without a gap. Nothing
+changes in the file: the edit is kept until you export it, and closing
+the window with an edit not exported asks first.</p>
+
+<h2 id="exporting">Exporting</h2>
+<figure><img class="shot" src="screenshots/tour-export.webp" alt="The Export dialog over Big Buck Bunny looking up at a butterfly on a tree: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p" width="1360" height="850" loading="lazy"></figure>
+<p>Export (Ctrl+E) saves what plays, as edited, as H.264, HEVC or AV1
+with AAC sound, at the file's own size or smaller. plaa encodes on the
+graphics card where it can (NVENC, AMF, Quick Sync, VAAPI or
+VideoToolbox) and on the processor otherwise, and the dialog says which.
+HDR video keeps its colors in HEVC and AV1.</p>
+<p>Sound only saves the sound alone: AAC, MP3 or Opus at a bit rate you
+choose, or lossless as FLAC, ALAC or WAV in 16 or 24 bits.</p>
+
+<h2 id="recording">Recording</h2>
+<figure><img class="shot" src="screenshots/tour-record.webp" alt="Sound recording at 7.7 seconds: the input's level in two bars, the Louder slider, Level automatically, AAC at 256 kb/s and the stop button" width="1360" height="850" loading="lazy"></figure>
+<p>Record Sound (Ctrl+Shift+N) records a microphone, or what the computer
+plays where the system offers it, with a level meter. Louder takes a
+quiet input up to 30 dB higher, kept for each input, and Level
+automatically evens the level out. Space starts and stops; once it
+stops, plaa asks what to name the recording, then plays it, ready to
+trim and export.</p>
+<p>Record Screen (Ctrl+Alt+N) records a screen or a window, or on Linux a
+region, with the pointer, and the sound of a microphone or of what the
+computer plays if you like, on the graphics card's encoder at 24 to 120
+pictures a second. Recording a screen, plaa's own windows stay out of it
+on macOS; elsewhere the recording window steps aside, and the red dot in
+the tray on Linux, or opening plaa again, stops it.</p>
+<p>Record Camera (Ctrl+Alt+M) records a camera, as QuickTime Player's New
+Movie Recording does, its picture shown mirrored while it records. Sound
+recordings go to Music, and screen and camera recordings to Videos
+(Movies on macOS), unless Settings choose other folders.</p>
+
+<h2 id="casting">Casting</h2>
+<figure><img class="shot" src="screenshots/tour-cast.webp" alt="The Cast menu open over Big Buck Bunny among flowers, playing on Living Room TV, with Kitchen Speaker listed too and a button to stop" width="1360" height="850" loading="lazy"></figure>
+<p>The Cast menu looks for Chromecasts and for TVs, speakers and programs
+that play DLNA on your network as it opens. Choose one, and plaa serves
+the file to it, or hands it the stream's address; plaa's own controls
+and timeline then play, pause and seek it there. When casting stops, the
+window goes on from where it got to.</p>
+
+<h2 id="network-audio">Network audio</h2>
+<p>plaa takes part in AVB and Milan networks, the kind that links
+professional speakers, amplifiers and audio interfaces. In Settings,
+Network, choose the wired interface the network is on. With Send what
+plays on, plaa becomes a Milan talker of its own on Linux, and sends
+through the Mac's own AVB entity on macOS: the sound of the window last
+played goes out as a stream on the network's clock, which any Milan
+controller can connect.</p>
+<p>The Network Audio button lists the listeners that can play plaa's
+sound, each with one button, and how the one chosen takes its stream,
+kept up to date as other controllers change it. The Connect menu, beside
+Open, lists the talkers plaa can listen to, and plays the one chosen in
+a window, as a file plays.</p>
+<p>Where the switch has no AVB, plaa falls back to AVB Lite and sends each
+listener, up to five, a copy of its own. On Linux plaa keeps network time
+with ptp4l, starting its own service where nothing else runs one, and
+shares the network's reservations with triib's entity service where it
+runs. The <a href="https://github.com/scrambletools/plaa#avb-on-linux">README</a>
+says what each system needs.</p>
+
+<h2 id="assistant">The assistant</h2>
+<figure><img class="shot" src="screenshots/tour-assistant.webp" alt="The assistant panel beside Big Buck Bunny: asked to skip ahead a minute and turn it down to 60%, it ran Seek, Set the volume and Get the status, and says it did both" width="1360" height="850" loading="lazy"></figure>
+<p>The assistant button opens a chat panel beside what plays. Ask about it,
+and the assistant looks with plaa's own tools, at the status, the file's
+streams or the picture shown, and plays, pauses, seeks or changes the
+sound for you, each step shown as it goes.</p>
+<p>Use a local model that stays on your computer, such as Ollama's or one
+behind an OpenAI-compatible server, or a cloud model from Anthropic,
+OpenAI or Google with your own key, kept in the system's keychain. Add
+models in Settings, Assistant; they are shared with the other Scramble
+Tools apps, such as <a href="https://prev.run">prev</a>.</p>
+
+<h2 id="agents">AI agents</h2>
+<p>Agents such as Claude Code can see what plays and control the plaa you
+are using, through MCP. Add plaa to an agent as an MCP server that runs
+<code>plaa --mcp</code>; for Claude Code:</p>
+<pre><code>claude mcp add plaa -- plaa --mcp</code></pre>
+<p>The first time an agent connects, plaa asks whether to let it in.
+Settings, Agents, turns outside control off, lists the agents allowed,
+and has a switch for each kind of tool, seeing what plays, controlling
+playback, and opening files or closing windows, that makes plaa ask
+before an agent's call runs. plaa bundles no model and listens on no
+network.</p>
+<div class="table"><table>
+<thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>list_windows</code></td><td>plaa's windows: their numbers, titles, what they play and how</td></tr>
+<tr><td><code>get_status</code></td><td>A window's state, position, length, speed, volume, loop and tracks</td></tr>
+<tr><td><code>get_info</code></td><td>The file's format, tags, chapters and streams, and the window's list</td></tr>
+<tr><td><code>get_frame</code></td><td>The picture shown, as a PNG at most 1280 pixels across</td></tr>
+<tr><td><code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code></td><td>Playback</td></tr>
+<tr><td><code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code></td><td>The sound, looping, and the sound track and subtitles</td></tr>
+<tr><td><code>next_item</code>, <code>previous_item</code></td><td>Moving through a window's list</td></tr>
+<tr><td><code>set_fullscreen</code>, <code>focus_window</code></td><td>The window</td></tr>
+<tr><td><code>open</code>, <code>close_window</code></td><td>Opening a file or address, and closing a window</td></tr>
+</tbody>
+</table></div>
+
+<h2 id="system">On each system</h2>
+<p>Media keys work, and what plays shows with its cover in the system's
+own controls: MPRIS on Linux, which <code>playerctl</code> drives too, the
+media flyout on Windows, and Now Playing on macOS. On macOS plaa has its
+own menu bar, and on macOS and Windows title bars in plaa's colors. On
+Linux, plaa's packages use the system's FFmpeg and sound server, PipeWire
+or PulseAudio.</p>
+
+<h2 id="settings">Settings</h2>
+<figure><img class="shot" src="screenshots/tour-settings.webp" alt="plaa's Settings over a paused video, on the Appearance tab: Follow system, Light and Dark, the system accent color switch and the color swatches, and the floating controls' settings" width="1360" height="850" loading="lazy"></figure>
+<p>Settings (Ctrl+,) has seven tabs. Appearance chooses light or dark, the
+system's accent color or one of plaa's, and how the floating controls
+look and when they hide. Playback has hardware decoding, the sound
+output, resuming, folder playlists, the streams' quality, yt-dlp, and
+Make Default, which makes plaa the system's default app for video and
+sound files. Storage chooses the folders recordings and saved frames go
+to; Network, the AVB interface; Language, plaa's language and the
+languages tracks are chosen by; Agents and Assistant, what the previous
+sections describe.</p>
+<p>plaa keeps its settings in <code>~/.config/plaa.toml</code> on Linux,
+<code>%APPDATA%\plaa\plaa.toml</code> on Windows and
+<code>~/Library/Application Support/plaa/plaa.toml</code> on macOS. The
+file's <code>[keys]</code> table changes the keyboard shortcuts, for every
+system or for one:</p>
+<pre><code>[keys]
+play-pause = ["Space", "P"]
+screenshot = "Ctrl+Shift+S"</code></pre>
+
+<h2 id="shortcuts">Keyboard shortcuts</h2>
+<div class="table"><table>
+<thead><tr><th>Action</th><th>Shortcut</th></tr></thead>
+<tbody>
+<tr><td>Play or pause</td><td>Space, K</td></tr>
+<tr><td>Back, forward 5 seconds</td><td>Left, Right</td></tr>
+<tr><td>Back, forward 10 seconds</td><td>J, L, Shift+Left, Shift+Right</td></tr>
+<tr><td>Previous, next frame</td><td><code>,</code> <code>.</code></td></tr>
+<tr><td>Back to the start</td><td>Home</td></tr>
+<tr><td>Volume up, down</td><td>Up, Down</td></tr>
+<tr><td>Mute</td><td>M</td></tr>
+<tr><td>Slower, faster, normal speed</td><td><code>[</code>, <code>]</code>, Backspace</td></tr>
+<tr><td>Next subtitles, next audio track</td><td>C, A</td></tr>
+<tr><td>Full screen</td><td>F, F11, and Escape to leave it</td></tr>
+<tr><td>Loop, A-B loop</td><td>Ctrl+L, B</td></tr>
+<tr><td>Previous, next in the playlist</td><td>P, N, Ctrl+Left, Ctrl+Right</td></tr>
+<tr><td>Previous, next chapter</td><td>Page Up, Page Down</td></tr>
+<tr><td>Playlist</td><td>Ctrl+P</td></tr>
+<tr><td>Picture in picture</td><td>Ctrl+Shift+P</td></tr>
+<tr><td>Zoom in, out at the pointer</td><td>Ctrl+wheel</td></tr>
+<tr><td>Save the frame as a picture</td><td>S</td></tr>
+<tr><td>Trim, split</td><td>Ctrl+T, Ctrl+Y</td></tr>
+<tr><td>Trim from, to the playhead</td><td>I, O, while trimming</td></tr>
+<tr><td>Rotate left, right</td><td>Ctrl+Shift+L, Ctrl+Shift+R</td></tr>
+<tr><td>Flip horizontally, vertically</td><td>Ctrl+Shift+H, Ctrl+Shift+V</td></tr>
+<tr><td>Undo, redo</td><td>Ctrl+Z, Ctrl+Shift+Z</td></tr>
+<tr><td>Export</td><td>Ctrl+E</td></tr>
+<tr><td>Record sound, the screen, a camera</td><td>Ctrl+Shift+N, Ctrl+Alt+N, Ctrl+Alt+M</td></tr>
+<tr><td>Open, open address</td><td>Ctrl+O, Ctrl+U</td></tr>
+<tr><td>Inspector</td><td>Ctrl+I</td></tr>
+<tr><td>Settings</td><td>Ctrl+,</td></tr>
+<tr><td>Close the window, quit</td><td>Ctrl+W, Ctrl+Q</td></tr>
+</tbody>
+</table></div>
+</main>
+
+<footer>
+  <p>plaa is free software under the <a href="https://github.com/scrambletools/plaa/blob/main/LICENSE">GNU GPL-3.0</a>.
+    Made by <a href="https://github.com/scrambletools">Scramble Tools</a>.
+    <a href="./#code-signing">Code signing policy</a> · <a href="./#privacy">Privacy</a></p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>plaa specifications</title>
+<meta name="description" content="plaa's specifications: the systems and processors it runs on, the formats it plays, records and exports, casting and network audio, its languages and input, the assistant and agents, and the software it is built on.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="./"><img src="icon.svg" alt="" width="32" height="32">plaa</a>
+  <nav>
+    <a href="./#features">Features</a>
+    <a href="./#download">Download</a>
+    <a href="tour.html">Tour</a>
+    <a href="specs.html">Specs</a>
+    <a class="repo" href="https://github.com/scrambletools/plaa">Source on GitHub</a>
+  </nav>
+</header>
+
+<main class="guide specs">
+  <h1>Specifications</h1>
+  <p class="lede-left">plaa 0.1.0, a video and audio player. For what each feature does, see the <a href="tour.html">tour</a>.</p>
+  <nav class="contents" aria-label="Contents">
+<ul>
+<li><a href="#systems">Systems</a></li>
+<li><a href="#formats">Formats</a></li>
+<li><a href="#playback">Playback</a></li>
+<li><a href="#editing">Editing and export</a></li>
+<li><a href="#recording">Recording</a></li>
+<li><a href="#casting">Casting</a></li>
+<li><a href="#network-audio">Network audio</a></li>
+<li><a href="#languages">Languages</a></li>
+<li><a href="#input">Input</a></li>
+<li><a href="#ai">Assistant and agents</a></li>
+<li><a href="#technology">Technology</a></li>
+<li><a href="#files">Settings and data</a></li>
+<li><a href="#license">License and privacy</a></li>
+</ul>
+  </nav>
+
+<h2 id="systems">Systems and processors</h2>
+<div class="table"><table>
+<thead><tr><th>System</th><th>Versions</th><th>Processors</th><th>Packages</th></tr></thead>
+<tbody>
+<tr><td>Linux</td><td>Debian 13, Ubuntu 24.04 and 26.04, Fedora 44, Arch; Wayland and X11</td><td>x86_64, ARM64; RISC-V on Debian and Ubuntu</td><td>.deb and .rpm for each release, PKGBUILD for Arch</td></tr>
+<tr><td>Windows</td><td>Windows 10 and 11</td><td>x64, ARM64</td><td>Per-user installer (.msi), portable .zip</td></tr>
+<tr><td>macOS</td><td>macOS 14 or later</td><td>Apple Silicon</td><td>Installer package (.pkg)</td></tr>
+</tbody>
+</table></div>
+<table class="spec"><tbody>
+<tr><th>Graphics</th><td>The graphics card through Vulkan on Linux, Direct3D 12 or Vulkan on Windows, and Metal on macOS; on Linux without a Vulkan driver, Mesa's software driver</td></tr>
+<tr><th>FFmpeg</th><td>The system's on Linux, each package built for its release's; FFmpeg 9 with its encoders inside the Windows and macOS packages</td></tr>
+<tr><th>Instances</th><td>One running plaa per user; opening more files adds windows to it</td></tr>
+<tr><th>Look</th><td>Material Design 3, light or dark, and the accent color from the system or one chosen</td></tr>
+</tbody></table>
+
+<h2 id="formats">Formats</h2>
+<table class="spec"><tbody>
+<tr><th>Containers</th><td>Every format FFmpeg reads, among them MP4, MOV, Matroska, WebM, AVI, MPEG-TS, MPEG-PS, FLV, WMV, Ogg, MXF and 3GP</td></tr>
+<tr><th>Video</th><td>H.264, HEVC, AV1, VP9, VP8, MPEG-2, MPEG-4, ProRes, DNxHD, Theora and the rest FFmpeg decodes</td></tr>
+<tr><th>Sound</th><td>AAC, MP3, Opus, Vorbis, FLAC, ALAC, AC-3, E-AC-3, DTS, WAV, AIFF, WavPack, Monkey's Audio, Musepack, WMA and the rest FFmpeg decodes</td></tr>
+<tr><th>Subtitles</th><td>SubRip, WebVTT, MP4 text and other text subtitles; ASS and SSA styled by libass; Blu-ray, DVD and DVB picture subtitles; subtitle files beside the video or in a <code>Subs</code> folder</td></tr>
+<tr><th>Playlists</th><td>M3U and PLS, files opened together, and optionally the opened file's folder</td></tr>
+<tr><th>Streams</th><td>HTTP and HTTPS, HLS, DASH, RTSP, SRT</td></tr>
+<tr><th>Web pages</th><td>YouTube's and the other sites <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a> reads, when it is installed, with playlists</td></tr>
+</tbody></table>
+
+<h2 id="playback">Playback</h2>
+<table class="spec"><tbody>
+<tr><th>Decoding</th><td>On the graphics card where it can: VAAPI, CUDA or Vulkan on Linux, Direct3D 11 on Windows, VideoToolbox on macOS, up to 8K at 60 frames a second; on the processor otherwise</td></tr>
+<tr><th>Colors</th><td>BT.601, BT.709 and BT.2020, 8 to 16 bits; HDR10 and HLG tone mapped for ordinary screens; rotation from the file's metadata</td></tr>
+<tr><th>Scaling</th><td>plaa's own shader, filtering shrunk pictures as mpv does, so text and fine lines stay free of moiré</td></tr>
+<tr><th>Sound</th><td>In step with the picture by the output device's clock; the output chosen in Settings, through PipeWire or PulseAudio on Linux</td></tr>
+<tr><th>Seeking</th><td>Dragging the timeline with the picture following; 5 and 10 seconds; frame by frame; chapters; a preview over the timeline</td></tr>
+<tr><th>Speed</th><td>From 0.25 to 3 times, keeping the pitch</td></tr>
+<tr><th>Looping</th><td>The file, or an A-B loop</td></tr>
+<tr><th>Zoom</th><td>Up to 16 times at the pointer, dragged to look around</td></tr>
+<tr><th>Windows</th><td>One per file, full screen, picture in picture</td></tr>
+<tr><th>Visualizer</th><td>Spectrum, waveform, or Prism in three dimensions</td></tr>
+</tbody></table>
+
+<h2 id="editing">Editing and export</h2>
+<table class="spec"><tbody>
+<tr><th>Editing</th><td>Trim, split into clips, arrange and remove clips, rotate, flip; undo and redo; nothing changes until you export</td></tr>
+<tr><th>Video export</th><td>H.264, HEVC or AV1 with AAC sound, at the file's size or smaller, as 720p or 480p; HDR kept in HEVC and AV1</td></tr>
+<tr><th>Encoders</th><td>The graphics card's where one opens (NVENC, AMF, Quick Sync, VAAPI, VideoToolbox); x264, x265 and SVT-AV1 on the processor otherwise</td></tr>
+<tr><th>Sound export</th><td>AAC, MP3 or Opus at a bit rate chosen; FLAC, ALAC or WAV in 16 or 24 bits</td></tr>
+<tr><th>Frames</th><td>The picture shown, saved as a PNG</td></tr>
+</tbody></table>
+
+<h2 id="recording">Recording</h2>
+<table class="spec"><tbody>
+<tr><th>Sound</th><td>A microphone, or what the computer plays: the sound server's monitors on Linux, every output on Windows and macOS. A level meter, up to 30 dB louder, levelling automatically, in the sound export's formats</td></tr>
+<tr><th>Screen</th><td>A screen, a window or, on Linux, a region, with the pointer: through the ScreenCast portal and PipeWire on Linux, Windows.Graphics.Capture on Windows and ScreenCaptureKit on macOS</td></tr>
+<tr><th>Camera</th><td>Through FFmpeg: V4L2 on Linux, DirectShow on Windows, AVFoundation on macOS, iPhones as Continuity Camera included</td></tr>
+<tr><th>Video formats</th><td>H.264, HEVC or AV1 on the graphics card's encoder where one opens, at 24, 30, 60 or 120 pictures a second or every picture sent, with a microphone's sound or what the computer plays</td></tr>
+</tbody></table>
+
+<h2 id="casting">Casting</h2>
+<table class="spec"><tbody>
+<tr><th>Devices</th><td>Chromecast, found through mDNS; TVs, speakers and programs that play DLNA (UPnP AV), found through SSDP</td></tr>
+<tr><th>What goes</th><td>A file, served by plaa from this computer, or a stream's address</td></tr>
+<tr><th>Control</th><td>Play, pause and seek from plaa's own controls and timeline</td></tr>
+</tbody></table>
+
+<h2 id="network-audio">Network audio</h2>
+<table class="spec"><tbody>
+<tr><th>Role</th><td>A Milan talker and listener of its own on Linux; on macOS, through the Mac's own AVB entity</td></tr>
+<tr><th>Stream formats</th><td>AAF, as the AVB community's Basic and Extended Audio profiles set them, and AM824, of 2 or 8 channels, at 48, 96 or 192 kHz, in SR class A or B</td></tr>
+<tr><th>Control</th><td>Any Milan controller connects plaa's stream; Network Audio connects listeners to it, and Connect plays a talker's stream on this computer</td></tr>
+<tr><th>Without AVB switches</th><td>AVB Lite: a copy of the stream for each listener, up to five</td></tr>
+<tr><th>Time</th><td>gPTP from ptp4l, on an interface with a PTP hardware clock, such as Intel's I210</td></tr>
+<tr><th>Beside triib</th><td>Shares the network's reservations with triib's entity service where it runs</td></tr>
+</tbody></table>
+
+<h2 id="languages">Languages</h2>
+<table class="spec"><tbody>
+<tr><th>Interface</th><td>38 languages: Arabic, Bengali, Catalan, Chinese (Simplified and Traditional), Czech, Danish, Dutch, English (US and UK), Finnish, French, German, Greek, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian (Bokmål), Persian, Polish, Portuguese (Brazil and Portugal), Romanian, Russian, Spanish, Swahili, Swedish, Tamil, Thai, Turkish, Ukrainian, Urdu, Vietnamese</td></tr>
+<tr><th>Right to left</th><td>Arabic, Hebrew, Persian and Urdu lay out right to left</td></tr>
+<tr><th>Choosing</th><td>Follows the system's language, or the one chosen in Settings; audio and subtitle tracks follow the languages Settings prefer</td></tr>
+<tr><th>Translations</th><td>One Fluent file per language; the translations other than English are first drafts open to further review</td></tr>
+</tbody></table>
+
+<h2 id="input">Input</h2>
+<table class="spec"><tbody>
+<tr><th>Keyboard</th><td>Shortcuts for every main action, with ⌘ on macOS and Ctrl elsewhere; changeable in the settings file, for every system or for one</td></tr>
+<tr><th>Media keys</th><td>Play, pause, next and previous, through MPRIS on Linux, the media flyout on Windows and Now Playing on macOS</td></tr>
+<tr><th>Pointer</th><td>Mouse and touchpad: the timeline, Ctrl+wheel to zoom at the pointer, dragging to look around</td></tr>
+<tr><th>Drag and drop</th><td>Files dropped on a window open in it, on Wayland as elsewhere</td></tr>
+<tr><th>Accessibility</th><td>Keyboard focus with Tab and Shift+Tab; follows the system's reduced motion setting</td></tr>
+</tbody></table>
+
+<h2 id="ai">Assistant and agents</h2>
+<table class="spec"><tbody>
+<tr><th>Cloud models</th><td>Anthropic, OpenAI and Google Gemini, with your own API key, kept in the system keychain</td></tr>
+<tr><th>Local models</th><td>Ollama, or an OpenAI-compatible server such as LM Studio's, llama.cpp's or vLLM's, on this computer or another</td></tr>
+<tr><th>What a model needs</th><td>Tool calling; seeing pictures is optional</td></tr>
+<tr><th>Shared models</th><td>Set up once for the Scramble Tools apps, such as prev, in <code>scramble/assistant.toml</code> in the config folder; each app chooses its own</td></tr>
+<tr><th>MCP server</th><td><code>plaa --mcp</code>, over standard input and output, for Claude Code (<code>claude mcp add plaa -- plaa --mcp</code>) or any MCP client. It drives the plaa you are using, starting it if needed; nothing listens on the network</td></tr>
+<tr><th>Access</th><td>plaa asks before letting a new agent in, and remembers Allow; Settings lists allowed agents, and outside control can be turned off</td></tr>
+<tr><th>Tools (17)</th><td><code>list_windows</code>, <code>get_status</code>, <code>get_info</code>, <code>get_frame</code>, <code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code>, <code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code>, <code>next_item</code>, <code>previous_item</code>, <code>set_fullscreen</code>, <code>focus_window</code>, and <code>open</code> and <code>close_window</code></td></tr>
+<tr><th>Asking first</th><td>A switch each for seeing what plays, controlling playback, and opening files or closing windows</td></tr>
+</tbody></table>
+
+<h2 id="technology">Technology</h2>
+<table class="spec"><tbody>
+<tr><th>Language</th><td>Rust, edition 2024, Rust 1.95 or newer to build</td></tr>
+<tr><th>Interface</th><td>iced 0.14 with wgpu, and scramble-ui, shared with prev and triib</td></tr>
+<tr><th>Media</th><td>FFmpeg 9 through ffmpeg-next; libass for styled subtitles; cpal for sound</td></tr>
+<tr><th>Network audio</th><td>The atdecc, avb-lite, avb-mrp, avb-net and avb-stream crates; raw sockets through a small helper holding <code>CAP_NET_RAW</code> on Linux, and Apple's AudioVideoBridging framework on macOS</td></tr>
+<tr><th>Translations</th><td>Project Fluent</td></tr>
+<tr><th>AI agents</th><td>An MCP server through rmcp, relaying to the running plaa over a private local socket (a named pipe on Windows)</td></tr>
+<tr><th>Assistant</th><td>rig-core for Anthropic, OpenAI, Google Gemini, Ollama and OpenAI-compatible servers; API keys through keyring (the Secret Service on Linux, the Credential Manager on Windows, the Keychain on macOS)</td></tr>
+<tr><th>Fonts</th><td>Roboto Flex and Material Symbols Rounded, bundled</td></tr>
+<tr><th>System integration</th><td>XDG desktop portals and MPRIS on Linux; Win32 and the System Media Transport Controls on Windows; AppKit, MediaPlayer and Launch Services on macOS, with a menu bar through muda</td></tr>
+<tr><th>Dependencies</th><td>All open source, with licenses checked by cargo-deny in CI</td></tr>
+</tbody></table>
+
+<h2 id="files">Settings and data</h2>
+<div class="table"><table>
+<thead><tr><th>System</th><th>Settings</th><th>Where files were left off</th></tr></thead>
+<tbody>
+<tr><td>Linux</td><td><code>~/.config/plaa.toml</code></td><td><code>~/.local/state/plaa</code></td></tr>
+<tr><td>Windows</td><td><code>%APPDATA%\plaa\plaa.toml</code></td><td><code>%LOCALAPPDATA%\plaa</code></td></tr>
+<tr><td>macOS</td><td><code>~/Library/Application Support/plaa/plaa.toml</code></td><td><code>~/Library/Application Support/plaa</code></td></tr>
+</tbody>
+</table></div>
+
+<h2 id="license">License and privacy</h2>
+<table class="spec"><tbody>
+<tr><th>License</th><td>GNU GPL-3.0 or later; the bundled fonts keep their own licenses (SIL Open Font License 1.1, Apache 2.0)</td></tr>
+<tr><th>Source</th><td><a href="https://github.com/scrambletools/plaa">github.com/scrambletools/plaa</a>, with the sources of the libraries the Windows and macOS packages carry on each release</td></tr>
+<tr><th>Network</th><td>None of its own: plaa goes online only to play the addresses and web pages you open and to open links you click; on your local network it finds TVs and speakers as the Cast menu opens, and takes part in the AVB network you choose. No accounts, no telemetry</td></tr>
+<tr><th>AI agents</th><td>Only those you allow, through <code>plaa --mcp</code>; no bundled model. What an agent sees goes to the model it uses</td></tr>
+<tr><th>Assistant</th><td>Talks only to the model you add: a local model stays on your computer, and a cloud model gets what it asks to see. API keys stay in the system keychain</td></tr>
+<tr><th>Code signing</th><td>Windows releases are signed by Scramble Tools LLC, and macOS releases with Scramble Tools' Developer ID and notarized by Apple; see the <a href="./#code-signing">code signing policy</a></td></tr>
+</tbody></table>
+</main>
+
+<footer>
+  <p>plaa is free software under the <a href="https://github.com/scrambletools/plaa/blob/main/LICENSE">GNU GPL-3.0</a>.
+    Made by <a href="https://github.com/scrambletools">Scramble Tools</a>.
+    <a href="./#code-signing">Code signing policy</a> · <a href="./#privacy">Privacy</a></p>
+</footer>
+
+</body>
+</html>

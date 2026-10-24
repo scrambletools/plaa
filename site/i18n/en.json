@@ -1,0 +1,1703 @@
+{
+ "430e332bd8f9": {
+  "page": "index.html",
+  "text": "plaa: a media player for Linux, Windows and macOS that plays on the network"
+ },
+ "c499f293b5b7": {
+  "page": "index.html",
+  "text": "<img1>plaa"
+ },
+ "fc338f87a058": {
+  "page": "index.html",
+  "text": "Features"
+ },
+ "a479c9c34e87": {
+  "page": "index.html",
+  "text": "Download"
+ },
+ "cd9e8f38bcfe": {
+  "page": "index.html",
+  "text": "Tour"
+ },
+ "7b4379a60050": {
+  "page": "index.html",
+  "text": "Specs"
+ },
+ "c60f2f817f12": {
+  "page": "index.html",
+  "text": "Source on GitHub"
+ },
+ "e05ca859c449": {
+  "page": "index.html",
+  "text": "plaa"
+ },
+ "3102d61d8271": {
+  "page": "index.html",
+  "text": "<span1>Plays what you have, where you want it.</span1> <span2>Video, audio, streams and web video, trimmed, exported and recorded, on your screen, on a TV or speaker, or across an AVB network, by yourself or with your favorite AI&nbsp;agent.</span2>"
+ },
+ "f7b92ac27107": {
+  "page": "index.html",
+  "text": "<a1>Download plaa {v}</a1> <a2>Source on GitHub</a2>"
+ },
+ "dff4b5f3fa95": {
+  "page": "index.html",
+  "text": "Free and open source under the GPL 3 on Linux, Windows and macOS. In 38 languages, including right-to-left."
+ },
+ "7fc233ae8f37": {
+  "page": "index.html",
+  "text": "What plaa does"
+ },
+ "4c091a62f539": {
+  "page": "index.html",
+  "text": "Plays almost anything"
+ },
+ "878509cdcfaa": {
+  "page": "index.html",
+  "text": "Every format FFmpeg reads, decoded on the graphics card where it can, HDR shown as it should be, with the file's chapters, tracks in the languages you prefer, and subtitles of every kind, ASS styled as made."
+ },
+ "931119c8da58": {
+  "page": "index.html",
+  "text": "Streams and web video"
+ },
+ "295b279b1327": {
+  "page": "index.html",
+  "text": "HTTP, HLS, DASH, RTSP and SRT addresses, and web pages such as YouTube's through yt-dlp when you have it, in the quality that fits your screen or the one you choose."
+ },
+ "66eb3a233fe1": {
+  "page": "index.html",
+  "text": "Trim, split and export"
+ },
+ "c59ecf96db19": {
+  "page": "index.html",
+  "text": "Cut a file into clips, reorder, turn and flip them, and export the result on your graphics card's encoder where there is one, or the sound alone, compressed or lossless. Nothing changes until you export."
+ },
+ "1c54132b8e5a": {
+  "page": "index.html",
+  "text": "Record"
+ },
+ "186fbb0ba934": {
+  "page": "index.html",
+  "text": "Sound from a microphone, the screen or a window with or without its sound, and a camera, as QuickTime Player's New Recording does, in formats you choose."
+ },
+ "40832ca7a314": {
+  "page": "index.html",
+  "text": "A visualizer for sound"
+ },
+ "574e794c4ca6": {
+  "page": "index.html",
+  "text": "A sound file shows its cover with a spectrum of what you hear or the file's waveform under it, or a scene in three dimensions that moves with the music."
+ },
+ "a1a29a656b74": {
+  "page": "index.html",
+  "text": "Cast to a TV or speaker"
+ },
+ "9cac06890429": {
+  "page": "index.html",
+  "text": "Send what plays to a Chromecast, or a TV, speaker or program that plays DLNA, on your network, and play, pause and seek it from plaa's own controls and timeline."
+ },
+ "fa31c96e4283": {
+  "page": "index.html",
+  "text": "An assistant beside what plays"
+ },
+ "f43dded6e001": {
+  "page": "index.html",
+  "text": "Ask about what plays in a chat panel, and the assistant looks at it and plays, pauses, seeks or changes the sound for you. Use a local model that stays on your computer, or a cloud model from Anthropic, OpenAI or Google with your own key."
+ },
+ "2b51b10f6585": {
+  "page": "index.html",
+  "text": "AI agents"
+ },
+ "88b19d0961ab": {
+  "page": "index.html",
+  "text": "Agents such as Claude Code see what plays and control the plaa you are using over MCP, only once you allow them, and asking before the steps you choose."
+ },
+ "c4595dc0f71f": {
+  "page": "index.html",
+  "text": "Floating controls"
+ },
+ "823609cc4ff6": {
+  "page": "index.html",
+  "text": "Material 3 toolbars float over the picture and slide away as you watch, or stay docked, in light or dark, in your system's accent color, picture in picture and full screen."
+ },
+ "d75531af49e4": {
+  "page": "index.html",
+  "text": "At home on each system"
+ },
+ "8ec672ece138": {
+  "page": "index.html",
+  "text": "Media keys and the system's now-playing controls, a single running plaa that takes the files you open, Finder and Open With, and the Mac's own menu bar."
+ },
+ "55128bc5e315": {
+  "page": "index.html",
+  "text": "Trim, split and arrange clips"
+ },
+ "ddeae00db25a": {
+  "page": "index.html",
+  "text": "The inspector: the file and its streams"
+ },
+ "618c4c7e36f8": {
+  "page": "index.html",
+  "text": "A sound file's cover, tags and spectrum"
+ },
+ "955e3d259f37": {
+  "page": "index.html",
+  "text": "Prism, moved by the music"
+ },
+ "ad3edae34bf7": {
+  "page": "index.html",
+  "text": "<a1>Take the tour</a1>"
+ },
+ "e3a1dad8ed4e": {
+  "page": "index.html",
+  "text": "Network audio, built in"
+ },
+ "93f234d23ec8": {
+  "page": "index.html",
+  "text": "plaa is an AVB and Milan entity of its own on Linux, and uses the Mac's on macOS, so what it plays goes straight to the speakers, amplifiers and interfaces on your AVB network, in time with them."
+ },
+ "15c0d13f2d6e": {
+  "page": "index.html",
+  "text": "Send what plays"
+ },
+ "1bc9e8a6e682": {
+  "page": "index.html",
+  "text": "A stereo 48 kHz stream on the network's own clock, which any Milan controller can connect, starting once a listener is ready."
+ },
+ "3eec6e1911fd": {
+  "page": "index.html",
+  "text": "Network Audio"
+ },
+ "873d629c365e": {
+  "page": "index.html",
+  "text": "The listeners that can play plaa's sound, each with one button, and how the one you choose takes its stream, kept up to date as other controllers change them."
+ },
+ "bb3d7db8d002": {
+  "page": "index.html",
+  "text": "Listen here"
+ },
+ "9e31767f0533": {
+  "page": "index.html",
+  "text": "The talkers on the network, each a button away from playing on this computer."
+ },
+ "8e675af91fda": {
+  "page": "index.html",
+  "text": "On a plain switch"
+ },
+ "347b3fbba1d6": {
+  "page": "index.html",
+  "text": "Where the switch has no AVB, plaa falls back to AVB Lite and sends each listener, up to five, a copy of its own, still in time with the rest of the network."
+ },
+ "506db875dbb5": {
+  "page": "index.html",
+  "text": "Beside triib"
+ },
+ "276bd42d261e": {
+  "page": "index.html",
+  "text": "plaa shares the network's reservations with triib's entity service where it runs, and keeps network time with ptp4l where nothing else does."
+ },
+ "5e8a7051c9d0": {
+  "page": "index.html",
+  "text": "plaa {v} for Linux and Windows on x86_64 and ARM64, Linux on RISC-V, and macOS on Apple Silicon. Every file is on the <a1>release page</a1>, with <a2>checksums</a2>. On Linux each package uses its release's own FFmpeg; on Windows and macOS plaa carries its own."
+ },
+ "bc0792d8dc81": {
+  "page": "index.html",
+  "text": "System"
+ },
+ "fd6c3ebf7bef": {
+  "page": "index.html",
+  "text": "Install"
+ },
+ "de89bebd80f9": {
+  "page": "index.html",
+  "text": "Windows 10 and 11"
+ },
+ "304ebb08851b": {
+  "page": "index.html",
+  "text": "Installer (.msi): <a1>x64</a1> · <a2>ARM64</a2>"
+ },
+ "266dca3640a2": {
+  "page": "index.html",
+  "text": "Open it: it installs for you alone, with no administrator prompt"
+ },
+ "5ab7761535e2": {
+  "page": "index.html",
+  "text": "Windows, portable"
+ },
+ "c6562b548a86": {
+  "page": "index.html",
+  "text": ".zip: <a1>x64</a1> · <a2>ARM64</a2>"
+ },
+ "d813bfe8feb3": {
+  "page": "index.html",
+  "text": "Unpack it anywhere and run <code>plaa.exe</code>"
+ },
+ "f6f4e84c2d4a": {
+  "page": "index.html",
+  "text": "macOS 14 and later, Apple Silicon"
+ },
+ "1444a039b47d": {
+  "page": "index.html",
+  "text": "Installer package (.pkg): <a1>Apple Silicon</a1>"
+ },
+ "c10c7bf238c9": {
+  "page": "index.html",
+  "text": "Open it. It lets plaa reach your AVB network too"
+ },
+ "f03c1c4c6d56": {
+  "page": "index.html",
+  "text": "Debian 13"
+ },
+ "d2d0a2426b0f": {
+  "page": "index.html",
+  "text": ".deb: <a1>x86_64</a1> · <a2>ARM64</a2> · <a3>RISC-V</a3>"
+ },
+ "f4e5feb0454d": {
+  "page": "index.html",
+  "text": "<code>sudo apt install ./plaa_{v}-1.debian13_*.deb</code>"
+ },
+ "16b8952c48f9": {
+  "page": "index.html",
+  "text": "Ubuntu 24.04"
+ },
+ "88fa6ce1816a": {
+  "page": "index.html",
+  "text": "<code>sudo apt install ./plaa_{v}-1.ubuntu24.04_*.deb</code>"
+ },
+ "87db66c888a2": {
+  "page": "index.html",
+  "text": "Ubuntu 26.04"
+ },
+ "2bf528aa536d": {
+  "page": "index.html",
+  "text": "<code>sudo apt install ./plaa_{v}-1.ubuntu26.04_*.deb</code>"
+ },
+ "5693d641dc57": {
+  "page": "index.html",
+  "text": "Fedora 44"
+ },
+ "3989655ccf61": {
+  "page": "index.html",
+  "text": ".rpm: <a1>x86_64</a1> · <a2>ARM64</a2>"
+ },
+ "51db2a3d4540": {
+  "page": "index.html",
+  "text": "<code>sudo dnf install ./plaa-{v}-1.fc44.*.rpm</code>"
+ },
+ "f96ddf323d80": {
+  "page": "index.html",
+  "text": "Arch"
+ },
+ "c351afe9e9fa": {
+  "page": "index.html",
+  "text": "<a1>PKGBUILD</a1> and <a2>plaa.install</a2>"
+ },
+ "70a4bfafdc84": {
+  "page": "index.html",
+  "text": "<code>makepkg -si</code> in a folder with both"
+ },
+ "e9f62bfba1c6": {
+  "page": "index.html",
+  "text": "The Windows installer and <code>plaa.exe</code> are signed by Scramble Tools LLC, and the macOS package with its Developer ID, notarized by Apple. Each package is installed, upgraded, run, made to play a video and removed in a clean system before a release goes out. See the <a1>install notes</a1> for what differs between them, and the release for the sources of the libraries the Windows and macOS packages carry."
+ },
+ "321062598d1b": {
+  "page": "index.html",
+  "text": "Code signing policy"
+ },
+ "4c2329716938": {
+  "page": "index.html",
+  "text": "Windows releases of plaa are signed by Scramble Tools LLC with <a1>Microsoft Azure Artifact Signing</a1>, and macOS releases with Scramble Tools' Developer ID, notarized by Apple."
+ },
+ "1f83be07964a": {
+  "page": "index.html",
+  "text": "<strong>What is signed:</strong> only programs built from this project's own <a1>source code</a1> by its GitHub Actions release workflow: <code>plaa.exe</code>, the libraries it carries and the installers."
+ },
+ "840981ec0887": {
+  "page": "index.html",
+  "text": "<strong>Committers and reviewers:</strong> the members of the <a1>scrambletoolsllc</a1> GitHub organization, who review every outside contribution before it is merged."
+ },
+ "6263ca064f9a": {
+  "page": "index.html",
+  "text": "<strong>Approvers:</strong> the owner of the <a1>scrambletoolsllc</a1> GitHub organization, who alone can publish a release, and with it a signing."
+ },
+ "2d89c53bf0a2": {
+  "page": "index.html",
+  "text": "Signing runs only in the release workflow, which signs in to Azure without a stored secret. Everyone on the team signs in to GitHub and Azure with two-factor authentication."
+ },
+ "cf01481f626d": {
+  "page": "index.html",
+  "text": "Privacy"
+ },
+ "b38d6a398de3": {
+  "page": "index.html",
+  "text": "This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. plaa goes online only to play the addresses and web pages you open, through yt-dlp for web pages, and to open links you click. On your local network it finds TVs and speakers when you open the Cast menu, serves the file you cast to the one you choose while it plays, and, when you choose a network interface for AVB, takes part in that network. When you use the assistant with a model you added, plaa sends that model your messages and what it asks to see of what plays: to the provider you chose for a cloud model, or to the server you gave for a local model. API keys stay in your system's keychain. Agents reach plaa only through <code>plaa --mcp</code> on your own computer, once you allow them. plaa has no accounts and sends no telemetry. This website sets no cookies and loads nothing from other sites."
+ },
+ "cb6517210def": {
+  "page": "index.html",
+  "text": "plaa is free software under the <a1>GNU GPL-3.0</a1>. Made by <a2>Scramble Tools</a2>. The screenshots show <a3>Big Buck Bunny</a3>, © 2008 Blender Foundation, under <a4>CC BY 3.0</a4>. <a5>Code signing policy</a5> · <a6>Privacy</a6>"
+ },
+ "325b8765f5de": {
+  "page": "index.html",
+  "text": "plaa is a free, open source video and audio player, similar to QuickTime Player and IINA, that trims and exports, records, casts to TVs and speakers, sends and listens to AVB and Milan network audio, and lets AI agents such as Claude Code control it over MCP.",
+  "attribute": true
+ },
+ "e20c8069b91c": {
+  "page": "index.html",
+  "text": "The plaa icon",
+  "attribute": true
+ },
+ "19c6d40dec3b": {
+  "page": "index.html",
+  "text": "plaa in dark mode, paused on Big Buck Bunny's meadow, where three rodents peek out from behind a rock, with the toolbar floating over the picture and the timeline, volume and playback controls floating below",
+  "attribute": true
+ },
+ "cd8e2c6f1e4d": {
+  "page": "index.html",
+  "text": "Editing Big Buck Bunny: the film as a strip of pictures below a flying squirrel, cut into three clips with the middle one chosen, beside the cut and delete buttons and Done",
+  "attribute": true
+ },
+ "8fc370b0033c": {
+  "page": "index.html",
+  "text": "The inspector beside the picture, listing the file's name, folder, size, format, duration and bit rate, its H.264 video decoded on the graphics card, and its MP3 sound",
+  "attribute": true
+ },
+ "b16453547bbb": {
+  "page": "index.html",
+  "text": "plaa in light mode playing a sound file: its cover, a still of Big Buck Bunny frowning, its title and artist, and its spectrum below",
+  "attribute": true
+ },
+ "d5eca9321313": {
+  "page": "index.html",
+  "text": "Prism: a glowing sphere with rainbow cutouts over a neon grid, with bars of the spectrum streaming past it",
+  "attribute": true
+ },
+ "2f37d63d1977": {
+  "page": "tour.html",
+  "text": "A tour of plaa"
+ },
+ "f3b42bfd65b6": {
+  "page": "tour.html",
+  "text": "<a1>Opening</a1>"
+ },
+ "7a84a635315d": {
+  "page": "tour.html",
+  "text": "<a1>Playing</a1>"
+ },
+ "6ee2247584a1": {
+  "page": "tour.html",
+  "text": "<a1>Tracks and subtitles</a1>"
+ },
+ "1b74c70c12b2": {
+  "page": "tour.html",
+  "text": "<a1>Streams and web videos</a1>"
+ },
+ "0c9fedf20f89": {
+  "page": "tour.html",
+  "text": "<a1>Playlists</a1>"
+ },
+ "1bcbfd2a1672": {
+  "page": "tour.html",
+  "text": "<a1>Sound files</a1>"
+ },
+ "9e24965d94e5": {
+  "page": "tour.html",
+  "text": "<a1>Inspector</a1>"
+ },
+ "e8ae1bb939fa": {
+  "page": "tour.html",
+  "text": "<a1>Trimming and splitting</a1>"
+ },
+ "a92544229c4f": {
+  "page": "tour.html",
+  "text": "<a1>Exporting</a1>"
+ },
+ "992f7d2d7a0e": {
+  "page": "tour.html",
+  "text": "<a1>Recording</a1>"
+ },
+ "f3a1b7e09eaa": {
+  "page": "tour.html",
+  "text": "<a1>Casting</a1>"
+ },
+ "6542eb4e789b": {
+  "page": "tour.html",
+  "text": "<a1>Network audio</a1>"
+ },
+ "f45e0a5be3ce": {
+  "page": "tour.html",
+  "text": "<a1>The assistant</a1>"
+ },
+ "2875ef990c96": {
+  "page": "tour.html",
+  "text": "<a1>AI agents</a1>"
+ },
+ "70153fb14dec": {
+  "page": "tour.html",
+  "text": "<a1>On each system</a1>"
+ },
+ "0183b04870f6": {
+  "page": "tour.html",
+  "text": "<a1>Settings</a1>"
+ },
+ "5d98fb695919": {
+  "page": "tour.html",
+  "text": "<a1>Keyboard shortcuts</a1>"
+ },
+ "3cec564d5325": {
+  "page": "tour.html",
+  "text": "This tour walks through what plaa does, in the order you are likely to meet it. On macOS, use ⌘ where it says Ctrl. The <a1>keyboard shortcuts</a1> are listed at the end, and can be changed in the settings file."
+ },
+ "742ca47f4792": {
+  "page": "tour.html",
+  "text": "The screenshots show <a1>Big Buck Bunny</a1>, © 2008 Blender Foundation, under <a2>CC BY 3.0</a2>."
+ },
+ "56e44065a564": {
+  "page": "tour.html",
+  "text": "Opening"
+ },
+ "167c4009085d": {
+  "page": "tour.html",
+  "text": "Started on its own, plaa offers to open a file or an address, or to record. Open a file with Ctrl+O, from the file manager's Open With, from the command line (<code>plaa film.mkv</code>), or by dropping it on a window. Open Address (Ctrl+U) takes a stream or a web page, and offers the addresses opened lately again."
+ },
+ "fffa3294da8b": {
+  "page": "tour.html",
+  "text": "Each file plays in a window of its own, and there is one running plaa: a file opened again from the file manager or the command line goes to the running one, as files opened from Finder do on macOS. To have video and sound files open in plaa, use Make Default in <a1>Settings</a1>."
+ },
+ "298c39056151": {
+  "page": "tour.html",
+  "text": "Playing"
+ },
+ "8a60f2cfa0bc": {
+  "page": "tour.html",
+  "text": "The toolbar and the playback controls float over the picture and slide away once the pointer rests or leaves the window, and come back when it moves. The floating bars button docks them above and below the picture instead, and on a narrow window the tools that do not fit go into the More menu."
+ },
+ "caab4aa19422": {
+  "page": "tour.html",
+  "text": "Pointing at the timeline shows a picture from there, its time and its chapter; dragging it moves the picture with the handle, exactly. The arrow keys skip 5 seconds, J and L 10, and the comma and period keys step a frame. Speed goes from a quarter to three times, keeping the sound's pitch, and the volume and full screen are at the right of the controls."
+ },
+ "5a8ed52dd42d": {
+  "page": "tour.html",
+  "text": "Ctrl and the mouse wheel zoom in on the picture at the pointer, up to 16 times, and dragging it looks around. Picture in picture (Ctrl+Shift+P) keeps a small window over the others in a corner. plaa resumes each file where you left off, keeps the screen on while video plays, and keeps the computer awake while sound does."
+ },
+ "18a188fe3b03": {
+  "page": "tour.html",
+  "text": "Video is decoded on the graphics card where it can be, 8K at 60 frames a second included, and drawn by plaa's own shader: BT.601, BT.709 and BT.2020 colors, 8 to 16 bits, HDR10 and HLG tone mapped for an ordinary screen, and phone videos turned upright. The sound keeps in step with the picture by the output device's own clock."
+ },
+ "acee72b51463": {
+  "page": "tour.html",
+  "text": "Tracks and subtitles"
+ },
+ "a4828ced06bc": {
+  "page": "tour.html",
+  "text": "plaa picks the audio and subtitle tracks in the languages Settings prefer, and the menu at the right of the controls changes them. It shows text subtitles (SubRip, WebVTT, MP4 text and more), ASS and SSA styled as made through libass, and Blu-ray, DVD and DVB picture subtitles. Subtitle files beside the video, such as <code>Film.en.srt</code>, or in a <code>Subs</code> folder, are offered too."
+ },
+ "a82a7e7d8874": {
+  "page": "tour.html",
+  "text": "A file's chapters are marked on the timeline and listed in a menu, and Page Up and Page Down move between them. Loop (Ctrl+L) plays the file over and over; B marks where an A-B loop starts, and B again where it ends."
+ },
+ "4a6499d4815b": {
+  "page": "tour.html",
+  "text": "Streams and web videos"
+ },
+ "761e4c8c76ad": {
+  "page": "tour.html",
+  "text": "plaa plays HTTP, HLS, DASH, RTSP and SRT addresses. Streams read ahead, and wait to read on rather than stutter over a slow network, marking on the timeline how far they have read; a spinner shows while they wait."
+ },
+ "1501342093ab": {
+  "page": "tour.html",
+  "text": "With <a1>yt-dlp</a1> installed, plaa also plays the videos on web pages such as YouTube's, with their titles, channels, chapters and thumbnails, and a web playlist becomes a plaa playlist. A stream or web video plays in the quality that fits your screen, or the one chosen from the quality menu, which also offers the sound alone."
+ },
+ "77b69f32c878": {
+  "page": "tour.html",
+  "text": "Playlists"
+ },
+ "ff93c5f1912b": {
+  "page": "tour.html",
+  "text": "Files opened or dropped together play one after another, as do M3U and PLS lists, and in Settings plaa can list the other files in the opened file's folder. The playlist (Ctrl+P) shows beside the picture; P and N go to the previous and next item, and the next one plays when one ends."
+ },
+ "730ec6ee92a8": {
+  "page": "tour.html",
+  "text": "Sound files"
+ },
+ "cc3e703d5fa6": {
+  "page": "tour.html",
+  "text": "A sound file shows its cover, title, artist and album, with the spectrum of what you hear below them, as bars that rise with it and fall back slowly, or the file's waveform from start to end, the part played in the accent color, which a click or a drag seeks along."
+ },
+ "4ca6fd3d67d0": {
+  "page": "tour.html",
+  "text": "Or choose Prism from the visualizer menu: a scene in three dimensions that fills the window and moves with the music, a lace orb around a core that swells on each beat, ringed by glass shards rising with the spectrum, over a rippling grid of light."
+ },
+ "8222c902ae07": {
+  "page": "tour.html",
+  "text": "Inspector"
+ },
+ "089173fd6301": {
+  "page": "tour.html",
+  "text": "The inspector (Ctrl+I) shows what a file is made of: its name, folder, size, format, duration and bit rate, its tags, and each of its streams, with the codec, frame rate and colors of the video and how it is decoded, and the sound's channels and rate."
+ },
+ "ecb454920a65": {
+  "page": "tour.html",
+  "text": "Trimming and splitting"
+ },
+ "b1936c4ed84f": {
+  "page": "tour.html",
+  "text": "Trim (Ctrl+T) shows the file as a strip of pictures with a handle at each end, and plays the part kept over and over while you move them; I and O set them to where it plays. Split (Ctrl+Y) cuts the file into clips at the playhead, which you can drag into another order, trim one by one, or remove with Delete. Rotate and flip (Ctrl+Shift+L, R, H and V) turn the picture, and undo and redo cover every step."
+ },
+ "3f7dbb4e3ccd": {
+  "page": "tour.html",
+  "text": "The edit plays as it will be, clip after clip without a gap. Nothing changes in the file: the edit is kept until you export it, and closing the window with an edit not exported asks first."
+ },
+ "c37343fbc2a7": {
+  "page": "tour.html",
+  "text": "Exporting"
+ },
+ "9dc8ca2429f1": {
+  "page": "tour.html",
+  "text": "Export (Ctrl+E) saves what plays, as edited, as H.264, HEVC or AV1 with AAC sound, at the file's own size or smaller. plaa encodes on the graphics card where it can (NVENC, AMF, Quick Sync, VAAPI or VideoToolbox) and on the processor otherwise, and the dialog says which. HDR video keeps its colors in HEVC and AV1."
+ },
+ "2cde4cf09d8f": {
+  "page": "tour.html",
+  "text": "Sound only saves the sound alone: AAC, MP3 or Opus at a bit rate you choose, or lossless as FLAC, ALAC or WAV in 16 or 24 bits."
+ },
+ "9b98e1a0008e": {
+  "page": "tour.html",
+  "text": "Recording"
+ },
+ "6fe776ee86a3": {
+  "page": "tour.html",
+  "text": "Record Sound (Ctrl+Shift+N) records a microphone, or what the computer plays where the system offers it, with a level meter. Louder takes a quiet input up to 30 dB higher, kept for each input, and Level automatically evens the level out. Space starts and stops; once it stops, plaa asks what to name the recording, then plays it, ready to trim and export."
+ },
+ "ede4cf909ce8": {
+  "page": "tour.html",
+  "text": "Record Screen (Ctrl+Alt+N) records a screen or a window, or on Linux a region, with the pointer, and the sound of a microphone or of what the computer plays if you like, on the graphics card's encoder at 24 to 120 pictures a second. Recording a screen, plaa's own windows stay out of it on macOS; elsewhere the recording window steps aside, and the red dot in the tray on Linux, or opening plaa again, stops it."
+ },
+ "1000efaffc1a": {
+  "page": "tour.html",
+  "text": "Record Camera (Ctrl+Alt+M) records a camera, as QuickTime Player's New Movie Recording does, its picture shown mirrored while it records. Sound recordings go to Music, and screen and camera recordings to Videos (Movies on macOS), unless Settings choose other folders."
+ },
+ "e0f540f92c72": {
+  "page": "tour.html",
+  "text": "Casting"
+ },
+ "04a5d9d5c3ea": {
+  "page": "tour.html",
+  "text": "The Cast menu looks for Chromecasts and for TVs, speakers and programs that play DLNA on your network as it opens. Choose one, and plaa serves the file to it, or hands it the stream's address; plaa's own controls and timeline then play, pause and seek it there. When casting stops, the window goes on from where it got to."
+ },
+ "3f82b908a2ec": {
+  "page": "tour.html",
+  "text": "Network audio"
+ },
+ "005aec8d8b05": {
+  "page": "tour.html",
+  "text": "plaa takes part in AVB and Milan networks, the kind that links professional speakers, amplifiers and audio interfaces. In Settings, Network, choose the wired interface the network is on. With Send what plays on, plaa becomes a Milan talker of its own on Linux, and sends through the Mac's own AVB entity on macOS: the sound of the window last played goes out as a stream on the network's clock, which any Milan controller can connect."
+ },
+ "bcaca47349b5": {
+  "page": "tour.html",
+  "text": "The Network Audio button lists the listeners that can play plaa's sound, each with one button, and how the one chosen takes its stream, kept up to date as other controllers change it. The Connect menu, beside Open, lists the talkers plaa can listen to, and plays the one chosen in a window, as a file plays."
+ },
+ "5090f28c007d": {
+  "page": "tour.html",
+  "text": "Where the switch has no AVB, plaa falls back to AVB Lite and sends each listener, up to five, a copy of its own. On Linux plaa keeps network time with ptp4l, starting its own service where nothing else runs one, and shares the network's reservations with triib's entity service where it runs. The <a1>README</a1> says what each system needs."
+ },
+ "882f80e586dd": {
+  "page": "tour.html",
+  "text": "The assistant"
+ },
+ "0c93fb4ce109": {
+  "page": "tour.html",
+  "text": "The assistant button opens a chat panel beside what plays. Ask about it, and the assistant looks with plaa's own tools, at the status, the file's streams or the picture shown, and plays, pauses, seeks or changes the sound for you, each step shown as it goes."
+ },
+ "bcfe366f6e93": {
+  "page": "tour.html",
+  "text": "Use a local model that stays on your computer, such as Ollama's or one behind an OpenAI-compatible server, or a cloud model from Anthropic, OpenAI or Google with your own key, kept in the system's keychain. Add models in Settings, Assistant; they are shared with the other Scramble Tools apps, such as <a1>prev</a1>."
+ },
+ "38702dc61ea6": {
+  "page": "tour.html",
+  "text": "Agents such as Claude Code can see what plays and control the plaa you are using, through MCP. Add plaa to an agent as an MCP server that runs <code>plaa --mcp</code>; for Claude Code:"
+ },
+ "af4669f0b795": {
+  "page": "tour.html",
+  "text": "The first time an agent connects, plaa asks whether to let it in. Settings, Agents, turns outside control off, lists the agents allowed, and has a switch for each kind of tool, seeing what plays, controlling playback, and opening files or closing windows, that makes plaa ask before an agent's call runs. plaa bundles no model and listens on no network."
+ },
+ "9a830c714bb2": {
+  "page": "tour.html",
+  "text": "Tool"
+ },
+ "ca032b5844df": {
+  "page": "tour.html",
+  "text": "What it does"
+ },
+ "c68c75d921ba": {
+  "page": "tour.html",
+  "text": "<code>list_windows</code>"
+ },
+ "3c28f451da8b": {
+  "page": "tour.html",
+  "text": "plaa's windows: their numbers, titles, what they play and how"
+ },
+ "9fecefc17b3e": {
+  "page": "tour.html",
+  "text": "<code>get_status</code>"
+ },
+ "98fcb0c6c25b": {
+  "page": "tour.html",
+  "text": "A window's state, position, length, speed, volume, loop and tracks"
+ },
+ "fef5ecee2d17": {
+  "page": "tour.html",
+  "text": "<code>get_info</code>"
+ },
+ "13bfcf260ba7": {
+  "page": "tour.html",
+  "text": "The file's format, tags, chapters and streams, and the window's list"
+ },
+ "2a99e5a19f83": {
+  "page": "tour.html",
+  "text": "<code>get_frame</code>"
+ },
+ "baff26c12348": {
+  "page": "tour.html",
+  "text": "The picture shown, as a PNG at most 1280 pixels across"
+ },
+ "72ac155fbfdb": {
+  "page": "tour.html",
+  "text": "<code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code>"
+ },
+ "c8e308704911": {
+  "page": "tour.html",
+  "text": "Playback"
+ },
+ "7e02cb7e0721": {
+  "page": "tour.html",
+  "text": "<code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code>"
+ },
+ "3aea5f8d7ebc": {
+  "page": "tour.html",
+  "text": "The sound, looping, and the sound track and subtitles"
+ },
+ "b868c7d54ec5": {
+  "page": "tour.html",
+  "text": "<code>next_item</code>, <code>previous_item</code>"
+ },
+ "122df2e82b03": {
+  "page": "tour.html",
+  "text": "Moving through a window's list"
+ },
+ "5e3f9531a331": {
+  "page": "tour.html",
+  "text": "<code>set_fullscreen</code>, <code>focus_window</code>"
+ },
+ "e2263a59774e": {
+  "page": "tour.html",
+  "text": "The window"
+ },
+ "0565affc3bbb": {
+  "page": "tour.html",
+  "text": "<code>open</code>, <code>close_window</code>"
+ },
+ "6386fba01e71": {
+  "page": "tour.html",
+  "text": "Opening a file or address, and closing a window"
+ },
+ "61e6dcca7656": {
+  "page": "tour.html",
+  "text": "On each system"
+ },
+ "4b51b9e2a697": {
+  "page": "tour.html",
+  "text": "Media keys work, and what plays shows with its cover in the system's own controls: MPRIS on Linux, which <code>playerctl</code> drives too, the media flyout on Windows, and Now Playing on macOS. On macOS plaa has its own menu bar, and on macOS and Windows title bars in plaa's colors. On Linux, plaa's packages use the system's FFmpeg and sound server, PipeWire or PulseAudio."
+ },
+ "c7f73bb54d92": {
+  "page": "tour.html",
+  "text": "Settings"
+ },
+ "aa4b2a4fabe0": {
+  "page": "tour.html",
+  "text": "Settings (Ctrl+,) has seven tabs. Appearance chooses light or dark, the system's accent color or one of plaa's, and how the floating controls look and when they hide. Playback has hardware decoding, the sound output, resuming, folder playlists, the streams' quality, yt-dlp, and Make Default, which makes plaa the system's default app for video and sound files. Storage chooses the folders recordings and saved frames go to; Network, the AVB interface; Language, plaa's language and the languages tracks are chosen by; Agents and Assistant, what the previous sections describe."
+ },
+ "c05626a0e836": {
+  "page": "tour.html",
+  "text": "plaa keeps its settings in <code>~/.config/plaa.toml</code> on Linux, <code>%APPDATA%\\plaa\\plaa.toml</code> on Windows and <code>~/Library/Application Support/plaa/plaa.toml</code> on macOS. The file's <code>[keys]</code> table changes the keyboard shortcuts, for every system or for one:"
+ },
+ "266695479a94": {
+  "page": "tour.html",
+  "text": "Keyboard shortcuts"
+ },
+ "97c89a4d6630": {
+  "page": "tour.html",
+  "text": "Action"
+ },
+ "e2012dea310d": {
+  "page": "tour.html",
+  "text": "Shortcut"
+ },
+ "fe13ca095619": {
+  "page": "tour.html",
+  "text": "Play or pause"
+ },
+ "e792b570a323": {
+  "page": "tour.html",
+  "text": "Space, K"
+ },
+ "c82ac3db1ee7": {
+  "page": "tour.html",
+  "text": "Back, forward 5 seconds"
+ },
+ "4edba22ffd46": {
+  "page": "tour.html",
+  "text": "Left, Right"
+ },
+ "8f9a9c016bb3": {
+  "page": "tour.html",
+  "text": "Back, forward 10 seconds"
+ },
+ "39668d2dcdcf": {
+  "page": "tour.html",
+  "text": "J, L, Shift+Left, Shift+Right"
+ },
+ "80cbdf488ae9": {
+  "page": "tour.html",
+  "text": "Previous, next frame"
+ },
+ "a2bcccd68515": {
+  "page": "tour.html",
+  "text": "Back to the start"
+ },
+ "70f8bb9a8a53": {
+  "page": "tour.html",
+  "text": "Home"
+ },
+ "7d4085658cc3": {
+  "page": "tour.html",
+  "text": "Volume up, down"
+ },
+ "1c0d3ba8819c": {
+  "page": "tour.html",
+  "text": "Up, Down"
+ },
+ "0f0973483d91": {
+  "page": "tour.html",
+  "text": "Mute"
+ },
+ "c63ae6dd4fc9": {
+  "page": "tour.html",
+  "text": "M"
+ },
+ "4cff1ccfd45a": {
+  "page": "tour.html",
+  "text": "Slower, faster, normal speed"
+ },
+ "273ffea5872b": {
+  "page": "tour.html",
+  "text": "<code>[</code>, <code>]</code>, Backspace"
+ },
+ "e5222e43b204": {
+  "page": "tour.html",
+  "text": "Next subtitles, next audio track"
+ },
+ "de6cecf80ad2": {
+  "page": "tour.html",
+  "text": "C, A"
+ },
+ "d15f886d60b1": {
+  "page": "tour.html",
+  "text": "Full screen"
+ },
+ "8c48656e87fd": {
+  "page": "tour.html",
+  "text": "F, F11, and Escape to leave it"
+ },
+ "4219fc447d08": {
+  "page": "tour.html",
+  "text": "Loop, A-B loop"
+ },
+ "5cf68b723262": {
+  "page": "tour.html",
+  "text": "Ctrl+L, B"
+ },
+ "a8a8dec0c6f9": {
+  "page": "tour.html",
+  "text": "Previous, next in the playlist"
+ },
+ "908faf9c6248": {
+  "page": "tour.html",
+  "text": "P, N, Ctrl+Left, Ctrl+Right"
+ },
+ "ed5a79801258": {
+  "page": "tour.html",
+  "text": "Previous, next chapter"
+ },
+ "d2e270e0576e": {
+  "page": "tour.html",
+  "text": "Page Up, Page Down"
+ },
+ "cd95b41f85dd": {
+  "page": "tour.html",
+  "text": "Playlist"
+ },
+ "a30f66202777": {
+  "page": "tour.html",
+  "text": "Ctrl+P"
+ },
+ "89f875f24652": {
+  "page": "tour.html",
+  "text": "Picture in picture"
+ },
+ "f2f9dd89ac2c": {
+  "page": "tour.html",
+  "text": "Ctrl+Shift+P"
+ },
+ "79235c7c4def": {
+  "page": "tour.html",
+  "text": "Zoom in, out at the pointer"
+ },
+ "2f07f50a986a": {
+  "page": "tour.html",
+  "text": "Ctrl+wheel"
+ },
+ "d5cb3867ccba": {
+  "page": "tour.html",
+  "text": "Save the frame as a picture"
+ },
+ "02aa629c8b16": {
+  "page": "tour.html",
+  "text": "S"
+ },
+ "f63fe3527b73": {
+  "page": "tour.html",
+  "text": "Trim, split"
+ },
+ "b084dcb9ae4b": {
+  "page": "tour.html",
+  "text": "Ctrl+T, Ctrl+Y"
+ },
+ "cdaea324470e": {
+  "page": "tour.html",
+  "text": "Trim from, to the playhead"
+ },
+ "573ffc11d165": {
+  "page": "tour.html",
+  "text": "I, O, while trimming"
+ },
+ "da1e0b17472c": {
+  "page": "tour.html",
+  "text": "Rotate left, right"
+ },
+ "5e9375d6f568": {
+  "page": "tour.html",
+  "text": "Ctrl+Shift+L, Ctrl+Shift+R"
+ },
+ "0475d153334f": {
+  "page": "tour.html",
+  "text": "Flip horizontally, vertically"
+ },
+ "bce8cd8c80f6": {
+  "page": "tour.html",
+  "text": "Ctrl+Shift+H, Ctrl+Shift+V"
+ },
+ "c203cc8c0a8f": {
+  "page": "tour.html",
+  "text": "Undo, redo"
+ },
+ "1ef7df119260": {
+  "page": "tour.html",
+  "text": "Ctrl+Z, Ctrl+Shift+Z"
+ },
+ "f3e4fadb9e37": {
+  "page": "tour.html",
+  "text": "Export"
+ },
+ "37b83fbdbef6": {
+  "page": "tour.html",
+  "text": "Ctrl+E"
+ },
+ "7e4a50a4d160": {
+  "page": "tour.html",
+  "text": "Record sound, the screen, a camera"
+ },
+ "44572414016b": {
+  "page": "tour.html",
+  "text": "Ctrl+Shift+N, Ctrl+Alt+N, Ctrl+Alt+M"
+ },
+ "989e0687a27d": {
+  "page": "tour.html",
+  "text": "Open, open address"
+ },
+ "53662c2af65c": {
+  "page": "tour.html",
+  "text": "Ctrl+O, Ctrl+U"
+ },
+ "e36004564f5b": {
+  "page": "tour.html",
+  "text": "Ctrl+I"
+ },
+ "af7ac1d63059": {
+  "page": "tour.html",
+  "text": "Ctrl+,"
+ },
+ "339ee55e5b3c": {
+  "page": "tour.html",
+  "text": "Close the window, quit"
+ },
+ "25466602447c": {
+  "page": "tour.html",
+  "text": "Ctrl+W, Ctrl+Q"
+ },
+ "b21f5ccaea98": {
+  "page": "tour.html",
+  "text": "plaa is free software under the <a1>GNU GPL-3.0</a1>. Made by <a2>Scramble Tools</a2>. <a3>Code signing policy</a3> · <a4>Privacy</a4>"
+ },
+ "3da31c633261": {
+  "page": "tour.html",
+  "text": "A tour of plaa: opening files, streams and web videos, playing, subtitles, sound files, editing and exporting, recording, casting, network audio, the assistant and AI agents.",
+  "attribute": true
+ },
+ "f5cbdf6bfb51": {
+  "page": "tour.html",
+  "text": "Contents",
+  "attribute": true
+ },
+ "0257872699ae": {
+  "page": "tour.html",
+  "text": "plaa's start window: the plaa clapperboard, Open and Open Address, Record Sound, Record Screen and Record Camera, and the keyboard shortcuts for each",
+  "attribute": true
+ },
+ "9a5df152cd0a": {
+  "page": "tour.html",
+  "text": "plaa in dark mode, paused on Big Buck Bunny holding an apple in a meadow, with the toolbar and controls floating over the picture and, above the timeline, a preview of the scene at 5:29",
+  "attribute": true
+ },
+ "77aa7e8d1b39": {
+  "page": "tour.html",
+  "text": "The Export dialog over Big Buck Bunny looking up at a butterfly on a tree: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p",
+  "attribute": true
+ },
+ "2cb600314536": {
+  "page": "tour.html",
+  "text": "Sound recording at 7.7 seconds: the input's level in two bars, the Louder slider, Level automatically, AAC at 256 kb/s and the stop button",
+  "attribute": true
+ },
+ "3d53bf8e7293": {
+  "page": "tour.html",
+  "text": "The Cast menu open over Big Buck Bunny among flowers, playing on Living Room TV, with Kitchen Speaker listed too and a button to stop",
+  "attribute": true
+ },
+ "fe5c3a8b0ab3": {
+  "page": "tour.html",
+  "text": "The assistant panel beside Big Buck Bunny: asked to skip ahead a minute and turn it down to 60%, it ran Seek, Set the volume and Get the status, and says it did both",
+  "attribute": true
+ },
+ "3234eaecae83": {
+  "page": "tour.html",
+  "text": "plaa's Settings over a paused video, on the Appearance tab: Follow system, Light and Dark, the system accent color switch and the color swatches, and the floating controls' settings",
+  "attribute": true
+ },
+ "a5a8579acf4c": {
+  "page": "specs.html",
+  "text": "plaa specifications"
+ },
+ "0c709f9886c3": {
+  "page": "specs.html",
+  "text": "Specifications"
+ },
+ "b25ee6da5ab9": {
+  "page": "specs.html",
+  "text": "plaa {v}, a video and audio player. For what each feature does, see the <a1>tour</a1>."
+ },
+ "77df58244ee6": {
+  "page": "specs.html",
+  "text": "<a1>Systems</a1>"
+ },
+ "d062a9002bb9": {
+  "page": "specs.html",
+  "text": "<a1>Formats</a1>"
+ },
+ "0c84e3c2302c": {
+  "page": "specs.html",
+  "text": "<a1>Playback</a1>"
+ },
+ "acd0367539a6": {
+  "page": "specs.html",
+  "text": "<a1>Editing and export</a1>"
+ },
+ "4a8e4a99ccc3": {
+  "page": "specs.html",
+  "text": "<a1>Languages</a1>"
+ },
+ "cb800d221665": {
+  "page": "specs.html",
+  "text": "<a1>Input</a1>"
+ },
+ "bed4d4462465": {
+  "page": "specs.html",
+  "text": "<a1>Assistant and agents</a1>"
+ },
+ "0e3d994d9865": {
+  "page": "specs.html",
+  "text": "<a1>Technology</a1>"
+ },
+ "47da9a90205a": {
+  "page": "specs.html",
+  "text": "<a1>Settings and data</a1>"
+ },
+ "ca9f059b4152": {
+  "page": "specs.html",
+  "text": "<a1>License and privacy</a1>"
+ },
+ "1413f8bb4824": {
+  "page": "specs.html",
+  "text": "Systems and processors"
+ },
+ "a239107ef28f": {
+  "page": "specs.html",
+  "text": "Versions"
+ },
+ "2aee1b9d4885": {
+  "page": "specs.html",
+  "text": "Processors"
+ },
+ "0a999012ffb8": {
+  "page": "specs.html",
+  "text": "Packages"
+ },
+ "83ad8510bbd3": {
+  "page": "specs.html",
+  "text": "Linux"
+ },
+ "6456b5b05b07": {
+  "page": "specs.html",
+  "text": "Debian 13, Ubuntu 24.04 and 26.04, Fedora 44, Arch; Wayland and X11"
+ },
+ "d54168005f4f": {
+  "page": "specs.html",
+  "text": "x86_64, ARM64; RISC-V on Debian and Ubuntu"
+ },
+ "d270cea31435": {
+  "page": "specs.html",
+  "text": ".deb and .rpm for each release, PKGBUILD for Arch"
+ },
+ "26d9c28d789c": {
+  "page": "specs.html",
+  "text": "Windows"
+ },
+ "0346c8a43cf8": {
+  "page": "specs.html",
+  "text": "x64, ARM64"
+ },
+ "3950472118c0": {
+  "page": "specs.html",
+  "text": "Per-user installer (.msi), portable .zip"
+ },
+ "cd6fdcbf5a86": {
+  "page": "specs.html",
+  "text": "macOS"
+ },
+ "6611c3a85967": {
+  "page": "specs.html",
+  "text": "macOS 14 or later"
+ },
+ "5b7657e40c32": {
+  "page": "specs.html",
+  "text": "Apple Silicon"
+ },
+ "d347bc820ad2": {
+  "page": "specs.html",
+  "text": "Installer package (.pkg)"
+ },
+ "ab255c27aec8": {
+  "page": "specs.html",
+  "text": "Graphics"
+ },
+ "ac15945a4d6f": {
+  "page": "specs.html",
+  "text": "The graphics card through Vulkan on Linux, Direct3D 12 or Vulkan on Windows, and Metal on macOS; on Linux without a Vulkan driver, Mesa's software driver"
+ },
+ "493adfa792db": {
+  "page": "specs.html",
+  "text": "FFmpeg"
+ },
+ "151af4f52430": {
+  "page": "specs.html",
+  "text": "The system's on Linux, each package built for its release's; FFmpeg 9 with its encoders inside the Windows and macOS packages"
+ },
+ "86d67413e7f1": {
+  "page": "specs.html",
+  "text": "Instances"
+ },
+ "8b59b37fd57d": {
+  "page": "specs.html",
+  "text": "One running plaa per user; opening more files adds windows to it"
+ },
+ "b8db515e7ae6": {
+  "page": "specs.html",
+  "text": "Look"
+ },
+ "1635d69a704b": {
+  "page": "specs.html",
+  "text": "Material Design 3, light or dark, and the accent color from the system or one chosen"
+ },
+ "2804d9f16a38": {
+  "page": "specs.html",
+  "text": "Formats"
+ },
+ "e040a458f465": {
+  "page": "specs.html",
+  "text": "Containers"
+ },
+ "c880c707a9a8": {
+  "page": "specs.html",
+  "text": "Every format FFmpeg reads, among them MP4, MOV, Matroska, WebM, AVI, MPEG-TS, MPEG-PS, FLV, WMV, Ogg, MXF and 3GP"
+ },
+ "bc17c1f0179a": {
+  "page": "specs.html",
+  "text": "Video"
+ },
+ "e050aa663026": {
+  "page": "specs.html",
+  "text": "H.264, HEVC, AV1, VP9, VP8, MPEG-2, MPEG-4, ProRes, DNxHD, Theora and the rest FFmpeg decodes"
+ },
+ "b4e3efeba10e": {
+  "page": "specs.html",
+  "text": "Sound"
+ },
+ "58249ed98f4a": {
+  "page": "specs.html",
+  "text": "AAC, MP3, Opus, Vorbis, FLAC, ALAC, AC-3, E-AC-3, DTS, WAV, AIFF, WavPack, Monkey's Audio, Musepack, WMA and the rest FFmpeg decodes"
+ },
+ "17770471cb9f": {
+  "page": "specs.html",
+  "text": "Subtitles"
+ },
+ "b9177a57177a": {
+  "page": "specs.html",
+  "text": "SubRip, WebVTT, MP4 text and other text subtitles; ASS and SSA styled by libass; Blu-ray, DVD and DVB picture subtitles; subtitle files beside the video or in a <code>Subs</code> folder"
+ },
+ "c99ab2670c2e": {
+  "page": "specs.html",
+  "text": "M3U and PLS, files opened together, and optionally the opened file's folder"
+ },
+ "74985da267c6": {
+  "page": "specs.html",
+  "text": "Streams"
+ },
+ "d34ef5cec8ed": {
+  "page": "specs.html",
+  "text": "HTTP and HTTPS, HLS, DASH, RTSP, SRT"
+ },
+ "c573c2856cb0": {
+  "page": "specs.html",
+  "text": "Web pages"
+ },
+ "3ba14045b630": {
+  "page": "specs.html",
+  "text": "YouTube's and the other sites <a1>yt-dlp</a1> reads, when it is installed, with playlists"
+ },
+ "4b9d36d83c06": {
+  "page": "specs.html",
+  "text": "Decoding"
+ },
+ "588a7e445808": {
+  "page": "specs.html",
+  "text": "On the graphics card where it can: VAAPI, CUDA or Vulkan on Linux, Direct3D 11 on Windows, VideoToolbox on macOS, up to 8K at 60 frames a second; on the processor otherwise"
+ },
+ "88d5e4cac104": {
+  "page": "specs.html",
+  "text": "Colors"
+ },
+ "85f2ac5b11e2": {
+  "page": "specs.html",
+  "text": "BT.601, BT.709 and BT.2020, 8 to 16 bits; HDR10 and HLG tone mapped for ordinary screens; rotation from the file's metadata"
+ },
+ "0b4193c5fc38": {
+  "page": "specs.html",
+  "text": "Scaling"
+ },
+ "40873b784d3d": {
+  "page": "specs.html",
+  "text": "plaa's own shader, filtering shrunk pictures as mpv does, so text and fine lines stay free of moiré"
+ },
+ "c8c7681b29d5": {
+  "page": "specs.html",
+  "text": "In step with the picture by the output device's clock; the output chosen in Settings, through PipeWire or PulseAudio on Linux"
+ },
+ "08f7bb09909c": {
+  "page": "specs.html",
+  "text": "Seeking"
+ },
+ "c1ce50f5b0a8": {
+  "page": "specs.html",
+  "text": "Dragging the timeline with the picture following; 5 and 10 seconds; frame by frame; chapters; a preview over the timeline"
+ },
+ "2d2cb022bc3d": {
+  "page": "specs.html",
+  "text": "Speed"
+ },
+ "69db0af1ff94": {
+  "page": "specs.html",
+  "text": "From 0.25 to 3 times, keeping the pitch"
+ },
+ "5c32a08b6182": {
+  "page": "specs.html",
+  "text": "Looping"
+ },
+ "aea324fb9038": {
+  "page": "specs.html",
+  "text": "The file, or an A-B loop"
+ },
+ "9b3cbed5c490": {
+  "page": "specs.html",
+  "text": "Zoom"
+ },
+ "e464e4ca970f": {
+  "page": "specs.html",
+  "text": "Up to 16 times at the pointer, dragged to look around"
+ },
+ "b90b9ad7b0a1": {
+  "page": "specs.html",
+  "text": "One per file, full screen, picture in picture"
+ },
+ "7177c76604a1": {
+  "page": "specs.html",
+  "text": "Visualizer"
+ },
+ "cf363f71a7dd": {
+  "page": "specs.html",
+  "text": "Spectrum, waveform, or Prism in three dimensions"
+ },
+ "8a4bc4327d46": {
+  "page": "specs.html",
+  "text": "Editing and export"
+ },
+ "3b9ba1a25151": {
+  "page": "specs.html",
+  "text": "Editing"
+ },
+ "d2b18b9ec653": {
+  "page": "specs.html",
+  "text": "Trim, split into clips, arrange and remove clips, rotate, flip; undo and redo; nothing changes until you export"
+ },
+ "f72f94dbc067": {
+  "page": "specs.html",
+  "text": "Video export"
+ },
+ "5e60e4fce8e6": {
+  "page": "specs.html",
+  "text": "H.264, HEVC or AV1 with AAC sound, at the file's size or smaller, as 720p or 480p; HDR kept in HEVC and AV1"
+ },
+ "fc09d6797da2": {
+  "page": "specs.html",
+  "text": "Encoders"
+ },
+ "a972c87f5fad": {
+  "page": "specs.html",
+  "text": "The graphics card's where one opens (NVENC, AMF, Quick Sync, VAAPI, VideoToolbox); x264, x265 and SVT-AV1 on the processor otherwise"
+ },
+ "b5aaf12537ea": {
+  "page": "specs.html",
+  "text": "Sound export"
+ },
+ "45e96e06ad2c": {
+  "page": "specs.html",
+  "text": "AAC, MP3 or Opus at a bit rate chosen; FLAC, ALAC or WAV in 16 or 24 bits"
+ },
+ "e3e7a3833d19": {
+  "page": "specs.html",
+  "text": "Frames"
+ },
+ "7774490c495e": {
+  "page": "specs.html",
+  "text": "The picture shown, saved as a PNG"
+ },
+ "ac5ad6d23f21": {
+  "page": "specs.html",
+  "text": "A microphone, or what the computer plays: the sound server's monitors on Linux, every output on Windows and macOS. A level meter, up to 30 dB louder, levelling automatically, in the sound export's formats"
+ },
+ "5cc847f94fce": {
+  "page": "specs.html",
+  "text": "Screen"
+ },
+ "af491284aebb": {
+  "page": "specs.html",
+  "text": "A screen, a window or, on Linux, a region, with the pointer: through the ScreenCast portal and PipeWire on Linux, Windows.Graphics.Capture on Windows and ScreenCaptureKit on macOS"
+ },
+ "4da9c9af9631": {
+  "page": "specs.html",
+  "text": "Camera"
+ },
+ "885799def7ef": {
+  "page": "specs.html",
+  "text": "Through FFmpeg: V4L2 on Linux, DirectShow on Windows, AVFoundation on macOS, iPhones as Continuity Camera included"
+ },
+ "70d291a61f2a": {
+  "page": "specs.html",
+  "text": "Video formats"
+ },
+ "e636aca55eb6": {
+  "page": "specs.html",
+  "text": "H.264, HEVC or AV1 on the graphics card's encoder where one opens, at 24, 30, 60 or 120 pictures a second or every picture sent, with a microphone's sound or what the computer plays"
+ },
+ "df485c871329": {
+  "page": "specs.html",
+  "text": "Devices"
+ },
+ "0f32bc6b740c": {
+  "page": "specs.html",
+  "text": "Chromecast, found through mDNS; TVs, speakers and programs that play DLNA (UPnP AV), found through SSDP"
+ },
+ "2082eb13ae8d": {
+  "page": "specs.html",
+  "text": "What goes"
+ },
+ "ee0e3e8b5a1b": {
+  "page": "specs.html",
+  "text": "A file, served by plaa from this computer, or a stream's address"
+ },
+ "ea1d3df298ca": {
+  "page": "specs.html",
+  "text": "Control"
+ },
+ "553fdde5d4f5": {
+  "page": "specs.html",
+  "text": "Play, pause and seek from plaa's own controls and timeline"
+ },
+ "c3f104d13657": {
+  "page": "specs.html",
+  "text": "Role"
+ },
+ "7060099bbdf3": {
+  "page": "specs.html",
+  "text": "A Milan talker and listener of its own on Linux; on macOS, through the Mac's own AVB entity"
+ },
+ "3c59147d5761": {
+  "page": "specs.html",
+  "text": "Stream formats"
+ },
+ "7145608e256e": {
+  "page": "specs.html",
+  "text": "AAF, as the AVB community's Basic and Extended Audio profiles set them, and AM824, of 2 or 8 channels, at 48, 96 or 192 kHz, in SR class A or B"
+ },
+ "14d21a507ef3": {
+  "page": "specs.html",
+  "text": "Any Milan controller connects plaa's stream; Network Audio connects listeners to it, and Connect plays a talker's stream on this computer"
+ },
+ "98c2a03a8f7d": {
+  "page": "specs.html",
+  "text": "Without AVB switches"
+ },
+ "7c92cdf48760": {
+  "page": "specs.html",
+  "text": "AVB Lite: a copy of the stream for each listener, up to five"
+ },
+ "6c82e6dd8680": {
+  "page": "specs.html",
+  "text": "Time"
+ },
+ "516e441e4481": {
+  "page": "specs.html",
+  "text": "gPTP from ptp4l, on an interface with a PTP hardware clock, such as Intel's I210"
+ },
+ "00a5e0146984": {
+  "page": "specs.html",
+  "text": "Shares the network's reservations with triib's entity service where it runs"
+ },
+ "db07be184479": {
+  "page": "specs.html",
+  "text": "Languages"
+ },
+ "7b4db7ef1fa2": {
+  "page": "specs.html",
+  "text": "Interface"
+ },
+ "bac8259c4599": {
+  "page": "specs.html",
+  "text": "38 languages: Arabic, Bengali, Catalan, Chinese (Simplified and Traditional), Czech, Danish, Dutch, English (US and UK), Finnish, French, German, Greek, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian (Bokmål), Persian, Polish, Portuguese (Brazil and Portugal), Romanian, Russian, Spanish, Swahili, Swedish, Tamil, Thai, Turkish, Ukrainian, Urdu, Vietnamese"
+ },
+ "da502a644e54": {
+  "page": "specs.html",
+  "text": "Right to left"
+ },
+ "e5f381927082": {
+  "page": "specs.html",
+  "text": "Arabic, Hebrew, Persian and Urdu lay out right to left"
+ },
+ "27d0b935919a": {
+  "page": "specs.html",
+  "text": "Choosing"
+ },
+ "1cb98b2ab2cd": {
+  "page": "specs.html",
+  "text": "Follows the system's language, or the one chosen in Settings; audio and subtitle tracks follow the languages Settings prefer"
+ },
+ "8ad8302d110b": {
+  "page": "specs.html",
+  "text": "Translations"
+ },
+ "cb07bf8d6578": {
+  "page": "specs.html",
+  "text": "One Fluent file per language; the translations other than English are first drafts open to further review"
+ },
+ "b568d47f2e24": {
+  "page": "specs.html",
+  "text": "Input"
+ },
+ "6662c40bac78": {
+  "page": "specs.html",
+  "text": "Keyboard"
+ },
+ "804c35a71128": {
+  "page": "specs.html",
+  "text": "Shortcuts for every main action, with ⌘ on macOS and Ctrl elsewhere; changeable in the settings file, for every system or for one"
+ },
+ "8daa1199383b": {
+  "page": "specs.html",
+  "text": "Media keys"
+ },
+ "d77450f200f4": {
+  "page": "specs.html",
+  "text": "Play, pause, next and previous, through MPRIS on Linux, the media flyout on Windows and Now Playing on macOS"
+ },
+ "bc5de071a8ad": {
+  "page": "specs.html",
+  "text": "Pointer"
+ },
+ "45a7d226f9f3": {
+  "page": "specs.html",
+  "text": "Mouse and touchpad: the timeline, Ctrl+wheel to zoom at the pointer, dragging to look around"
+ },
+ "f5e1911f3477": {
+  "page": "specs.html",
+  "text": "Drag and drop"
+ },
+ "89e82fb20238": {
+  "page": "specs.html",
+  "text": "Files dropped on a window open in it, on Wayland as elsewhere"
+ },
+ "d660049bc1f2": {
+  "page": "specs.html",
+  "text": "Accessibility"
+ },
+ "05955717738e": {
+  "page": "specs.html",
+  "text": "Keyboard focus with Tab and Shift+Tab; follows the system's reduced motion setting"
+ },
+ "cf069c1a2735": {
+  "page": "specs.html",
+  "text": "Assistant and agents"
+ },
+ "6c9a071cd8f7": {
+  "page": "specs.html",
+  "text": "Cloud models"
+ },
+ "d80700f4a6d2": {
+  "page": "specs.html",
+  "text": "Anthropic, OpenAI and Google Gemini, with your own API key, kept in the system keychain"
+ },
+ "91ab74644c8d": {
+  "page": "specs.html",
+  "text": "Local models"
+ },
+ "4e5dbf1b2dca": {
+  "page": "specs.html",
+  "text": "Ollama, or an OpenAI-compatible server such as LM Studio's, llama.cpp's or vLLM's, on this computer or another"
+ },
+ "6ad6a7848cd7": {
+  "page": "specs.html",
+  "text": "What a model needs"
+ },
+ "0fe8b5c6017a": {
+  "page": "specs.html",
+  "text": "Tool calling; seeing pictures is optional"
+ },
+ "e98b281038b0": {
+  "page": "specs.html",
+  "text": "Shared models"
+ },
+ "793510af703f": {
+  "page": "specs.html",
+  "text": "Set up once for the Scramble Tools apps, such as prev, in <code>scramble/assistant.toml</code> in the config folder; each app chooses its own"
+ },
+ "94cbffb24efc": {
+  "page": "specs.html",
+  "text": "MCP server"
+ },
+ "8940c46d8876": {
+  "page": "specs.html",
+  "text": "<code>plaa --mcp</code>, over standard input and output, for Claude Code (<code>claude mcp add plaa -- plaa --mcp</code>) or any MCP client. It drives the plaa you are using, starting it if needed; nothing listens on the network"
+ },
+ "2f81a22de0af": {
+  "page": "specs.html",
+  "text": "Access"
+ },
+ "868c229c5191": {
+  "page": "specs.html",
+  "text": "plaa asks before letting a new agent in, and remembers Allow; Settings lists allowed agents, and outside control can be turned off"
+ },
+ "28499def4bad": {
+  "page": "specs.html",
+  "text": "Tools (17)"
+ },
+ "8aa9ab29d0a4": {
+  "page": "specs.html",
+  "text": "<code>list_windows</code>, <code>get_status</code>, <code>get_info</code>, <code>get_frame</code>, <code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code>, <code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code>, <code>next_item</code>, <code>previous_item</code>, <code>set_fullscreen</code>, <code>focus_window</code>, and <code>open</code> and <code>close_window</code>"
+ },
+ "97fa19250695": {
+  "page": "specs.html",
+  "text": "Asking first"
+ },
+ "b16943de6e5b": {
+  "page": "specs.html",
+  "text": "A switch each for seeing what plays, controlling playback, and opening files or closing windows"
+ },
+ "d018b082e8a3": {
+  "page": "specs.html",
+  "text": "Technology"
+ },
+ "89b86ab0e66f": {
+  "page": "specs.html",
+  "text": "Language"
+ },
+ "fc9b6ba994bf": {
+  "page": "specs.html",
+  "text": "Rust, edition 2024, Rust 1.95 or newer to build"
+ },
+ "a98173a5fdc7": {
+  "page": "specs.html",
+  "text": "iced 0.14 with wgpu, and scramble-ui, shared with prev and triib"
+ },
+ "0c77aeece8c2": {
+  "page": "specs.html",
+  "text": "Media"
+ },
+ "350077d5a605": {
+  "page": "specs.html",
+  "text": "FFmpeg 9 through ffmpeg-next; libass for styled subtitles; cpal for sound"
+ },
+ "d4633247d4a2": {
+  "page": "specs.html",
+  "text": "The atdecc, avb-lite, avb-mrp, avb-net and avb-stream crates; raw sockets through a small helper holding <code>CAP_NET_RAW</code> on Linux, and Apple's AudioVideoBridging framework on macOS"
+ },
+ "4bd9be830185": {
+  "page": "specs.html",
+  "text": "Project Fluent"
+ },
+ "97d41d352c0d": {
+  "page": "specs.html",
+  "text": "An MCP server through rmcp, relaying to the running plaa over a private local socket (a named pipe on Windows)"
+ },
+ "8010d1f4d069": {
+  "page": "specs.html",
+  "text": "Assistant"
+ },
+ "cd46947df863": {
+  "page": "specs.html",
+  "text": "rig-core for Anthropic, OpenAI, Google Gemini, Ollama and OpenAI-compatible servers; API keys through keyring (the Secret Service on Linux, the Credential Manager on Windows, the Keychain on macOS)"
+ },
+ "ffe688a50143": {
+  "page": "specs.html",
+  "text": "Fonts"
+ },
+ "ec25bfb74f0a": {
+  "page": "specs.html",
+  "text": "Roboto Flex and Material Symbols Rounded, bundled"
+ },
+ "2aa3f35f0aaf": {
+  "page": "specs.html",
+  "text": "System integration"
+ },
+ "048a17f81dd3": {
+  "page": "specs.html",
+  "text": "XDG desktop portals and MPRIS on Linux; Win32 and the System Media Transport Controls on Windows; AppKit, MediaPlayer and Launch Services on macOS, with a menu bar through muda"
+ },
+ "0562f32dc56f": {
+  "page": "specs.html",
+  "text": "Dependencies"
+ },
+ "81d65c84a48a": {
+  "page": "specs.html",
+  "text": "All open source, with licenses checked by cargo-deny in CI"
+ },
+ "8906c977181f": {
+  "page": "specs.html",
+  "text": "Settings and data"
+ },
+ "f4bda3369edd": {
+  "page": "specs.html",
+  "text": "Where files were left off"
+ },
+ "fe18548f3eff": {
+  "page": "specs.html",
+  "text": "<code>~/.config/plaa.toml</code>"
+ },
+ "a37636fe8da5": {
+  "page": "specs.html",
+  "text": "<code>~/.local/state/plaa</code>"
+ },
+ "70e72876b17e": {
+  "page": "specs.html",
+  "text": "<code>%APPDATA%\\plaa\\plaa.toml</code>"
+ },
+ "1475911260c6": {
+  "page": "specs.html",
+  "text": "<code>%LOCALAPPDATA%\\plaa</code>"
+ },
+ "65a4cd68e043": {
+  "page": "specs.html",
+  "text": "<code>~/Library/Application Support/plaa/plaa.toml</code>"
+ },
+ "03d394f4dc4c": {
+  "page": "specs.html",
+  "text": "<code>~/Library/Application Support/plaa</code>"
+ },
+ "bef020fa479b": {
+  "page": "specs.html",
+  "text": "License and privacy"
+ },
+ "3229609e1543": {
+  "page": "specs.html",
+  "text": "License"
+ },
+ "ccdccb273a6c": {
+  "page": "specs.html",
+  "text": "GNU GPL-3.0 or later; the bundled fonts keep their own licenses (SIL Open Font License 1.1, Apache 2.0)"
+ },
+ "6da13addb000": {
+  "page": "specs.html",
+  "text": "Source"
+ },
+ "30c0cc659f3c": {
+  "page": "specs.html",
+  "text": "<a1>github.com/scrambletools/plaa</a1>, with the sources of the libraries the Windows and macOS packages carry on each release"
+ },
+ "53ebc572b4a4": {
+  "page": "specs.html",
+  "text": "Network"
+ },
+ "2d1b9732fc3c": {
+  "page": "specs.html",
+  "text": "None of its own: plaa goes online only to play the addresses and web pages you open and to open links you click; on your local network it finds TVs and speakers as the Cast menu opens, and takes part in the AVB network you choose. No accounts, no telemetry"
+ },
+ "816fb5946fd6": {
+  "page": "specs.html",
+  "text": "Only those you allow, through <code>plaa --mcp</code>; no bundled model. What an agent sees goes to the model it uses"
+ },
+ "8636174fad23": {
+  "page": "specs.html",
+  "text": "Talks only to the model you add: a local model stays on your computer, and a cloud model gets what it asks to see. API keys stay in the system keychain"
+ },
+ "445973854213": {
+  "page": "specs.html",
+  "text": "Code signing"
+ },
+ "5da22d0f1ae0": {
+  "page": "specs.html",
+  "text": "Windows releases are signed by Scramble Tools LLC, and macOS releases with Scramble Tools' Developer ID and notarized by Apple; see the <a1>code signing policy</a1>"
+ },
+ "acdacf8be7b7": {
+  "page": "specs.html",
+  "text": "plaa's specifications: the systems and processors it runs on, the formats it plays, records and exports, casting and network audio, its languages and input, the assistant and agents, and the software it is built on.",
+  "attribute": true
+ },
+ "extra:policy-note": {
+  "page": "index.html",
+  "text": "This translation is given for convenience; the English version of this policy is the one that applies."
+ }
+}
