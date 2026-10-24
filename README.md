@@ -253,7 +253,8 @@ recording without one,
 `cargo run --release -p plaa-media --example play -- <file>` plays a file
 without a window and says what it showed, and the `export` example
 exports one as the Export dialog does. Both take `--insert`, `--sound`
-and `--picture` to try edits that mix files.
+and `--picture` to try edits that mix files, and `--picture-filter` and
+`--sound-filter` to try filters.
 
 ### AVB on Linux
 
@@ -394,7 +395,19 @@ agent sees, pictures and sound among it, goes to its model.
 
 Times are in seconds of what plays: the edited movie, once the file is
 edited. Every edit an agent makes shows in the window as it is made,
-and undo takes it back.
+and undo takes it back. A call that takes more than two seconds, such
+as reading many pictures, measuring a long film's sound or exporting,
+tells the agent how far it has come, and shows it over the window.
+
+`apply_filter` takes FFmpeg filter graphs as `-vf` and `-af` do, such
+as `hue=s=0` for black and white, `eq=contrast=1.2`, `crop=ih:ih`,
+`drawtext=text='Title'`, `highpass=f=80,loudnorm` or `afftdn`, for the
+whole movie or a part. plaa checks each graph before any of its filters
+starts: only filters that change each frame as it comes are allowed,
+none given a file, folder, address or model, so a graph can neither
+read nor write files, reach a device or the network, nor change when
+things play. The filters play at once, export, and show in what
+`get_frames` and `get_sound` give.
 
 | Tool | What it does |
 |---|---|
@@ -415,6 +428,7 @@ and undo takes it back.
 | `trim`, `cut`, `split`, `move_clip` | Keeping a part, taking one out, splitting and ordering clips |
 | `insert` | Putting in part of another file, or of the same one |
 | `replace` | Another file's sound or picture over a part, or silence, or black |
+| `apply_filter`, `remove_filters` | FFmpeg filters on the picture or sound, all of it or a part, checked first |
 | `turn_picture`, `undo` | Turning or flipping the picture; undo, redo and undoing all |
 | `export` | Writing the edit to a new file, as the Export dialog does |
 

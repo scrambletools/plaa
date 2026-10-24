@@ -25,6 +25,14 @@
 - Edits that mix files play as they will be, picture and sound each
   from its own file, and export the same way, other files' pictures
   fitted in the movie's.
+- `apply_filter` and `remove_filters` put a window's picture or sound,
+  all of it or a part, through FFmpeg filters, such as `hue=s=0` for
+  black and white, checked before they start: only filters that change
+  frames as they come, none given a file, device or address. They play
+  at once and export; a filter over the whole movie that crops it
+  exports at its size.
+- Agents' calls that take more than two seconds report how far they
+  have come, and the window shows it.
 
 ## [0.1.0] - 2026-10-23
 
