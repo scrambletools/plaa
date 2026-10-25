@@ -441,7 +441,11 @@ impl Runtime {
                 if let Some(own) = &mut self.own {
                     own.listen_into(buffer);
                 }
-                #[cfg(not(target_os = "linux"))]
+                #[cfg(target_os = "macos")]
+                if let Some(host) = &mut self.host {
+                    host.listen_into(buffer);
+                }
+                #[cfg(not(any(target_os = "linux", target_os = "macos")))]
                 let _ = buffer;
             }
             Input::SoundRate => {
@@ -606,7 +610,7 @@ impl Runtime {
         }
         #[cfg(target_os = "macos")]
         if let Some(host) = &mut self.host {
-            host.turn(&self.controller);
+            host.turn(&mut self.controller, now);
             if host.avb_on() && self.local.0.is_none() {
                 self.open_local();
             }

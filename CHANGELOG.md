@@ -37,6 +37,11 @@
   under a video, from a time of the edit, at a volume in decibels, with
   fades; it plays at once, exports, and is heard by `get_sound` and
   `get_levels`. `remove_mix` takes it out.
+- On a Mac, Connect plays a talker's stream through the Mac's own AVB
+  entity, as plaa's own entity does on Linux. The entity's clock follows
+  the stream while it plays, as on the Mac's own clock its audio device
+  leaves gaps, and goes back after. macOS asks once for microphone
+  access, as the stream arrives through an audio input.
 
 ### Changed
 
