@@ -1288,6 +1288,8 @@ impl Plaa {
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.scale = scale;
                 }
+                // Sliding bars and sheets step by whole pixels of it.
+                scramble_ui::motion::set_scale_factor(scale);
                 Task::none()
             }
             Message::Screen(id, lines) => {

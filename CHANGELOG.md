@@ -46,6 +46,12 @@
   slides in only when none was open; one taking another's place shows
   at once. The assistant's slides in too.
 
+### Fixed
+
+- Icons and labels on the floating bars and side panels no longer hop a
+  pixel against their bars as a slide settles: slides move by whole
+  pixels (scramble-ui 891f44c).
+
 ## [0.1.0] - 2026-10-23
 
 The first release.
