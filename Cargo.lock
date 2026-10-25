@@ -3963,7 +3963,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "plaa"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "ashpd",
  "base64 0.22.1",
@@ -4005,7 +4005,7 @@ dependencies = [
 
 [[package]]
 name = "plaa-assist"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -4020,7 +4020,7 @@ dependencies = [
 
 [[package]]
 name = "plaa-avb"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "atdecc",
  "avb-lite",
@@ -4033,7 +4033,7 @@ dependencies = [
 
 [[package]]
 name = "plaa-cast"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "roxmltree",
  "rustls",
@@ -4042,7 +4042,7 @@ dependencies = [
 
 [[package]]
 name = "plaa-media"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "block2 0.6.2",
  "cpal",
@@ -4067,7 +4067,7 @@ dependencies = [
 
 [[package]]
 name = "plaa-store"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "serde",
  "tempfile",

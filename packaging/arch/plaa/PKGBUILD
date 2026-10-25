@@ -1,6 +1,6 @@
 # Maintainer: Scramble Tools <https://github.com/scrambletools>
 pkgname=plaa
-pkgver=0.1.0
+pkgver=0.5.0
 pkgrel=1
 pkgdesc='Play video and audio files and streams'
 arch=('x86_64' 'aarch64')

@@ -77,6 +77,12 @@
   </provides>
 
   <releases>
+    <release version="0.5.0" date="2026-10-25">
+      <description>
+        <p>Agents and the assistant read and edit what plays, with FFmpeg filters and other files' sound mixed in; Make Default; one side panel at a time; and AVB network audio played on a Mac.</p>
+      </description>
+      <url type="details">https://github.com/scrambletools/plaa/releases/tag/v0.5.0</url>
+    </release>
     <release version="0.1.0" date="2026-10-23">
       <description>
         <p>The first release: playback, streams and web videos, editing and export, recording, casting, the visualizer, AVB network audio and the assistant.</p>
