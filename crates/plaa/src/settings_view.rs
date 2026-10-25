@@ -259,18 +259,27 @@ impl Plaa {
             selected: self.settings_tab == which,
             on_press: SettingsMessage::Tab(which),
         };
-        let tabs = component::tabs(vec![
+        let mut tabs = vec![
             tab(
                 crate::fl!("settings-tab-appearance"),
                 SettingsTab::Appearance,
             ),
             tab(crate::fl!("settings-tab-playback"), SettingsTab::Playback),
             tab(crate::fl!("settings-tab-storage"), SettingsTab::Storage),
-            tab(crate::fl!("settings-tab-network"), SettingsTab::Network),
+        ];
+        // Windows has no AVB yet, so no Network tab.
+        if !cfg!(target_os = "windows") {
+            tabs.push(tab(
+                crate::fl!("settings-tab-network"),
+                SettingsTab::Network,
+            ));
+        }
+        tabs.extend([
             tab(crate::fl!("settings-tab-language"), SettingsTab::Language),
             tab(crate::fl!("settings-tab-agents"), SettingsTab::Agents),
             tab(crate::fl!("settings-tab-assistant"), SettingsTab::Assistant),
         ]);
+        let tabs = component::tabs(tabs);
         let header = column![
             row![
                 scramble_ui::aligned(scramble_ui::styled(

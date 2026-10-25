@@ -26,6 +26,10 @@ impl Plaa {
         self.avb_error = None;
         self.avb_snapshot = Arc::new(Snapshot::default());
         self.avb_watched = (false, Vec::new());
+        // Windows has no AVB yet, whatever the settings file says.
+        if cfg!(target_os = "windows") {
+            return;
+        }
         let Some(interface) = self.settings.avb_interface.clone() else {
             return;
         };

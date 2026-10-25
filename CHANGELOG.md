@@ -45,6 +45,8 @@
   and each runs the window's full height, beside the toolbars. A panel
   slides in only when none was open; one taking another's place shows
   at once. The assistant's slides in too.
+- Windows has no Network tab in Settings, and plaa starts no AVB there,
+  until Windows sends and plays AVB streams.
 
 ### Fixed
 
