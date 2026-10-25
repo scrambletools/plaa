@@ -52,6 +52,8 @@
   at once. The assistant's slides in too.
 - Windows has no Network tab in Settings, and plaa starts no AVB there,
   until Windows sends and plays AVB streams.
+- The AVB crates come from crates.io, atdecc 0.1.2 among them, in place
+  of a pinned revision of scrambletools/avb.
 
 ### Fixed
 

@@ -282,11 +282,10 @@ holds an interface that filters VLANs in hardware, as the I210 does,
 promiscuous, so it hears CVU SRP's commands in the media VLAN.
 
 The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
-pinned by commit. To change them alongside, `cargo --config
+by their versions on crates.io. To change them alongside, `cargo --config
 .cargo/avb-local.toml build` builds against a checkout beside this one,
-from a git-ignored file with `[patch."https://github.com/scrambletools/avb"]`
-path entries for `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and
-`avb-stream`.
+from a git-ignored file with `[patch.crates-io]` path entries for
+`atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream`.
 
 ### AVB on a Mac
 

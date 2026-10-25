@@ -41,7 +41,7 @@ look follows Material Design 3, as in prev.
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first, and the 38 languages prev has |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
-| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb pinned by revision: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
+| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb from crates.io: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
 | Distribution | A .deb for each Debian and Ubuntu release and an .rpm for Fedora's, each built against its FFmpeg, a PKGBUILD, an MSI and zip for Windows and an installer package for macOS ([Releasing](RELEASING.md)); no AppImage, Flatpak or plain archive for Linux, as none can grant the raw socket capability AVB needs |
 
 ## Scope

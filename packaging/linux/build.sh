@@ -8,12 +8,10 @@
 #
 # The container is of this computer's architecture, whatever the image's
 # tag last pulled. Cargo's downloads and the build stay in Docker volumes
-# named for the image, so a second build is quicker. PLAA_AVB_CHECKOUT,
-# a checkout of scrambletools/avb, stands in for GitHub's, as for a
-# revision not pushed yet. PLAA_CROSS, such as riscv64, builds a .deb
-# for that architecture instead. PLAA_DOCKER_CPUS, such as 4, limits the
-# processors the build takes, leaving room on a computer keeping
-# network time with ptp4l.
+# named for the image, so a second build is quicker. PLAA_CROSS, such as
+# riscv64, builds a .deb for that architecture instead. PLAA_DOCKER_CPUS,
+# such as 4, limits the processors the build takes, leaving room on a
+# computer keeping network time with ptp4l.
 set -euo pipefail
 
 image=${1:?usage: build.sh IMAGE OUT}
@@ -24,13 +22,6 @@ volume=plaa-build-$(tr -c 'a-z0-9\n' - <<<"$image")
 options=(--rm --platform "linux/$(docker version -f '{{.Server.Arch}}')"
     -v "$root:/src:ro" -v "$out:/out" -v "$volume-cargo:/cargo" -v "$volume-target:/target"
     -e CARGO_HOME=/cargo -e RUSTUP_HOME=/cargo/rustup -e CARGO_TERM_COLOR=always)
-if [ -n "${PLAA_AVB_CHECKOUT:-}" ]; then
-    options+=(-v "$(cd "$PLAA_AVB_CHECKOUT" && pwd):/avb:ro" -e GIT_CONFIG_COUNT=2
-        -e GIT_CONFIG_KEY_0=url.file:///avb.insteadOf
-        -e GIT_CONFIG_VALUE_0=https://github.com/scrambletools/avb
-        -e GIT_CONFIG_KEY_1=safe.directory -e GIT_CONFIG_VALUE_1='*'
-        -e CARGO_NET_GIT_FETCH_WITH_CLI=true)
-fi
 # A .deb for another architecture, built on this one's (build-package.sh).
 if [ -n "${PLAA_CROSS:-}" ]; then
     options+=(-e "PLAA_CROSS=$PLAA_CROSS")

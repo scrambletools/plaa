@@ -161,8 +161,6 @@ To run one by hand:
 - Linux, with Docker: `packaging/linux/build.sh debian:13 dist`, then
   `packaging/tests/linux/run.sh debian:13
   dist/plaa_X.Y.Z-1~debian13_amd64.deb [previous.deb]`.
-  `PLAA_AVB_CHECKOUT=../avb` builds against a local avb checkout, as for
-  a revision not pushed yet.
 - Windows, on a computer without plaa installed, as it installs and
   removes it: `powershell -ExecutionPolicy Bypass -File
   packaging\tests\windows\test-msi.ps1 -Msi plaa-X.Y.Z-x64.msi`. For a

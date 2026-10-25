@@ -59,5 +59,4 @@ unknown-git = "deny"
 # scramble-ui, the interface shared by Scramble Tools apps, pinned by commit.
 allow-git = [
     "https://github.com/scrambletools/scramble-ui",
-    "https://github.com/scrambletools/avb",
 ]
