@@ -42,12 +42,22 @@ struct Listener<'s> {
 /// to as many channels takes fewer too, named by their entity, and by the
 /// input too where an entity has several.
 fn listeners<'s>(snapshot: &'s Snapshot, ours: &Stream) -> Vec<Listener<'s>> {
+    let own = snapshot
+        .entities
+        .iter()
+        .find(|entity| entity.own)
+        .map(|entity| entity.id);
     let mut found = Vec::new();
     for entity in snapshot.entities.iter().filter(|entity| !entity.own) {
         let able: Vec<&Stream> = entity
             .inputs
             .iter()
             .filter(|input| ours.formats.iter().any(|format| takes(input, *format)))
+            // One under another grandmaster cannot take plaa's stream, and
+            // shows only where it is bound to it, to stop it.
+            .filter(|input| {
+                !entity.apart || input.bound.is_some_and(|(talker, _)| Some(talker) == own)
+            })
             .collect();
         for input in &able {
             found.push(Listener {
@@ -235,10 +245,14 @@ struct Source {
 
 /// The outputs of other entities plaa's `input` can take, named as
 /// listeners are: those sending in a format it takes, and those that can
-/// change to one.
+/// change to one, under plaa's grandmaster.
 fn sources(snapshot: &Snapshot, input: &Stream) -> Vec<Source> {
     let mut found = Vec::new();
-    for entity in snapshot.entities.iter().filter(|entity| !entity.own) {
+    for entity in snapshot
+        .entities
+        .iter()
+        .filter(|entity| !entity.own && !entity.apart)
+    {
         let able: Vec<(&Stream, Option<StreamFormat>)> = entity
             .outputs
             .iter()
@@ -730,6 +744,7 @@ mod tests {
             name: name.into(),
             own: false,
             here: false,
+            apart: false,
             outputs: Vec::new(),
             inputs,
         }
@@ -815,6 +830,36 @@ mod tests {
         let snapshot = network(&[STEREO_24, STEREO]);
         let input = &snapshot.entities[0].inputs[0];
         assert_eq!(sources(&snapshot, input)[2].change, Some(STEREO));
+    }
+
+    #[test]
+    fn entities_under_another_grandmaster_are_left_out() {
+        let mut snapshot = network(&[STEREO, STEREO_24, EIGHT]);
+        snapshot.entities[1].apart = true;
+        let input = &snapshot.entities[0].inputs[0];
+        let names: Vec<String> = sources(&snapshot, input)
+            .into_iter()
+            .map(|source| source.name)
+            .collect();
+        assert_eq!(names, ["Synthia", "Desk"]);
+        // Listened to already, it can still be stopped.
+        snapshot.entities[0].inputs[0].bound = Some((EntityId(1), 0));
+        assert_eq!(
+            shown(&connect_entries(&snapshot))[0],
+            "Stop listening to Mic"
+        );
+        // A listener under another takes no stream of plaa's, unless it
+        // is bound to it.
+        let ours = stream(0, "Playback", STEREO, &[STEREO, STEREO_12]);
+        assert_eq!(listeners(&snapshot, &ours).len(), 1);
+        snapshot.entities[5].apart = true;
+        assert!(listeners(&snapshot, &ours).is_empty());
+        snapshot.entities[5].inputs[0].bound = Some((EntityId(9), 0));
+        let names: Vec<String> = listeners(&snapshot, &ours)
+            .into_iter()
+            .map(|listener| listener.name)
+            .collect();
+        assert_eq!(names, ["Amp"]);
     }
 
     #[test]

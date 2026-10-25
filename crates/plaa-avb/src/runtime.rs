@@ -881,6 +881,15 @@ impl Runtime {
     /// Lays out what the controller read for the app, and tells it.
     fn publish(&mut self) {
         let own = self.own_entity();
+        // The grandmaster and gPTP domain each entity advertises, where it
+        // has one: an entity under another keeps another time than plaa's,
+        // and no stream passes between them.
+        let clock = |id: EntityId| {
+            let adp = self.controller.entity(id)?.adp;
+            (adp.gptp_grandmaster_id.0 != 0)
+                .then_some((adp.gptp_grandmaster_id, adp.gptp_domain_number))
+        };
+        let ours = own.and_then(clock);
         let mut entities: Vec<Found> = self
             .controller
             .entities()
@@ -891,7 +900,8 @@ impl Runtime {
                     .controller
                     .entity(id)
                     .is_some_and(|entity| entity.mac == self.mac);
-                Some(found(id, model, own == Some(id), here))
+                let apart = ours.is_some_and(|ours| clock(id).is_some_and(|theirs| theirs != ours));
+                Some(found(id, model, own == Some(id), here, apart))
             })
             .collect();
         entities.sort_by(|left, right| {
@@ -928,7 +938,7 @@ fn notifier(bytes: &[u8], controller: EntityId) -> Option<EntityId> {
 
 /// An entity as the app shows it, from what the controller read: its
 /// audio streams, media clocks left out.
-fn found(id: EntityId, model: &EntityModel, own: bool, here: bool) -> Found {
+fn found(id: EntityId, model: &EntityModel, own: bool, here: bool, apart: bool) -> Found {
     let streams = |input: bool| {
         model
             .streams(input)
@@ -967,6 +977,7 @@ fn found(id: EntityId, model: &EntityModel, own: bool, here: bool) -> Found {
             .map_or_else(|| format!("{id}"), str::to_owned),
         own,
         here,
+        apart,
         outputs: streams(false),
         inputs: streams(true),
     }

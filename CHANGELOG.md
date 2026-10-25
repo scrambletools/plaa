@@ -61,6 +61,10 @@
 - Icons and labels on the floating bars and side panels no longer hop a
   pixel against their bars as a slide settles: slides move by whole
   pixels (scramble-ui 891f44c).
+- Connect and Network Audio leave out talkers and listeners under
+  another gPTP grandmaster than plaa's entity, which keep another time
+  and take none of its streams; a listener on plaa's stream already
+  stays, to be stopped.
 
 ## [0.1.0] - 2026-10-23
 

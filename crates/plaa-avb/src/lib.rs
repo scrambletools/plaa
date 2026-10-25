@@ -77,6 +77,9 @@ pub struct Found {
     pub own: bool,
     /// On this computer, as triib's entities are.
     pub here: bool,
+    /// Under another gPTP grandmaster than plaa's entity, so keeping
+    /// another time: no stream passes between them.
+    pub apart: bool,
     /// Its audio stream outputs and inputs, media clocks left out.
     pub outputs: Vec<Stream>,
     pub inputs: Vec<Stream>,
