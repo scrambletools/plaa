@@ -1,5 +1,5 @@
-/* plaa's website, in Material 3 colors from a violet seed, as plaa's own
-   accent is. */
+/* plaa's website, in Material 3 colors from a golden orange seed,
+   #f5a623. */
 
 @font-face {
   font-family: "Roboto Flex";
@@ -9,16 +9,16 @@
 }
 
 :root {
-  --primary: #6750a4;
+  --primary: #805611;
   --on-primary: #ffffff;
-  --primary-container: #eaddff;
-  --on-primary-container: #21005d;
-  --surface: #fef7ff;
-  --surface-container: #f3edf7;
-  --surface-container-high: #ece6f0;
-  --on-surface: #1d1b20;
-  --on-surface-variant: #49454f;
-  --outline-variant: #cac4d0;
+  --primary-container: #ffddb4;
+  --on-primary-container: #633f00;
+  --surface: #fff8f4;
+  --surface-container: #f9ecdf;
+  --surface-container-high: #f3e6da;
+  --on-surface: #211b13;
+  --on-surface-variant: #4f4539;
+  --outline-variant: #d3c4b4;
   --shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.10);
   --hero-shadow: var(--shadow);
   color-scheme: light;
@@ -26,23 +26,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --primary: #d0bcff;
-    --on-primary: #381e72;
-    --primary-container: #4f378b;
-    --on-primary-container: #eaddff;
-    --surface: #141218;
-    --surface-container: #211f26;
-    --surface-container-high: #2b2930;
-    --on-surface: #e6e0e9;
-    --on-surface-variant: #cac4d0;
-    --outline-variant: #49454f;
+    --primary: #f5bc6f;
+    --on-primary: #452b00;
+    --primary-container: #633f00;
+    --on-primary-container: #ffddb4;
+    --surface: #18120b;
+    --surface-container: #251f17;
+    --surface-container-high: #302921;
+    --on-surface: #ede0d4;
+    --on-surface-variant: #d3c4b4;
+    --outline-variant: #4f4539;
     --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
     /* A hairline and a soft glow in the accent color, so a dark
        screenshot stands off the dark page. */
     --hero-shadow:
-      0 0 0 1px rgb(208 188 255 / 0.20),
-      0 0 48px 0 rgb(208 188 255 / 0.18),
-      0 0 140px 16px rgb(103 80 164 / 0.20),
+      0 0 0 1px rgb(245 188 111 / 0.20),
+      0 0 48px 0 rgb(245 188 111 / 0.18),
+      0 0 140px 16px rgb(128 86 17 / 0.20),
       0 24px 64px rgb(0 0 0 / 0.5);
     color-scheme: dark;
   }
