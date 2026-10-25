@@ -402,9 +402,21 @@
   "page": "tour.html",
   "text": "<a1>Inspector</a1>"
  },
- "e8ae1bb939fa": {
+ "ea8df9a67b33": {
   "page": "tour.html",
-  "text": "<a1>Trimming and splitting</a1>"
+  "text": "<a1>Editing</a1>"
+ },
+ "8aa4875fb47a": {
+  "page": "tour.html",
+  "text": "<a1>Mixing files</a1>"
+ },
+ "6a52592e56d8": {
+  "page": "tour.html",
+  "text": "<a1>Mixing in sound</a1>"
+ },
+ "dc9746d817ac": {
+  "page": "tour.html",
+  "text": "<a1>Filters</a1>"
  },
  "a92544229c4f": {
   "page": "tour.html",
@@ -534,9 +546,9 @@
   "page": "tour.html",
   "text": "The inspector (Ctrl+I) shows what a file is made of: its name, folder, size, format, duration and bit rate, its tags, and each of its streams, with the video's codec, size, frame rate and pixel format and how it is decoded, and the sound's codec, rate, channels and language."
  },
- "ecb454920a65": {
+ "3b9ba1a25151": {
   "page": "tour.html",
-  "text": "Trimming and splitting"
+  "text": "Editing"
  },
  "b1936c4ed84f": {
   "page": "tour.html",
@@ -546,13 +558,41 @@
   "page": "tour.html",
   "text": "The edit plays as it will be, clip after clip without a gap. Nothing changes in the file: the edit is kept until you export it, and closing the window with an edit not exported asks first."
  },
- "16262e5c9802": {
+ "59e55b0c71bd": {
   "page": "tour.html",
-  "text": "Ask the assistant, or an agent, and the edit can mix files too: put in a part of another file, or play another file's sound or picture over a part, such as music under a video or a voice over it, or make a part silent or black. The clips show each file's pictures, and the edit plays and exports as it will be."
+  "text": "The assistant and agents edit too. Ask them to keep a part, take one out, split, move a clip or turn the picture, and each step shows in the window as it is made, ready to undo."
  },
- "14143300b3e3": {
+ "2eea3936b16f": {
   "page": "tour.html",
-  "text": "They can also put the picture or the sound through FFmpeg's filters, for all of it or a part: black and white, color and contrast, a crop, sharpening, a title, less noise or an even loudness. plaa checks each filter before it runs, and the result plays at once."
+  "text": "Mixing files"
+ },
+ "63055ad74d05": {
+  "page": "tour.html",
+  "text": "Ask the assistant, or an agent, and the edit can mix files: put in a part of another file, play another file's picture or sound in place of a part's own, or make a part silent or black. The clips show each file's pictures, other files' pictures fit in the movie's, and the edit plays and exports as it will be."
+ },
+ "8e21fd4e3bc8": {
+  "page": "tour.html",
+  "text": "Mixing in sound"
+ },
+ "532699f2f1db": {
+  "page": "tour.html",
+  "text": "To hear another file together with what plays, rather than in its place, ask for its sound mixed in: music under a video, a voice over it, or a sound effect. It starts at a time of the edit, plays part of the file or all of it at the volume you choose, fades in and out if you like, and keeps its time as clips change. Ask, for example, \"put song.mp3 under the video, quietly, and fade it out over the last five seconds\"."
+ },
+ "336b01241705": {
+  "page": "tour.html",
+  "text": "The mix plays at once and exports with the rest. For a voice over the movie, ask for the movie's own sound to go quieter under it too, so the voice stays clear. The assistant can measure how loud each part is, or listen with a model that hears, to set the level, and taking a mix out leaves the rest of the edit as it was."
+ },
+ "96e578211aa2": {
+  "page": "tour.html",
+  "text": "Filters"
+ },
+ "3774e8c07ee7": {
+  "page": "tour.html",
+  "text": "The assistant and agents can put the picture or the sound, all of it or a part, through FFmpeg's filters: black and white, color, contrast and warmth, a crop, sharpening, a vignette, a title over the picture, fades, less noise, a quieter or louder sound, or an even loudness. Describe the look or the sound you want, such as \"make it black and white, with a little more contrast\", and the assistant chooses the filters."
+ },
+ "2ba77fa2c525": {
+  "page": "tour.html",
+  "text": "plaa checks each filter before it runs and lets through only those that change the picture or the sound as it plays: none that read or write files, reach devices or the network, or change the timing, which the editing steps do. The result plays at once, a new filter adds to those already there, and undo takes it back. A crop over the whole movie exports at its new size."
  },
  "c37343fbc2a7": {
   "page": "tour.html",
@@ -622,9 +662,9 @@
   "page": "tour.html",
   "text": "Agents such as Claude Code can see what plays, read any part of it, and control and edit the plaa you are using, through MCP. Add plaa to an agent as an MCP server that runs <code>plaa --mcp</code>; for Claude Code:"
  },
- "f112d44f5eca": {
+ "2ccada461336": {
   "page": "tour.html",
-  "text": "The first time an agent connects, plaa asks whether to let it in. Settings, Agents, turns outside control off, lists the agents allowed, and has a switch for each kind of tool, seeing what plays, controlling playback, opening files or closing windows, and editing or exporting, that makes plaa ask before an agent's call runs. Every edit shows in the window as it is made, and undo takes it back. plaa bundles no model and listens on no network."
+  "text": "The first time an agent connects, plaa asks whether to let it in. Settings, Agents, turns outside control off, lists the agents allowed, and has a switch for each kind of tool, seeing what plays, controlling playback, opening files or closing windows, and editing or exporting, that makes plaa ask before an agent's call runs. Every edit shows in the window as it is made, and undo takes it back. A step that takes more than two seconds, such as an export, shows how far it has come in the window and tells the agent too. plaa bundles no model and listens on no network."
  },
  "9a830c714bb2": {
   "page": "tour.html",
@@ -1050,9 +1090,9 @@
   "page": "tour.html",
   "text": "plaa is free software under the <a1>GNU GPL-3.0</a1>. Made by <a2>Scramble Tools</a2>. <a3>Code signing policy</a3> · <a4>Privacy</a4>"
  },
- "3da31c633261": {
+ "f196cede9d23": {
   "page": "tour.html",
-  "text": "A tour of plaa: opening files, streams and web videos, playing, subtitles, sound files, editing and exporting, recording, casting, network audio, the assistant and AI agents.",
+  "text": "A tour of plaa: opening files, streams and web videos, playing, subtitles, sound files, editing, mixing, filters and exporting, recording, casting, network audio, the assistant and AI agents.",
   "attribute": true
  },
  "f5cbdf6bfb51": {
@@ -1375,29 +1415,21 @@
   "page": "specs.html",
   "text": "Editing and export"
  },
- "3b9ba1a25151": {
+ "838359ca25f5": {
   "page": "specs.html",
-  "text": "Editing"
+  "text": "Trim, split into clips, arrange and remove clips, rotate, flip; undo and redo; nothing changes until you export. Agents and the assistant make each edit too"
  },
- "d2b18b9ec653": {
+ "888b5bb8c970": {
   "page": "specs.html",
-  "text": "Trim, split into clips, arrange and remove clips, rotate, flip; undo and redo; nothing changes until you export"
+  "text": "Through agents and the assistant: parts of other files put in, and another file's picture or sound, or silence or black, in place of a part's own; played and exported as edited, other pictures fitted in the movie's"
  },
- "96e578211aa2": {
+ "c0a361cfc768": {
   "page": "specs.html",
-  "text": "Filters"
+  "text": "Through agents and the assistant: another file's sound, all of it or a part, mixed in with what plays from a time of the edit, at -60 to +24 dB, with fades in and out; it keeps its time as clips change, plays at once and exports"
  },
- "5c63545dbe1a": {
+ "0be5de4dc5a1": {
   "page": "specs.html",
-  "text": "Through agents and the assistant: FFmpeg's filters on the picture or sound, all of it or a part, such as black and white, color, crop, sharpening, titles, noise reduction and loudness; checked before they run, played at once and exported"
- },
- "2eea3936b16f": {
-  "page": "specs.html",
-  "text": "Mixing files"
- },
- "058b6449eeef": {
-  "page": "specs.html",
-  "text": "Through agents and the assistant: parts of other files put in, and another file's sound or picture, or silence or black, over a part; played and exported as edited, other pictures fitted in the movie's"
+  "text": "Through agents and the assistant: FFmpeg's filters on the picture or sound, all of it or a part, such as black and white, color, crop, sharpening, titles, fades, noise reduction, volume and loudness; checked before they run, and only filters that change each frame as it comes, none that touch files, devices or the network; played at once, undone with undo, and exported, a crop over the whole movie at its new size"
  },
  "f72f94dbc067": {
   "page": "specs.html",
@@ -1670,6 +1702,14 @@
  "6058d1c089ba": {
   "page": "specs.html",
   "text": "Any part of what plays, as edited: pictures at any times as JPEGs, how loud it is and where it is silent, the subtitles' text, and the sound itself for models that hear, such as Gemini"
+ },
+ "1b90271d66cf": {
+  "page": "specs.html",
+  "text": "Progress"
+ },
+ "d8d2dc558b89": {
+  "page": "specs.html",
+  "text": "A step that takes more than two seconds shows its progress in the window and sends it to the agent as MCP progress notifications"
  },
  "97fa19250695": {
   "page": "specs.html",

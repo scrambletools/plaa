@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>A tour of plaa</title>
-<meta name="description" content="A tour of plaa: opening files, streams and web videos, playing, subtitles, sound files, editing and exporting, recording, casting, network audio, the assistant and AI agents.">
+<meta name="description" content="A tour of plaa: opening files, streams and web videos, playing, subtitles, sound files, editing, mixing, filters and exporting, recording, casting, network audio, the assistant and AI agents.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -32,7 +32,10 @@
 <li><a href="#playlists">Playlists</a></li>
 <li><a href="#sound">Sound files</a></li>
 <li><a href="#inspector">Inspector</a></li>
-<li><a href="#editing">Trimming and splitting</a></li>
+<li><a href="#editing">Editing</a></li>
+<li><a href="#mixing-files">Mixing files</a></li>
+<li><a href="#mixing-sound">Mixing in sound</a></li>
+<li><a href="#filters">Filters</a></li>
 <li><a href="#exporting">Exporting</a></li>
 <li><a href="#recording">Recording</a></li>
 <li><a href="#casting">Casting</a></li>
@@ -136,7 +139,7 @@ size, format, duration and bit rate, its tags, and each of its streams,
 with the video's codec, size, frame rate and pixel format and how it is
 decoded, and the sound's codec, rate, channels and language.</p>
 
-<h2 id="editing">Trimming and splitting</h2>
+<h2 id="editing">Editing</h2>
 <figure><img class="shot" src="screenshots/edit.webp" alt="Editing Big Buck Bunny: the film as a strip of pictures below a flying squirrel, cut into three clips with the middle one chosen, beside the cut and delete buttons and Done" width="1360" height="850" loading="lazy"></figure>
 <p>Trim (Ctrl+T) shows the file as a strip of pictures with a handle at
 each end, and plays the part kept over and over while you move them; I
@@ -147,15 +150,44 @@ picture, and undo and redo cover every step.</p>
 <p>The edit plays as it will be, clip after clip without a gap. Nothing
 changes in the file: the edit is kept until you export it, and closing
 the window with an edit not exported asks first.</p>
-<p>Ask the assistant, or an agent, and the edit can mix files too: put in
-a part of another file, or play another file's sound or picture over a
-part, such as music under a video or a voice over it, or make a part
-silent or black. The clips show each file's pictures, and the edit plays
+<p>The assistant and agents edit too. Ask them to keep a part, take one
+out, split, move a clip or turn the picture, and each step shows in the
+window as it is made, ready to undo.</p>
+
+<h2 id="mixing-files">Mixing files</h2>
+<p>Ask the assistant, or an agent, and the edit can mix files: put in a
+part of another file, play another file's picture or sound in place of a
+part's own, or make a part silent or black. The clips show each file's
+pictures, other files' pictures fit in the movie's, and the edit plays
 and exports as it will be.</p>
-<p>They can also put the picture or the sound through FFmpeg's filters,
-for all of it or a part: black and white, color and contrast, a crop,
-sharpening, a title, less noise or an even loudness. plaa checks each
-filter before it runs, and the result plays at once.</p>
+
+<h2 id="mixing-sound">Mixing in sound</h2>
+<p>To hear another file together with what plays, rather than in its
+place, ask for its sound mixed in: music under a video, a voice over it,
+or a sound effect. It starts at a time of the edit, plays part of the
+file or all of it at the volume you choose, fades in and out if you
+like, and keeps its time as clips change. Ask, for example, "put
+song.mp3 under the video, quietly, and fade it out over the last five
+seconds".</p>
+<p>The mix plays at once and exports with the rest. For a voice over the
+movie, ask for the movie's own sound to go quieter under it too, so the
+voice stays clear. The assistant can measure how loud each part is, or listen with a model that
+hears, to set the level, and taking a mix out leaves the rest of the
+edit as it was.</p>
+
+<h2 id="filters">Filters</h2>
+<p>The assistant and agents can put the picture or the sound, all of it or
+a part, through FFmpeg's filters: black and white, color, contrast and
+warmth, a crop, sharpening, a vignette, a title over the picture, fades,
+less noise, a quieter or louder sound, or an even loudness. Describe the
+look or the sound you want, such as "make it black and white, with a
+little more contrast", and the assistant chooses the filters.</p>
+<p>plaa checks each filter before it runs and lets through only those that
+change the picture or the sound as it plays: none that read or write
+files, reach devices or the network, or change the timing, which the
+editing steps do. The result plays at once, a new filter adds to those
+already there, and undo takes it back. A crop over the whole movie
+exports at its new size.</p>
 
 <h2 id="exporting">Exporting</h2>
 <figure><img class="shot" src="screenshots/tour-export.webp" alt="The Export dialog over Big Buck Bunny looking up at a butterfly on a tree: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p" width="1360" height="850" loading="lazy"></figure>
@@ -238,8 +270,10 @@ Settings, Agents, turns outside control off, lists the agents allowed,
 and has a switch for each kind of tool, seeing what plays, controlling
 playback, opening files or closing windows, and editing or exporting,
 that makes plaa ask before an agent's call runs. Every edit shows in the
-window as it is made, and undo takes it back. plaa bundles no model and
-listens on no network.</p>
+window as it is made, and undo takes it back. A step that takes more
+than two seconds, such as an export, shows how far it has come in the
+window and tells the agent too. plaa bundles no model and listens on no
+network.</p>
 <div class="table"><table>
 <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
 <tbody>
