@@ -13,12 +13,12 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use atdecc::controller::{self, CommandId, Controller, Event, Outcome};
+use atdecc::controller::{self, CommandId, Controller, Event, Outcome, Refusal};
 use atdecc::descriptor::{DescriptorType, SamplingRate};
 use atdecc::model::EntityModel;
 use atdecc::pdu::{self, Pdu};
 use atdecc::stream_format::StreamFormat;
-use atdecc::{ADP_ACMP_MULTICAST, AecpMessageType, EntityId, Instant, MacAddress};
+use atdecc::{ADP_ACMP_MULTICAST, AcmpStatus, AecpMessageType, EntityId, Instant, MacAddress};
 use avb_net::Socket;
 
 #[cfg(target_os = "linux")]
@@ -47,6 +47,9 @@ enum Step {
     /// The listener changes, where it must, to its format that takes the
     /// talker's stream as the talker sends it now, whatever it was asked.
     Follow(End, End),
+    /// The listener lets go of the talker it takes, as one outside Milan,
+    /// the Mac's among them, takes no other until it does.
+    Unbind(End),
     Bind(End, End),
 }
 
@@ -214,6 +217,7 @@ pub(crate) fn start(
         avtp,
         controller: Controller::new(controller_config),
         pending: HashMap::new(),
+        unbinds: HashSet::new(),
         #[cfg(target_os = "linux")]
         own: None,
         #[cfg(target_os = "macos")]
@@ -282,6 +286,8 @@ struct Runtime {
     controller: Controller,
     /// What is left of connections waiting for a format to be set.
     pending: HashMap<CommandId, VecDeque<Step>>,
+    /// The unbinds sent, not yet answered.
+    unbinds: HashSet<CommandId>,
     #[cfg(target_os = "linux")]
     own: Option<Own>,
     #[cfg(target_os = "macos")]
@@ -426,7 +432,8 @@ impl Runtime {
             }
             Input::Disconnect(listener) => {
                 self.failure = None;
-                self.controller.disconnect(now, listener);
+                self.unbinds
+                    .insert(self.controller.disconnect(now, listener));
             }
             Input::Watch { listed, chosen } => {
                 // Newly chosen inputs are asked at once.
@@ -522,6 +529,13 @@ impl Runtime {
                 wanted,
             ));
         }
+        let bound = self
+            .controller
+            .model(listener.0)
+            .and_then(|model| model.binding(listener.1)?.talker_stream());
+        if bound.is_some_and(|bound| bound != talker) {
+            steps.push_back(Step::Unbind(listener));
+        }
         // The listener follows once the talker has answered, as it may
         // send in another format than it was asked.
         steps.push_back(Step::Follow(talker, listener));
@@ -580,6 +594,11 @@ impl Runtime {
             Step::Format(entity, descriptor_type, index, format) => self
                 .controller
                 .set_stream_format(now, entity, descriptor_type, index, format),
+            Step::Unbind(listener) => {
+                let command = self.controller.disconnect(now, listener);
+                self.unbinds.insert(command);
+                command
+            }
             Step::Bind(talker, listener) => self.controller.connect(now, talker, listener),
             Step::Follow(..) => return,
         };
@@ -646,6 +665,14 @@ impl Runtime {
         }
         match event {
             Event::CommandFinished(command, outcome) => {
+                // A listener that answers an unbind NOT_CONNECTED takes no
+                // stream already, as asked.
+                let not_connected = Outcome::Refused(Refusal::Acmp(AcmpStatus::NOT_CONNECTED));
+                let outcome = if self.unbinds.remove(&command) && outcome == not_connected {
+                    Outcome::Done
+                } else {
+                    outcome
+                };
                 if let Some(steps) = self.pending.remove(&command) {
                     // A rate or format is set, or could not be: said where
                     // not, and on either way, as the listener follows what

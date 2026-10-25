@@ -65,6 +65,11 @@
   another gPTP grandmaster than plaa's entity, which keep another time
   and take none of its streams; a listener on plaa's stream already
   stays, to be stopped.
+- Stop no longer leaves a connection showing that the listener had
+  already dropped: a listener that answers NOT_CONNECTED is asked how
+  it stands, and the answer is not shown as a failure. Choosing another
+  talker unbinds the first, as the Mac's entity takes no other until
+  then.
 
 ## [0.1.0] - 2026-10-23
 
