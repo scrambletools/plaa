@@ -433,7 +433,8 @@ impl PlayerWindow {
     pub fn refresh(&mut self) {
         self.status = self.player.status();
         self.subtitle = self.player.subtitle();
-        // While casting, the renderer's playback shows.
+        // While casting, the renderer's playback shows: the file's time
+        // and length, as it plays the file unedited.
         if let Some(casting) = &self.casting {
             self.status.paused = !casting.playing();
             self.status.ended = false;
@@ -444,8 +445,14 @@ impl PlayerWindow {
                 if let Some(position) = status.position {
                     self.status.position = Duration::from_secs_f64(position.max(0.0));
                 }
-                if self.status.duration.is_none() {
-                    self.status.duration = status.duration.map(Duration::from_secs_f64);
+                let reported = status
+                    .duration
+                    .filter(|duration| *duration > 0.0)
+                    .map(Duration::from_secs_f64);
+                if let Some(duration) = self.info.as_ref().and_then(|info| info.duration) {
+                    self.status.duration = Some(duration);
+                } else if reported.is_some() {
+                    self.status.duration = reported;
                 }
             }
         }

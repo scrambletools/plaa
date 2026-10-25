@@ -48,6 +48,9 @@
 
 ### Fixed
 
+- Casting an edited window starts the TV or speaker where the edit's
+  playhead is in the file, shows the file's own length while it casts,
+  and goes on in the edit from where the file got to.
 - Icons and labels on the floating bars and side panels no longer hop a
   pixel against their bars as a slide settles: slides move by whole
   pixels (scramble-ui 891f44c).

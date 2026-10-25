@@ -1,7 +1,10 @@
 //! Casting a window's file or stream to a renderer on the network, a TV or
 //! speaker that plays DLNA: the renderers are looked for as the Cast menu
 //! opens; while a window casts, its own player waits, paused, and its
-//! controls and timeline are the renderer's.
+//! controls and timeline are the renderer's. The renderer plays the file
+//! as it is, without an edit, so casting starts from where the edit's
+//! playhead is in the file, and the window goes on from where the file
+//! got to in the edit.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -77,7 +80,11 @@ impl Plaa {
             // A stream plaa listens to, whose window offers no casting.
             Source::Live { .. } => return Task::none(),
         };
-        let start = player.status.position.as_secs_f64();
+        let edited = player.status.position.as_secs_f64();
+        let start = match player.editor.edit() {
+            Some(edit) => edit.own_time_at(edited).unwrap_or(0.0),
+            None => edited,
+        };
         player.player.pause();
         // The cast before, if any, stops first.
         player.casting = None;
@@ -115,9 +122,12 @@ impl Plaa {
             return Task::none();
         };
         if let Some(position) = casting.status.and_then(|status| status.position) {
-            player
-                .player
-                .seek(Duration::from_secs_f64(position.max(0.0)), true);
+            let position = position.max(0.0);
+            let edited = match player.editor.edit() {
+                Some(edit) => edit.edited_from(position).unwrap_or(edit.duration()),
+                None => position,
+            };
+            player.player.seek(Duration::from_secs_f64(edited), true);
         }
         if casting.playing() {
             player.player.play();

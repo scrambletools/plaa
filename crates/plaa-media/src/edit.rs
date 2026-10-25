@@ -636,6 +636,42 @@ impl Edit {
         None
     }
 
+    /// The time in the file edited at edited time `seconds`: in its own
+    /// clip there, or where the next of its own clips starts where
+    /// another file's part plays; none past its last clip.
+    pub fn own_time_at(&self, seconds: f64) -> Option<f64> {
+        let mut start = 0.0;
+        for clip in &self.clips {
+            let end = start + clip.length();
+            if clip.source == OWN && seconds < end {
+                return Some((clip.from + (seconds - start).max(0.0)).min(clip.to));
+            }
+            start = end;
+        }
+        None
+    }
+
+    /// The edited time the file's time `seconds` plays at, or, where that
+    /// part was taken out, where the first part of the file after it
+    /// starts; none past the last part kept.
+    pub fn edited_from(&self, seconds: f64) -> Option<f64> {
+        if let Some(edited) = self.edited_of(seconds) {
+            return Some(edited);
+        }
+        let mut start = 0.0;
+        let mut next: Option<(f64, f64)> = None;
+        for clip in &self.clips {
+            if clip.source == OWN
+                && clip.from > seconds
+                && next.is_none_or(|(from, _)| clip.from < from)
+            {
+                next = Some((clip.from, start));
+            }
+            start += clip.length();
+        }
+        next.map(|(_, edited)| edited)
+    }
+
     /// Keeps the edited movie from `from` to `to` seconds. Returns whether
     /// that changed it.
     pub fn trim(&mut self, from: f64, to: f64) -> bool {
@@ -1005,6 +1041,31 @@ mod tests {
             picture,
             sound: true,
         }
+    }
+
+    #[test]
+    fn casting_maps_the_edit_to_the_file_and_back() {
+        let mut edit = Edit::whole(60.0);
+        assert!(edit.cut(10.0, 20.0));
+        let intro = edit.add_other(other("/intro.mp4", 5.0, true));
+        let clip = Clip {
+            source: intro,
+            ..Clip::new(0.0, 5.0)
+        };
+        assert!(edit.insert(0.0, clip));
+        // Edited: 0 to 5 the intro, 5 to 15 the file's 0 to 10, then 15
+        // on its 20 to 60.
+        assert_eq!(edit.own_time_at(2.0), Some(0.0), "the intro plays");
+        assert_eq!(edit.own_time_at(7.0), Some(2.0));
+        assert_eq!(edit.own_time_at(16.0), Some(21.0));
+        assert_eq!(edit.own_time_at(edit.duration()), None);
+        assert_eq!(edit.edited_from(2.0), Some(7.0));
+        assert_eq!(edit.edited_from(12.0), Some(15.0), "cut: the part after");
+        assert_eq!(edit.edited_from(21.0), Some(16.0));
+        assert_eq!(edit.edited_from(60.0), None);
+        let whole = Edit::whole(30.0);
+        assert_eq!(whole.own_time_at(12.0), Some(12.0));
+        assert_eq!(whole.edited_from(12.0), Some(12.0));
     }
 
     #[test]
