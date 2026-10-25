@@ -175,9 +175,9 @@
   "page": "index.html",
   "text": "Listen here"
  },
- "63a922870e9f": {
+ "fcac526cca44": {
   "page": "index.html",
-  "text": "On Linux, with Send what plays on, the talkers on the network, each a button away from playing on this computer."
+  "text": "With Send what plays on, the talkers on the network, each a button away from playing on this computer."
  },
  "8e675af91fda": {
   "page": "index.html",
@@ -638,9 +638,9 @@
   "page": "tour.html",
   "text": "plaa takes part in AVB and Milan networks, the kind that links professional speakers, amplifiers and audio interfaces. In Settings, Network, choose the wired interface the network is on. With Send what plays on, plaa becomes a Milan talker of its own on Linux, and sends through the Mac's own AVB entity on macOS: the sound of the window last played goes out as a stream on the network's clock, which any Milan controller can connect. On Windows plaa does not send or play AVB streams."
  },
- "b9b612f5ee5a": {
+ "f8e8b84bedc3": {
   "page": "tour.html",
-  "text": "The Network Audio button lists the listeners that can play plaa's sound, each with one button, and how the one chosen takes its stream, kept up to date as other controllers change it. On Linux, with Send what plays on, the Connect menu beside Open lists the talkers plaa can listen to, and plays the one chosen in a window, as a file plays."
+  "text": "The Network Audio button lists the listeners that can play plaa's sound, each with one button, and how the one chosen takes its stream, kept up to date as other controllers change it. With Send what plays on, the Connect menu beside Open lists the talkers plaa can listen to, those on the same network clock, and plays the one chosen in a window, as a file plays. On a Mac the stream comes in as the sound input of the Mac's AVB entity, so macOS asks once to let plaa use the microphone."
  },
  "9cfd5becb8fe": {
   "page": "tour.html",
@@ -854,9 +854,9 @@
   "page": "tour.html",
   "text": "Settings"
  },
- "32294f427910": {
+ "75f4370aa86b": {
   "page": "tour.html",
-  "text": "Settings (Ctrl+,) has seven tabs. Appearance chooses light or dark, the system's accent color or one of plaa's, animations, and how the floating controls look and when they hide. Playback has hardware decoding, the sound output, resuming, folder playlists, the streams' quality, yt-dlp, and Make Default, which makes plaa the system's default app for video and sound files. Storage chooses the folders recordings and saved frames go to; Network, the AVB interface, Send what plays and plaa's name on the network; Language, plaa's language and the languages tracks are chosen by; Agents and Assistant, what the previous sections describe."
+  "text": "Settings (Ctrl+,) has seven tabs, six on Windows, which has no Network tab. Appearance chooses light or dark, the system's accent color or one of plaa's, animations, and how the floating controls look and when they hide. Playback has hardware decoding, the sound output, resuming, folder playlists, the streams' quality, yt-dlp, and Make Default, which makes plaa the system's default app for video and sound files. Storage chooses the folders recordings and saved frames go to; Network, the AVB interface, Send what plays and plaa's name on the network; Language, plaa's language and the languages tracks are chosen by; Agents and Assistant, what the previous sections describe."
  },
  "48f0478f282a": {
   "page": "tour.html",
@@ -1519,21 +1519,21 @@
   "page": "specs.html",
   "text": "Role"
  },
- "2c03307b9d70": {
+ "20d0d6ebdec4": {
   "page": "specs.html",
-  "text": "A Milan talker and listener of its own on Linux; on macOS, a talker through the Mac's own AVB entity; on Windows, neither"
+  "text": "A Milan talker and listener of its own on Linux; on macOS, a talker and listener through the Mac's own AVB entity; on Windows, neither"
  },
  "3c59147d5761": {
   "page": "specs.html",
   "text": "Stream formats"
  },
- "2b8eeb2051a7": {
+ "f4daf087b871": {
   "page": "specs.html",
-  "text": "On Linux, AAF as the AVB community's Basic and Extended Audio profiles set them, in SR class A or B, and AM824 in class A, of 2 or 8 channels at 48, 96 or 192 kHz, where a frame holds them (2 channels only in class B at 192 kHz)"
+  "text": "On Linux, AAF as the AVB community's Basic and Extended Audio profiles set them, in SR class A or B, and AM824 in class A, of 2 or 8 channels at 48, 96 or 192 kHz, where a frame holds them (2 channels only in class B at 192 kHz); on macOS, the Mac's entity's: AAF of 8 channels at 44.1 to 192 kHz, and AM824 of 8 channels at 48, 96 or 192 kHz"
  },
- "237d26f0a2ce": {
+ "99db1d8abb20": {
   "page": "specs.html",
-  "text": "Any Milan controller connects plaa's stream; Network Audio connects listeners to it, and on Linux, with Send what plays on, Connect plays a talker's stream on this computer"
+  "text": "Any Milan controller connects plaa's stream; Network Audio connects listeners to it, and on Linux and macOS, with Send what plays on, Connect plays a talker's stream on this computer; both list only entities under plaa's gPTP grandmaster"
  },
  "98c2a03a8f7d": {
   "page": "specs.html",
