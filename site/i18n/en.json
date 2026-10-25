@@ -307,21 +307,21 @@
   "page": "index.html",
   "text": "Windows releases of plaa are signed by Scramble Tools LLC with <a1>Microsoft Azure Artifact Signing</a1>, and macOS releases with Scramble Tools' Developer ID, notarized by Apple."
  },
- "1f83be07964a": {
+ "438e6acffd97": {
   "page": "index.html",
-  "text": "<strong>What is signed:</strong> only programs built from this project's own <a1>source code</a1> by its GitHub Actions release workflow: <code>plaa.exe</code>, the libraries it carries and the installers."
+  "text": "<strong>What is signed:</strong> <code>plaa.exe</code>, <code>plaa.app</code> and the installers, built from this project's own <a1>source code</a1> by its GitHub Actions release workflow, and the libraries they carry: FFmpeg's DLLs from BtbN's builds, pinned by checksum, libass and the libraries it needs, built from source by vcpkg in the workflow, and on macOS the Homebrew libraries inside <code>plaa.app</code>. The Visual C++ runtime DLLs keep Microsoft's own signatures."
  },
- "840981ec0887": {
+ "adb4574276e8": {
   "page": "index.html",
-  "text": "<strong>Committers and reviewers:</strong> the members of the <a1>scrambletoolsllc</a1> GitHub organization, who review every outside contribution before it is merged."
+  "text": "<strong>Committers and reviewers:</strong> the members of the <a1>scrambletools</a1> GitHub organization, who review every outside contribution before it is merged."
  },
- "6263ca064f9a": {
+ "2105694538c0": {
   "page": "index.html",
-  "text": "<strong>Approvers:</strong> the owner of the <a1>scrambletoolsllc</a1> GitHub organization, who alone can publish a release, and with it a signing."
+  "text": "<strong>Approvers:</strong> the owner of the <a1>scrambletools</a1> GitHub organization, who alone can run the release workflow, which signs, and publish a release."
  },
- "2d89c53bf0a2": {
+ "48316d2786a5": {
   "page": "index.html",
-  "text": "Signing runs only in the release workflow, which signs in to Azure without a stored secret. Everyone on the team signs in to GitHub and Azure with two-factor authentication."
+  "text": "Signing runs only in the release workflow, when a version is tagged or when the owner runs it by hand to try the packages. It signs in to Azure with GitHub's OpenID Connect token, so no Azure secret is stored; the macOS certificates and the notary key are secrets of the workflow's release environment. Everyone on the team signs in to GitHub and Azure with two-factor authentication."
  },
  "cf01481f626d": {
   "page": "index.html",
