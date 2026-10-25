@@ -65,7 +65,8 @@ the addresses opened lately again.</p>
 a file opened again from the file manager or the command line goes to
 the running one, as files opened from Finder do on macOS. To have video
 and sound files open in plaa, use Make Default in
-<a href="#settings">Settings</a>.</p>
+<a href="#settings">Settings</a>, or on Windows Open Settings, which
+opens plaa's page in the system's Settings.</p>
 
 <h2 id="playing">Playing</h2>
 <figure><img class="shot" src="screenshots/tour-play.webp" alt="plaa in dark mode, paused on Big Buck Bunny holding an apple in a meadow, with the toolbar and controls floating over the picture and, above the timeline, a preview of the scene at 5:29" width="1360" height="850" loading="lazy"></figure>
@@ -84,23 +85,24 @@ pitch, and the volume and full screen are at the right of the controls.</p>
 (Ctrl+Shift+P) keeps a small window over the others in a corner. plaa
 resumes each file where you left off, keeps the screen on while video
 plays, and keeps the computer awake while sound does.</p>
-<p>Video is decoded on the graphics card where it can be, 8K at 60 frames
-a second included, and drawn by plaa's own shader: BT.601, BT.709 and
+<p>Video is decoded on the graphics card where it can be, up to 8K at 60
+frames a second on a card that can, and drawn by plaa's own shader: BT.601, BT.709 and
 BT.2020 colors, 8 to 16 bits, HDR10 and HLG tone mapped for an ordinary
-screen, and phone videos turned upright. The sound keeps in step with
-the picture by the output device's own clock.</p>
+screen, and phone videos turned upright. The picture keeps in step
+with the sound, by the output device's own clock.</p>
 
 <h2 id="tracks">Tracks and subtitles</h2>
 <p>plaa picks the audio and subtitle tracks in the languages Settings
 prefer, and the menu at the right of the controls changes them. It shows
 text subtitles (SubRip, WebVTT, MP4 text and more), ASS and SSA styled
 as made through libass, and Blu-ray, DVD and DVB picture subtitles.
-Subtitle files beside the video, such as <code>Film.en.srt</code>, or in a
-<code>Subs</code> folder, are offered too.</p>
+Subtitle files named after the video, such as <code>Film.en.srt</code>,
+beside it or in a <code>Subs</code> or <code>Subtitles</code> folder, are
+offered too.</p>
 <p>A file's chapters are marked on the timeline and listed in a menu, and
 Page Up and Page Down move between them. Loop (Ctrl+L) plays the file
-over and over; B marks where an A-B loop starts, and B again where it
-ends.</p>
+over and over; B marks where an A-B loop starts, B again where it ends,
+and B a third time turns it off.</p>
 
 <h2 id="streams">Streams and web videos</h2>
 <p>plaa plays HTTP, HLS, DASH, RTSP and SRT addresses. Streams read ahead,
@@ -110,14 +112,15 @@ the timeline how far they have read; a spinner shows while they wait.</p>
 plaa also plays the videos on web pages such as YouTube's, with their
 titles, channels, chapters and thumbnails, and a web playlist becomes a
 plaa playlist. A stream or web video plays in the quality that fits your
-screen, or the one chosen from the quality menu, which also offers the
-sound alone.</p>
+screen, or the one chosen from the quality menu, which for a web video
+also offers the sound alone.</p>
 
 <h2 id="playlists">Playlists</h2>
 <p>Files opened or dropped together play one after another, as do M3U and
 PLS lists, and in Settings plaa can list the other files in the opened
-file's folder. The playlist (Ctrl+P) shows beside the picture; P and N
-go to the previous and next item, and the next one plays when one
+file's folder. The playlist (Ctrl+P) shows beside the picture. N goes
+to the next item, and P back to the start of the one playing, or in its
+first three seconds to the one before; the next one plays when one
 ends.</p>
 
 <h2 id="sound">Sound files</h2>
@@ -184,8 +187,8 @@ look or the sound you want, such as "make it black and white, with a
 little more contrast", and the assistant chooses the filters.</p>
 <p>plaa checks each filter before it runs and lets through only those that
 change the picture or the sound as it plays: none that read or write
-files, reach devices or the network, or change the timing, which the
-editing steps do. The result plays at once, a new filter adds to those
+files, reach devices or the network, or change the movie's length or
+order, which the editing steps do. The result plays at once, a new filter adds to those
 already there, and undo takes it back. A crop over the whole movie
 exports at its new size.</p>
 
@@ -207,12 +210,14 @@ quiet input up to 30 dB higher, kept for each input, and Level
 automatically evens the level out. Space starts and stops; once it
 stops, plaa asks what to name the recording, then plays it, ready to
 trim and export.</p>
-<p>Record Screen (Ctrl+Alt+N) records a screen or a window, or on Linux a
-region, with the pointer, and the sound of a microphone or of what the
-computer plays if you like, on the graphics card's encoder at 24 to 120
-pictures a second. Recording a screen, plaa's own windows stay out of it
-on macOS; elsewhere the recording window steps aside, and the red dot in
-the tray on Linux, or opening plaa again, stops it.</p>
+<p>Record Screen (Ctrl+Alt+N) records a screen or a window, or a region
+where the Linux desktop offers one, with the pointer, and the sound of a
+microphone or of what the computer plays if you like, on the graphics
+card's encoder where one opens, at 24 to 120 pictures a second or every
+picture the screen sends. Recording a screen, plaa's own windows stay
+out of it on macOS; elsewhere the recording window steps aside, and the
+red dot in the tray on Linux desktops that have one, or opening plaa
+again, stops it.</p>
 <p>Record Camera (Ctrl+Alt+M) records a camera, as QuickTime Player's New
 Movie Recording does, its picture shown mirrored while it records. Sound
 recordings go to Music, and screen and camera recordings to Videos
@@ -222,9 +227,10 @@ recordings go to Music, and screen and camera recordings to Videos
 <figure><img class="shot" src="screenshots/tour-cast.webp" alt="The Cast menu open over Big Buck Bunny among flowers, playing on Living Room TV, with Kitchen Speaker listed too and a button to stop" width="1360" height="850" loading="lazy"></figure>
 <p>The Cast menu looks for Chromecasts and for TVs, speakers and programs
 that play DLNA on your network as it opens. Choose one, and plaa serves
-the file to it, or hands it the stream's address; plaa's own controls
-and timeline then play, pause and seek it there. When casting stops, the
-window goes on from where it got to.</p>
+the file to it, as it is without an edit, or hands it the stream's
+address; plaa's own controls and timeline then play, pause and seek it
+there, and the volume sets its volume. When casting stops, the window
+goes on from where it got to.</p>
 
 <h2 id="network-audio">Network audio</h2>
 <p>plaa takes part in AVB and Milan networks, the kind that links
@@ -233,14 +239,15 @@ Network, choose the wired interface the network is on. With Send what
 plays on, plaa becomes a Milan talker of its own on Linux, and sends
 through the Mac's own AVB entity on macOS: the sound of the window last
 played goes out as a stream on the network's clock, which any Milan
-controller can connect.</p>
+controller can connect. On Windows plaa does not send or play AVB
+streams.</p>
 <p>The Network Audio button lists the listeners that can play plaa's
 sound, each with one button, and how the one chosen takes its stream,
-kept up to date as other controllers change it. The Connect menu, beside
-Open, lists the talkers plaa can listen to, and plays the one chosen in
-a window, as a file plays.</p>
-<p>Where the switch has no AVB, plaa falls back to AVB Lite and sends each
-listener, up to five, a copy of its own. On Linux plaa keeps network time
+kept up to date as other controllers change it. On Linux, with Send what
+plays on, the Connect menu beside Open lists the talkers plaa can listen
+to, and plays the one chosen in a window, as a file plays.</p>
+<p>On Linux, where the switch has no AVB, plaa falls back to AVB Lite and
+sends each listener, up to five, a copy of its own. plaa keeps network time
 with ptp4l, starting its own service where nothing else runs one, and
 shares the network's reservations with triib's entity service where it
 runs. The <a href="https://github.com/scrambletools/plaa#avb-on-linux">README</a>
@@ -251,8 +258,9 @@ says what each system needs.</p>
 <p>The assistant button opens a chat panel beside what plays. Ask about it,
 and the assistant looks with plaa's own tools, at the status, the file's
 streams, its pictures at any time, how loud it is and its subtitles, and
-plays, pauses, seeks, changes the sound or edits it for you, each step
-shown as it goes.</p>
+plays, pauses, seeks, changes the sound, edits it, mixes in other files,
+puts it through filters or exports it for you, each step shown as it
+goes.</p>
 <p>Use a local model that stays on your computer, such as Ollama's or one
 behind an OpenAI-compatible server, or a cloud model from Anthropic,
 OpenAI or Google with your own key, kept in the system's keychain. Add
@@ -268,19 +276,21 @@ Code:</p>
 <p>The first time an agent connects, plaa asks whether to let it in.
 Settings, Agents, turns outside control off, lists the agents allowed,
 and has a switch for each kind of tool, seeing what plays, controlling
-playback, opening files or closing windows, and editing or exporting,
-that makes plaa ask before an agent's call runs. Every edit shows in the
+playback, the sound or full screen, opening a file or closing a window,
+and editing or exporting, that makes plaa ask before an agent's call
+runs. Every edit shows in the
 window as it is made, and undo takes it back. A step that takes more
 than two seconds, such as an export, shows how far it has come in the
-window and tells the agent too. plaa bundles no model and listens on no
-network.</p>
+window, and tells an agent that asks for progress. plaa bundles no
+model, and agents reach it only through a private socket on your
+computer, never over the network.</p>
 <div class="table"><table>
 <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
 <tbody>
 <tr><td><code>list_windows</code></td><td>plaa's windows: their numbers, titles, what they play and how</td></tr>
 <tr><td><code>get_status</code></td><td>A window's state, position, length, speed, volume, loop and tracks</td></tr>
 <tr><td><code>get_info</code></td><td>The file's format, tags, chapters and streams, and the window's list</td></tr>
-<tr><td><code>get_frame</code></td><td>The picture shown, as a PNG at most 1280 pixels across</td></tr>
+<tr><td><code>get_frame</code></td><td>The picture shown, as a PNG at most 1280 pixels on its longest side</td></tr>
 <tr><td><code>play</code>, <code>pause</code>, <code>seek</code>, <code>set_speed</code></td><td>Playback</td></tr>
 <tr><td><code>set_volume</code>, <code>set_loop</code>, <code>choose_tracks</code></td><td>The sound, looping, and the sound track and subtitles</td></tr>
 <tr><td><code>next_item</code>, <code>previous_item</code></td><td>Moving through a window's list</td></tr>
@@ -290,10 +300,10 @@ network.</p>
 <tr><td><code>get_levels</code></td><td>How loud each step is, and where it is silent</td></tr>
 <tr><td><code>get_subtitles</code></td><td>The subtitles' lines and their times, as they show in the edit</td></tr>
 <tr><td><code>get_sound</code></td><td>Up to a minute of sound, for models that hear</td></tr>
-<tr><td><code>get_edit</code></td><td>The clips, the files they play, and what replaces their picture or sound</td></tr>
+<tr><td><code>get_edit</code></td><td>The clips, the files they play, what replaces their picture or sound, their filters, and the sound mixed in</td></tr>
 <tr><td><code>trim</code>, <code>cut</code>, <code>split</code>, <code>move_clip</code></td><td>Keeping a part, taking one out, splitting and ordering clips</td></tr>
 <tr><td><code>insert</code></td><td>Putting in part of another file, or of the same one</td></tr>
-<tr><td><code>replace</code></td><td>Another file's sound or picture over a part, or silence, or black</td></tr>
+<tr><td><code>replace</code></td><td>Another file's sound or picture in place of a part's own, or silence, or black</td></tr>
 <tr><td><code>mix_in</code>, <code>remove_mix</code></td><td>Another file's sound mixed in with what plays, such as music under a video</td></tr>
 <tr><td><code>apply_filter</code>, <code>remove_filters</code></td><td>FFmpeg's filters on the picture or sound, such as black and white, checked before they run</td></tr>
 <tr><td><code>turn_picture</code>, <code>undo</code></td><td>Turning or flipping the picture; undo, redo and undoing all</td></tr>
@@ -305,28 +315,31 @@ network.</p>
 <p>Media keys work, and what plays shows with its cover in the system's
 own controls: MPRIS on Linux, which <code>playerctl</code> drives too, the
 media flyout on Windows, and Now Playing on macOS. On macOS plaa has its
-own menu bar, and on macOS and Windows title bars in plaa's colors. On
+own menu bar and a title bar in plaa's colors, and on Windows the title
+bar follows plaa's light or dark. On
 Linux, plaa's packages use the system's FFmpeg and sound server, PipeWire
 or PulseAudio.</p>
 
 <h2 id="settings">Settings</h2>
 <figure><img class="shot" src="screenshots/tour-settings.webp" alt="plaa's Settings over a paused video, on the Appearance tab: Follow system, Light and Dark, the system accent color switch and the color swatches, and the floating controls' settings" width="1360" height="850" loading="lazy"></figure>
 <p>Settings (Ctrl+,) has seven tabs. Appearance chooses light or dark, the
-system's accent color or one of plaa's, and how the floating controls
-look and when they hide. Playback has hardware decoding, the sound
+system's accent color or one of plaa's, animations, and how the floating
+controls look and when they hide. Playback has hardware decoding, the sound
 output, resuming, folder playlists, the streams' quality, yt-dlp, and
 Make Default, which makes plaa the system's default app for video and
 sound files. Storage chooses the folders recordings and saved frames go
-to; Network, the AVB interface; Language, plaa's language and the
+to; Network, the AVB interface, Send what plays and plaa's name on the
+network; Language, plaa's language and the
 languages tracks are chosen by; Agents and Assistant, what the previous
 sections describe.</p>
 <p>plaa keeps its settings in <code>~/.config/plaa.toml</code> on Linux,
 <code>%APPDATA%\plaa\plaa.toml</code> on Windows and
 <code>~/Library/Application Support/plaa/plaa.toml</code> on macOS. The
 file's <code>[keys]</code> table changes the keyboard shortcuts, for every
-system or for one:</p>
+system or for one. A list replaces the action's own keys, and a key given
+to one action is taken from any other that had it:</p>
 <pre><code>[keys]
-play-pause = ["Space", "P"]
+play-pause = ["Space", "K", "MediaPlayPause"]
 screenshot = "Ctrl+Shift+S"</code></pre>
 
 <h2 id="shortcuts">Keyboard shortcuts</h2>

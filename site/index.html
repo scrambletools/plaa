@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>plaa: a media player for Linux, Windows and macOS that plays on the network</title>
-<meta name="description" content="plaa is a free, open source video and audio player, similar to QuickTime Player and IINA, that trims and exports, records, casts to TVs and speakers, sends and listens to AVB and Milan network audio, and lets AI agents such as Claude Code control it over MCP.">
+<meta name="description" content="plaa is a free, open source video and audio player, similar to QuickTime Player and IINA, that edits and exports, records, casts to TVs and speakers, sends and listens to AVB and Milan network audio, and lets AI agents such as Claude Code control it over MCP.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -25,8 +25,8 @@
   <section class="hero">
     <img class="hero-icon" src="icon.svg" alt="The plaa icon" width="128" height="128">
     <h1>plaa</h1>
-    <p class="lede"><span class="lede-first">Plays what you have, where you want it.</span>
-      <span class="lede-rest">Video, audio, streams and web video, trimmed, exported and recorded, on your screen,
+    <p class="lede"><span class="lede-first">Simple media player that plays everything well.</span>
+      <span class="lede-rest">Video, audio, streams and web video, edited, exported and recorded, on your screen,
       on a TV or speaker, or across an AVB network, by yourself or with your favorite AI&nbsp;agent.</span></p>
     <p class="actions">
       <a class="button filled" href="#download">Download plaa 0.1.0</a>
@@ -41,19 +41,19 @@
     <div class="grid">
       <article>
         <h3>Plays almost anything</h3>
-        <p>Every format FFmpeg reads, decoded on the graphics card where it can, HDR shown as it should be, with the file's chapters, tracks in the languages you prefer, and subtitles of every kind, ASS styled as made.</p>
+        <p>Every format FFmpeg reads, decoded on the graphics card where it can, HDR tone mapped for ordinary screens, with the file's chapters, tracks in the languages you prefer, and subtitles of every kind, ASS styled as made.</p>
       </article>
       <article>
         <h3>Streams and web video</h3>
         <p>HTTP, HLS, DASH, RTSP and SRT addresses, and web pages such as YouTube's through yt-dlp when you have it, in the quality that fits your screen or the one you choose.</p>
       </article>
       <article>
-        <h3>Trim, split and export</h3>
-        <p>Cut a file into clips, reorder, turn and flip them, and export the result on your graphics card's encoder where there is one, or the sound alone, compressed or lossless. Nothing changes until you export.</p>
+        <h3>Edit and export</h3>
+        <p>Cut a file into clips and reorder them, turn and flip the picture, or ask the assistant to mix in other files and music or put it through filters. Export the result on your graphics card's encoder where there is one, or the sound alone, compressed or lossless. Nothing changes until you export.</p>
       </article>
       <article>
         <h3>Record</h3>
-        <p>Sound from a microphone, the screen or a window with or without its sound, and a camera, as QuickTime Player's New Recording does, in formats you choose.</p>
+        <p>A microphone or what the computer plays, the screen or a window with sound if you like, and a camera, as QuickTime Player does, in formats you choose.</p>
       </article>
       <article>
         <h3>A visualizer for sound</h3>
@@ -61,11 +61,11 @@
       </article>
       <article>
         <h3>Cast to a TV or speaker</h3>
-        <p>Send what plays to a Chromecast, or a TV, speaker or program that plays DLNA, on your network, and play, pause and seek it from plaa's own controls and timeline.</p>
+        <p>Send the file or stream you play to a Chromecast, or a TV, speaker or program that plays DLNA, on your network, and play, pause, seek and set its volume from plaa's own controls and timeline.</p>
       </article>
       <article>
         <h3>An assistant beside what plays</h3>
-        <p>Ask about what plays in a chat panel, and the assistant looks at it and plays, pauses, seeks or changes the sound for you. Use a local model that stays on your computer, or a cloud model from Anthropic, OpenAI or Google with your own key.</p>
+        <p>Ask about what plays in a chat panel, and the assistant looks at it and plays, seeks, edits, mixes in sound, puts it through filters or exports it for you. Use a local model that stays on your computer, or a cloud model from Anthropic, OpenAI or Google with your own key.</p>
       </article>
       <article>
         <h3>AI agents</h3>
@@ -91,11 +91,11 @@
 
   <section id="network" class="features">
     <h2>Network audio, built in</h2>
-    <p class="section-lede">plaa is an AVB and Milan entity of its own on Linux, and uses the Mac's on macOS, so what it plays goes straight to the speakers, amplifiers and interfaces on your AVB network, in time with them.</p>
+    <p class="section-lede">plaa is an AVB and Milan entity of its own on Linux, and uses the Mac's on macOS, so what it plays goes straight to the speakers, amplifiers and interfaces on your AVB network, in time with them. On Windows it does not send or play AVB streams.</p>
     <div class="grid">
       <article>
         <h3>Send what plays</h3>
-        <p>A stereo 48 kHz stream on the network's own clock, which any Milan controller can connect, starting once a listener is ready.</p>
+        <p>A stereo stream on the network's own clock, at 48 kHz unless another rate is chosen, which any Milan controller can connect, starting once a listener is ready.</p>
       </article>
       <article>
         <h3>Network Audio</h3>
@@ -103,15 +103,15 @@
       </article>
       <article>
         <h3>Listen here</h3>
-        <p>The talkers on the network, each a button away from playing on this computer.</p>
+        <p>On Linux, with Send what plays on, the talkers on the network, each a button away from playing on this computer.</p>
       </article>
       <article>
         <h3>On a plain switch</h3>
-        <p>Where the switch has no AVB, plaa falls back to AVB Lite and sends each listener, up to five, a copy of its own, still in time with the rest of the network.</p>
+        <p>On Linux, where the switch has no AVB, plaa falls back to AVB Lite and sends each listener, up to five, a copy of its own, still in time with the rest of the network.</p>
       </article>
       <article>
         <h3>Beside triib</h3>
-        <p>plaa shares the network's reservations with triib's entity service where it runs, and keeps network time with ptp4l where nothing else does.</p>
+        <p>On Linux, plaa shares the network's reservations with triib's entity service where it runs, and keeps network time with ptp4l where nothing else does.</p>
       </article>
     </div>
   </section>
@@ -134,7 +134,7 @@
         </tbody>
       </table>
     </div>
-    <p class="small">The Windows installer and <code>plaa.exe</code> are signed by Scramble Tools LLC, and the macOS package with its Developer ID, notarized by Apple. Each package is installed, upgraded, run, made to play a video and removed in a clean system before a release goes out. See the <a href="https://github.com/scrambletools/plaa#packages">install notes</a> for what differs between them, and the release for the sources of the libraries the Windows and macOS packages carry.</p>
+    <p class="small">The Windows installer and <code>plaa.exe</code> are signed by Scramble Tools LLC, and the macOS package with its Developer ID, notarized by Apple. Before a release goes out, each installer is installed, run and removed on a test machine, playing a video where the machine can show one, and upgraded from the release before where there is one. See <a href="https://github.com/scrambletools/plaa/blob/main/docs/RELEASING.md#what-each-system-needs">what each system needs</a> for what differs between them, and the release for the sources of the libraries the Windows and macOS packages carry.</p>
   </section>
 
   <section id="code-signing" class="policy">
@@ -161,8 +161,9 @@
       the addresses and web pages you open, through yt-dlp for web pages, and to open links you click.
       On your local network it finds TVs and speakers when you open the Cast menu, serves the file you
       cast to the one you choose while it plays, and, when you choose a network interface for AVB,
-      takes part in that network. When you use the assistant with a model you added, plaa sends that
-      model your messages and what it asks to see of what plays: to the provider you chose for a
+      takes part in that network. Setting up the assistant, plaa looks for model servers on your computer
+      and asks a provider you add for its models. When you use the assistant, plaa sends the model
+      your messages and what it asks to see of what plays: to the provider you chose for a
       cloud model, or to the server you gave for a local model. API keys stay in your system's
       keychain. Agents reach plaa only through <code>plaa --mcp</code> on your own computer, once you
       allow them. plaa has no accounts and sends no telemetry. This website sets no
