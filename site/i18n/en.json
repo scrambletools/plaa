@@ -360,9 +360,9 @@
   "text": "The inspector beside the picture, listing the file's name, folder, size, format, duration and bit rate, its H.264 video decoded on the graphics card, and its MP3 sound",
   "attribute": true
  },
- "b16453547bbb": {
+ "6ba364eb4fec": {
   "page": "index.html",
-  "text": "plaa in light mode playing a sound file: its cover, a still of Big Buck Bunny frowning, its title and artist, and its spectrum below",
+  "text": "plaa in dark mode playing a sound file: its cover, a still of Big Buck Bunny frowning, its title and artist, and its spectrum below",
   "attribute": true
  },
  "d5eca9321313": {
@@ -650,9 +650,13 @@
   "page": "tour.html",
   "text": "The assistant"
  },
- "aa82604f6904": {
+ "9df2879e3172": {
   "page": "tour.html",
-  "text": "The assistant button opens a chat panel beside what plays. Ask about it, and the assistant looks with plaa's own tools, at the status, the file's streams, its pictures at any time, how loud it is and its subtitles, and plays, pauses, seeks, changes the sound, edits it, mixes in other files, puts it through filters or exports it for you, each step shown as it goes."
+  "text": "The assistant button opens a chat panel beside what plays. Ask it to improve the color, and it looks at the video's pictures, then corrects them with FFmpeg's filters, warmer or cooler, brighter, richer or with more contrast, over the whole movie or one scene, and looks again to check. Ask it to edit, and it trims, takes parts out, splits and moves clips, puts in part of another file, mixes in music and exports what you made. Each step shows in the panel as it goes, and undo takes it back."
+ },
+ "d1522022289e": {
+  "page": "tour.html",
+  "text": "Ask, for example, \"make the colors warmer and richer, and cut the first 20 seconds\": it looks at the picture, warms and enriches it, looks again and cuts the start, showing the picture before and after."
  },
  "bcfe366f6e93": {
   "page": "tour.html",
@@ -1110,9 +1114,9 @@
   "text": "plaa in dark mode, paused on Big Buck Bunny holding an apple in a meadow, with the toolbar and controls floating over the picture and, above the timeline, a preview of the scene at 5:29",
   "attribute": true
  },
- "77aa7e8d1b39": {
+ "a036fb733b6d": {
   "page": "tour.html",
-  "text": "The Export dialog over Big Buck Bunny looking up at a butterfly on a tree: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p",
+  "text": "The Export dialog over Big Buck Bunny holding an apple in a meadow: H.264, HEVC, AV1 or sound only, encoded on the graphics card, at 1080p as it is, 720p or 480p",
   "attribute": true
  },
  "2cb600314536": {
@@ -1120,14 +1124,14 @@
   "text": "Sound recording at 7.7 seconds: the input's level in two bars, the Louder slider, Level automatically, AAC at 256 kb/s and the stop button",
   "attribute": true
  },
- "3d53bf8e7293": {
+ "3ff1d17d1960": {
   "page": "tour.html",
-  "text": "The Cast menu open over Big Buck Bunny among flowers, playing on Living Room TV, with Kitchen Speaker listed too and a button to stop",
+  "text": "The Cast menu open over Big Buck Bunny looking up at an apple tree, playing on Living Room TV, with Kitchen Speaker listed too and a button to stop",
   "attribute": true
  },
- "fe5c3a8b0ab3": {
+ "5152c09a531c": {
   "page": "tour.html",
-  "text": "The assistant panel beside Big Buck Bunny: asked to skip ahead a minute and turn it down to 60%, it ran Seek, Set the volume and Get the status, and says it did both",
+  "text": "The assistant panel beside Big Buck Bunny in a meadow: asked to make the colors warmer and richer and cut the first 20 seconds, it got pictures, applied filters, got pictures again and cut out the start, its two pictures showing the colors before and after, and says what it changed",
   "attribute": true
  },
  "3234eaecae83": {

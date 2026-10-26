@@ -12,6 +12,8 @@ QuickTime Player and IINA. Built in Rust with [iced](https://iced.rs) and
 Download it from [plaa.run](https://plaa.run#download) or the
 [release page](https://github.com/scrambletools/plaa/releases/latest).
 
+![plaa in dark mode, paused on Big Buck Bunny's meadow, where three rodents peek out from behind a rock, with the toolbar floating over the picture and the timeline, volume and playback controls floating below](site/screenshots/playing.webp)
+
 ## Features
 
 ### Available now
