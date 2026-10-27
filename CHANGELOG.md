@@ -11,6 +11,9 @@
   send the interface's frames on its first transmit queue, as a card
   with several, as the I210 has four, spread a stream's frames over
   them by a hash that takes in its sequence number.
+- Connecting in a format the talker is not sending in unbinds the
+  talker's other listeners first, as its menu says, since a Milan
+  talker takes another format only while it streams to none.
 
 ## [0.5.0] - 2026-10-25
 

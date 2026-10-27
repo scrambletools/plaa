@@ -508,6 +508,12 @@ impl Runtime {
             && wanted != *current
             && formats.contains(&wanted)
         {
+            // A talker takes another format only while it streams to none,
+            // and a listener only unbound (Milan, 5.4.2.7): those it sends
+            // to let go first, as Connect says.
+            for bound in self.bound_to(talker) {
+                steps.push_back(Step::Unbind(bound));
+            }
             // At another rate than the talker runs at, its audio unit
             // goes there first, as controllers change rates.
             if let Some(rate) = wanted.sample_rate()
@@ -541,6 +547,30 @@ impl Runtime {
         steps.push_back(Step::Follow(talker, listener));
         steps.push_back(Step::Bind(talker, listener));
         self.next_step(now, steps);
+    }
+
+    /// The stream inputs bound to `talker`'s output, as the controller
+    /// last read them.
+    fn bound_to(&self, talker: End) -> Vec<End> {
+        self.controller
+            .entities()
+            .filter_map(|entity| {
+                let id = entity.entity_id();
+                Some((id, self.controller.model(id)?))
+            })
+            .flat_map(|(id, model)| {
+                model
+                    .streams(true)
+                    .filter(|stream| {
+                        model
+                            .binding(stream.index)
+                            .and_then(|binding| binding.talker_stream())
+                            == Some(talker)
+                    })
+                    .map(|stream| (id, stream.index))
+                    .collect::<Vec<_>>()
+            })
+            .collect()
     }
 
     /// The listener's format that takes the talker's stream as the talker
