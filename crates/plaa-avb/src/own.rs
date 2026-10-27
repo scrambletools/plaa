@@ -227,6 +227,8 @@ pub(crate) struct Own {
     ready: bool,
     /// The stream is advertised.
     declared: bool,
+    /// What its last declaration reserved, in bits a second.
+    declared_bandwidth: Option<u64>,
     /// When it is next declared, once it has an address.
     declare_at: Option<Duration>,
     withdrawn_at: Option<Duration>,
@@ -365,6 +367,7 @@ impl Own {
             own_clock,
             ready: false,
             declared: false,
+            declared_bandwidth: None,
             declare_at: None,
             withdrawn_at: None,
             blocked,
@@ -896,11 +899,26 @@ impl Own {
                     ..
                 } => {
                     // Its frames' size changed: declared again, and sent
-                    // anew.
+                    // anew. A bridge may keep a grown stream's old frame
+                    // size while it holds the stream's last reservation,
+                    // as MOTU's do, so one that grew goes on under its
+                    // next ID, new to the bridge.
                     if self.declared {
+                        let grown = self
+                            .declaration()
+                            .zip(self.declared_bandwidth)
+                            .is_some_and(|(now, before)| now.bandwidth(self.intervals()) > before);
                         self.stop_talker();
                         self.withdraw(since);
-                        self.declare_at = Some(since + REDECLARE);
+                        let mut wait = REDECLARE;
+                        if grown && let Some((stream_id, _)) = self.entity.output_stream(0) {
+                            self.entity
+                                .set_output_stream_id(0, next_stream_id(stream_id));
+                            // The bridge holds nothing of the new ID to
+                            // let go first.
+                            wait = Duration::ZERO;
+                        }
+                        self.declare_at = Some(since + wait);
                     }
                 }
                 EntityEvent::MaxTransitTimeChanged { .. } if self.talker.is_some() => {
@@ -1255,10 +1273,12 @@ impl Own {
         let Some(declaration) = self.declaration() else {
             return;
         };
+        let bandwidth = declaration.bandwidth(self.intervals());
         let entity = self.entity.entity_id();
         if let Some(participant) = self.cvu() {
             participant.declare_talker(since, entity, declaration);
             self.declared = true;
+            self.declared_bandwidth = Some(bandwidth);
             self.update_talker();
             return;
         }
@@ -1271,6 +1291,7 @@ impl Own {
         };
         reservation.declare(since, &declaration);
         self.declared = true;
+        self.declared_bandwidth = Some(bandwidth);
         self.update_talker();
     }
 
@@ -1339,6 +1360,11 @@ impl Own {
             .outputs
             .first()
             .is_some_and(|output| output.class_b())
+    }
+
+    /// Its class's intervals a second, each taking a frame.
+    fn intervals(&self) -> u32 {
+        if self.class_b() { 4000 } else { 8000 }
     }
 
     /// The priority its frames go out on outside AVB Lite: its class's.
@@ -1535,6 +1561,13 @@ fn fallen_quiet(since: Duration, heard: Option<Duration>) -> bool {
     heard.is_none_or(|heard| since >= heard + FOREIGN_QUIET)
 }
 
+/// The stream's ID after `stream_id`: its last octet the next, round from
+/// 255 to 0, the entity's address and instance kept.
+fn next_stream_id(stream_id: StreamId) -> StreamId {
+    let last = (stream_id.0 as u8).wrapping_add(1);
+    StreamId(stream_id.0 & !0xff | u64::from(last))
+}
+
 /// Where the input takes its stream: where its talker sends it, as it
 /// declares, `declared`, or as the probe found, `probed`. In AVB Lite
 /// that is this computer's own address, `own`, while the stream comes
@@ -1685,6 +1718,19 @@ mod tests {
         assert!(!fallen_quiet(second(129), heard));
         assert!(fallen_quiet(second(130), heard));
         assert!(fallen_quiet(second(5), None));
+    }
+
+    /// A grown stream goes on under the next of the entity's stream IDs.
+    #[test]
+    fn its_stream_moves_to_the_next_id() {
+        let mac = MacAddress([0xa0, 0x10, 0xa3, 0xa5, 0x17, 0x26]);
+        let first = StreamId::new(mac, u16::from(INSTANCE) << 8);
+        assert_eq!(first, StreamId(0xa010_a3a5_1726_7000));
+        assert_eq!(next_stream_id(first), StreamId(0xa010_a3a5_1726_7001));
+        assert_eq!(
+            next_stream_id(StreamId(0xa010_a3a5_1726_70ff)),
+            StreamId(0xa010_a3a5_1726_7000)
+        );
     }
 
     /// In AVB Lite the input takes its stream at this computer's address

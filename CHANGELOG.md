@@ -14,6 +14,19 @@
 - Connecting in a format the talker is not sending in unbinds the
   talker's other listeners first, as its menu says, since a Milan
   talker takes another format only while it streams to none.
+- plaa's entity refuses to change a bound input's or a streaming
+  output's format, or a streaming output's max transit time, as Milan
+  asks (atdecc 0.1.3), and takes a format adapted from one it offers
+  as up to so many channels.
+- Listening to a 192 kHz stream on a 48 kHz sound device plays, where
+  the resampler gave up at four times the device's rate and stopped
+  it (avb-stream 0.1.1).
+- A stream withdrawn as soon as it is declared, as when its format
+  changes at once, sends its Leave, rather than leaving the bridge to
+  time it out (avb-mrp 0.1.1).
+- A stream that grows, to more channels or a higher rate, goes on at
+  once under the next of plaa's stream IDs, so a bridge that keeps the
+  stream's old frame size a while, as MOTU's do, polices nothing.
 
 ## [0.5.0] - 2026-10-25
 
