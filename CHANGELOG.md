@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- plaa takes its port again once a program it stepped aside for, one
+  that declared streams there without sharing them, has gone quiet for
+  30 seconds, rather than staying off the network until it restarts.
+
 ## [0.5.0] - 2026-10-25
 
 ### Added

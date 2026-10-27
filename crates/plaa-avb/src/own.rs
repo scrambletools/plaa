@@ -100,6 +100,11 @@ const LOOK: Duration = Duration::from_secs(2);
 /// running meanwhile would be two on the port as the service opens.
 const SERVICE_GRACE: Duration = Duration::from_secs(15);
 
+/// How long another program's MRP from this computer's address must be
+/// quiet before plaa, having stepped aside for it, takes the port again:
+/// a participant declares again each LeaveAll period, 10 to 15 seconds.
+const FOREIGN_QUIET: Duration = Duration::from_secs(30);
+
 /// ptp4l's read-only management socket.
 const PTP4L_SOCKET: &str = "/var/run/ptp4lro";
 
@@ -184,6 +189,9 @@ pub(crate) struct Own {
     /// When the program whose participant plaa shared went, for plaa to
     /// wait a while for it to come back.
     gone_at: Option<Duration>,
+    /// When another program's MRP from this computer's address was last
+    /// heard, which plaa steps aside for while it lasts.
+    foreign_at: Option<Duration>,
     sender: Sender<Input>,
     clock: Arc<MediaClock>,
     sound: Arc<Sound>,
@@ -337,6 +345,7 @@ impl Own {
             generation,
             look_at: LOOK,
             gone_at: None,
+            foreign_at: None,
             sender: sender.clone(),
             clock,
             sound,
@@ -489,6 +498,7 @@ impl Own {
     /// plaa's would withdraw each other. plaa shares it where it is
     /// served, else steps aside.
     fn foreign(&mut self, now: Instant, since: Duration) {
+        self.foreign_at = Some(since);
         let own = self
             .reservation
             .as_ref()
@@ -593,30 +603,40 @@ impl Own {
     }
 
     /// Looks for a program serving the port's participant, to share it;
-    /// where none does and plaa has no participant, it runs its own.
+    /// where none does and plaa has no participant, it runs its own, once
+    /// any it stepped aside for has fallen quiet.
     fn look(&mut self, now: Instant, since: Duration) {
         self.look_at = since + LOOK;
         let shared = self
             .reservation
             .as_ref()
             .is_some_and(Reservation::is_shared);
-        if shared || self.share(now, since) || self.reservation.is_some() || self.blocked.is_some()
-        {
+        if shared || self.share(now, since) || self.reservation.is_some() {
+            return;
+        }
+        if self.blocked.is_some() && !fallen_quiet(since, self.foreign_at) {
             return;
         }
         match alone(since, self.gone_at, reservation::taken(&self.interface)) {
             Alone::Wait => return,
             Alone::Blocked(why) => {
-                self.blocked = Some(why);
-                self.entity.depart();
+                if self.blocked.replace(why).is_none() {
+                    self.entity.depart();
+                }
                 return;
             }
             Alone::Own => {}
         }
         match Reservation::own(&self.interface, self.mac, &self.sender) {
             Ok(mut own) => {
-                own.begin(since);
-                self.reservation = Some(own);
+                if self.blocked.take().is_some() {
+                    // Back from stepping aside: the entity starts again.
+                    self.reservation = Some(own);
+                    self.begin(now, since);
+                } else {
+                    own.begin(since);
+                    self.reservation = Some(own);
+                }
                 self.arm_lite(since);
                 if self.addressed() {
                     self.declare_at = Some(self.redeclare_at(since));
@@ -624,8 +644,9 @@ impl Own {
                 self.ask_to_listen(since);
             }
             Err(error) => {
-                self.blocked = Some(error.to_string());
-                self.entity.depart();
+                if self.blocked.replace(error.to_string()).is_none() {
+                    self.entity.depart();
+                }
             }
         }
     }
@@ -1508,6 +1529,12 @@ fn alone(since: Duration, gone_at: Option<Duration>, taken: Option<String>) -> A
     }
 }
 
+/// Whether another program's MRP from this computer's address, last heard
+/// at `heard`, has fallen quiet by `since`: that program went.
+fn fallen_quiet(since: Duration, heard: Option<Duration>) -> bool {
+    heard.is_none_or(|heard| since >= heard + FOREIGN_QUIET)
+}
+
 /// Where the input takes its stream: where its talker sends it, as it
 /// declares, `declared`, or as the probe found, `probed`. In AVB Lite
 /// that is this computer's own address, `own`, while the stream comes
@@ -1646,6 +1673,18 @@ mod tests {
             Alone::Blocked("old".into())
         );
         assert_eq!(alone(second(3), None, None), Alone::Own);
+    }
+
+    /// plaa takes the port again once a program it stepped aside for, its
+    /// MRP from this computer's address, has been quiet for a while.
+    #[test]
+    fn it_takes_the_port_again_once_the_other_falls_quiet() {
+        let second = Duration::from_secs;
+        let heard = Some(second(100));
+        assert!(!fallen_quiet(second(110), heard));
+        assert!(!fallen_quiet(second(129), heard));
+        assert!(fallen_quiet(second(130), heard));
+        assert!(fallen_quiet(second(5), None));
     }
 
     /// In AVB Lite the input takes its stream at this computer's address
