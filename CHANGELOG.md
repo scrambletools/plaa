@@ -7,6 +7,10 @@
 - plaa takes its port again once a program it stepped aside for, one
   that declared streams there without sharing them, has gone quiet for
   30 seconds, rather than staying off the network until it restarts.
+- A stream's frames leave in order: plaa's ptp4l services have every CPU
+  send the interface's frames on its first transmit queue, as a card
+  with several, as the I210 has four, spread a stream's frames over
+  them by a hash that takes in its sequence number.
 
 ## [0.5.0] - 2026-10-25
 

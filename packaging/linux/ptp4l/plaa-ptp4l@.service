@@ -8,6 +8,15 @@ After=network.target
 Conflicts=plaa-ptp4l-lite@%i.service triib-ptp4l-gptp@%i.service triib-ptp4l-lite@%i.service
 
 [Service]
+# Every CPU's frames go out on the interface's first transmit queue. A
+# card with several, as the Intel I210 has four, otherwise spreads frames
+# over them by a hash of their first octets, a stream's own sequence
+# number among them, and they leave out of order as the queues drain.
+ExecStartPre=-/bin/sh -c '\
+    for queue in /sys/class/net/"$$1"/queues/tx-*; do \
+        echo 0 >"$$queue/xps_cpus"; done 2>/dev/null; \
+    cat /proc/irq/default_smp_affinity \
+        >"/sys/class/net/$$1/queues/tx-0/xps_cpus" 2>/dev/null; true' sh %i
 ExecStart=ptp4l -f /usr/share/plaa/ptp4l-gptp.cfg -i %i
 Restart=on-failure
 RestartSec=2

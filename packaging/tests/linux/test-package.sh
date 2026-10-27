@@ -120,6 +120,8 @@ for profile in gptp lite; do
     grep -q "^ExecStart=ptp4l -f /usr/share/plaa/ptp4l-$profile.cfg -i %i\$" \
         "/usr/lib/systemd/system/$unit" ||
         fail "$unit does not run ptp4l with plaa's configuration"
+    grep -q 'tx-0/xps_cpus' "/usr/lib/systemd/system/$unit" ||
+        fail "$unit does not keep the interface's frames on one queue"
 done
 echo "all there"
 

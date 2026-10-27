@@ -8,6 +8,13 @@ After=network.target
 Conflicts=plaa-ptp4l@%i.service triib-ptp4l-gptp@%i.service triib-ptp4l-lite@%i.service
 
 [Service]
+# Every CPU's frames go out on the interface's first transmit queue, as
+# plaa-ptp4l@ has them, so a stream's frames leave in order.
+ExecStartPre=-/bin/sh -c '\
+    for queue in /sys/class/net/"$$1"/queues/tx-*; do \
+        echo 0 >"$$queue/xps_cpus"; done 2>/dev/null; \
+    cat /proc/irq/default_smp_affinity \
+        >"/sys/class/net/$$1/queues/tx-0/xps_cpus" 2>/dev/null; true' sh %i
 ExecStart=ptp4l -f /usr/share/plaa/ptp4l-lite.cfg -i %i
 Restart=on-failure
 RestartSec=2

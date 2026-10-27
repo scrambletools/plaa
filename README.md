@@ -279,7 +279,11 @@ other's declarations; beside an older service, which does not share it,
 plaa's entity steps aside. Without the service, plaa runs MSRP and MVRP
 itself, and where no bridge reserves its streams it falls back to AVB
 Lite, moving ptp4l to the AVB Lite PTP profile,
-`plaa-ptp4l-lite@<interface>`, until the link goes down. Meanwhile it
+`plaa-ptp4l-lite@<interface>`, until the link goes down. Both services
+first have every CPU send the interface's frames on its first transmit
+queue, as triib's link service does: a card with several, as the I210
+has four, otherwise spreads a stream's frames over them by a hash that
+takes in its sequence number, and they leave out of order. Meanwhile it
 holds an interface that filters VLANs in hardware, as the I210 does,
 promiscuous, so it hears CVU SRP's commands in the media VLAN.
 
