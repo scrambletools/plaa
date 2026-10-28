@@ -31,7 +31,9 @@ use avb_mrp::msrp::{ListenerState, TalkerDeclaration};
 use avb_mrp::sharing::{Mode, Notice};
 use avb_stream::audio::{SharedBuffer, Sink, Source};
 use avb_stream::media::Media;
-use avb_stream::{Listener, ListenerConfig, MediaClock, Talker, TalkerConfig, TalkerStats};
+use avb_stream::{
+    Listener, ListenerConfig, ListenerStats, MediaClock, Talker, TalkerConfig, TalkerStats,
+};
 
 use crate::reservation::{self, Heard, Reservation, VLAN};
 use crate::runtime::Input;
@@ -149,6 +151,64 @@ impl Sent {
     }
 }
 
+/// What the stream input took over the entity's life, for its counters:
+/// the receivers that ran, and with [`Received::counters`] the one
+/// running, so they never go back as receivers come and go.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Received {
+    media_locked: u64,
+    media_unlocked: u64,
+    interrupted: u64,
+    sequence_mismatches: u64,
+    frames: u64,
+    unsupported_formats: u64,
+    late: u64,
+    early: u64,
+}
+
+impl Received {
+    /// The receiver that stopped, with what it took; one that stopped
+    /// while locked unlocked as it stopped.
+    fn stopped(&mut self, stats: &ListenerStats) {
+        *self = self.with(stats);
+        if stats.media_locked > stats.media_unlocked {
+            self.media_unlocked += 1;
+        }
+    }
+
+    fn with(self, stats: &ListenerStats) -> Self {
+        Self {
+            media_locked: self.media_locked + stats.media_locked,
+            media_unlocked: self.media_unlocked + stats.media_unlocked,
+            interrupted: self.interrupted + stats.interrupted,
+            sequence_mismatches: self.sequence_mismatches + stats.sequence_mismatches,
+            frames: self.frames + stats.frames_received,
+            unsupported_formats: self.unsupported_formats + stats.unsupported_formats,
+            late: self.late + stats.late,
+            early: self.early + stats.early,
+        }
+    }
+
+    /// The stream input's counters in GET_COUNTERS' places (Milan 1.3,
+    /// Table 5.10), with `running` counted in. Each wraps as the counters
+    /// do.
+    fn counters(self, running: Option<&ListenerStats>) -> [u32; 32] {
+        let all = running.map_or(self, |stats| self.with(stats));
+        let low = |count: u64| count as u32;
+        let mut counters = [0; 32];
+        counters[0] = low(all.media_locked);
+        counters[1] = low(all.media_unlocked);
+        counters[2] = low(all.interrupted);
+        counters[3] = low(all.sequence_mismatches);
+        counters[6] = low(all.frames);
+        counters[8] = low(all.unsupported_formats);
+        counters[9] = low(all.late);
+        counters[10] = low(all.early);
+        counters[11] = low(all.frames);
+        counters
+    }
+}
+
 /// What the stream input listens to.
 #[derive(Default)]
 struct Listening {
@@ -171,8 +231,8 @@ struct Listening {
     /// The buffer a player drains, which the stream plays into; the sound
     /// output where none.
     into: Option<SharedBuffer>,
-    /// The input's counters, kept as the receivers come and go.
-    counters: [u32; 32],
+    /// What the receivers that stopped took, for the input's counters.
+    received: Received,
 }
 
 pub(crate) struct Own {
@@ -1163,35 +1223,19 @@ impl Own {
     }
 
     fn stop_receiver(&mut self) {
-        self.listening.receiver = None;
+        if let Some(receiver) = self.listening.receiver.take() {
+            self.listening.received.stopped(&receiver.stats());
+        }
         self.listening.receiving = None;
     }
 
     /// The input's counters, as Milan's GET_COUNTERS places them, from
-    /// what the receiver counted; one that stopped while locked unlocked
-    /// as it stopped.
+    /// what the receivers counted.
     fn count_received(&mut self) {
-        let counters = &mut self.listening.counters;
-        match &self.listening.receiver {
-            Some(receiver) => {
-                let stats = receiver.stats();
-                let low = |count: u64| count as u32;
-                *counters = [0; 32];
-                counters[0] = low(stats.media_locked);
-                counters[1] = low(stats.media_unlocked);
-                counters[2] = low(stats.interrupted);
-                counters[3] = low(stats.sequence_mismatches);
-                counters[6] = low(stats.frames_received);
-                counters[8] = low(stats.unsupported_formats);
-                counters[9] = low(stats.late);
-                counters[10] = low(stats.early);
-                counters[11] = low(stats.frames_received);
-            }
-            None if counters[0] > counters[1] => counters[1] += 1,
-            None => return,
-        }
+        let running = self.listening.receiver.as_ref().map(Listener::stats);
+        let counters = self.listening.received.counters(running.as_ref());
         self.entity
-            .set_counters(DescriptorType::STREAM_INPUT, 0, *counters);
+            .set_counters(DescriptorType::STREAM_INPUT, 0, counters);
     }
 
     /// When the entity, MAAP or MRP next need their timers run.
@@ -1655,6 +1699,32 @@ mod tests {
         // They wrap, as counters do.
         sent.stopped(ran(u64::from(u32::MAX), 0));
         assert_eq!(sent.counters(None)[7], 7999);
+    }
+
+    /// The input's counters go on from receiver to receiver, as when its
+    /// talker's registration lapses and comes back, and one that stopped
+    /// locked counts as unlocked.
+    #[test]
+    fn its_input_counters_never_go_back() {
+        let took = |frames_received, media_locked, media_unlocked| ListenerStats {
+            frames_received,
+            media_locked,
+            media_unlocked,
+            ..ListenerStats::default()
+        };
+        let mut received = Received::default();
+        let first = took(149_174, 1, 0);
+        assert_eq!(&received.counters(Some(&first))[..2], &[1, 0]);
+        received.stopped(&first);
+        let stopped = received.counters(None);
+        assert_eq!(&stopped[..2], &[1, 1]);
+        assert_eq!(stopped[11], 149_174);
+        let counters = received.counters(Some(&took(995, 1, 0)));
+        assert_eq!(&counters[..2], &[2, 1]);
+        assert_eq!(counters[11], 150_169);
+        // One that never locked leaves the locks as they were.
+        received.stopped(&took(0, 0, 0));
+        assert_eq!(&received.counters(None)[..2], &[1, 1]);
     }
 
     /// Its logo is the app's icon and its vendor's Scramble Tools', PNGs

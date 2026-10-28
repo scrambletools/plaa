@@ -24,6 +24,9 @@
 - A stream withdrawn as soon as it is declared, as when its format
   changes at once, sends its Leave, rather than leaving the bridge to
   time it out (avb-mrp 0.1.1).
+- The stream input's counters go on over plaa's life, rather than
+  starting again from zero each time it connects or its talker comes
+  back, which controllers saw as counters going back.
 - A stream that grows, to more channels or a higher rate, goes on at
   once under the next of plaa's stream IDs, so a bridge that keeps the
   stream's old frame size a while, as MOTU's do, polices nothing.
