@@ -34,6 +34,9 @@ pub(crate) enum Heard {
     Available,
     /// It declared the stream.
     Declared,
+    /// It stops, on purpose, leaving what plaa declared there registered
+    /// while the port runs AVB, for plaa to declare it again at once.
+    Leaving,
     /// Another talker on this computer declares a stream of its ID, as
     /// while the program has yet to see an earlier connection of plaa's
     /// close: plaa declares it again in a moment.
@@ -278,6 +281,15 @@ impl Reservation {
         }
     }
 
+    /// Has the bridge declare again at once all it declares, which plaa's
+    /// own participants, new to the port, have yet to hear: the LeaveAll
+    /// carries what they declared, so they declare it all first.
+    pub(crate) fn leave_all(&mut self, since: Duration) {
+        if let Self::Own(own) = self {
+            own.msrp.leave_all_at(since);
+        }
+    }
+
     /// Joins VLAN 2 and class A and B's domains, which a program sharing
     /// its participant has done already.
     pub(crate) fn begin(&mut self, since: Duration) {
@@ -350,6 +362,7 @@ impl Reservation {
                 None
             }
             Notice::Mode(mode) => Some(Heard::Mode(mode)),
+            Notice::Leaving => Some(Heard::Leaving),
             Notice::Copies {
                 stream_id,
                 tag,
@@ -518,7 +531,7 @@ fn shared(
 ) -> io::Result<Reservation> {
     let hello = Hello {
         version: sharing::VERSION,
-        features: feature::AVB_LITE,
+        features: feature::AVB_LITE | feature::HANDOFF,
     };
     sharing::write_request(&mut stream, &Request::Hello(hello))?;
     // A participant without AVB Lite skips it.
@@ -564,7 +577,7 @@ mod tests {
             sharing::read_request(theirs).unwrap(),
             Request::Hello(Hello {
                 version: sharing::VERSION,
-                features: feature::AVB_LITE,
+                features: feature::AVB_LITE | feature::HANDOFF,
             })
         );
         assert_eq!(
@@ -664,6 +677,10 @@ mod tests {
         assert_eq!(
             reservation.handle_notice(refused(Refusal::Unreadable, 0), Some(7), None),
             Some(Heard::Refused(Refusal::Unreadable))
+        );
+        assert_eq!(
+            reservation.handle_notice(Notice::Leaving, Some(7), None),
+            Some(Heard::Leaving)
         );
         assert_eq!(
             reservation.handle_notice(refused(Refusal::Unavailable, 7), Some(7), None),

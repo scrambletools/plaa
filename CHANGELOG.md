@@ -27,6 +27,10 @@
 - The stream input's counters go on over plaa's life, rather than
   starting again from zero each time it connects or its talker comes
   back, which controllers saw as counters going back.
+- plaa takes over the reservations it shares with triib's entity
+  service at once as the service stops, and hands them back as it
+  starts again, its stream and the one it listens to playing on, where
+  it waited 15 seconds and stopped both (avb-mrp 0.1.2).
 - A stream that grows, to more channels or a higher rate, goes on at
   once under the next of plaa's stream IDs, so a bridge that keeps the
   stream's old frame size a while, as MOTU's do, polices nothing.

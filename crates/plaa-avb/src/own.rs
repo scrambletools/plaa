@@ -107,6 +107,12 @@ const SERVICE_GRACE: Duration = Duration::from_secs(15);
 /// a participant declares again each LeaveAll period, 10 to 15 seconds.
 const FOREIGN_QUIET: Duration = Duration::from_secs(30);
 
+/// How long what plaa heard holds as it changes participants: the new one
+/// hears the bridge's declarations as the bridge declares them again, at
+/// once on a LeaveAll of the new one's, else on the bridge's own, a
+/// LeaveAll period of 10 to 15 seconds.
+const CARRY: Duration = Duration::from_secs(16);
+
 /// ptp4l's read-only management socket.
 const PTP4L_SOCKET: &str = "/var/run/ptp4lro";
 
@@ -209,6 +215,62 @@ impl Received {
     }
 }
 
+/// What plaa heard of its stream's listeners and of the talker it
+/// listens to, holding as it changes participants: the new one has yet to
+/// hear the bridge, so its word that there are none waits until it says
+/// there are, or for [`CARRY`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct Carried {
+    until: Option<Duration>,
+    listener: bool,
+    talker: bool,
+}
+
+impl Carried {
+    fn from(since: Duration) -> Self {
+        Self {
+            until: Some(since + CARRY),
+            listener: true,
+            talker: true,
+        }
+    }
+
+    /// Whether `heard` waits: none heard of what holds. Some heard of it
+    /// ends its holding, so the new participant's word goes from then on.
+    fn holds(&mut self, heard: &Heard) -> bool {
+        let (holding, none) = match heard {
+            Heard::Listener(state) => (&mut self.listener, state.is_none()),
+            Heard::Talker(talker) => (&mut self.talker, talker.is_none()),
+            _ => return false,
+        };
+        if none {
+            return *holding;
+        }
+        *holding = false;
+        if !self.listener && !self.talker {
+            self.until = None;
+        }
+        false
+    }
+
+    /// What the new participant never said there is, by `since`: none of
+    /// it, as it would have heard it from the bridge by then.
+    fn due(&mut self, since: Duration) -> Vec<Heard> {
+        if !self.until.is_some_and(|until| since >= until) {
+            return Vec::new();
+        }
+        let carried = std::mem::take(self);
+        let mut due = Vec::new();
+        if carried.listener {
+            due.push(Heard::Listener(None));
+        }
+        if carried.talker {
+            due.push(Heard::Talker(None));
+        }
+        due
+    }
+}
+
 /// What the stream input listens to.
 #[derive(Default)]
 struct Listening {
@@ -252,6 +314,11 @@ pub(crate) struct Own {
     /// When another program's MRP from this computer's address was last
     /// heard, which plaa steps aside for while it lasts.
     foreign_at: Option<Duration>,
+    /// When the program whose participant plaa shared said it leaves,
+    /// whose last MRP plaa does not step aside for.
+    left_at: Option<Duration>,
+    /// What plaa heard before it changed participants, holding.
+    carried: Carried,
     sender: Sender<Input>,
     clock: Arc<MediaClock>,
     sound: Arc<Sound>,
@@ -408,6 +475,8 @@ impl Own {
             look_at: LOOK,
             gone_at: None,
             foreign_at: None,
+            left_at: None,
+            carried: Carried::default(),
             sender: sender.clone(),
             clock,
             sound,
@@ -569,6 +638,10 @@ impl Own {
         if !own || self.share(now, since) {
             return;
         }
+        // The program that said it leaves withdraws its own declarations.
+        if self.left_at.is_some_and(|left| since < left + LOOK) {
+            return;
+        }
         self.blocked = Some(format!(
             "another program declares streams on {}, and does not share them",
             self.interface
@@ -594,6 +667,12 @@ impl Own {
         else {
             return false;
         };
+        // From plaa's own, in AVB: the bridge holds what they declared.
+        let handed = self
+            .reservation
+            .as_ref()
+            .is_some_and(|reservation| !reservation.is_shared())
+            && self.cvu().is_none();
         self.generation = generation;
         self.gone_at = None;
         self.refused = None;
@@ -601,7 +680,12 @@ impl Own {
         // plaa's own participants go without a word, as the stream they
         // declared is declared again in the shared one.
         self.reservation = Some(shared);
-        self.lost_participant(since);
+        if handed {
+            self.carried = Carried::from(since);
+            self.new_participant(since);
+        } else {
+            self.lost_participant(since);
+        }
         if self.blocked.take().is_some() {
             self.begin(now, since);
         } else if self.declared {
@@ -635,9 +719,46 @@ impl Own {
     /// for it to come back, then runs its own.
     pub(crate) fn shared_closed(&mut self, since: Duration, generation: u64) {
         let ours = self.reservation.as_ref().and_then(Reservation::generation) == Some(generation);
-        if !ours {
-            return;
+        if ours {
+            self.lose_shared(since);
         }
+    }
+
+    /// The program sharing its participant stops, saying so, and leaves
+    /// what plaa declared there registered: plaa runs its own participants
+    /// at once, declares it all again, and has the bridge declare again
+    /// what they have yet to hear. In AVB Lite the program withdrew it all,
+    /// and plaa starts anew, as where it cannot run its own.
+    fn take_over(&mut self, since: Duration) {
+        self.left_at = Some(since);
+        let lite = self.mode.is_some_and(|mode| mode.lite.is_some());
+        let own = (!lite)
+            .then(|| Reservation::own(&self.interface, self.mac, &self.sender).ok())
+            .flatten();
+        let Some(mut own) = own else {
+            self.lose_shared(since);
+            self.gone_at = None;
+            return;
+        };
+        own.begin(since);
+        // The shared one's closing is not plaa's from now on.
+        self.reservation = Some(own);
+        self.carried = Carried::from(since);
+        self.new_participant(since);
+        self.arm_lite(since);
+        if self.declared {
+            self.declare(since);
+        } else if self.addressed() && self.declare_at.is_none() {
+            self.declare_at = Some(self.redeclare_at(since));
+        }
+        self.ask_to_listen(since);
+        if let Some(reservation) = &mut self.reservation {
+            reservation.leave_all(since);
+        }
+    }
+
+    /// The shared participant went, and what plaa declared there with it.
+    fn lose_shared(&mut self, since: Duration) {
         self.reservation = None;
         self.stop_talker();
         if self.declared {
@@ -655,10 +776,17 @@ impl Own {
     /// The participant plaa declared its listener in went, and with it
     /// what it registered: plaa listens again once it has another.
     fn lost_participant(&mut self, since: Duration) {
+        self.listening.talker = None;
+        self.carried = Carried::default();
+        self.new_participant(since);
+    }
+
+    /// plaa declares in another participant, which has yet to be asked to
+    /// listen, and to declare plaa's listener.
+    fn new_participant(&mut self, since: Duration) {
         self.mode = None;
         self.copies = None;
         self.update_lite_status();
-        self.listening.talker = None;
         self.listening.asked = false;
         self.listening.declared = None;
         self.listening.refused = false;
@@ -728,6 +856,9 @@ impl Own {
         if self.cvu().is_some() && matches!(heard, Heard::Listener(_) | Heard::Talker(_)) {
             return;
         }
+        if self.carried.holds(&heard) {
+            return;
+        }
         match heard {
             Heard::Listener(state) => {
                 self.ready = state.is_some_and(ListenerState::ready);
@@ -790,6 +921,7 @@ impl Own {
                 self.update_lite_status();
             }
             Heard::Declared => self.refused = None,
+            Heard::Leaving => self.take_over(since),
             Heard::Taken => {
                 // Another talker here has its ID, as while the program has
                 // yet to see plaa's earlier connection close.
@@ -1017,6 +1149,9 @@ impl Own {
             .as_mut()
             .and_then(|reservation| reservation.poll_heard(ours, listened))
         {
+            self.heard(since, heard);
+        }
+        for heard in self.carried.due(since) {
             self.heard(since, heard);
         }
         self.lite_turn(since);
@@ -1253,6 +1388,7 @@ impl Own {
                 .and_then(Reservation::poll_timeout),
             self.declare_at,
             Some(self.look_at),
+            self.carried.until,
             self.lite_timeout(),
         ]
         .into_iter()
@@ -1699,6 +1835,45 @@ mod tests {
         // They wrap, as counters do.
         sent.stopped(ran(u64::from(u32::MAX), 0));
         assert_eq!(sent.counters(None)[7], 7999);
+    }
+
+    /// What plaa heard holds while the new participant says there is
+    /// none, until it says there is, or for a LeaveAll period at most.
+    #[test]
+    fn what_was_heard_holds_across_a_change_of_participant() {
+        let since = Duration::from_secs(100);
+        let mut carried = Carried::from(since);
+        let talker = TalkerDeclaration {
+            stream_id: 0x77,
+            destination: MacAddress([0x91, 0xe0, 0xf0, 0, 0, 1]),
+            vlan_id: VLAN,
+            max_frame_size: 56,
+            max_interval_frames: 1,
+            priority: PRIORITY,
+            rank: true,
+            accumulated_latency: TALKER_LATENCY,
+            failure: None,
+            event: avb_mrp::Event::New,
+        };
+        // A new participant answers Listen with no talker at once.
+        assert!(carried.holds(&Heard::Talker(None)));
+        assert!(carried.holds(&Heard::Listener(None)));
+        assert!(!carried.holds(&Heard::Declared));
+        // The bridge declared again: what it says goes from then on.
+        assert!(!carried.holds(&Heard::Talker(Some(talker))));
+        assert!(!carried.holds(&Heard::Talker(None)));
+        assert!(carried.holds(&Heard::Listener(None)));
+        assert!(carried.due(since + CARRY / 2).is_empty());
+        // No listener was heard by then: there is none.
+        assert_eq!(carried.due(since + CARRY), [Heard::Listener(None)]);
+        assert_eq!(carried, Carried::default());
+        assert!(!carried.holds(&Heard::Listener(None)));
+        // Both heard, nothing holds or waits.
+        let mut carried = Carried::from(since);
+        carried.holds(&Heard::Talker(Some(talker)));
+        carried.holds(&Heard::Listener(Some(ListenerState::Ready)));
+        assert_eq!(carried.until, None);
+        assert!(carried.due(since + CARRY).is_empty());
     }
 
     /// The input's counters go on from receiver to receiver, as when its

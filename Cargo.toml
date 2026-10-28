@@ -21,7 +21,7 @@ plaa-store = { path = "crates/plaa-store", version = "0.5.0" }
 # both (see the README).
 atdecc = "0.1.3"
 avb-lite = "0.1.0"
-avb-mrp = "0.1.1"
+avb-mrp = "0.1.2"
 avb-net = "0.1.0"
 avb-stream = "0.1.1"
 # Material Design 3 for iced, shared by Scramble Tools apps. A git-ignored
