@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- plaa's gPTP service has ptp4l send PTP 2.0 where linuxptp can, from
+  4.2 on, so AVB switches that ignore 2.1, as PreSonus's, answer its
+  peer delay requests.
 - plaa takes its port again once a program it stepped aside for, one
   that declared streams there without sharing them, has gone quiet for
   30 seconds, rather than staying off the network until it restarts.

@@ -117,12 +117,14 @@ done
 for profile in gptp lite; do
     unit=plaa-ptp4l@.service
     [ "$profile" = lite ] && unit=plaa-ptp4l-lite@.service
-    grep -q "^ExecStart=ptp4l -f /usr/share/plaa/ptp4l-$profile.cfg -i %i\$" \
+    grep -q "ptp4l -f /usr/share/plaa/ptp4l-$profile.cfg -i " \
         "/usr/lib/systemd/system/$unit" ||
         fail "$unit does not run ptp4l with plaa's configuration"
     grep -q 'tx-0/xps_cpus' "/usr/lib/systemd/system/$unit" ||
         fail "$unit does not keep the interface's frames on one queue"
 done
+grep -q -- '--ptp_minor_version 0' /usr/lib/systemd/system/plaa-ptp4l@.service ||
+    fail "plaa-ptp4l@.service does not have ptp4l send PTP 2.0"
 echo "all there"
 
 # Only the helper holds the capability; plaa gets its raw sockets from

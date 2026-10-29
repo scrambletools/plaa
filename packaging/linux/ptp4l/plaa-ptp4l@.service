@@ -17,7 +17,13 @@ ExecStartPre=-/bin/sh -c '\
         echo 0 >"$$queue/xps_cpus"; done 2>/dev/null; \
     cat /proc/irq/default_smp_affinity \
         >"/sys/class/net/$$1/queues/tx-0/xps_cpus" 2>/dev/null; true' sh %i
-ExecStart=ptp4l -f /usr/share/plaa/ptp4l-gptp.cfg -i %i
+# linuxptp 4 sends PTP 2.1, and some AVB switches, as PreSonus's, ignore
+# its Pdelay_Req for it. From 4.2 it can send 2.0, as 802.1AS-2011 has,
+# and it is told to wherever it knows the option.
+ExecStart=/bin/sh -c '\
+    minor=; ptp4l --ptp_minor_version 0 -v >/dev/null 2>&1 && \
+        minor="--ptp_minor_version 0"; \
+    exec ptp4l -f /usr/share/plaa/ptp4l-gptp.cfg -i "$$1" $$minor' sh %i
 Restart=on-failure
 RestartSec=2
 
