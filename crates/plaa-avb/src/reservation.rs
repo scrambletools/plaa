@@ -112,24 +112,6 @@ pub(crate) struct SharedParticipant {
     pending: Option<Heard>,
 }
 
-impl OwnParticipants {
-    /// The talker the port registered for `stream_id`: its Talker
-    /// Advertise, else its Talker Failed, as one gives way to the other.
-    fn talker(&self, stream_id: u64) -> Option<TalkerDeclaration> {
-        let find = |wanted: u8| {
-            self.msrp
-                .registered()
-                .find(|(attribute_type, value, _)| {
-                    *attribute_type == wanted && stream_of(value) == Some(stream_id)
-                })
-                .and_then(|(attribute_type, value, _)| {
-                    msrp::decode_talker(attribute_type, value, avb_mrp::Event::New)
-                })
-        };
-        find(msrp::attribute::TALKER_ADVERTISE).or_else(|| find(msrp::attribute::TALKER_FAILED))
-    }
-}
-
 impl SharedParticipant {
     /// The participant said hello: the Unavailable it said before stands
     /// where it takes no AVB Lite. One that does says Available once plaa
@@ -214,7 +196,7 @@ impl Reservation {
     /// look for its talker among what they registered.
     pub(crate) fn listen(&mut self, stream_id: u64) -> Option<Heard> {
         match self {
-            Self::Own(own) => Some(Heard::Talker(own.talker(stream_id))),
+            Self::Own(own) => Some(Heard::Talker(talker(&own.msrp, stream_id))),
             Self::Shared(shared) => {
                 let _ = sharing::write_request(&mut shared.writer, &Request::Listen(stream_id));
                 None
@@ -458,7 +440,7 @@ impl Reservation {
                     value,
                 } if listened.is_some() && stream_of(&value) == listened => {
                     let stream_id = listened.unwrap_or_default();
-                    return Some(Heard::Talker(own.talker(stream_id)));
+                    return Some(Heard::Talker(talker(&own.msrp, stream_id)));
                 }
                 _ => {}
             }
@@ -513,10 +495,31 @@ fn own(interface: &str, mac: MacAddress, sender: &Sender<Input>) -> io::Result<R
     Ok(Reservation::Own(Box::new(OwnParticipants {
         msrp_socket,
         mvrp_socket,
-        msrp: Participant::new(msrp::FORMAT, Duration::ZERO, seed ^ 0x70),
+        msrp: participant(seed ^ 0x70),
         mvrp: Participant::new(mvrp::FORMAT, Duration::ZERO, seed ^ 0x5555),
         stop,
     })))
+}
+
+/// plaa's MSRP participant, where a Join of a stream's Talker Advertise
+/// or Talker Failed takes the other's place, as a bridge may turn a
+/// talker failed and back with Joins alone.
+fn participant(seed: u64) -> Participant {
+    Participant::new(msrp::FORMAT, Duration::ZERO, seed).with_twins(msrp::twin)
+}
+
+/// The talker `msrp` registered for `stream_id`, advertised or failed.
+fn talker(msrp: &Participant, stream_id: u64) -> Option<TalkerDeclaration> {
+    msrp.registered()
+        .find(|(attribute_type, value, _)| {
+            matches!(
+                *attribute_type,
+                msrp::attribute::TALKER_ADVERTISE | msrp::attribute::TALKER_FAILED
+            ) && stream_of(value) == Some(stream_id)
+        })
+        .and_then(|(attribute_type, value, _)| {
+            msrp::decode_talker(attribute_type, value, avb_mrp::Event::New)
+        })
 }
 
 /// Shares the participant `stream` reaches, its notices read into `sender`
@@ -897,5 +900,70 @@ mod tests {
                 },
             ]
         );
+    }
+
+    /// A bridge turns the talker plaa listens to failed, its Advertise
+    /// never withdrawn, and back: plaa has the talker as it is now each
+    /// time, not the Advertise left over.
+    #[test]
+    fn a_talker_turned_failed_and_back_is_as_it_is_now() {
+        fn exchange(bridge: &mut Participant, ours: &mut Participant, from: u64, to: u64) {
+            for now in (from..=to).step_by(10).map(Duration::from_millis) {
+                bridge.handle_timeout(now);
+                ours.handle_timeout(now);
+                while let Some(pdu) = bridge.poll_transmit() {
+                    ours.handle_pdu(now, &pdu);
+                }
+                while let Some(pdu) = ours.poll_transmit() {
+                    bridge.handle_pdu(now, &pdu);
+                }
+            }
+        }
+        let advertised = TalkerDeclaration {
+            stream_id: 0x77,
+            destination: MacAddress([0x91, 0xe0, 0xf0, 0, 0, 1]),
+            vlan_id: VLAN,
+            max_frame_size: 56,
+            max_interval_frames: 1,
+            priority: 3,
+            rank: true,
+            accumulated_latency: 125_000,
+            failure: None,
+            event: avb_mrp::Event::New,
+        };
+        let failure = msrp::TalkerFailure {
+            bridge_id: 0x8000_0001_f2ff_fe01,
+            code: 8,
+        };
+        let failed = TalkerDeclaration {
+            failure: Some(failure),
+            ..advertised
+        };
+        let mut bridge = Participant::new(msrp::FORMAT, Duration::ZERO, 2);
+        let mut ours = participant(1);
+        let failure_of = |ours: &Participant| talker(ours, 0x77).map(|talker| talker.failure);
+        bridge.declare(
+            Duration::ZERO,
+            msrp::attribute::TALKER_ADVERTISE,
+            msrp::talker_value(&advertised),
+            None,
+        );
+        exchange(&mut bridge, &mut ours, 0, 500);
+        assert_eq!(failure_of(&ours), Some(None));
+        bridge.declare(
+            Duration::from_millis(500),
+            msrp::attribute::TALKER_FAILED,
+            msrp::talker_value(&failed),
+            None,
+        );
+        exchange(&mut bridge, &mut ours, 500, 1000);
+        assert_eq!(failure_of(&ours), Some(Some(failure)));
+        bridge.withdraw(
+            Duration::from_millis(1000),
+            msrp::attribute::TALKER_FAILED,
+            &0x77u64.to_be_bytes(),
+        );
+        exchange(&mut bridge, &mut ours, 1000, 3000);
+        assert_eq!(failure_of(&ours), Some(None));
     }
 }

@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- The talker of the stream plaa listens to shows failed as a bridge
+  turns it failed with a Join alone, as PreSonus's switch does, rather
+  than as advertised until the bridge's next LeaveAll. On avb-mrp 0.1.3,
+  which also has plaa declare its SR classes again after a bridge's
+  LeaveAll that carries the bridge's own.
 - plaa's gPTP service has ptp4l send PTP 2.0 where linuxptp can, from
   4.2 on, so AVB switches that ignore 2.1, as PreSonus's, answer its
   peer delay requests.
