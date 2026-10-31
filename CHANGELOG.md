@@ -9,6 +9,9 @@
   in: its entity departs and its stream is withdrawn, rather than left
   for controllers and bridges to time out. A second signal ends it at
   once.
+- plaa's own MSRP participant sends its stream's Leave as plaa quits,
+  where it waited for its join timer and plaa was gone first, leaving
+  the bridge to hold the stream until its LeaveTime ran out.
 - The talker of the stream plaa listens to shows failed as a bridge
   turns it failed with a Join alone, as PreSonus's switch does, rather
   than as advertised until the bridge's next LeaveAll. On avb-mrp 0.1.3,

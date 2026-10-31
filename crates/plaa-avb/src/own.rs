@@ -1424,7 +1424,7 @@ impl Own {
         self.stop_listening(since);
         self.disarm_lite();
         if let Some(reservation) = &mut self.reservation {
-            reservation.handle_timeout(since);
+            reservation.finish(since);
         }
         self.entity.depart();
     }

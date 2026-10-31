@@ -20,6 +20,10 @@ use avb_net::{MacAddress, Socket};
 
 use crate::runtime::{Input, read_into};
 
+/// MRP's JoinTime (802.1Q 10.7.11): a declaration or withdrawal goes out
+/// within it.
+const JOIN_TIME: Duration = Duration::from_millis(200);
+
 /// The VLAN class A and B's streams run on.
 pub(crate) const VLAN: u16 = 2;
 
@@ -385,6 +389,13 @@ impl Reservation {
             }
             _ => None,
         }
+    }
+
+    /// Runs the timers on as far as a withdrawal's Leave, which goes out
+    /// within MRP's JoinTime rather than at once: for plaa going, which
+    /// cannot wait for it.
+    pub(crate) fn finish(&mut self, since: Duration) {
+        self.handle_timeout(since + JOIN_TIME);
     }
 
     pub(crate) fn handle_timeout(&mut self, since: Duration) {
@@ -965,5 +976,45 @@ mod tests {
         );
         exchange(&mut bridge, &mut ours, 1000, 3000);
         assert_eq!(failure_of(&ours), Some(None));
+    }
+
+    /// A withdrawal's Leave waits for the join timer, so plaa going runs
+    /// it out, else the bridge holds the stream until its LeaveTime ends a
+    /// registration no one renews.
+    #[test]
+    fn a_withdrawal_goes_out_within_join_time() {
+        let talker = TalkerDeclaration {
+            stream_id: 0x77,
+            destination: MacAddress([0x91, 0xe0, 0xf0, 0, 0, 1]),
+            vlan_id: VLAN,
+            max_frame_size: 56,
+            max_interval_frames: 1,
+            priority: 3,
+            rank: true,
+            accumulated_latency: 125_000,
+            failure: None,
+            event: avb_mrp::Event::New,
+        };
+        let mut ours = participant(1);
+        ours.declare(
+            Duration::ZERO,
+            msrp::attribute::TALKER_ADVERTISE,
+            msrp::talker_value(&talker),
+            None,
+        );
+        for now in (0..=500).step_by(10).map(Duration::from_millis) {
+            ours.handle_timeout(now);
+            while ours.poll_transmit().is_some() {}
+        }
+        let going = Duration::from_millis(1000);
+        ours.withdraw(
+            going,
+            msrp::attribute::TALKER_ADVERTISE,
+            &0x77u64.to_be_bytes(),
+        );
+        ours.handle_timeout(going);
+        assert!(ours.poll_transmit().is_none(), "the Leave waited");
+        ours.handle_timeout(going + JOIN_TIME);
+        assert!(ours.poll_transmit().is_some(), "the Leave went out");
     }
 }
