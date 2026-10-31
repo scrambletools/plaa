@@ -95,6 +95,9 @@ pub enum External {
     /// Something dragged over or dropped on a window, on Wayland.
     #[cfg(target_os = "linux")]
     Drag(smithay_clipboard::dnd::DragEvent),
+    /// The system asked plaa to quit, as at logout or shutdown.
+    #[cfg(unix)]
+    Terminate,
     /// An item of the macOS menu bar was chosen.
     #[cfg(target_os = "macos")]
     Menu(shortcuts::Action),
@@ -302,6 +305,8 @@ fn main() -> iced::Result {
     *EXTERNAL_EVENTS
         .lock()
         .unwrap_or_else(PoisonError::into_inner) = Some(receiver);
+    #[cfg(unix)]
+    watch_signals();
 
     iced::daemon(
         move || app::Plaa::boot(sources.clone(), omarchy_dir.clone()),
@@ -319,6 +324,29 @@ fn main() -> iced::Result {
     .theme(app::Plaa::theme)
     .subscription(app::Plaa::subscription)
     .run()
+}
+
+/// SIGTERM, SIGINT and SIGHUP, as at logout or shutdown or from the
+/// terminal plaa was started in, quit it as its Quit does, without asking,
+/// so its entity departs and its stream is withdrawn rather than left for
+/// the network to time out. A second one ends it at once.
+#[cfg(unix)]
+fn watch_signals() {
+    use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
+    let Ok(mut signals) = signal_hook::iterator::Signals::new([SIGTERM, SIGINT, SIGHUP]) else {
+        return;
+    };
+    let _ = std::thread::Builder::new()
+        .name("signals".into())
+        .spawn(move || {
+            let mut signals = signals.forever();
+            if signals.next().is_some() {
+                post(External::Terminate);
+            }
+            if let Some(signal) = signals.next() {
+                std::process::exit(128 + signal);
+            }
+        });
 }
 
 /// Writes `--help` and `--version` output to the terminal plaa was

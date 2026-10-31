@@ -1344,6 +1344,8 @@ impl Plaa {
                 self.avb_changed();
                 self.follow_listening()
             }
+            #[cfg(unix)]
+            Message::External(External::Terminate) => self.quit(),
             Message::External(External::Thumbnail(id, file, thumbnail)) => {
                 if let Some(player) = self.player_mut(id) {
                     if thumbnail.strip {

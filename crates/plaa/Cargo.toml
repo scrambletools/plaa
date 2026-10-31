@@ -54,6 +54,11 @@ raw-window-handle = "0.6"
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rfd = { version = "0.15", default-features = false }
 
+# SIGTERM and its kin, as at logout or shutdown, quit plaa as its Quit
+# does, so it says goodbye to the network.
+[target.'cfg(unix)'.dependencies]
+signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }
+
 # The menu bar, and the title bar plaa's chrome runs up behind.
 [target.'cfg(target_os = "macos")'.dependencies]
 muda = { version = "0.20", default-features = false }

@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- plaa quits as its Quit does when the system asks it to, with SIGTERM
+  at logout or shutdown, or SIGINT and SIGHUP from the terminal it runs
+  in: its entity departs and its stream is withdrawn, rather than left
+  for controllers and bridges to time out. A second signal ends it at
+  once.
 - The talker of the stream plaa listens to shows failed as a bridge
   turns it failed with a Join alone, as PreSonus's switch does, rather
   than as advertised until the bridge's next LeaveAll. On avb-mrp 0.1.3,
