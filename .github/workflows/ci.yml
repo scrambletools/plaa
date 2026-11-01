@@ -43,11 +43,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: FFmpeg
-        run: brew install ffmpeg pkgconf
+        id: ffmpeg
+        run: |
+          brew install ffmpeg pkgconf
+          echo "version=$(brew list --versions ffmpeg | cut -d' ' -f2)" >>"$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      # Build scripts keep Homebrew's Cellar paths, which name the version,
+      # so a new FFmpeg needs a cache of its own.
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ffmpeg-${{ steps.ffmpeg.outputs.version }}
       - name: libclang for bindgen
         run: echo "LIBCLANG_PATH=$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib" >>"$GITHUB_ENV"
       - run: cargo clippy --workspace --all-targets -- -D warnings

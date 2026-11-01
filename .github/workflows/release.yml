@@ -301,11 +301,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: FFmpeg and libass
-        run: brew install ffmpeg libass pkgconf
+        id: brew
+        run: |
+          brew install ffmpeg libass pkgconf
+          echo "versions=$(brew list --versions ffmpeg libass | cut -d' ' -f2 | paste -sd- -)" >>"$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@stable
+      # Build scripts keep Homebrew's Cellar paths, which name the version,
+      # so new FFmpeg or libass versions need a cache of their own.
       - uses: Swatinem/rust-cache@v2
         with:
-          key: macos
+          key: macos-${{ steps.brew.outputs.versions }}
       - name: libclang for bindgen
         run: echo "LIBCLANG_PATH=$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib" >>"$GITHUB_ENV"
       # A keychain of its own holding the two Developer ID identities, for
