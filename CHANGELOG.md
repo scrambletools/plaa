@@ -54,6 +54,11 @@
   a late send catches up: they leave at priority 3, so the queue's fair
   scheduler holds them in one flow rather than a flow each. On avb-net
   0.1.3.
+- Listeners are told of every restart of the stream's media clock: two
+  restarts with no frame sent between, as when the talker falls behind
+  twice in a row, changed the mr bit back, and a listener took the jump
+  as a gap and played on a fraction of a millisecond off. On avb-stream
+  0.2.1.
 - Connecting in a format the talker is not sending in unbinds the
   talker's other listeners first, as its menu says, since a Milan
   talker takes another format only while it streams to none.
