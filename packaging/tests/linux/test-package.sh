@@ -72,6 +72,13 @@ package_version() {
     arch) pacman -Qp "$1" | cut -d' ' -f2 ;;
     esac
 }
+recommended() {
+    case $kind in
+    deb) dpkg-deb -f "$1" Recommends ;;
+    rpm) rpm -qp --recommends "$1" ;;
+    arch) bsdtar -xOf "$1" .PKGINFO | sed -n 's/^optdepend = //p' ;;
+    esac
+}
 
 section "$(. /etc/os-release && echo "$PRETTY_NAME"), $(uname -m)"
 case $kind in
@@ -106,25 +113,21 @@ for file in \
     /usr/share/licenses/plaa/THIRD-PARTY.md \
     /usr/share/licenses/plaa/fonts/OFL.txt \
     /usr/share/licenses/plaa/fonts/LICENSE-MaterialSymbols.txt \
-    /usr/share/plaa/ptp4l-gptp.cfg \
-    /usr/share/plaa/ptp4l-lite.cfg \
-    "/usr/lib/systemd/system/plaa-ptp4l@.service" \
-    "/usr/lib/systemd/system/plaa-ptp4l-lite@.service" \
-    /usr/share/polkit-1/rules.d/50-plaa-ptp4l.rules; do
+    "/usr/lib/systemd/system/plaa-link@.service" \
+    /usr/share/polkit-1/rules.d/50-plaa-link.rules; do
     [ -f "$file" ] || fail "$file is missing"
 done
-# The services run ptp4l with the configurations the package brings.
-for profile in gptp lite; do
-    unit=plaa-ptp4l@.service
-    [ "$profile" = lite ] && unit=plaa-ptp4l-lite@.service
-    grep -q "ptp4l -f /usr/share/plaa/ptp4l-$profile.cfg -i " \
-        "/usr/lib/systemd/system/$unit" ||
-        fail "$unit does not run ptp4l with plaa's configuration"
-    grep -q 'tx-0/xps_cpus' "/usr/lib/systemd/system/$unit" ||
-        fail "$unit does not keep the interface's frames on one queue"
+grep -q 'tx-0/xps_cpus' "/usr/lib/systemd/system/plaa-link@.service" ||
+    fail "plaa-link@.service does not keep the interface's frames on one queue"
+# Network time comes from gptpd, which plaa recommends and plays without;
+# its own ptp4l services are gone, an upgrade's among them.
+recommended "$package" | grep -qw gptpd || fail "the package does not recommend gptpd"
+! command -v gptpd >/dev/null || fail "gptpd came in, though plaa only recommends it"
+for path in /usr/share/plaa/ptp4l-gptp.cfg /usr/share/plaa/ptp4l-lite.cfg \
+    "/usr/lib/systemd/system/plaa-ptp4l@.service" "/usr/lib/systemd/system/plaa-ptp4l-lite@.service" \
+    /usr/share/polkit-1/rules.d/50-plaa-ptp4l.rules; do
+    [ ! -e "$path" ] || fail "$path is left from plaa's ptp4l services"
 done
-grep -q -- '--ptp_minor_version 0' /usr/lib/systemd/system/plaa-ptp4l@.service ||
-    fail "plaa-ptp4l@.service does not have ptp4l send PTP 2.0"
 echo "all there"
 
 # Only the helper holds the capability; plaa gets its raw sockets from
@@ -271,8 +274,7 @@ remove_package
 leftovers=()
 for path in /usr/bin/plaa /usr/lib/plaa "/usr/share/applications/$id.desktop" \
     "/usr/share/metainfo/$id.metainfo.xml" /usr/share/licenses/plaa /usr/share/plaa \
-    "/usr/lib/systemd/system/plaa-ptp4l@.service" "/usr/lib/systemd/system/plaa-ptp4l-lite@.service" \
-    /usr/share/polkit-1/rules.d/50-plaa-ptp4l.rules; do
+    "/usr/lib/systemd/system/plaa-link@.service" /usr/share/polkit-1/rules.d/50-plaa-link.rules; do
     [ -e "$path" ] && leftovers+=("$path")
 done
 [ ${#leftovers[@]} -eq 0 ] || fail "removing left ${leftovers[*]}"

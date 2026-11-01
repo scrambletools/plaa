@@ -159,7 +159,7 @@ if [ $kind = deb ]; then
         printf '%s\n' "$linked" libass9 libcap2-bin libvulkan1 mesa-vulkan-drivers libwayland-client0 \
             libxkbcommon0 | list
         echo "    recommends:"
-        printf '%s\n' linuxptp | list
+        printf '%s\n' gptpd | list
         echo "    suggests:"
         printf '%s\n' yt-dlp | list
     } >>"$config"
@@ -172,7 +172,7 @@ else
         printf '%s\n' "$linked" libass libcap vulkan-loader mesa-vulkan-drivers libwayland-client \
             libxkbcommon | list
         echo "    recommends:"
-        printf '%s\n' linuxptp | list
+        printf '%s\n' gptpd | list
         echo "    suggests:"
         printf '%s\n' yt-dlp | list
     } >>"$config"

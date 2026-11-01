@@ -52,12 +52,14 @@ are development builds, which keep their own.
   OpenGL draws where there is none. AVB needs `CAP_NET_RAW`, held only
   by `/usr/lib/plaa/plaa-netraw`, which opens raw sockets for plaa; the
   packages set it as they install (`setcap`, from libcap), recommend
-  linuxptp, whose ptp4l the AVB talker needs running gPTP, and say when
-  no wired interface has a PTP hardware clock. They bring plaa's ptp4l
-  service, `plaa-ptp4l@.service`, its gPTP configuration in
-  `/usr/share/plaa`, and a polkit rule letting the person at the
-  computer start it, as plaa does where no ptp4l runs; it conflicts with
-  triib's units, which serve plaa as well. There is no plain
+  gptpd, its own package from the gptp repository, which the AVB talker
+  needs keeping gPTP (each release carries gptpd's debs and rpms too, of
+  the version `GPTPD_VERSION` in release.yml names), and say when no
+  wired interface has a PTP hardware clock. They bring
+  `plaa-link@.service`, which keeps the frames plaa sends on one
+  transmit queue, and a polkit rule letting the
+  person at the computer run it, as plaa does as its entity starts, and
+  stop the ptp4l services an older plaa ran. There is no plain
   archive, AppImage or Flatpak, as none can carry the capability, and an
   archive would hold one release's FFmpeg names.
 - **macOS:** FFmpeg and libass, from Homebrew, inside plaa.app, built on

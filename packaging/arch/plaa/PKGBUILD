@@ -11,7 +11,7 @@ depends=('alsa-lib' 'ffmpeg' 'gcc-libs' 'glibc' 'libass' 'libcap' 'libpipewire' 
 makedepends=('cargo' 'clang' 'git')
 optdepends=('vulkan-driver: drawing on the graphics card, or vulkan-swrast without one'
             'yt-dlp: playing videos from web pages'
-            'linuxptp: sending what plays to AVB speakers and amplifiers'
+            'gptpd: sending what plays to AVB speakers and amplifiers'
             'libx11: running under X11'
             'libxcursor: running under X11'
             'libxi: running under X11')

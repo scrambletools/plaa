@@ -1,0 +1,18 @@
+[Unit]
+Description=One transmit queue on %i for plaa
+After=sys-subsystem-net-devices-%i.device
+
+# Every CPU's frames go out on the interface's first transmit queue. A
+# card with several, as the Intel I210 has four, otherwise spreads frames
+# over them by a hash of their first octets, a stream's own sequence
+# number among them, and they leave out of order as the queues drain.
+# plaa runs it again as its entity starts, since a driver starting afresh
+# forgets it. triib-link@ does the same for triib.
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '\
+    for queue in /sys/class/net/"$$1"/queues/tx-*; do \
+        echo 0 >"$$queue/xps_cpus"; done 2>/dev/null; \
+    cat /proc/irq/default_smp_affinity \
+        >"/sys/class/net/$$1/queues/tx-0/xps_cpus" 2>/dev/null; true' sh %i

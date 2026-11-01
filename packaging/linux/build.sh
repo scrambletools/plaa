@@ -11,7 +11,7 @@
 # named for the image, so a second build is quicker. PLAA_CROSS, such as
 # riscv64, builds a .deb for that architecture instead. PLAA_DOCKER_CPUS,
 # such as 4, limits the processors the build takes, leaving room on a
-# computer keeping network time with ptp4l.
+# computer keeping network time with gptpd.
 set -euo pipefail
 
 image=${1:?usage: build.sh IMAGE OUT}

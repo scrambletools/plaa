@@ -30,6 +30,9 @@ env:
   FFMPEG_SERIES: '9.0'
   # The vcpkg that builds libass and the libraries it needs for Windows.
   VCPKG_COMMIT: 857036234d15fbed8f30fed66e898d7725446c0c
+  # gptpd's release, whose Debian and RPM packages this release carries
+  # too, as no distribution has gptpd.
+  GPTPD_VERSION: 0.1.0
 
 jobs:
   linux:
@@ -611,6 +614,9 @@ jobs:
           cp artifacts/linux-*/* artifacts/windows-*/* artifacts/macos-*/* upload/
           # The PKGBUILD and its install file, to build the Arch package.
           cp artifacts/aur/* upload/
+          # gptpd's packages, for the AVB talker; its PKGBUILD stays with
+          # gptpd's release, as this one has a PKGBUILD of its own.
+          gh release download "v$GPTPD_VERSION" -R scrambletools/gptp -D upload -p 'gptpd*.deb' -p 'gptpd*.rpm'
           # GitHub names uploads with a dot for a tilde, so the .debs take
           # those names before their checksums are written.
           for file in upload/*~*; do
@@ -626,6 +632,8 @@ jobs:
               /^## / { found = index($0, "[" version "]") > 0; next }
               found' CHANGELOG.md >notes.md
           fi
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Draft the release
         run: |
           if [ -s notes.md ]; then notes=(--notes-file notes.md); else notes=(--generate-notes); fi

@@ -3,9 +3,10 @@
 # system layout, for packages: plaa, plaa-netraw beside it in plaa's
 # library folder, the one program granted CAP_NET_RAW, the desktop entry,
 # icons, AppStream metadata and licenses, the check the packages run as
-# they install for an interface that can send AVB streams, and plaa's
-# ptp4l service, its gPTP configuration and the polkit rule letting the
-# person at the computer start it.
+# they install for an interface that can send AVB streams, and plaa-link@,
+# which keeps a stream's frames on one transmit queue, with the polkit
+# rule letting the person at the computer run it. Network time comes from
+# gptpd, a package of its own.
 #
 #   scripts/dist-install.sh BINARY_DIR [DESTDIR] [PREFIX]
 #
@@ -38,9 +39,6 @@ for font_license in OFL.txt LICENSE-MaterialSymbols.txt; do
         "$share/licenses/plaa/fonts/$font_license"
 done
 install -Dm644 "$root/README.md" "$share/doc/plaa/README.md"
-ptp4l=$root/packaging/linux/ptp4l
-install -Dm644 "$ptp4l/ptp4l-gptp.cfg" "$share/plaa/ptp4l-gptp.cfg"
-install -Dm644 "$ptp4l/plaa-ptp4l@.service" "$destdir$prefix/lib/systemd/system/plaa-ptp4l@.service"
-install -Dm644 "$ptp4l/ptp4l-lite.cfg" "$share/plaa/ptp4l-lite.cfg"
-install -Dm644 "$ptp4l/plaa-ptp4l-lite@.service" "$destdir$prefix/lib/systemd/system/plaa-ptp4l-lite@.service"
-install -Dm644 "$ptp4l/50-plaa-ptp4l.rules" "$share/polkit-1/rules.d/50-plaa-ptp4l.rules"
+link=$root/packaging/linux/link
+install -Dm644 "$link/plaa-link@.service" "$destdir$prefix/lib/systemd/system/plaa-link@.service"
+install -Dm644 "$link/50-plaa-link.rules" "$share/polkit-1/rules.d/50-plaa-link.rules"

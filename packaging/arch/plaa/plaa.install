@@ -12,4 +12,9 @@ post_install() {
 
 post_upgrade() {
     grant
+    # plaa's ptp4l services gave way to gptpd: any an older plaa started
+    # would keep gptpd off its interface.
+    if [ -d /run/systemd/system ]; then
+        systemctl stop 'plaa-ptp4l@*.service' 'plaa-ptp4l-lite@*.service' 2>/dev/null || true
+    fi
 }
