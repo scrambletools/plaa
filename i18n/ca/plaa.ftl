@@ -287,12 +287,19 @@ network-blocked = No s'envia: { $reason }
 network-waiting = A punt per enviar, s'espera que es connecti un receptor.
 network-sending = S'envia als receptors connectats.
 network-looking = S'estan cercant receptors…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = S'està iniciant el ptp4l, que manté l'hora de xarxa amb què s'envia el flux del plaa…
-network-ptp-elsewhere = El ptp4l s'executa en una altra interfície, de manera que el flux del plaa no té hora de xarxa aquí i és possible que els receptors no el puguin reproduir. Tria aquella interfície a Configuració, o executa el ptp4l en aquesta.
-network-ptp-missing = El ptp4l no s'està executant, de manera que el flux del plaa no té hora de xarxa i és possible que els receptors no el puguin reproduir. Instal·la el linuxptp amb el paquet del plaa, o el triib, que l'executa.
-network-ptp-failed = El ptp4l no s'està executant, de manera que el flux del plaa no té hora de xarxa i és possible que els receptors no el puguin reproduir. El plaa no l'ha pogut iniciar: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = S'està iniciant el gptpd, que manté l'hora de xarxa amb què s'envia el flux del plaa…
+network-ptp-missing = El gptpd no s'està executant, de manera que el flux del plaa no té hora de xarxa i és possible que els receptors no el puguin reproduir. Instal·la el gptpd, des de les versions del plaa o del triib.
+network-ptp-failed = El gptpd no s'està executant, de manera que el flux del plaa no té hora de xarxa i és possible que els receptors no el puguin reproduir: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Aquest ordinador manté l'hora de la xarxa, com el seu rellotge mestre (priority1 { $priority1 }, definit a { $config }).
+network-clock-capable = Aquest ordinador pot mantenir l'hora de la xarxa, si queda en primer lloc (priority1 { $priority1 }, definit a { $config }).
+network-clock-never = Aquest ordinador no manté mai l'hora de la xarxa (priority1 255, definit a { $config }).
 network-no-listeners = Cap receptor de la xarxa no pot reproduir el so del plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

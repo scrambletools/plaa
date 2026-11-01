@@ -280,12 +280,19 @@ network-blocked = ไม่ได้ส่ง: { $reason }
 network-waiting = พร้อมส่ง กำลังรอให้ Listener เชื่อมต่อ
 network-sending = กำลังส่งไปยัง Listener ที่เชื่อมต่ออยู่
 network-looking = กำลังค้นหา Listener…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = กำลังเริ่ม ptp4l ซึ่งรักษาเวลาเครือข่ายที่สตรีมของ plaa ใช้ในการส่ง…
-network-ptp-elsewhere = ptp4l ทำงานบนอินเทอร์เฟซอื่น สตรีมของ plaa จึงไม่มีเวลาเครือข่ายที่นี่ และ Listener อาจเล่นไม่ได้ เลือกอินเทอร์เฟซนั้นในการตั้งค่า หรือเรียกใช้ ptp4l บนอินเทอร์เฟซนี้
-network-ptp-missing = ptp4l ไม่ได้ทำงาน สตรีมของ plaa จึงไม่มีเวลาเครือข่าย และ Listener อาจเล่นไม่ได้ ติดตั้ง linuxptp พร้อมกับแพ็กเกจของ plaa หรือติดตั้ง triib ซึ่งจะเรียกใช้ ptp4l ให้
-network-ptp-failed = ptp4l ไม่ได้ทำงาน สตรีมของ plaa จึงไม่มีเวลาเครือข่าย และ Listener อาจเล่นไม่ได้ plaa เริ่ม ptp4l ไม่ได้: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = กำลังเริ่ม gptpd ซึ่งรักษาเวลาเครือข่ายที่สตรีมของ plaa ใช้ในการส่ง…
+network-ptp-missing = gptpd ไม่ได้ทำงาน สตรีมของ plaa จึงไม่มีเวลาเครือข่าย และ Listener อาจเล่นไม่ได้ ติดตั้ง gptpd จากรุ่นเผยแพร่ของ plaa หรือ triib
+network-ptp-failed = gptpd ไม่ได้ทำงาน สตรีมของ plaa จึงไม่มีเวลาเครือข่าย และ Listener อาจเล่นไม่ได้: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = คอมพิวเตอร์เครื่องนี้รักษาเวลาของเครือข่ายในฐานะ grandmaster (priority1 { $priority1 }, ตั้งค่าใน { $config })
+network-clock-capable = คอมพิวเตอร์เครื่องนี้รักษาเวลาของเครือข่ายได้ หากได้อันดับแรก (priority1 { $priority1 }, ตั้งค่าใน { $config })
+network-clock-never = คอมพิวเตอร์เครื่องนี้ไม่รักษาเวลาของเครือข่ายเลย (priority1 255, ตั้งค่าใน { $config })
 network-no-listeners = ไม่มี Listener บนเครือข่ายที่เล่นเสียงของ plaa ได้
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

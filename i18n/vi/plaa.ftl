@@ -280,12 +280,19 @@ network-blocked = Không gửi: { $reason }
 network-waiting = Sẵn sàng gửi, đang chờ một Listener kết nối.
 network-sending = Đang gửi tới các Listener đã kết nối.
 network-looking = Đang tìm Listener…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Đang khởi động ptp4l, chương trình giữ thời gian mạng mà luồng của plaa dựa vào để gửi…
-network-ptp-elsewhere = ptp4l đang chạy trên một giao diện khác, nên luồng của plaa không có thời gian mạng ở đây và các Listener có thể không phát được. Hãy chọn giao diện đó trong Cài đặt, hoặc chạy ptp4l trên giao diện này.
-network-ptp-missing = ptp4l không chạy, nên luồng của plaa không có thời gian mạng và các Listener có thể không phát được. Hãy cài đặt linuxptp cùng gói của plaa, hoặc cài triib, ứng dụng sẽ chạy ptp4l.
-network-ptp-failed = ptp4l không chạy, nên luồng của plaa không có thời gian mạng và các Listener có thể không phát được. plaa không thể khởi động ptp4l: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Đang khởi động gptpd, chương trình giữ thời gian mạng mà luồng của plaa dựa vào để gửi…
+network-ptp-missing = gptpd không chạy, nên luồng của plaa không có thời gian mạng và các Listener có thể không phát được. Hãy cài đặt gptpd, từ các bản phát hành của plaa hoặc triib.
+network-ptp-failed = gptpd không chạy, nên luồng của plaa không có thời gian mạng và các Listener có thể không phát được: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Máy tính này giữ thời gian của mạng, với vai trò grandmaster (priority1 { $priority1 }, đặt trong { $config }).
+network-clock-capable = Máy tính này có thể giữ thời gian của mạng, nếu xếp hạng đầu (priority1 { $priority1 }, đặt trong { $config }).
+network-clock-never = Máy tính này không bao giờ giữ thời gian của mạng (priority1 255, đặt trong { $config }).
 network-no-listeners = Không có Listener nào trên mạng có thể phát âm thanh của plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

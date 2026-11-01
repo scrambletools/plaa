@@ -290,12 +290,19 @@ network-blocked = אין שליחה: { $reason }
 network-waiting = מוכן לשליחה, ממתין שמאזין יתחבר.
 network-sending = שולח אל המאזינים המחוברים.
 network-looking = מחפש מאזינים…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = מפעיל את ptp4l, ששומר על זמן הרשת שלפיו נשלח הזרם של plaa…
-network-ptp-elsewhere = ptp4l פועל בממשק אחר, ולכן הזרם של plaa לא שומר כאן על זמן הרשת וייתכן שמאזינים לא ינגנו אותו. אפשר לבחור בהגדרות את הממשק ההוא, או להפעיל את ptp4l בממשק הזה.
-network-ptp-missing = ptp4l לא פועל, ולכן הזרם של plaa לא שומר על זמן הרשת וייתכן שמאזינים לא ינגנו אותו. אפשר להתקין את linuxptp עם החבילה של plaa, או את triib, שמפעיל אותו.
-network-ptp-failed = ptp4l לא פועל, ולכן הזרם של plaa לא שומר על זמן הרשת וייתכן שמאזינים לא ינגנו אותו. plaa לא הצליח להפעיל אותו: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = מפעיל את gptpd, ששומר על זמן הרשת שלפיו נשלח הזרם של plaa…
+network-ptp-missing = gptpd לא פועל, ולכן הזרם של plaa לא שומר על זמן הרשת וייתכן שמאזינים לא ינגנו אותו. אפשר להתקין את gptpd מהגרסאות של plaa או של triib.
+network-ptp-failed = gptpd לא פועל, ולכן הזרם של plaa לא שומר על זמן הרשת וייתכן שמאזינים לא ינגנו אותו: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = המחשב הזה שומר על זמן הרשת, בתור השעון הראשי שלה (priority1 { $priority1 }, מוגדר בקובץ { $config }).
+network-clock-capable = המחשב הזה יכול לשמור על זמן הרשת, אם ידורג ראשון (priority1 { $priority1 }, מוגדר בקובץ { $config }).
+network-clock-never = המחשב הזה אף פעם לא שומר על זמן הרשת (priority1 255, מוגדר בקובץ { $config }).
 network-no-listeners = אין ברשת מאזין שיכול לנגן את הצליל של plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

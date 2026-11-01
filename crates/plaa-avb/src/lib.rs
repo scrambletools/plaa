@@ -8,7 +8,7 @@
 //! One thread runs it all on the interface, as triib's endpoint daemon
 //! does: frames from raw sockets, the controller's and the entity's state
 //! machines from the avb crates, MAAP for the stream's address, MSRP and
-//! MVRP for its reservation, and gPTP from ptp4l. Two MRP participants on
+//! MVRP for its reservation, and gPTP from gptpd. Two MRP participants on
 //! one port withdraw each other's declarations, so where triib's endpoint
 //! daemon runs on the interface, the entity reserves its stream in the
 //! daemon's participant, which it shares.
@@ -109,7 +109,7 @@ pub enum ListenBlocked {
     AvbLite,
 }
 
-/// How ptp4l, which keeps the time plaa's stream is sent by, stands on
+/// How gptpd, which keeps the time plaa's stream is sent by, stands on
 /// the interface.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Ptp {
@@ -117,15 +117,25 @@ pub enum Ptp {
     /// own, or the Mac keeps the time.
     #[default]
     Unknown,
-    /// ptp4l answers for the interface.
-    Running,
-    /// ptp4l answers, for another interface.
-    Elsewhere,
-    /// plaa started its ptp4l service, which has yet to answer.
+    /// gptpd answers for the interface, with this computer's clock.
+    Running(Clock),
+    /// gptpd's service started, and gptpd has yet to answer.
     Starting,
-    /// No ptp4l runs on the interface: plaa's service is not installed,
-    /// or could not start, and why.
+    /// gptpd does not run on the interface: it is not installed, or
+    /// refused to run there, or could not start, and why.
     Missing(Option<String>),
+}
+
+/// This computer's clock on the network, as gptpd ranks it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Clock {
+    /// Its priority1: 255 never makes it the grandmaster, and lower
+    /// ranks it higher.
+    pub priority1: u8,
+    /// It is the network's grandmaster now.
+    pub grandmaster: bool,
+    /// gptpd's configuration for the interface, which sets priority1.
+    pub config: String,
 }
 
 /// What the network looks like now.

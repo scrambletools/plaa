@@ -279,12 +279,19 @@ network-blocked = 未发送：{ $reason }
 network-waiting = 已准备好发送，正在等待接收端连接。
 network-sending = 正在发送给已连接的接收端。
 network-looking = 正在查找接收端…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = 正在启动 ptp4l，它维护 plaa 发送流所依据的网络时间…
-network-ptp-elsewhere = ptp4l 在另一个接口上运行，因此 plaa 的流在这里无法与网络时间同步，接收端可能无法播放。请在“设置”中选择那个接口，或在此接口上运行 ptp4l。
-network-ptp-missing = ptp4l 未运行，因此 plaa 的流无法与网络时间同步，接收端可能无法播放。请随 plaa 的软件包安装 linuxptp，或安装会运行 ptp4l 的 triib。
-network-ptp-failed = ptp4l 未运行，因此 plaa 的流无法与网络时间同步，接收端可能无法播放。plaa 无法启动 ptp4l：{ $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = 正在启动 gptpd，它维护 plaa 发送流所依据的网络时间…
+network-ptp-missing = gptpd 未运行，因此 plaa 的流无法与网络时间同步，接收端可能无法播放。请从 plaa 或 triib 的发布版本中安装 gptpd。
+network-ptp-failed = gptpd 未运行，因此 plaa 的流无法与网络时间同步，接收端可能无法播放：{ $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = 这台电脑作为网络的主时钟，维护网络时间（priority1 { $priority1 }，在 { $config } 中设置）。
+network-clock-capable = 这台电脑在排名第一时可以维护网络时间（priority1 { $priority1 }，在 { $config } 中设置）。
+network-clock-never = 这台电脑从不维护网络时间（priority1 255，在 { $config } 中设置）。
 network-no-listeners = 网络上没有能播放 plaa 声音的接收端。
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }：{ $stream }

@@ -288,12 +288,19 @@ network-blocked = அனுப்பவில்லை: { $reason }
 network-waiting = அனுப்பத் தயார், ஒரு Listener இணைவதற்காகக் காத்திருக்கிறது.
 network-sending = இணைக்கப்பட்ட Listeners-க்கு அனுப்புகிறது.
 network-looking = Listeners-ஐத் தேடுகிறது…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = ptp4l-ஐத் தொடங்குகிறது; plaa-வின் stream அனுப்பப்படும் நெட்வொர்க் நேரத்தை அதுவே பராமரிக்கிறது…
-network-ptp-elsewhere = ptp4l வேறொரு interface-இல் இயங்குகிறது, எனவே இங்கே plaa-வின் stream-க்கு நெட்வொர்க் நேரம் கிடைக்காது, Listeners அதை இயக்காமல் போகலாம். அமைப்புகளில் அந்த interface-ஐத் தேர்ந்தெடுக்கவும், அல்லது இதில் ptp4l-ஐ இயக்கவும்.
-network-ptp-missing = ptp4l இயங்கவில்லை, எனவே plaa-வின் stream-க்கு நெட்வொர்க் நேரம் கிடைக்காது, Listeners அதை இயக்காமல் போகலாம். plaa-வின் தொகுப்புடன் linuxptp-ஐ நிறுவவும், அல்லது அதை இயக்கும் triib-ஐ நிறுவவும்.
-network-ptp-failed = ptp4l இயங்கவில்லை, எனவே plaa-வின் stream-க்கு நெட்வொர்க் நேரம் கிடைக்காது, Listeners அதை இயக்காமல் போகலாம். plaa-வால் அதைத் தொடங்க முடியவில்லை: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = gptpd-ஐத் தொடங்குகிறது; plaa-வின் stream அனுப்பப்படும் நெட்வொர்க் நேரத்தை அதுவே பராமரிக்கிறது…
+network-ptp-missing = gptpd இயங்கவில்லை, எனவே plaa-வின் stream-க்கு நெட்வொர்க் நேரம் கிடைக்காது, Listeners அதை இயக்காமல் போகலாம். plaa அல்லது triib வெளியீடுகளிலிருந்து gptpd-ஐ நிறுவவும்.
+network-ptp-failed = gptpd இயங்கவில்லை, எனவே plaa-வின் stream-க்கு நெட்வொர்க் நேரம் கிடைக்காது, Listeners அதை இயக்காமல் போகலாம்: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = இந்தக் கணினி, நெட்வொர்க்கின் grandmaster ஆக, அதன் நேரத்தைப் பராமரிக்கிறது (priority1 { $priority1 }, { $config } கோப்பில் அமைக்கப்பட்டது).
+network-clock-capable = இந்தக் கணினி முதலிடம் பெற்றால், நெட்வொர்க்கின் நேரத்தைப் பராமரிக்க முடியும் (priority1 { $priority1 }, { $config } கோப்பில் அமைக்கப்பட்டது).
+network-clock-never = இந்தக் கணினி ஒருபோதும் நெட்வொர்க்கின் நேரத்தைப் பராமரிக்காது (priority1 255, { $config } கோப்பில் அமைக்கப்பட்டது).
 network-no-listeners = நெட்வொர்க்கில் உள்ள எந்த Listener-ஆலும் plaa-வின் ஒலியை இயக்க முடியாது.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

@@ -282,12 +282,19 @@ network-blocked = Not sending: { $reason }
 network-waiting = Ready to send, waiting for a listener to connect.
 network-sending = Sending to the listeners connected.
 network-looking = Looking for listeners…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Starting ptp4l, which keeps the network time plaa's stream is sent by…
-network-ptp-elsewhere = ptp4l runs on another interface, so plaa's stream keeps no network time here and listeners may not play it. Choose that interface in Settings, or run ptp4l on this one.
-network-ptp-missing = ptp4l is not running, so plaa's stream keeps no network time and listeners may not play it. Install linuxptp with plaa's package, or triib, which runs it.
-network-ptp-failed = ptp4l is not running, so plaa's stream keeps no network time and listeners may not play it. plaa could not start it: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Starting gptpd, which keeps the network time plaa's stream is sent by…
+network-ptp-missing = gptpd is not running, so plaa's stream keeps no network time and listeners may not play it. Install gptpd, from plaa's or triib's releases.
+network-ptp-failed = gptpd is not running, so plaa's stream keeps no network time and listeners may not play it: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = This computer keeps the network's time, as its grandmaster (priority1 { $priority1 }, set in { $config }).
+network-clock-capable = This computer can keep the network's time, should it rank first (priority1 { $priority1 }, set in { $config }).
+network-clock-never = This computer never keeps the network's time (priority1 255, set in { $config }).
 network-no-listeners = No listener on the network can play plaa's sound.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

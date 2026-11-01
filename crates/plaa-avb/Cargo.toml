@@ -17,6 +17,10 @@ avb-mrp.workspace = true
 avb-net.workspace = true
 avb-stream.workspace = true
 
+# gptpd's status, on Linux, where it keeps gPTP for plaa's entity.
+[target.'cfg(target_os = "linux")'.dependencies]
+gptp.workspace = true
+
 # The Mac's own AVB entity's Core Audio device, found by its UID.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-core-audio = { version = "0.3", default-features = false, features = ["std", "AudioHardware", "objc2", "objc2-core-audio-types", "objc2-foundation"] }

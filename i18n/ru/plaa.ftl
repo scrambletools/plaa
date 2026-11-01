@@ -293,12 +293,19 @@ network-blocked = Звук не отправляется: { $reason }
 network-waiting = Всё готово к отправке, ожидание подключения приёмника.
 network-sending = Идёт отправка подключённым приёмникам.
 network-looking = Поиск приёмников…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Запуск ptp4l, который поддерживает сетевое время для отправки потока plaa…
-network-ptp-elsewhere = ptp4l работает на другом интерфейсе, поэтому здесь у потока plaa нет сетевого времени и приёмники могут его не воспроизвести. Выберите тот интерфейс в настройках или запустите ptp4l на этом.
-network-ptp-missing = ptp4l не запущен, поэтому у потока plaa нет сетевого времени и приёмники могут его не воспроизвести. Установите linuxptp вместе с пакетом plaa или установите triib, который его запускает.
-network-ptp-failed = ptp4l не запущен, поэтому у потока plaa нет сетевого времени и приёмники могут его не воспроизвести. plaa не удалось его запустить: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Запуск gptpd, который поддерживает сетевое время для отправки потока plaa…
+network-ptp-missing = gptpd не запущен, поэтому у потока plaa нет сетевого времени и приёмники могут его не воспроизвести. Установите gptpd из выпусков plaa или triib.
+network-ptp-failed = gptpd не запущен, поэтому у потока plaa нет сетевого времени и приёмники могут его не воспроизвести: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Этот компьютер поддерживает время сети как её гранд-мастер (priority1 { $priority1 }, задано в { $config }).
+network-clock-capable = Этот компьютер может поддерживать время сети, если окажется первым по рангу (priority1 { $priority1 }, задано в { $config }).
+network-clock-never = Этот компьютер никогда не поддерживает время сети (priority1 255, задано в { $config }).
 network-no-listeners = В сети нет приёмников, которые могут воспроизвести звук plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

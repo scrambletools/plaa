@@ -282,12 +282,19 @@ network-blocked = Haitumi: { $reason }
 network-waiting = Iko tayari kutuma, inasubiri listener iunganishwe.
 network-sending = Inatuma kwa listener zilizounganishwa.
 network-looking = Inatafuta listener…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Inawasha ptp4l, inayotunza saa ya mtandao ambayo mtiririko wa plaa hutumwa kwa kuifuata…
-network-ptp-elsewhere = ptp4l inaendeshwa kwenye kiolesura kingine, kwa hivyo mtiririko wa plaa hauna saa ya mtandao hapa na huenda listener zisiweze kuucheza. Chagua kiolesura hicho katika Mipangilio, au endesha ptp4l kwenye hiki.
-network-ptp-missing = ptp4l haiendeshwi, kwa hivyo mtiririko wa plaa hauna saa ya mtandao na huenda listener zisiweze kuucheza. Sakinisha linuxptp pamoja na kifurushi cha plaa, au triib, inayoiendesha.
-network-ptp-failed = ptp4l haiendeshwi, kwa hivyo mtiririko wa plaa hauna saa ya mtandao na huenda listener zisiweze kuucheza. plaa imeshindwa kuiwasha: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Inawasha gptpd, inayotunza saa ya mtandao ambayo mtiririko wa plaa hutumwa kwa kuifuata…
+network-ptp-missing = gptpd haiendeshwi, kwa hivyo mtiririko wa plaa hauna saa ya mtandao na huenda listener zisiweze kuucheza. Sakinisha gptpd, kutoka matoleo ya plaa au triib.
+network-ptp-failed = gptpd haiendeshwi, kwa hivyo mtiririko wa plaa hauna saa ya mtandao na huenda listener zisiweze kuucheza: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Kompyuta hii hutunza saa ya mtandao, kama grandmaster yake (priority1 { $priority1 }, imewekwa katika { $config }).
+network-clock-capable = Kompyuta hii inaweza kutunza saa ya mtandao, ikiwa itashika nafasi ya kwanza (priority1 { $priority1 }, imewekwa katika { $config }).
+network-clock-never = Kompyuta hii haitunzi kamwe saa ya mtandao (priority1 255, imewekwa katika { $config }).
 network-no-listeners = Hakuna listener kwenye mtandao inayoweza kucheza sauti ya plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

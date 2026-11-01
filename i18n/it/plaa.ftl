@@ -287,12 +287,19 @@ network-blocked = Invio non attivo: { $reason }
 network-waiting = Pronto per l'invio, in attesa che si colleghi un listener.
 network-sending = Invio ai listener collegati.
 network-looking = Ricerca dei listener…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Avvio di ptp4l, che mantiene l'ora di rete con cui viene inviato lo stream di plaa…
-network-ptp-elsewhere = ptp4l è in esecuzione su un'altra interfaccia, quindi qui lo stream di plaa non ha un'ora di rete e i listener potrebbero non riprodurlo. Scegli quell'interfaccia in Impostazioni, oppure esegui ptp4l su questa.
-network-ptp-missing = ptp4l non è in esecuzione, quindi lo stream di plaa non ha un'ora di rete e i listener potrebbero non riprodurlo. Installa linuxptp con il pacchetto di plaa, oppure installa triib, che lo esegue.
-network-ptp-failed = ptp4l non è in esecuzione, quindi lo stream di plaa non ha un'ora di rete e i listener potrebbero non riprodurlo. plaa non è riuscito ad avviarlo: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Avvio di gptpd, che mantiene l'ora di rete con cui viene inviato lo stream di plaa…
+network-ptp-missing = gptpd non è in esecuzione, quindi lo stream di plaa non ha un'ora di rete e i listener potrebbero non riprodurlo. Installa gptpd, dalle release di plaa o di triib.
+network-ptp-failed = gptpd non è in esecuzione, quindi lo stream di plaa non ha un'ora di rete e i listener potrebbero non riprodurlo: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Questo computer mantiene l'ora della rete, come suo grandmaster (priority1 { $priority1 }, impostato in { $config }).
+network-clock-capable = Questo computer può mantenere l'ora della rete, se si classifica primo (priority1 { $priority1 }, impostato in { $config }).
+network-clock-never = Questo computer non mantiene mai l'ora della rete (priority1 255, impostato in { $config }).
 network-no-listeners = Nessun listener in rete può riprodurre il suono di plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

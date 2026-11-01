@@ -95,14 +95,39 @@ fn name(entity: &Found, stream: &Stream, several: bool) -> String {
     }
 }
 
-/// What is wrong with ptp4l, where something is.
+/// What is wrong with gptpd, where something is.
 fn ptp_note(ptp: &Ptp) -> Option<String> {
     Some(match ptp {
-        Ptp::Unknown | Ptp::Running => return None,
+        Ptp::Unknown | Ptp::Running(_) => return None,
         Ptp::Starting => crate::fl!("network-ptp-starting"),
-        Ptp::Elsewhere => crate::fl!("network-ptp-elsewhere"),
         Ptp::Missing(None) => crate::fl!("network-ptp-missing"),
         Ptp::Missing(Some(why)) => crate::fl!("network-ptp-failed", reason = why.clone()),
+    })
+}
+
+/// This computer's clock on the network, where gptpd keeps it: the
+/// grandmaster now, one it may become, or never, as its priority1 in
+/// gptpd's configuration sets, which plaa shows and leaves to change there.
+fn clock_note(ptp: &Ptp) -> Option<String> {
+    let Ptp::Running(clock) = ptp else {
+        return None;
+    };
+    let priority1 = clock.priority1;
+    let config = clock.config.clone();
+    Some(if clock.grandmaster {
+        crate::fl!(
+            "network-clock-grandmaster",
+            priority1 = priority1,
+            config = config
+        )
+    } else if priority1 == 255 {
+        crate::fl!("network-clock-never", config = config)
+    } else {
+        crate::fl!(
+            "network-clock-capable",
+            priority1 = priority1,
+            config = config
+        )
     })
 }
 
@@ -115,11 +140,14 @@ pub fn sheet<'a>(
     let mut content = column![].spacing(4).width(Fill);
     let own = snapshot.entities.iter().find(|entity| entity.own);
     let ours = own.and_then(|own| Some(((own.id, 0), own.outputs.first()?)));
-    // Without ptp4l the stream keeps no network time, which listeners
+    // Without gptpd the stream keeps no network time, which listeners
     // need to play it.
     let sending = !matches!(snapshot.talker, TalkerState::Off | TalkerState::Blocked(_));
     if let (true, Some(problem)) = (sending, ptp_note(&snapshot.ptp)) {
         content = content.push(scramble_ui::aligned(text(problem).style(style::error_text)));
+    }
+    if let (true, Some(clock)) = (sending, clock_note(&snapshot.ptp)) {
+        content = content.push(note(clock));
     }
     match (&snapshot.talker, ours) {
         (TalkerState::Off, _) => content = content.push(note(crate::fl!("network-off"))),
@@ -1096,17 +1124,41 @@ mod tests {
         assert_eq!(media_locked(&input), Some(true));
     }
 
+    fn running(priority1: u8, grandmaster: bool) -> Ptp {
+        Ptp::Running(plaa_avb::Clock {
+            priority1,
+            grandmaster,
+            config: "/etc/gptpd/enp2s0.conf".into(),
+        })
+    }
+
     #[test]
-    fn ptp4l_is_mentioned_only_when_it_keeps_no_time() {
+    fn gptpd_is_mentioned_only_when_it_keeps_no_time() {
         assert_eq!(ptp_note(&Ptp::Unknown), None);
-        assert_eq!(ptp_note(&Ptp::Running), None);
-        assert!(ptp_note(&Ptp::Missing(None)).unwrap().contains("linuxptp"));
+        assert_eq!(ptp_note(&running(248, false)), None);
+        assert!(ptp_note(&Ptp::Starting).unwrap().contains("gptpd"));
+        let missing = ptp_note(&Ptp::Missing(None)).unwrap();
+        assert!(missing.contains("gptpd") && !missing.contains("linuxptp"));
         let failed = ptp_note(&Ptp::Missing(Some("access denied".into()))).unwrap();
         assert!(failed.ends_with("access denied"));
-        assert!(
-            ptp_note(&Ptp::Elsewhere)
-                .unwrap()
-                .contains("another interface")
+    }
+
+    /// The clock's rank shows with where to change it, only while gptpd
+    /// runs.
+    #[test]
+    fn the_clock_shows_its_rank_and_where_it_is_set() {
+        assert_eq!(clock_note(&Ptp::Starting), None);
+        assert_eq!(clock_note(&Ptp::Missing(None)), None);
+        for (clock, priority1) in [(running(248, false), "248"), (running(246, true), "246")] {
+            let note = clock_note(&clock).unwrap();
+            assert!(note.contains(priority1) && note.contains("/etc/gptpd/enp2s0.conf"));
+        }
+        assert_ne!(
+            clock_note(&running(246, true)),
+            clock_note(&running(246, false))
         );
+        let never = clock_note(&running(255, false)).unwrap();
+        assert!(never.contains("/etc/gptpd/enp2s0.conf"));
+        assert_ne!(Some(never), clock_note(&running(248, false)));
     }
 }

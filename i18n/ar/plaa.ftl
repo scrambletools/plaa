@@ -299,12 +299,19 @@ network-blocked = لا يتم الإرسال: { $reason }
 network-waiting = جاهز للإرسال، في انتظار اتصال مستقبِل.
 network-sending = جارٍ الإرسال إلى المستقبِلات المتصلة.
 network-looking = جارٍ البحث عن مستقبِلات…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = جارٍ بدء ptp4l، الذي يحافظ على وقت الشبكة الذي يُرسَل به تدفق plaa…
-network-ptp-elsewhere = يعمل ptp4l على واجهة أخرى، لذا لا يحافظ تدفق plaa على وقت الشبكة هنا وقد لا تتمكن المستقبِلات من تشغيله. اختر تلك الواجهة في الإعدادات، أو شغّل ptp4l على هذه الواجهة.
-network-ptp-missing = ptp4l لا يعمل، لذا لا يحافظ تدفق plaa على وقت الشبكة وقد لا تتمكن المستقبِلات من تشغيله. ثبّت linuxptp مع حزمة plaa، أو ثبّت triib الذي يشغّله.
-network-ptp-failed = ptp4l لا يعمل، لذا لا يحافظ تدفق plaa على وقت الشبكة وقد لا تتمكن المستقبِلات من تشغيله. تعذّر على plaa تشغيله: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = جارٍ بدء gptpd، الذي يحافظ على وقت الشبكة الذي يُرسَل به تدفق plaa…
+network-ptp-missing = gptpd لا يعمل، لذا لا يحافظ تدفق plaa على وقت الشبكة وقد لا تتمكن المستقبِلات من تشغيله. ثبّت gptpd، من إصدارات plaa أو triib.
+network-ptp-failed = gptpd لا يعمل، لذا لا يحافظ تدفق plaa على وقت الشبكة وقد لا تتمكن المستقبِلات من تشغيله: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = يحافظ هذا الكمبيوتر على وقت الشبكة، بصفته ساعتها الرئيسية (priority1 { $priority1 }، المحدد في { $config }).
+network-clock-capable = يمكن لهذا الكمبيوتر أن يحافظ على وقت الشبكة، إن جاء في المرتبة الأولى (priority1 { $priority1 }، المحدد في { $config }).
+network-clock-never = لا يحافظ هذا الكمبيوتر على وقت الشبكة أبدًا (priority1 255، المحدد في { $config }).
 network-no-listeners = لا يوجد على الشبكة مستقبِل يمكنه تشغيل صوت plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

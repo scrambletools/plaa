@@ -293,12 +293,19 @@ network-blocked = Nie można wysyłać: { $reason }
 network-waiting = Gotowe do wysyłania, oczekiwanie na podłączenie odbiornika.
 network-sending = Wysyłanie do podłączonych odbiorników.
 network-looking = Wyszukiwanie odbiorników…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Uruchamianie ptp4l, który utrzymuje czas sieciowy, według którego wysyłany jest strumień plaa…
-network-ptp-elsewhere = ptp4l działa na innym interfejsie, więc strumień plaa nie ma tutaj czasu sieciowego i odbiorniki mogą go nie odtworzyć. Wybierz tamten interfejs w Ustawieniach albo uruchom ptp4l na tym.
-network-ptp-missing = ptp4l nie działa, więc strumień plaa nie ma czasu sieciowego i odbiorniki mogą go nie odtworzyć. Zainstaluj linuxptp razem z pakietem plaa albo zainstaluj triib, który go uruchamia.
-network-ptp-failed = ptp4l nie działa, więc strumień plaa nie ma czasu sieciowego i odbiorniki mogą go nie odtworzyć. plaa nie może go uruchomić: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Uruchamianie gptpd, który utrzymuje czas sieciowy, według którego wysyłany jest strumień plaa…
+network-ptp-missing = gptpd nie działa, więc strumień plaa nie ma czasu sieciowego i odbiorniki mogą go nie odtworzyć. Zainstaluj gptpd z wydań plaa lub triib.
+network-ptp-failed = gptpd nie działa, więc strumień plaa nie ma czasu sieciowego i odbiorniki mogą go nie odtworzyć: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Ten komputer utrzymuje czas sieci jako jej zegar nadrzędny (priority1 { $priority1 }, ustawiony w { $config }).
+network-clock-capable = Ten komputer może utrzymywać czas sieci, jeśli znajdzie się na pierwszym miejscu (priority1 { $priority1 }, ustawiony w { $config }).
+network-clock-never = Ten komputer nigdy nie utrzymuje czasu sieci (priority1 255, ustawiony w { $config }).
 network-no-listeners = Żaden odbiornik w sieci nie może odtworzyć dźwięku z plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

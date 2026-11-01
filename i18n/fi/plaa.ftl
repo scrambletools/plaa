@@ -288,12 +288,19 @@ network-blocked = Ei lähetetä: { $reason }
 network-waiting = Valmis lähettämään, odotetaan vastaanottimen yhdistämistä.
 network-sending = Lähetetään yhdistetyille vastaanottimille.
 network-looking = Etsitään vastaanottimia…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Käynnistetään ptp4l, joka ylläpitää verkon aikaa, jonka mukaan plaan virta lähetetään…
-network-ptp-elsewhere = ptp4l on käynnissä toisessa liitännässä, joten plaan virralla ei ole täällä verkon aikaa, eivätkä vastaanottimet ehkä pysty toistamaan sitä. Valitse se liitäntä Asetuksissa tai käynnistä ptp4l tässä liitännässä.
-network-ptp-missing = ptp4l ei ole käynnissä, joten plaan virralla ei ole verkon aikaa, eivätkä vastaanottimet ehkä pysty toistamaan sitä. Asenna linuxptp plaan paketin mukana tai asenna triib, joka käynnistää sen.
-network-ptp-failed = ptp4l ei ole käynnissä, joten plaan virralla ei ole verkon aikaa, eivätkä vastaanottimet ehkä pysty toistamaan sitä. plaa ei voinut käynnistää sitä: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Käynnistetään gptpd, joka ylläpitää verkon aikaa, jonka mukaan plaan virta lähetetään…
+network-ptp-missing = gptpd ei ole käynnissä, joten plaan virralla ei ole verkon aikaa, eivätkä vastaanottimet ehkä pysty toistamaan sitä. Asenna gptpd plaan tai triibin julkaisuista.
+network-ptp-failed = gptpd ei ole käynnissä, joten plaan virralla ei ole verkon aikaa, eivätkä vastaanottimet ehkä pysty toistamaan sitä: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Tämä tietokone ylläpitää verkon aikaa sen pääkellona (priority1 { $priority1 }, asetettu tiedostossa { $config }).
+network-clock-capable = Tämä tietokone voi ylläpitää verkon aikaa, jos se on järjestyksessä ensimmäinen (priority1 { $priority1 }, asetettu tiedostossa { $config }).
+network-clock-never = Tämä tietokone ei koskaan ylläpidä verkon aikaa (priority1 255, asetettu tiedostossa { $config }).
 network-no-listeners = Mikään verkon vastaanotin ei pysty toistamaan plaan ääntä.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

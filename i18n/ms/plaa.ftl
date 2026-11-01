@@ -281,12 +281,19 @@ network-blocked = Tidak menghantar: { $reason }
 network-waiting = Sedia untuk menghantar, menunggu listener menyambung.
 network-sending = Menghantar kepada listener yang disambungkan.
 network-looking = Mencari listener…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Memulakan ptp4l, yang menjaga masa rangkaian yang menjadi rujukan penghantaran strim plaa…
-network-ptp-elsewhere = ptp4l berjalan pada antara muka lain, jadi strim plaa tiada masa rangkaian di sini dan listener mungkin tidak dapat memainkannya. Pilih antara muka itu dalam Tetapan, atau jalankan ptp4l pada antara muka ini.
-network-ptp-missing = ptp4l tidak berjalan, jadi strim plaa tiada masa rangkaian dan listener mungkin tidak dapat memainkannya. Pasang linuxptp bersama pakej plaa, atau triib, yang menjalankannya.
-network-ptp-failed = ptp4l tidak berjalan, jadi strim plaa tiada masa rangkaian dan listener mungkin tidak dapat memainkannya. plaa tidak dapat memulakannya: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Memulakan gptpd, yang menjaga masa rangkaian yang menjadi rujukan penghantaran strim plaa…
+network-ptp-missing = gptpd tidak berjalan, jadi strim plaa tiada masa rangkaian dan listener mungkin tidak dapat memainkannya. Pasang gptpd, daripada keluaran plaa atau triib.
+network-ptp-failed = gptpd tidak berjalan, jadi strim plaa tiada masa rangkaian dan listener mungkin tidak dapat memainkannya: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Komputer ini menjaga masa rangkaian, sebagai grandmaster rangkaian (priority1 { $priority1 }, ditetapkan dalam { $config }).
+network-clock-capable = Komputer ini boleh menjaga masa rangkaian, jika ia berada di kedudukan pertama (priority1 { $priority1 }, ditetapkan dalam { $config }).
+network-clock-never = Komputer ini tidak pernah menjaga masa rangkaian (priority1 255, ditetapkan dalam { $config }).
 network-no-listeners = Tiada listener pada rangkaian yang dapat memainkan bunyi plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

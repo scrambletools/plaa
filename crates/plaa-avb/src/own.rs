@@ -7,11 +7,11 @@
 //! entity service's participant where it runs on the port. There, while
 //! the port runs AVB Lite, the service declares them by CVU SRP in the
 //! entity's name, and the stream goes as a copy to each listener it
-//! admits, as it says.
+//! admits, as it says. gPTP, its time and its profile are gptpd's, which
+//! both programs share on the port.
 
 mod lite;
 
-use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -20,8 +20,8 @@ use std::time::Duration;
 
 use atdecc::descriptor::DescriptorType;
 use atdecc::entity::{
-    EndpointModel, Entity, EntityEvent, InputReservation, OutputReservation, ProbedStream,
-    StreamModel, UNADDRESSED,
+    ClockQuality, EndpointModel, Entity, EntityEvent, Gptp, InputReservation, OutputReservation,
+    ProbedStream, StreamModel, UNADDRESSED,
 };
 use atdecc::lite::{FallbackReason, LiteFlags, LiteStatus, PtpProfile};
 use atdecc::maap::{self, Maap, MaapEvent};
@@ -89,8 +89,14 @@ const REDECLARE: Duration = Duration::from_secs(2);
 /// notifications of them at most.
 const COUNT_EVERY: Duration = Duration::from_secs(1);
 
-/// How long ptp4l may take to answer once its service starts.
+/// How long gptpd may take to answer once its service starts.
 const PTP_PATIENCE: Duration = Duration::from_secs(15);
+
+/// How long the entity keeps the grandmaster it had while gptpd names
+/// none, as when it restarts or starts again: it names one within a
+/// second or two, and a grandmaster gone for good is gone in three missed
+/// Announces.
+const GRANDMASTER_HOLD: Duration = Duration::from_secs(5);
 
 /// How often it looks whether another program serves the port's
 /// participant, to share it, while it runs its own or none.
@@ -112,9 +118,6 @@ const FOREIGN_QUIET: Duration = Duration::from_secs(30);
 /// once on a LeaveAll of the new one's, else on the bridge's own, a
 /// LeaveAll period of 10 to 15 seconds.
 const CARRY: Duration = Duration::from_secs(16);
-
-/// ptp4l's read-only management socket.
-const PTP4L_SOCKET: &str = "/var/run/ptp4lro";
 
 /// plaa's entity ID on an interface with address `mac`.
 pub(crate) fn entity_id(mac: MacAddress) -> EntityId {
@@ -333,23 +336,18 @@ pub(crate) struct Own {
     copies: Option<(u16, Vec<MacAddress>)>,
     /// The link's speed in Mb/s, as of the last mode, for GET_LITE_STATUS.
     link_speed: u32,
-    /// What ptp4l last said of the interface.
+    /// What gptpd last said of the interface.
     gptp: Option<gptp::Status>,
     /// The interface's link and grandmaster, counted for controllers.
     link: Link,
-    /// AVB Lite on plaa's own participants: weighing whether to fall
+    /// AVB Lite on plaa's own participants: following gptpd as it falls
     /// back, and CVU SRP once it does.
     own_lite: Option<OwnLite>,
-    /// Where PTP's messages come in, for the fallback and each
-    /// grandmaster's link speed.
-    ptp_socket: Option<Arc<avb_net::Socket>>,
-    /// The link speed each grandmaster announces, and the media clock's
-    /// correction for it in AVB Lite (profile 5).
-    grandmaster_links: HashMap<u64, u32>,
-    correction: i64,
+    /// The runtime's AVTP socket, which holds the interface promiscuous
+    /// while AVB Lite runs.
+    avtp: Arc<avb_net::Socket>,
     interface: String,
     mac: MacAddress,
-    own_clock: ClockIdentity,
     /// Whether a listener on the network is ready for the stream.
     ready: bool,
     /// The stream is advertised.
@@ -373,11 +371,15 @@ pub(crate) struct Own {
     /// in use until MAAP has claimed the stream's address anew.
     address_file: Option<std::path::PathBuf>,
     kept: Option<MacAddress>,
-    /// How ptp4l stands on the interface, and whether plaa tried to start
+    /// How gptpd stands on the interface, and whether plaa tried to start
     /// its service there, which it does once.
     ptp: Ptp,
     ptp_tried: bool,
     ptp_started: Option<std::time::Instant>,
+    /// Until when the entity keeps the grandmaster gptpd stopped naming,
+    /// and what it is yet to say of gPTP meanwhile.
+    hold_until: Option<std::time::Instant>,
+    held: Option<Gptp>,
 }
 
 impl Own {
@@ -386,6 +388,7 @@ impl Own {
     pub(crate) fn new(
         config: &Config,
         mac: MacAddress,
+        avtp: Arc<avb_net::Socket>,
         sender: &Sender<Input>,
         stop: &Arc<AtomicBool>,
         sound: Arc<Sound>,
@@ -395,12 +398,15 @@ impl Own {
             .into_iter()
             .find(|found| found.name == interface)
             .ok_or_else(|| io::Error::other(format!("no interface named {interface}")))?;
-        let Some(phc) = found.hardware_clock else {
+        // gptpd keeps gPTP time only on an interface that stamps frames on
+        // a PTP hardware clock.
+        if found.hardware_clock.is_none() {
             return Err(io::Error::other(format!(
                 "{interface} has no PTP hardware clock to time a stream by"
             )));
-        };
-        let clock = Arc::new(MediaClock::open(Some(phc))?);
+        }
+        let clock = Arc::new(MediaClock::gptpd(&interface));
+        ptp::steer(&interface);
         let generation = 1;
         let mut blocked = None;
         let reservation = match Reservation::share(
@@ -419,12 +425,8 @@ impl Own {
                 None => Some(Reservation::own(&interface, mac, sender)?),
             },
         };
-        gptp::watch(
-            PTP4L_SOCKET.to_owned(),
-            stop.clone(),
-            sender.clone(),
-            Input::Gptp,
-        );
+        gptp::watch(interface.clone(), stop.clone(), sender.clone(), Input::Gptp);
+        // gptpd's own, the MAC's EUI-64, until it says.
         let own_clock = ClockIdentity(u64::from_be_bytes([
             mac.0[0], mac.0[1], mac.0[2], 0xff, 0xfe, mac.0[3], mac.0[4], mac.0[5],
         ]));
@@ -440,6 +442,7 @@ impl Own {
             mac,
             interface_name: interface.clone(),
             clock_identity: own_clock,
+            clock_quality: ClockQuality::NOT_GRANDMASTER_CAPABLE,
             sampling_rates: avb_stream::formats::RATES.to_vec(),
             current_sampling_rate: avb_stream::formats::RATES[0],
             outputs: vec![StreamModel {
@@ -460,9 +463,6 @@ impl Own {
             vendor_logo: Some(VENDOR_LOGO.to_vec()),
         };
         let stream = StreamId::new(mac, u16::from(INSTANCE) << 8);
-        let ptp_socket = lite::open_ptp(&interface, sender, stop)
-            .inspect_err(|error| eprintln!("plaa: PTP's messages go unheard: {error}"))
-            .ok();
         let alone = reservation
             .as_ref()
             .is_some_and(|reservation| !reservation.is_shared());
@@ -488,12 +488,9 @@ impl Own {
             gptp: None,
             link: Link::default(),
             own_lite: None,
-            ptp_socket,
-            grandmaster_links: HashMap::new(),
-            correction: 0,
+            avtp,
             interface,
             mac,
-            own_clock,
             ready: false,
             declared: false,
             declared_bandwidth: None,
@@ -511,6 +508,8 @@ impl Own {
             ptp: Ptp::Unknown,
             ptp_tried: false,
             ptp_started: None,
+            hold_until: None,
+            held: None,
         };
         if alone {
             own.arm_lite(Duration::ZERO);
@@ -958,41 +957,74 @@ impl Own {
         since: Duration,
         status: Option<gptp::Status>,
     ) {
-        let answered = status.is_some();
-        // ptp4l on another interface says nothing of this one.
-        let ours = status.filter(|status| status.own_clock == self.own_clock);
-        self.ptp = match (&ours, answered) {
-            (Some(_), _) => Ptp::Running,
-            (None, true) => Ptp::Elsewhere,
-            (None, false) => self.missing_ptp(),
+        self.ptp = match &status {
+            Some(status) => Ptp::Running(crate::Clock {
+                priority1: status.priority1,
+                grandmaster: status.is_us,
+                config: ptp::config(&self.interface),
+            }),
+            None => self.missing_ptp(),
         };
-        let gptp = ours
+        let gptp = status
             .as_ref()
             .map(|status| status.gptp.clone())
             .unwrap_or_default();
-        self.entity.set_gptp(now, gptp);
-        if let Some(status) = &ours {
-            self.link.grandmaster(status.gptp.grandmaster);
+        // gptpd restarting, or starting before it hears the grandmaster,
+        // names none for a second or two: the entity keeps the one it had
+        // meanwhile, rather than naming none, or itself.
+        let named = status.as_ref().is_some_and(|status| status.named);
+        if named {
+            self.hold_until = None;
+        } else if self.hold_until.is_none() && self.gptp.as_ref().is_some_and(|was| was.named) {
+            self.hold_until = Some(std::time::Instant::now() + GRANDMASTER_HOLD);
         }
-        self.gptp = ours;
-        self.lite_ptp4l(since);
+        if !named && self.holding() {
+            self.held = Some(gptp);
+        } else {
+            self.held = None;
+            self.report_gptp(now, gptp);
+        }
+        if let Some(status) = &status {
+            self.entity.set_clock(
+                status.own_clock,
+                ClockQuality::of_priority1(status.priority1),
+            );
+        }
+        self.gptp = status;
+        self.lite_gptp(since);
         self.update_lite_status();
     }
 
-    /// No ptp4l answers: plaa starts its service, once, where it is
-    /// installed and no ptp4l runs on the interface that might answer
-    /// in a moment.
+    /// Whether the entity still keeps the grandmaster gptpd last named.
+    fn holding(&self) -> bool {
+        self.hold_until
+            .is_some_and(|until| std::time::Instant::now() < until)
+    }
+
+    /// What the entity says of gPTP, and counts as the grandmaster.
+    fn report_gptp(&mut self, now: Instant, gptp: Gptp) {
+        if gptp.grandmaster != ClockIdentity(0) {
+            self.link.grandmaster(gptp.grandmaster);
+        }
+        self.entity.set_gptp(now, gptp);
+    }
+
+    /// gptpd does not answer: where it said why it refused to run, that;
+    /// where it ran, its service starts it again in a moment; else plaa
+    /// starts its service, once, where it is installed.
     fn missing_ptp(&mut self) -> Ptp {
-        if self.ptp_tried {
-            return match &self.ptp {
-                Ptp::Starting | Ptp::Missing(_) => self.ptp.clone(),
-                _ => Ptp::Missing(None),
-            };
+        if let Some(why) = ptp::refused(&self.interface) {
+            return Ptp::Missing(Some(why));
         }
-        if ptp::running_on(&self.interface) {
-            return Ptp::Starting;
+        match &self.ptp {
+            Ptp::Running(_) => {
+                self.ptp_started = Some(std::time::Instant::now());
+                return Ptp::Starting;
+            }
+            Ptp::Starting | Ptp::Missing(_) if self.ptp_tried => return self.ptp.clone(),
+            _ => {}
         }
-        if !ptp::installed() {
+        if self.ptp_tried || !ptp::installed() {
             return Ptp::Missing(None);
         }
         self.ptp_tried = true;
@@ -1005,7 +1037,7 @@ impl Own {
         }
     }
 
-    /// How ptp4l stands on the interface.
+    /// How gptpd stands on the interface.
     pub(crate) fn ptp(&self) -> Ptp {
         self.ptp.clone()
     }
@@ -1027,9 +1059,18 @@ impl Own {
                 .ptp_started
                 .is_some_and(|started| started.elapsed() >= PTP_PATIENCE)
         {
-            self.ptp = Ptp::Missing(Some(
-                "its service started, but ptp4l does not answer".into(),
-            ));
+            let why = match (ptp::refused(&self.interface), self.ptp_tried) {
+                (Some(why), _) => why,
+                (None, true) => "its service started, but gptpd does not answer".into(),
+                (None, false) => "gptpd stopped answering".into(),
+            };
+            self.ptp = Ptp::Missing(Some(why));
+        }
+        if self.held.is_some()
+            && !self.holding()
+            && let Some(gptp) = self.held.take()
+        {
+            self.report_gptp(now, gptp);
         }
         if self.blocked.is_some() {
             return;
@@ -1048,7 +1089,6 @@ impl Own {
             self.link.link(up);
             self.entity
                 .set_counters(DescriptorType::AVB_INTERFACE, 0, self.link.counters());
-            self.lite_link(since, up);
         }
         self.maap.handle_timeout(now);
         while let Some(event) = self.maap.poll_event() {
@@ -1580,7 +1620,9 @@ impl Own {
             return;
         }
         let ptp = self.gptp.as_ref();
-        let offset = ptp.and_then(|status| status.offset);
+        // gptpd steers no clock, so the offset is how far the last Sync
+        // fell from its mapping.
+        let offset = ptp.and_then(|status| status.residual);
         let lite = self.mode.and_then(|mode| mode.lite);
         let mut flags = LiteFlags::empty();
         if let Some(mode) = self.mode {
@@ -1601,9 +1643,9 @@ impl Own {
             interface: 0,
             flags,
             fallback_reason: FallbackReason(lite.unwrap_or(0)),
-            // ptp4l still in gPTP keeps the profile gPTP, fallen back or
+            // gptpd still in gPTP keeps the profile gPTP, fallen back or
             // not.
-            ptp_profile: if lite.is_some() && ptp.is_some_and(|status| status.end_to_end) {
+            ptp_profile: if lite.is_some() && ptp.is_some_and(|status| status.lite.is_some()) {
                 PtpProfile::AVB_LITE_PTP
             } else {
                 PtpProfile::GPTP

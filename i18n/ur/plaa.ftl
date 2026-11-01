@@ -281,12 +281,19 @@ network-blocked = نہیں بھیجا جا رہا: { $reason }
 network-waiting = بھیجنے کے لیے تیار، کسی لسنر کے جڑنے کا انتظار ہے۔
 network-sending = جڑے ہوئے لسنرز کو بھیجا جا رہا ہے۔
 network-looking = لسنرز تلاش کیے جا رہے ہیں…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = ptp4l شروع ہو رہا ہے، جو وہ نیٹ ورک ٹائم رکھتا ہے جس کے مطابق plaa کی اسٹریم بھیجی جاتی ہے…
-network-ptp-elsewhere = ptp4l کسی دوسرے انٹرفیس پر چل رہا ہے، اس لیے یہاں plaa کی اسٹریم کا نیٹ ورک ٹائم سے کوئی تعلق نہیں اور ممکن ہے لسنرز اسے نہ چلا سکیں۔ ترتیبات میں وہ انٹرفیس منتخب کریں، یا اس انٹرفیس پر ptp4l چلائیں۔
-network-ptp-missing = ptp4l نہیں چل رہا، اس لیے plaa کی اسٹریم کا نیٹ ورک ٹائم سے کوئی تعلق نہیں اور ممکن ہے لسنرز اسے نہ چلا سکیں۔ plaa کے پیکیج کے ساتھ linuxptp انسٹال کریں، یا triib، جو اسے چلاتا ہے۔
-network-ptp-failed = ptp4l نہیں چل رہا، اس لیے plaa کی اسٹریم کا نیٹ ورک ٹائم سے کوئی تعلق نہیں اور ممکن ہے لسنرز اسے نہ چلا سکیں۔ plaa اسے شروع نہیں کر سکا: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = gptpd شروع ہو رہا ہے، جو وہ نیٹ ورک ٹائم رکھتا ہے جس کے مطابق plaa کی اسٹریم بھیجی جاتی ہے…
+network-ptp-missing = gptpd نہیں چل رہا، اس لیے plaa کی اسٹریم کا نیٹ ورک ٹائم سے کوئی تعلق نہیں اور ممکن ہے لسنرز اسے نہ چلا سکیں۔ plaa یا triib کی ریلیزز سے gptpd انسٹال کریں۔
+network-ptp-failed = gptpd نہیں چل رہا، اس لیے plaa کی اسٹریم کا نیٹ ورک ٹائم سے کوئی تعلق نہیں اور ممکن ہے لسنرز اسے نہ چلا سکیں: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = یہ کمپیوٹر نیٹ ورک کا ٹائم رکھتا ہے، اس کے گرینڈ ماسٹر کے طور پر (priority1 { $priority1 }، { $config } میں سیٹ)۔
+network-clock-capable = یہ کمپیوٹر نیٹ ورک کا ٹائم رکھ سکتا ہے، اگر یہ پہلے نمبر پر آئے (priority1 { $priority1 }، { $config } میں سیٹ)۔
+network-clock-never = یہ کمپیوٹر کبھی نیٹ ورک کا ٹائم نہیں رکھتا (priority1 255، { $config } میں سیٹ)۔
 network-no-listeners = نیٹ ورک پر کوئی لسنر plaa کی آواز نہیں چلا سکتا۔
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

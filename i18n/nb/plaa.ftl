@@ -287,12 +287,19 @@ network-blocked = Sender ikke: { $reason }
 network-waiting = Klar til å sende, venter på at en mottaker kobler til.
 network-sending = Sender til mottakerne som er koblet til.
 network-looking = Ser etter mottakere…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Starter ptp4l, som holder nettverkstiden plaas strøm sendes etter…
-network-ptp-elsewhere = ptp4l kjører på et annet grensesnitt, så plaas strøm har ingen nettverkstid her, og mottakere kan kanskje ikke spille den av. Velg det grensesnittet i Innstillinger, eller kjør ptp4l på dette.
-network-ptp-missing = ptp4l kjører ikke, så plaas strøm har ingen nettverkstid, og mottakere kan kanskje ikke spille den av. Installer linuxptp med plaas pakke, eller triib, som kjører det.
-network-ptp-failed = ptp4l kjører ikke, så plaas strøm har ingen nettverkstid, og mottakere kan kanskje ikke spille den av. plaa kunne ikke starte det: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Starter gptpd, som holder nettverkstiden plaas strøm sendes etter…
+network-ptp-missing = gptpd kjører ikke, så plaas strøm har ingen nettverkstid, og mottakere kan kanskje ikke spille den av. Installer gptpd fra utgivelsene til plaa eller triib.
+network-ptp-failed = gptpd kjører ikke, så plaas strøm har ingen nettverkstid, og mottakere kan kanskje ikke spille den av: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Denne datamaskinen holder nettverkets tid, som dets grandmaster (priority1 { $priority1 }, angitt i { $config }).
+network-clock-capable = Denne datamaskinen kan holde nettverkets tid, om den rangeres først (priority1 { $priority1 }, angitt i { $config }).
+network-clock-never = Denne datamaskinen holder aldri nettverkets tid (priority1 255, angitt i { $config }).
 network-no-listeners = Ingen mottaker på nettverket kan spille av lyden fra plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

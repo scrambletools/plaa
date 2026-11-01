@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Changed
+
+- plaa keeps network time with gptpd, shared with triib's entity
+  service, in place of its own ptp4l services. Its packages recommend
+  gptpd where they recommended linuxptp, plaa starts `gptpd@<interface>`
+  where it does not run yet, and Network Audio says why where gptpd
+  refused to run. The stream takes its time from gptpd's record of the
+  grandmaster's time, which steers no clock, so a new grandmaster, a
+  restart or a link bounce no longer slews the clock the neighbor
+  measures the link by, and streams follow a new grandmaster within a
+  Sync or two. gptpd sends PTP 2.0 on every distribution.
+- AVB Lite's fallback is gptpd's to decide, one decision for the port
+  that plaa and triib both follow: plaa sends no peer delay requests of
+  its own any more, and gptpd corrects for the grandmaster's link speed.
+- plaa's entity reports this computer's clock as gptpd ranks it,
+  grandmaster capable below priority1 255, and Network Audio shows its
+  priority1, which `/etc/gptpd/<interface>.conf` sets. On atdecc 0.2,
+  avb-stream 0.2 and gptp 0.1.
+- `scripts/dev-ptp4l.sh` gave way to `scripts/dev-link.sh`, which
+  installs plaa-link@ for dev builds and takes the old ptp4l services
+  out.
+
 ### Fixed
 
 - plaa quits as its Quit does when the system asks it to, with SIGTERM
@@ -12,21 +34,26 @@
 - plaa's own MSRP participant sends its stream's Leave as plaa quits,
   where it waited for its join timer and plaa was gone first, leaving
   the bridge to hold the stream until its LeaveTime ran out.
+- plaa's entity keeps the grandmaster it had through a few seconds of
+  gPTP naming none, as when gptpd restarts, rather than advertising no
+  grandmaster, or itself, meanwhile.
 - The talker of the stream plaa listens to shows failed as a bridge
   turns it failed with a Join alone, as PreSonus's switch does, rather
   than as advertised until the bridge's next LeaveAll. On avb-mrp 0.1.3,
   which also has plaa declare its SR classes again after a bridge's
   LeaveAll that carries the bridge's own.
-- plaa's gPTP service has ptp4l send PTP 2.0 where linuxptp can, from
-  4.2 on, so AVB switches that ignore 2.1, as PreSonus's, answer its
-  peer delay requests.
 - plaa takes its port again once a program it stepped aside for, one
   that declared streams there without sharing them, has gone quiet for
   30 seconds, rather than staying off the network until it restarts.
-- A stream's frames leave in order: plaa's ptp4l services have every CPU
-  send the interface's frames on its first transmit queue, as a card
-  with several, as the I210 has four, spread a stream's frames over
-  them by a hash that takes in its sequence number.
+- A stream's frames leave in order: plaa-link@, which plaa runs as its
+  entity starts, has every CPU send the interface's frames on its first
+  transmit queue, as a card with several, as the I210 has four, spread
+  a stream's frames over them by a hash that takes in its sequence
+  number.
+- A stream's frames keep their order when that queue backs up, as when
+  a late send catches up: they leave at priority 3, so the queue's fair
+  scheduler holds them in one flow rather than a flow each. On avb-net
+  0.1.3.
 - Connecting in a format the talker is not sending in unbinds the
   talker's other listeners first, as its menu says, since a Milan
   talker takes another format only while it streams to none.

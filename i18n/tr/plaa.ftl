@@ -281,12 +281,19 @@ network-blocked = Gönderilmiyor: { $reason }
 network-waiting = Göndermeye hazır, bir dinleyicinin bağlanması bekleniyor.
 network-sending = Bağlı dinleyicilere gönderiliyor.
 network-looking = Dinleyiciler aranıyor…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = plaa'nın akışının gönderildiği ağ saatini tutan ptp4l başlatılıyor…
-network-ptp-elsewhere = ptp4l başka bir arabirimde çalışıyor, bu yüzden plaa'nın akışı burada ağ saatine bağlı değil ve dinleyiciler onu oynatamayabilir. Ayarlar'dan o arabirimi seçin ya da bu arabirimde ptp4l çalıştırın.
-network-ptp-missing = ptp4l çalışmıyor, bu yüzden plaa'nın akışı ağ saatine bağlı değil ve dinleyiciler onu oynatamayabilir. linuxptp paketini plaa'nın paketiyle birlikte yükleyin ya da bunu kendisi çalıştıran triib'i yükleyin.
-network-ptp-failed = ptp4l çalışmıyor, bu yüzden plaa'nın akışı ağ saatine bağlı değil ve dinleyiciler onu oynatamayabilir. plaa onu başlatamadı: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = plaa'nın akışının gönderildiği ağ saatini tutan gptpd başlatılıyor…
+network-ptp-missing = gptpd çalışmıyor, bu yüzden plaa'nın akışı ağ saatine bağlı değil ve dinleyiciler onu oynatamayabilir. gptpd'yi plaa'nın ya da triib'in sürümlerinden yükleyin.
+network-ptp-failed = gptpd çalışmıyor, bu yüzden plaa'nın akışı ağ saatine bağlı değil ve dinleyiciler onu oynatamayabilir: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Bu bilgisayar, ağın grandmaster saati olarak ağın saatini tutuyor (priority1 { $priority1 }, { $config } dosyasında ayarlı).
+network-clock-capable = Bu bilgisayar, ilk sıraya yerleşirse ağın saatini tutabilir (priority1 { $priority1 }, { $config } dosyasında ayarlı).
+network-clock-never = Bu bilgisayar ağın saatini asla tutmaz (priority1 255, { $config } dosyasında ayarlı).
 network-no-listeners = Ağda plaa'nın sesini oynatabilecek bir dinleyici yok.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

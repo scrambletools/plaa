@@ -265,33 +265,44 @@ desktop's portals keep answering it: a tiny helper built beside it,
 `plaa-netraw`, holds the capability, opens the raw sockets and passes
 them to plaa. Grant it after each build with `sudo setcap cap_net_raw+ep
 target/release/plaa-netraw` (packages will). Sending
-also needs ptp4l running gPTP on the interface, which must have a PTP
-hardware clock, as triib's units run it. Where none runs, plaa starts
-its own, `plaa-ptp4l@<interface>`, which its packages install with a
-polkit rule letting the person at the computer start it, and which
-gives way to triib's; Network Audio says when ptp4l keeps no time for
-plaa's stream, and why. For dev builds, `scripts/dev-ptp4l.sh` installs
-the services and the rule under `/usr/local` and `/etc`, and
-`scripts/dev-ptp4l.sh remove` takes them out before a package goes in. Where triib's entity service
-runs on the interface, plaa reserves its stream in the service's MRP
-participant, which the service shares, as two on one port withdraw each
-other's declarations; beside an older service, which does not share it,
-plaa's entity steps aside. Without the service, plaa runs MSRP and MVRP
-itself, and where no bridge reserves its streams it falls back to AVB
-Lite, moving ptp4l to the AVB Lite PTP profile,
-`plaa-ptp4l-lite@<interface>`, until the link goes down. Both services
-first have every CPU send the interface's frames on its first transmit
-queue, as triib's link service does: a card with several, as the I210
-has four, otherwise spreads a stream's frames over them by a hash that
-takes in its sequence number, and they leave out of order. Meanwhile it
+also needs gptpd keeping gPTP on the interface, which must have a PTP
+hardware clock. gptpd is a package of its own, which plaa's packages
+recommend and plaa's and triib's releases offer, and plaa plays
+everything else without it. Where it does not run yet, plaa starts
+`gptpd@<interface>`, which gptpd's package installs with a polkit rule
+letting the person at the computer start it, and triib's entity service
+starts the same one, so the two share it. plaa takes the stream's time
+from the record gptpd keeps in `/run/gptpd/<interface>.time`, and gPTP's
+state from its socket beside it; Network Audio says when gptpd keeps no
+time for plaa's stream, and why, and shows this computer's priority1 as
+grandmaster, which `/etc/gptpd/<interface>.conf` sets. Where triib's
+entity service runs on the interface, plaa reserves its stream in the
+service's MRP participant, which the service shares, as two on one port
+withdraw each other's declarations; beside an older service, which does
+not share it, plaa's entity steps aside. Without the service, plaa runs
+MSRP and MVRP itself, and where gptpd finds no bridge reserving streams
+it falls back to the AVB Lite PTP profile, and plaa to AVB Lite with it,
+until gptpd returns to gPTP as the link comes up again. Meanwhile it
 holds an interface that filters VLANs in hardware, as the I210 does,
 promiscuous, so it hears CVU SRP's commands in the media VLAN.
 
+As its entity starts, plaa also runs `plaa-link@<interface>`, which its
+packages install with a polkit rule, to have every CPU send the
+interface's frames on its first transmit queue, as triib's link service
+does: a card with several, as the I210 has four, otherwise spreads a
+stream's frames over them by a hash that takes in its sequence number,
+and they leave out of order. For dev builds, `scripts/dev-link.sh`
+installs the service and the rule under `/usr/local` and `/etc`, and
+takes out the ptp4l services the older `scripts/dev-ptp4l.sh` put
+there; `scripts/dev-link.sh remove` takes it out before a package goes
+in.
+
 The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
+and `gptp`, which reads gptpd, from [scrambletools/gptp](https://github.com/scrambletools/gptp),
 by their versions on crates.io. To change them alongside, `cargo --config
-.cargo/avb-local.toml build` builds against a checkout beside this one,
+.cargo/avb-local.toml build` builds against checkouts beside this one,
 from a git-ignored file with `[patch.crates-io]` path entries for
-`atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream`.
+`atdecc`, `avb-lite`, `avb-mrp`, `avb-net`, `avb-stream` and `gptp`.
 
 ### AVB on a Mac
 

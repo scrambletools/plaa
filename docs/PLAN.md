@@ -41,7 +41,7 @@ look follows Material Design 3, as in prev.
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first, and the 38 languages prev has |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
-| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb from crates.io: a talker of what plays, and a listener to play or record a stream. ptp4l as triib runs it on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
+| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb and `gptp` of scrambletools/gptp from crates.io: a talker of what plays, and a listener to play or record a stream. gptpd, shared with triib, on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
 | Distribution | A .deb for each Debian and Ubuntu release and an .rpm for Fedora's, each built against its FFmpeg, a PKGBUILD, an MSI and zip for Windows and an installer package for macOS ([Releasing](RELEASING.md)); no AppImage, Flatpak or plain archive for Linux, as none can grant the raw socket capability AVB needs |
 
 ## Scope
@@ -437,13 +437,14 @@ channels at 48 kHz, AAF in 32 or 24 bits, six samples a frame (class A),
 its entity ID the interface address with 0xff70 in the middle, beside
 triib's 0xff00 and up. MAAP claims its multicast address; MSRP declares
 it on VLAN 2 with class A and B's domains, as MVRP joins the VLAN; gPTP
-comes from ptp4l through pmc, plaa starting its own ptp4l service where
-none runs, and the stream's presentation times from
-the interface's PTP hardware clock. When MSRP says a listener is ready,
-the talker starts and stops again when none is. It sends what the media
-window plays: plaa's audio output hands a copy of each chunk it gives
-its device, in stereo after the volume, to a buffer the talker drains on
-gPTP time, resampling between the two clocks by how full it keeps.
+comes from gptpd's socket, plaa starting gptpd@ where it does not run
+yet, and the stream's presentation times from the record of the
+grandmaster's time gptpd keeps, which steers no clock. When MSRP says a
+listener is ready, the talker starts and stops again when none is. It
+sends what the media window plays: plaa's audio output hands a copy of
+each chunk it gives its device, in stereo after the volume, to a buffer
+the talker drains on gPTP time, resampling between the two clocks by
+how full it keeps.
 
 The entity also has one stream input, "Listen", in the same formats,
 which the Network Audio sheet binds to a talker's output, as any Milan
@@ -481,7 +482,7 @@ as it connects: it admits listeners for every talker on the computer and
 tells plaa where to send each copy of its stream, and with which VLAN
 tag, and plaa takes a stream sent to this computer's own address or the
 multicast address it escalates to. plaa's entity answers GET_LITE_STATUS
-from what the service says and ptp4l, and passes a controller's
+from what the service says and gptpd, and passes a controller's
 SET_LITE_CONFIG on to the service, which decides escalation for the
 port. Beside an older service, plaa plays what reaches the port anyway,
 and says to update triib; one without AVB Lite stops plaa's stream while
@@ -490,13 +491,13 @@ When the service goes, plaa waits 15 s for triib to bring it back, as it
 does within seconds, then runs its own participants, and shares the
 service's again when it is back. On its own participants plaa runs AVB
 Lite itself, with avb's avb-lite crate, which triib's service is to move
-onto: it weighs from the Pdelay exchange whether a bridge reserves its
-streams, and where none does it falls back, declaring by CVU SRP in its
-entity's name, sending a unicast copy to each listener it admits within
-its fan-out, 5 by default, and 75% of the link, and moving its ptp4l
-service to the AVB Lite PTP profile (plaa-ptp4l-lite@), until the link
-comes up again. Meanwhile it holds the interface promiscuous where it
-filters VLANs in hardware, as the I210 does, which otherwise drops CVU
+onto: where gptpd finds from the Pdelay exchange that no bridge reserves
+streams and falls back to the AVB Lite PTP profile, plaa falls back with
+it, declaring by CVU SRP in its entity's name and sending a unicast copy
+to each listener it admits within its fan-out, 5 by default, and 75% of
+the link, until gptpd returns to gPTP as the link comes up again.
+Meanwhile it holds the interface promiscuous where it filters VLANs in
+hardware, as the I210 does, which otherwise drops CVU
 SRP's commands, tagged in the media VLAN. Beside an older service,
 which does not share it, or another program declaring MRP from this
 computer's address, the entity steps aside. Tested against an ESP32
@@ -561,4 +562,4 @@ Targets, to be measured as prev's are.
 | Patented codecs in bundled FFmpeg builds | Linux uses the system's FFmpeg. The Windows and macOS builds carry H.264, HEVC and AAC, the x264 and x265 encoders included, as VLC, HandBrake and OBS do: the pools collect from device makers and software sold, and plaa is free. If plaa is ever sold, preinstalled or downloaded in large numbers, take advice; dropping x264 and x265 on macOS first costs nothing, as VideoToolbox and Apple's AAC encoder export there |
 | Screen recording differs by desktop | The ScreenCast portal on Wayland, the system APIs elsewhere |
 | macOS asks before an app hears the microphone, naming the app by its bundle | Until plaa is packaged, macOS asks for the terminal that started it; the package's Info.plist gives the reason (`NSMicrophoneUsageDescription`) |
-| AVB needs hardware timestamping and ptp4l | Follow triib: Linux first, the entity off where the interface cannot do it |
+| AVB needs hardware timestamping and gptpd | Follow triib: Linux first, the entity off where the interface cannot do it |

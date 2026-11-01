@@ -290,12 +290,19 @@ network-blocked = Nu se trimite: { $reason }
 network-waiting = Gata de trimitere; se așteaptă conectarea unui receptor.
 network-sending = Se trimite către receptorii conectați.
 network-looking = Se caută receptori…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Se pornește ptp4l, care menține timpul de rețea după care este trimis fluxul plaa…
-network-ptp-elsewhere = ptp4l rulează pe altă interfață, așa că fluxul plaa nu are aici timp de rețea și este posibil ca receptorii să nu-l redea. Alege acea interfață în Configurări sau rulează ptp4l pe aceasta.
-network-ptp-missing = ptp4l nu rulează, așa că fluxul plaa nu are timp de rețea și este posibil ca receptorii să nu-l redea. Instalează linuxptp împreună cu pachetul plaa sau triib, care îl rulează.
-network-ptp-failed = ptp4l nu rulează, așa că fluxul plaa nu are timp de rețea și este posibil ca receptorii să nu-l redea. plaa nu l-a putut porni: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Se pornește gptpd, care menține timpul de rețea după care este trimis fluxul plaa…
+network-ptp-missing = gptpd nu rulează, așa că fluxul plaa nu are timp de rețea și este posibil ca receptorii să nu-l redea. Instalează gptpd, din versiunile plaa sau triib.
+network-ptp-failed = gptpd nu rulează, așa că fluxul plaa nu are timp de rețea și este posibil ca receptorii să nu-l redea: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Acest computer menține timpul rețelei, ca ceas principal al acesteia (priority1 { $priority1 }, setat în { $config }).
+network-clock-capable = Acest computer poate menține timpul rețelei, dacă se clasează primul (priority1 { $priority1 }, setat în { $config }).
+network-clock-never = Acest computer nu menține niciodată timpul rețelei (priority1 255, setat în { $config }).
 network-no-listeners = Niciun receptor din rețea nu poate reda sunetul plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

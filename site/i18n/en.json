@@ -191,9 +191,9 @@
   "page": "index.html",
   "text": "Beside triib"
  },
- "1789b5814266": {
+ "e166dde6090b": {
   "page": "index.html",
-  "text": "On Linux, plaa shares the network's reservations with triib's entity service where it runs, and keeps network time with ptp4l where nothing else does."
+  "text": "On Linux, plaa keeps network time with gptpd, and shares it and the network's reservations with triib's entity service where that runs."
  },
  "5e8a7051c9d0": {
   "page": "index.html",
@@ -642,9 +642,9 @@
   "page": "tour.html",
   "text": "The Network Audio button lists the listeners that can play plaa's sound, each with one button, and how the one chosen takes its stream, kept up to date as other controllers change it. With Send what plays on, the Connect menu beside Open lists the talkers plaa can listen to, those on the same network clock, and plays the one chosen in a window, as a file plays. On a Mac the stream comes in as the sound input of the Mac's AVB entity, so macOS asks once to let plaa use the microphone."
  },
- "9cfd5becb8fe": {
+ "289b53d1de2c": {
   "page": "tour.html",
-  "text": "On Linux, where the switch has no AVB, plaa falls back to AVB Lite and sends each listener, up to five, a copy of its own. plaa keeps network time with ptp4l, starting its own service where nothing else runs one, and shares the network's reservations with triib's entity service where it runs. The <a1>README</a1> says what each system needs."
+  "text": "On Linux, where the switch has no AVB, plaa falls back to AVB Lite and sends each listener, up to five, a copy of its own. plaa keeps network time with gptpd, starting it where nothing else has, and shares it and the network's reservations with triib's entity service where that runs. The <a1>README</a1> says what each system needs."
  },
  "882f80e586dd": {
   "page": "tour.html",
@@ -1561,9 +1561,9 @@
   "page": "specs.html",
   "text": "Time"
  },
- "2e5df9675140": {
+ "f0414796dcca": {
   "page": "specs.html",
-  "text": "On Linux, gPTP from ptp4l, on an interface with a PTP hardware clock, such as Intel's I210; on macOS, the Mac's own"
+  "text": "On Linux, gPTP from gptpd, on an interface with a PTP hardware clock, such as Intel's I210; on macOS, the Mac's own"
  },
  "fce30aff05fc": {
   "page": "specs.html",

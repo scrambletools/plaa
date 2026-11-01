@@ -288,12 +288,19 @@ network-blocked = Er wordt niet verstuurd: { $reason }
 network-waiting = Klaar om te versturen, wacht tot een ontvanger verbinding maakt.
 network-sending = Verstuurt naar de aangesloten ontvangers.
 network-looking = Ontvangers zoeken…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = ptp4l wordt gestart, dat de netwerktijd bijhoudt waarop de stream van plaa wordt verstuurd…
-network-ptp-elsewhere = ptp4l draait op een andere interface, dus de stream van plaa heeft hier geen netwerktijd en ontvangers kunnen hem misschien niet afspelen. Kies die interface in Instellingen, of start ptp4l op deze.
-network-ptp-missing = ptp4l draait niet, dus de stream van plaa heeft geen netwerktijd en ontvangers kunnen hem misschien niet afspelen. Installeer linuxptp met het pakket van plaa, of triib, dat het uitvoert.
-network-ptp-failed = ptp4l draait niet, dus de stream van plaa heeft geen netwerktijd en ontvangers kunnen hem misschien niet afspelen. plaa kon het niet starten: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = gptpd wordt gestart, dat de netwerktijd bijhoudt waarop de stream van plaa wordt verstuurd…
+network-ptp-missing = gptpd draait niet, dus de stream van plaa heeft geen netwerktijd en ontvangers kunnen hem misschien niet afspelen. Installeer gptpd, uit de releases van plaa of triib.
+network-ptp-failed = gptpd draait niet, dus de stream van plaa heeft geen netwerktijd en ontvangers kunnen hem misschien niet afspelen: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Deze computer houdt de tijd van het netwerk bij, als zijn grandmaster (priority1 { $priority1 }, ingesteld in { $config }).
+network-clock-capable = Deze computer kan de tijd van het netwerk bijhouden, mocht hij bovenaan staan (priority1 { $priority1 }, ingesteld in { $config }).
+network-clock-never = Deze computer houdt de tijd van het netwerk nooit bij (priority1 255, ingesteld in { $config }).
 network-no-listeners = Geen enkele ontvanger op het netwerk kan het geluid van plaa afspelen.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

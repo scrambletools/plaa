@@ -281,12 +281,19 @@ network-blocked = Nincs küldés: { $reason }
 network-waiting = Küldésre kész, várakozás egy vevő csatlakozására.
 network-sending = Küldés a csatlakozott vevőknek.
 network-looking = Vevők keresése…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = A ptp4l indítása; ez tartja a hálózati időt, amelyhez a plaa adatfolyama igazodik…
-network-ptp-elsewhere = A ptp4l egy másik csatolón fut, így a plaa adatfolyama itt nem követ hálózati időt, és előfordulhat, hogy a vevők nem tudják lejátszani. Válassza ki azt a csatolót a Beállításokban, vagy futtassa a ptp4l programot ezen a csatolón.
-network-ptp-missing = A ptp4l nem fut, így a plaa adatfolyama nem követ hálózati időt, és előfordulhat, hogy a vevők nem tudják lejátszani. Telepítse a linuxptp csomagot a plaa csomagjával együtt, vagy a triib alkalmazást, amely futtatja a ptp4l programot.
-network-ptp-failed = A ptp4l nem fut, így a plaa adatfolyama nem követ hálózati időt, és előfordulhat, hogy a vevők nem tudják lejátszani. A plaa nem tudta elindítani: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = A gptpd indítása; ez tartja a hálózati időt, amelyhez a plaa adatfolyama igazodik…
+network-ptp-missing = A gptpd nem fut, így a plaa adatfolyama nem követ hálózati időt, és előfordulhat, hogy a vevők nem tudják lejátszani. Telepítse a gptpd programot a plaa vagy a triib kiadásaiból.
+network-ptp-failed = A gptpd nem fut, így a plaa adatfolyama nem követ hálózati időt, és előfordulhat, hogy a vevők nem tudják lejátszani: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Ez a számítógép tartja a hálózat idejét, annak főórájaként (priority1 { $priority1 }, beállítva itt: { $config }).
+network-clock-capable = Ez a számítógép tarthatja a hálózat idejét, ha az első helyre kerül (priority1 { $priority1 }, beállítva itt: { $config }).
+network-clock-never = Ez a számítógép soha nem tartja a hálózat idejét (priority1 255, beállítva itt: { $config }).
 network-no-listeners = A hálózaton egyetlen vevő sem tudja lejátszani a plaa hangját.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

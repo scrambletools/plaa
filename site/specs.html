@@ -116,7 +116,7 @@
 <tr><th>Stream formats</th><td>On Linux, AAF as the AVB community's Basic and Extended Audio profiles set them, in SR class A or B, and AM824 in class A, of 2 or 8 channels at 48, 96 or 192 kHz, where a frame holds them (2 channels only in class B at 192 kHz); on macOS, the Mac's entity's: AAF of 8 channels at 44.1 to 192 kHz, and AM824 of 8 channels at 48, 96 or 192 kHz</td></tr>
 <tr><th>Control</th><td>Any Milan controller connects plaa's stream; Network Audio connects listeners to it, and on Linux and macOS, with Send what plays on, Connect plays a talker's stream on this computer; both list only entities under plaa's gPTP grandmaster</td></tr>
 <tr><th>Without AVB switches</th><td>On Linux, AVB Lite: a copy of the stream for each listener, up to five</td></tr>
-<tr><th>Time</th><td>On Linux, gPTP from ptp4l, on an interface with a PTP hardware clock, such as Intel's I210; on macOS, the Mac's own</td></tr>
+<tr><th>Time</th><td>On Linux, gPTP from gptpd, on an interface with a PTP hardware clock, such as Intel's I210; on macOS, the Mac's own</td></tr>
 <tr><th>Beside triib</th><td>On Linux, shares the network's reservations with triib's entity service where it runs</td></tr>
 </tbody></table>
 

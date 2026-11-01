@@ -1,9 +1,8 @@
-//! gPTP as ptp4l runs it, read as triib reads it: asked through its
-//! read-only management socket with linuxptp's pmc every few seconds.
-//! ptp4l running the AVB Lite PTP profile answers too, end to end and
-//! without gPTP's transportSpecific.
+//! gPTP as gptpd keeps it on the interface, for plaa and triib alike: its
+//! status, from the socket where it sends a snapshot as plaa connects, on
+//! each change and every 2 s, in either profile it runs, gPTP's or the AVB
+//! Lite PTP profile it falls back to.
 
-use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
@@ -11,131 +10,128 @@ use std::time::Duration;
 
 use atdecc::ClockIdentity;
 use atdecc::entity::Gptp;
+use atdecc::lite::FallbackReason;
+use gptp::status::{Block, Client, Fallback, Profile};
 
-/// How often ptp4l is asked.
-const POLL: Duration = Duration::from_secs(2);
+/// How long plaa waits before asking again where gptpd does not answer.
+const RETRY: Duration = Duration::from_secs(2);
+/// How long gptpd may say nothing before plaa takes it as gone: it sends
+/// a snapshot every 2 s.
+const SILENCE: Duration = Duration::from_secs(5);
 
-/// What ptp4l says, as an entity reports it, and this computer's clock
-/// identity; `None` when ptp4l does not answer.
+/// What gptpd says of the interface, as an entity reports it, and this
+/// computer's clock; `None` when gptpd does not answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Status {
     pub gptp: Gptp,
     pub own_clock: ClockIdentity,
-    /// The servo's last offset from the grandmaster, in nanoseconds.
-    pub offset: Option<i64>,
-    /// ptp4l measures delay end to end, as the AVB Lite PTP profile does,
-    /// not peer to peer as gPTP does.
-    pub end_to_end: bool,
+    /// gptpd's priority1, which its configuration sets: 255 never makes
+    /// this computer the grandmaster.
+    pub priority1: u8,
+    /// How far the last Sync fell from gptpd's mapping, in nanoseconds,
+    /// while it follows a grandmaster.
+    pub residual: Option<i64>,
+    /// gptpd runs the AVB Lite PTP profile on the port, having fallen back
+    /// for this reason.
+    pub lite: Option<FallbackReason>,
+    /// gptpd names a grandmaster: none yet as it starts, or once the one
+    /// it had is gone. Without one `gptp` names none, 0.
+    pub named: bool,
+    /// This computer is the grandmaster.
+    pub is_us: bool,
 }
 
-/// A clock identity as linuxptp prints it, such as `0001f2.fffe.ff3b14`.
-fn identity(text: &str) -> Option<ClockIdentity> {
-    let digits: String = text
-        .split('-')
-        .next()?
-        .chars()
-        .filter(|c| *c != '.')
+/// What an entity on `interface` reports of gptpd's `status`.
+pub fn read(status: &gptp::status::Status, interface: &str) -> Status {
+    let own_clock = ClockIdentity(status.clock.0);
+    let port = status
+        .ports
+        .iter()
+        .find(|port| port.name == interface)
+        .or(status.ports.first());
+    let mut path: Vec<ClockIdentity> = status
+        .path
+        .iter()
+        .map(|clock| ClockIdentity(clock.0))
         .collect();
-    (digits.len() == 16)
-        .then(|| u64::from_str_radix(&digits, 16).ok())
-        .flatten()
-        .map(ClockIdentity)
-}
-
-/// Reads pmc's answers: `key value` lines.
-pub fn parse(output: &str) -> Option<Status> {
-    let value = |key: &str| {
-        output.lines().find_map(|line| {
-            let mut words = line.split_whitespace();
-            (words.next() == Some(key)).then(|| words.next()).flatten()
-        })
-    };
-    let present = value("gmPresent") == Some("true");
-    let grandmaster = value("gmIdentity").and_then(identity)?;
-    let own_clock = value("clockIdentity").and_then(identity)?;
-    let parent = value("parentPortIdentity").and_then(identity);
-    let delay: f64 = value("peerMeanPathDelay")
-        .and_then(|text| text.parse().ok())
-        .unwrap_or(0.0);
-    let as_capable = value("asCapable") == Some("1");
-    let domain = value("domainNumber")
-        .and_then(|text| text.parse().ok())
-        .unwrap_or(0);
-    let offset = value("master_offset").and_then(|text| text.parse().ok());
-    // PORT_DATA_SET's delayMechanism: 1 end to end, 2 peer to peer.
-    let end_to_end = value("delayMechanism") == Some("1");
-    let mut path = Vec::new();
-    if present {
-        path.push(grandmaster);
-        if let Some(parent) = parent.filter(|parent| *parent != grandmaster && *parent != own_clock)
-        {
-            path.push(parent);
-        }
+    if path.is_empty() {
+        path.push(own_clock);
     }
-    path.push(own_clock);
-    Some(Status {
+    Status {
         gptp: Gptp {
-            grandmaster: if present { grandmaster } else { own_clock },
-            domain,
-            propagation_delay: delay.max(0.0) as u32,
-            as_capable,
+            grandmaster: status.grandmaster.map_or(ClockIdentity(0), |grandmaster| {
+                ClockIdentity(grandmaster.identity.0)
+            }),
+            domain: status.domain,
+            propagation_delay: port
+                .and_then(|port| port.link_delay)
+                .map_or(0, |delay| delay.clamp(0, i64::from(u32::MAX)) as u32),
+            as_capable: port.is_some_and(|port| port.as_capable),
             path,
         },
         own_clock,
-        offset,
-        end_to_end,
-    })
+        priority1: status.priority1,
+        residual: status.residual,
+        lite: (status.profile == Profile::AvbLite).then(|| reason(status.fallback)),
+        named: status.grandmaster.is_some(),
+        is_us: status
+            .grandmaster
+            .is_some_and(|grandmaster| grandmaster.is_us),
+    }
 }
 
-/// Asks ptp4l once, as gPTP, then as standard PTP: ptp4l ignores
-/// management messages whose transportSpecific is not its own.
-fn ask(socket: &str, client: &str) -> Option<Status> {
-    ask_as(socket, client, "1").or_else(|| ask_as(socket, client, "0"))
+/// gptpd's reason for AVB Lite, as AVB Lite's profile 2.2 names it.
+fn reason(fallback: Fallback) -> FallbackReason {
+    match fallback {
+        Fallback::EndpointTlv => FallbackReason::ENDPOINT_TLV,
+        Fallback::PdelayUnanswered => FallbackReason::PDELAY_UNANSWERED,
+        Fallback::MultipleResponders => FallbackReason::MULTIPLE_RESPONDERS,
+        Fallback::Configured | Fallback::None => FallbackReason::CONFIGURED,
+    }
 }
 
-fn ask_as(socket: &str, client: &str, transport: &str) -> Option<Status> {
-    let output = Command::new("pmc")
-        .args(["-u", "-b", "0", "-t", transport, "-s", socket, "-i", client])
-        .args([
-            "GET TIME_STATUS_NP",
-            "GET PORT_DATA_SET",
-            "GET PORT_DATA_SET_NP",
-            "GET PARENT_DATA_SET",
-            "GET DEFAULT_DATA_SET",
-        ])
-        .output()
-        .ok()?;
-    parse(&String::from_utf8_lossy(&output.stdout))
-}
-
-/// Asks ptp4l every few seconds and sends what changed, until `stop`.
+/// Listens to gptpd on `interface` and sends what changed, until `stop`.
 pub fn watch<T: Send + 'static>(
-    socket: String,
+    interface: String,
     stop: Arc<AtomicBool>,
     sender: Sender<T>,
     wrap: fn(Option<Status>) -> T,
 ) {
-    // pmc's own socket, where ptp4l answers it.
-    let client = std::env::var_os("XDG_RUNTIME_DIR")
-        .map_or_else(std::env::temp_dir, std::path::PathBuf::from)
-        .join(format!("plaa-pmc.{}", std::process::id()));
-    let _ = std::fs::create_dir_all(client.parent().unwrap_or(&client));
-    let client = client.display().to_string();
     let _ = std::thread::Builder::new()
         .name("gptp".into())
         .spawn(move || {
             let mut last: Option<Option<Status>> = None;
+            let mut tell = |status: Option<Status>| {
+                if last.as_ref() == Some(&status) {
+                    return true;
+                }
+                last = Some(status.clone());
+                sender.send(wrap(status)).is_ok()
+            };
             while !stop.load(Ordering::Relaxed) {
-                let status = ask(&socket, &client);
-                if last.as_ref() != Some(&status) {
-                    if sender.send(wrap(status.clone())).is_err() {
+                let Ok(mut client) = Client::connect(&interface) else {
+                    if !tell(None) {
                         return;
                     }
-                    last = Some(status);
+                    std::thread::sleep(RETRY);
+                    continue;
+                };
+                while !stop.load(Ordering::Relaxed) {
+                    let status = match client.next(Some(SILENCE)) {
+                        Ok(Some(Block::Status(status))) => Some(read(&status, &interface)),
+                        Ok(Some(Block::Reply(_))) => continue,
+                        // Silent too long, or gone.
+                        Ok(None) | Err(_) => None,
+                    };
+                    let gone = status.is_none();
+                    if !tell(status) {
+                        return;
+                    }
+                    if gone {
+                        break;
+                    }
                 }
-                std::thread::sleep(POLL);
             }
-            let _ = std::fs::remove_file(&client);
         });
 }
 
@@ -143,39 +139,81 @@ pub fn watch<T: Send + 'static>(
 mod tests {
     use super::*;
 
-    const ANSWER: &str = "\
-        gmPresent                  true
-        gmIdentity                 0001f2.fffe.ff3b14
-        portIdentity            f0a731.fffe.f40f14-1
-        peerMeanPathDelay       305
-        asCapable               1
-        parentPortIdentity                    0001f2.fffe.ff3b14-6
-        clockIdentity           f0a731.fffe.f40f14
-        domainNumber            0
-        master_offset              -12
-    ";
+    /// A snapshot as gptpd sends it.
+    const SNAPSHOT: &str = "\
+version 1
+clock 001b21.fffe.f40f14
+domain 0
+priority1 248
+profile gptp
+fallback none
+grandmaster 0001f2.fffe.ff3b14
+grandmaster.priority1 246
+grandmaster.steps_removed 1
+grandmaster.is_us false
+path 0001f2.fffe.ff3b14 001b21.fffe.f40f14
+generation 3
+residual -12
+port enp2s0
+port.up enp2s0 true
+port.as_capable enp2s0 true
+port.role enp2s0 timereceiver
+port.link_delay enp2s0 305
+counters.grandmaster_changes 1
+
+";
+
+    fn parsed(text: &str) -> gptp::status::Status {
+        match Block::parse(text) {
+            Ok(Block::Status(status)) => status,
+            other => panic!("not a status: {other:?}"),
+        }
+    }
 
     #[test]
     fn reads_what_the_entities_report() {
-        let status = parse(ANSWER).unwrap();
-        assert_eq!(status.own_clock, ClockIdentity(0xf0a7_31ff_fef4_0f14));
+        let status = read(&parsed(SNAPSHOT), "enp2s0");
+        assert_eq!(status.own_clock, ClockIdentity(0x001b_21ff_fef4_0f14));
         assert_eq!(
             status.gptp.grandmaster,
             ClockIdentity(0x0001_f2ff_feff_3b14)
         );
         assert_eq!(status.gptp.propagation_delay, 305);
-        assert_eq!(status.offset, Some(-12));
         assert!(status.gptp.as_capable);
-        assert!(!status.end_to_end);
-        let lite = ANSWER.replace("asCapable", "delayMechanism 1\n asCapable");
-        assert!(parse(&lite).unwrap().end_to_end);
         assert_eq!(
             status.gptp.path,
             [
                 ClockIdentity(0x0001_f2ff_feff_3b14),
-                ClockIdentity(0xf0a7_31ff_fef4_0f14)
+                ClockIdentity(0x001b_21ff_fef4_0f14)
             ]
         );
-        assert_eq!(parse("nothing here"), None);
+        assert_eq!((status.priority1, status.residual), (248, Some(-12)));
+        assert_eq!(status.lite, None);
+        assert!(status.named && !status.is_us);
+    }
+
+    #[test]
+    fn avb_lite_says_why_it_fell_back() {
+        let lite = SNAPSHOT
+            .replace("profile gptp", "profile avb-lite")
+            .replace("fallback none", "fallback pdelay-unanswered");
+        assert_eq!(
+            read(&parsed(&lite), "enp2s0").lite,
+            Some(FallbackReason::PDELAY_UNANSWERED)
+        );
+    }
+
+    /// With no grandmaster yet, as gptpd starts, the entity names none
+    /// rather than itself, which may never be grandmaster; it is alone on
+    /// the path.
+    #[test]
+    fn without_a_grandmaster_it_names_none() {
+        let mut status = parsed(SNAPSHOT);
+        status.grandmaster = None;
+        status.path.clear();
+        let alone = read(&status, "enp2s0");
+        assert_eq!(alone.gptp.grandmaster, ClockIdentity(0));
+        assert_eq!(alone.gptp.path, [alone.own_clock]);
+        assert!(!alone.named && !alone.is_us);
     }
 }

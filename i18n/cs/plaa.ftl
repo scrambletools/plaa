@@ -293,12 +293,19 @@ network-blocked = Neodesílá se: { $reason }
 network-waiting = Připraveno k odesílání, čeká se na připojení přijímače.
 network-sending = Odesílá se připojeným přijímačům.
 network-looking = Hledání přijímačů…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Spouští se ptp4l, který udržuje síťový čas, podle kterého se odesílá stream plaa…
-network-ptp-elsewhere = ptp4l běží na jiném rozhraní, takže stream plaa zde neudržuje síťový čas a přijímače ho nemusí přehrát. Vyberte v Nastavení to rozhraní, nebo spusťte ptp4l na tomto.
-network-ptp-missing = ptp4l neběží, takže stream plaa neudržuje síťový čas a přijímače ho nemusí přehrát. Nainstalujte linuxptp s balíčkem plaa, nebo triib, který ho spouští.
-network-ptp-failed = ptp4l neběží, takže stream plaa neudržuje síťový čas a přijímače ho nemusí přehrát. ptp4l se nepodařilo spustit: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Spouští se gptpd, který udržuje síťový čas, podle kterého se odesílá stream plaa…
+network-ptp-missing = gptpd neběží, takže stream plaa neudržuje síťový čas a přijímače ho nemusí přehrát. Nainstalujte gptpd z vydání plaa nebo triib.
+network-ptp-failed = gptpd neběží, takže stream plaa neudržuje síťový čas a přijímače ho nemusí přehrát: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Tento počítač udržuje čas sítě jako její hlavní hodiny (priority1 { $priority1 }, nastaveno v { $config }).
+network-clock-capable = Tento počítač může udržovat čas sítě, pokud bude v pořadí první (priority1 { $priority1 }, nastaveno v { $config }).
+network-clock-never = Tento počítač nikdy neudržuje čas sítě (priority1 255, nastaveno v { $config }).
 network-no-listeners = Žádný přijímač v síti nemůže přehrát zvuk z plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

@@ -280,12 +280,19 @@ network-blocked = 送信していません：{ $reason }
 network-waiting = 送信の準備ができました。リスナーの接続を待っています。
 network-sending = 接続されているリスナーに送信しています。
 network-looking = リスナーを探しています…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = plaaのストリームの送信基準となるネットワーク時刻を管理するptp4lを起動しています…
-network-ptp-elsewhere = ptp4lは別のインターフェイスで動作しているため、ここではplaaのストリームがネットワーク時刻に同期できず、リスナーが再生できない場合があります。「設定」でそのインターフェイスを選ぶか、このインターフェイスでptp4lを実行してください。
-network-ptp-missing = ptp4lが動作していないため、plaaのストリームがネットワーク時刻に同期できず、リスナーが再生できない場合があります。plaaのパッケージと一緒にlinuxptpをインストールするか、ptp4lを実行するtriibをインストールしてください。
-network-ptp-failed = ptp4lが動作していないため、plaaのストリームがネットワーク時刻に同期できず、リスナーが再生できない場合があります。plaaはptp4lを起動できませんでした：{ $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = plaaのストリームの送信基準となるネットワーク時刻を管理するgptpdを起動しています…
+network-ptp-missing = gptpdが動作していないため、plaaのストリームがネットワーク時刻に同期できず、リスナーが再生できない場合があります。plaaまたはtriibのリリースからgptpdをインストールしてください。
+network-ptp-failed = gptpdが動作していないため、plaaのストリームがネットワーク時刻に同期できず、リスナーが再生できない場合があります：{ $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = このコンピュータが、ネットワークのグランドマスターとしてネットワーク時刻を管理しています（priority1 { $priority1 }、{ $config }で設定）。
+network-clock-capable = このコンピュータは、最上位になればネットワーク時刻を管理できます（priority1 { $priority1 }、{ $config }で設定）。
+network-clock-never = このコンピュータがネットワーク時刻を管理することはありません（priority1 255、{ $config }で設定）。
 network-no-listeners = ネットワーク上に、plaaのサウンドを再生できるリスナーがありません。
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }：{ $stream }

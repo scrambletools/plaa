@@ -280,12 +280,19 @@ network-blocked = 보내지 않음: { $reason }
 network-waiting = 보낼 준비가 되었습니다. 리스너가 연결되기를 기다리는 중입니다.
 network-sending = 연결된 리스너로 보내는 중입니다.
 network-looking = 리스너를 찾는 중…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = plaa 스트림을 보낼 때 기준이 되는 네트워크 시간을 유지하는 ptp4l을 시작하는 중…
-network-ptp-elsewhere = ptp4l이 다른 인터페이스에서 실행 중이므로 여기서는 plaa 스트림이 네트워크 시간에 맞출 수 없어, 리스너가 재생하지 못할 수 있습니다. 설정에서 해당 인터페이스를 선택하거나 이 인터페이스에서 ptp4l을 실행하세요.
-network-ptp-missing = ptp4l이 실행 중이 아니므로 plaa 스트림이 네트워크 시간에 맞출 수 없어, 리스너가 재생하지 못할 수 있습니다. plaa 패키지와 함께 linuxptp를 설치하거나, ptp4l을 실행하는 triib을 설치하세요.
-network-ptp-failed = ptp4l이 실행 중이 아니므로 plaa 스트림이 네트워크 시간에 맞출 수 없어, 리스너가 재생하지 못할 수 있습니다. plaa가 ptp4l을 시작할 수 없습니다: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = plaa 스트림을 보낼 때 기준이 되는 네트워크 시간을 유지하는 gptpd를 시작하는 중…
+network-ptp-missing = gptpd가 실행 중이 아니므로 plaa 스트림이 네트워크 시간에 맞출 수 없어, 리스너가 재생하지 못할 수 있습니다. plaa 또는 triib 릴리스에서 gptpd를 설치하세요.
+network-ptp-failed = gptpd가 실행 중이 아니므로 plaa 스트림이 네트워크 시간에 맞출 수 없어, 리스너가 재생하지 못할 수 있습니다: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = 이 컴퓨터가 네트워크의 그랜드마스터로서 네트워크 시간을 유지합니다(priority1 { $priority1 }, { $config }에서 설정).
+network-clock-capable = 이 컴퓨터는 1순위가 되면 네트워크 시간을 유지할 수 있습니다(priority1 { $priority1 }, { $config }에서 설정).
+network-clock-never = 이 컴퓨터는 네트워크 시간을 유지하는 일이 없습니다(priority1 255, { $config }에서 설정).
 network-no-listeners = 네트워크에 plaa의 사운드를 재생할 수 있는 리스너가 없습니다.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }

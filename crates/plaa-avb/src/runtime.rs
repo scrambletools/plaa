@@ -96,9 +96,6 @@ pub(crate) enum Input {
     /// An ATDECC or MAAP frame, who sent it, and whether to a group
     /// address.
     Avtp(MacAddress, bool, Vec<u8>),
-    /// A PTP message, for AVB Lite's fallback.
-    #[cfg(target_os = "linux")]
-    Ptp(Vec<u8>),
     #[cfg(target_os = "linux")]
     Msrp(MacAddress, Vec<u8>),
     #[cfg(target_os = "linux")]
@@ -240,7 +237,7 @@ pub(crate) fn start(
     if config.talker {
         // MAAP, for the stream's address.
         runtime.avtp.join_multicast(own::MAAP_DESTINATION)?;
-        match Own::new(&config, mac, &sender, &stop, sound) {
+        match Own::new(&config, mac, runtime.avtp.clone(), &sender, &stop, sound) {
             Ok(own) => runtime.own = Some(own),
             Err(error) => runtime.talker = TalkerState::Blocked(error.to_string()),
         }
@@ -397,13 +394,6 @@ impl Runtime {
                 let since = self.since();
                 if let Some(own) = &mut self.own {
                     own.handle_mvrp(now, since, source, &bytes);
-                }
-            }
-            #[cfg(target_os = "linux")]
-            Input::Ptp(bytes) => {
-                let since = self.since();
-                if let Some(own) = &mut self.own {
-                    own.handle_ptp(since, &bytes);
                 }
             }
             #[cfg(target_os = "linux")]
@@ -818,7 +808,7 @@ impl Runtime {
         })
     }
 
-    /// How ptp4l stands on the interface, where plaa keeps the stream's
+    /// How gptpd stands on the interface, where plaa keeps the stream's
     /// time.
     fn ptp(&self) -> Ptp {
         #[cfg(target_os = "linux")]

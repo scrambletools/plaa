@@ -287,12 +287,19 @@ network-blocked = Δεν γίνεται αποστολή: { $reason }
 network-waiting = Έτοιμο για αποστολή, αναμονή για σύνδεση δέκτη.
 network-sending = Αποστολή στους συνδεδεμένους δέκτες.
 network-looking = Αναζήτηση δεκτών…
-# ptp4l (linuxptp's) keeps the network's time, which plaa's stream is
-# sent by and listeners play it by.
-network-ptp-starting = Εκκίνηση του ptp4l, που διατηρεί τον χρόνο δικτύου με τον οποίο στέλνεται η ροή του plaa…
-network-ptp-elsewhere = Το ptp4l εκτελείται σε άλλη διεπαφή, οπότε η ροή του plaa δεν έχει χρόνο δικτύου εδώ και οι δέκτες ίσως να μην μπορούν να την αναπαράγουν. Επιλέξτε εκείνη τη διεπαφή στις Ρυθμίσεις ή εκτελέστε το ptp4l σε αυτήν.
-network-ptp-missing = Το ptp4l δεν εκτελείται, οπότε η ροή του plaa δεν έχει χρόνο δικτύου και οι δέκτες ίσως να μην μπορούν να την αναπαράγουν. Εγκαταστήστε το linuxptp μαζί με το πακέτο του plaa ή το triib, που το εκτελεί.
-network-ptp-failed = Το ptp4l δεν εκτελείται, οπότε η ροή του plaa δεν έχει χρόνο δικτύου και οι δέκτες ίσως να μην μπορούν να την αναπαράγουν. Το plaa δεν μπόρεσε να το ξεκινήσει: { $reason }
+# gptpd keeps the network's time, which plaa's stream is sent by and
+# listeners play it by. It is a program of its own, which plaa's and
+# triib's releases offer.
+network-ptp-starting = Εκκίνηση του gptpd, που διατηρεί τον χρόνο δικτύου με τον οποίο στέλνεται η ροή του plaa…
+network-ptp-missing = Το gptpd δεν εκτελείται, οπότε η ροή του plaa δεν έχει χρόνο δικτύου και οι δέκτες ίσως να μην μπορούν να την αναπαράγουν. Εγκαταστήστε το gptpd, από τις εκδόσεις του plaa ή του triib.
+network-ptp-failed = Το gptpd δεν εκτελείται, οπότε η ροή του plaa δεν έχει χρόνο δικτύου και οι δέκτες ίσως να μην μπορούν να την αναπαράγουν: { $reason }
+# This computer's clock as the network's grandmaster, the clock every
+# other one follows, as gptpd ranks it: $priority1 is its priority1, a
+# number from 0 to 254 where lower ranks higher, and $config the file
+# that sets it.
+network-clock-grandmaster = Αυτός ο υπολογιστής διατηρεί τον χρόνο του δικτύου, ως το κύριο ρολόι του (priority1 { $priority1 }, ορίζεται στο { $config }).
+network-clock-capable = Αυτός ο υπολογιστής μπορεί να διατηρεί τον χρόνο του δικτύου, αν βρεθεί πρώτος στην κατάταξη (priority1 { $priority1 }, ορίζεται στο { $config }).
+network-clock-never = Αυτός ο υπολογιστής δεν διατηρεί ποτέ τον χρόνο του δικτύου (priority1 255, ορίζεται στο { $config }).
 network-no-listeners = Κανένας δέκτης στο δίκτυο δεν μπορεί να αναπαράγει τον ήχο του plaa.
 # A listener with several inputs: its name and the input's.
 network-stream = { $entity }: { $stream }
