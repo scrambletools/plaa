@@ -4,14 +4,16 @@
 //! starts the same one, so the two share gPTP on the interface, and its
 //! profile, gPTP's or AVB Lite's, is gptpd's to choose. Beside it
 //! plaa-link@<interface>, from plaa's own package, keeps the frames plaa
-//! sends on one transmit queue.
+//! sends on one transmit queue, that queue moving, and EEE and PAUSE off
+//! the link.
 
 use std::path::Path;
 use std::process::{Command, Stdio};
 
 /// gptpd's service.
 const GPTPD: &str = "gptpd";
-/// plaa's own, keeping its frames on one transmit queue.
+/// plaa's own, keeping its frames on one transmit queue, it moving, and
+/// EEE and PAUSE off the link.
 const LINK: &str = "plaa-link";
 
 /// The `service`'s unit on `interface`, where the name needs no escaping.
@@ -65,8 +67,10 @@ pub(crate) fn start(interface: &str) -> Result<(), String> {
 }
 
 /// Keeps the frames plaa sends on `interface` on its first transmit
-/// queue, where plaa's package installed plaa-link@: run again each time,
-/// as a driver starting afresh forgets it.
+/// queue, that queue moving, and EEE and PAUSE off the link, where plaa's
+/// package installed plaa-link@: run again each time, as a driver
+/// starting afresh forgets them. The link goes down and up once where
+/// EEE or PAUSE was on.
 pub(crate) fn steer(interface: &str) {
     if has(LINK)
         && let Err(why) = systemctl("restart", LINK, interface)

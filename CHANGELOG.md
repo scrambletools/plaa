@@ -23,6 +23,12 @@
 - `scripts/dev-ptp4l.sh` gave way to `scripts/dev-link.sh`, which
   installs plaa-link@ for dev builds and takes the old ptp4l services
   out.
+- plaa-link@ keeps Energy-Efficient Ethernet and PAUSE off the link, as
+  the AVB Lite profile asks of an endpoint and triib's link service
+  does, since a link waking from EEE or a PAUSE frame from the switch
+  holds up frames already due. Where either was on, the link goes down
+  and up once as plaa's entity starts. The packages depend on ethtool
+  for it.
 
 ### Fixed
 
@@ -50,6 +56,16 @@
   transmit queue, as a card with several, as the I210 has four, spread
   a stream's frames over them by a hash that takes in its sequence
   number.
+- Frames sent on time no longer wait in that queue when a busy desktop
+  holds up the card's report of frames sent: plaa-link@ lets about
+  130 us of the link through to the card, 16 KiB at a gigabit, before
+  byte queue limits stop the queue, where the limit shrank to a few of
+  a stream's small frames.
+- A stream's frames leave on time where the system's default queue
+  discipline is fq, as on some tuned desktops: plaa-link@ gives the
+  interface's first transmit queue fq_codel, which sends frames in the
+  order they come, where under fq a busy computer's frames left late.
+  The packages depend on iproute2 for ip and tc.
 - A stream's frames keep their order when that queue backs up, as when
   a late send catches up: they leave at priority 3, so the queue's fair
   scheduler holds them in one flow rather than a flow each. On avb-net

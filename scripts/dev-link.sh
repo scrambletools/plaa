@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Installs plaa-link@ for development builds, which no package set up, so
-# a dev build keeps its stream's frames on one transmit queue as an
-# installed plaa does: the unit in /usr/local/lib/systemd/system and the
-# polkit rule letting the person at the computer run it in
-# /etc/polkit-1/rules.d. It also takes out the ptp4l services an older
-# dev-ptp4l.sh put in, which would keep gptpd off their interface. The
-# unit shadows a package's, so remove it before installing plaa's
-# package. Needs sudo. gptpd, which keeps the network time, comes from
-# its own package or its repository's dev install.
+# a dev build keeps its stream's frames on one transmit queue, under
+# fq_codel, and EEE and PAUSE off the link, as an installed plaa does:
+# the unit in /usr/local/lib/systemd/system and the polkit rule letting
+# the person at the computer run it in /etc/polkit-1/rules.d. It also
+# takes out the ptp4l services an older dev-ptp4l.sh put in, which would
+# keep gptpd off their interface. The unit shadows a package's, so
+# remove it before installing plaa's package. Needs sudo. gptpd, which
+# keeps the network time, comes from its own package or its
+# repository's dev install.
 #
 #   scripts/dev-link.sh           installs it
 #   scripts/dev-link.sh remove    removes it

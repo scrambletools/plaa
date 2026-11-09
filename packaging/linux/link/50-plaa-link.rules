@@ -1,6 +1,6 @@
 // Lets the person at the computer run plaa-link@, which keeps the frames
-// plaa sends on an interface on its first transmit queue, as plaa does
-// as its entity starts there.
+// plaa sends on an interface on its first transmit queue, and EEE and
+// PAUSE off its link, as plaa does as its entity starts there.
 polkit.addRule(function (action, subject) {
     if (action.id !== "org.freedesktop.systemd1.manage-units" ||
         !subject.local || !subject.active) {

@@ -119,6 +119,15 @@ for file in \
 done
 grep -q 'tx-0/xps_cpus' "/usr/lib/systemd/system/plaa-link@.service" ||
     fail "plaa-link@.service does not keep the interface's frames on one queue"
+grep -q 'limit_min' "/usr/lib/systemd/system/plaa-link@.service" ||
+    fail "plaa-link@.service does not keep the interface's queue moving"
+grep -q 'set-eee' "/usr/lib/systemd/system/plaa-link@.service" ||
+    fail "plaa-link@.service does not keep EEE and PAUSE off the link"
+grep -q 'parent 1:1 fq_codel' "/usr/lib/systemd/system/plaa-link@.service" ||
+    fail "plaa-link@.service does not give the stream's queue fq_codel"
+# They come in as dependencies: ethtool and iproute2's tc for plaa-link@.
+command -v ethtool >/dev/null || fail "ethtool did not come in with plaa"
+command -v tc >/dev/null || fail "tc did not come in with plaa"
 # Network time comes from gptpd, which plaa recommends and plays without;
 # its own ptp4l services are gone, an upgrade's among them.
 recommended "$package" | grep -qw gptpd || fail "the package does not recommend gptpd"

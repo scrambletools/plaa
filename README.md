@@ -291,11 +291,20 @@ packages install with a polkit rule, to have every CPU send the
 interface's frames on its first transmit queue, as triib's link service
 does: a card with several, as the I210 has four, otherwise spreads a
 stream's frames over them by a hash that takes in its sequence number,
-and they leave out of order. For dev builds, `scripts/dev-link.sh`
-installs the service and the rule under `/usr/local` and `/etc`, and
-takes out the ptp4l services the older `scripts/dev-ptp4l.sh` put
-there; `scripts/dev-link.sh remove` takes it out before a package goes
-in.
+and they leave out of order. It also lets about 130 us of the link
+through that queue to the card, 16 KiB at a gigabit, before byte queue
+limits stop it, so frames sent on time don't wait there when a busy
+desktop holds up the card's report of frames sent. And it keeps
+Energy-Efficient Ethernet and PAUSE off the link, as the AVB Lite
+profile asks of an endpoint, since a link waking from EEE or a PAUSE
+frame from the switch holds up frames already due: where either was on,
+the link goes down and up once. It also gives that queue fq_codel,
+whatever the system's default, which sends frames in the order they
+come. Packages depend on ethtool and iproute2 for the service. For dev
+builds, `scripts/dev-link.sh` installs the service and the rule under
+`/usr/local` and `/etc`, and takes out the ptp4l services the older
+`scripts/dev-ptp4l.sh` put there; `scripts/dev-link.sh remove` takes it
+out before a package goes in.
 
 The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
 and `gptp`, which reads gptpd, from [scrambletools/gptp](https://github.com/scrambletools/gptp),

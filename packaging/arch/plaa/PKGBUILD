@@ -6,8 +6,8 @@ pkgdesc='Play video and audio files and streams'
 arch=('x86_64' 'aarch64')
 url='https://github.com/scrambletools/plaa'
 license=('GPL-3.0-or-later')
-depends=('alsa-lib' 'ffmpeg' 'gcc-libs' 'glibc' 'libass' 'libcap' 'libpipewire' 'libxkbcommon'
-         'vulkan-icd-loader' 'wayland')
+depends=('alsa-lib' 'ethtool' 'ffmpeg' 'gcc-libs' 'glibc' 'iproute2' 'libass' 'libcap'
+         'libpipewire' 'libxkbcommon' 'vulkan-icd-loader' 'wayland')
 makedepends=('cargo' 'clang' 'git')
 optdepends=('vulkan-driver: drawing on the graphics card, or vulkan-swrast without one'
             'yt-dlp: playing videos from web pages'

@@ -4,9 +4,9 @@
 # library folder, the one program granted CAP_NET_RAW, the desktop entry,
 # icons, AppStream metadata and licenses, the check the packages run as
 # they install for an interface that can send AVB streams, and plaa-link@,
-# which keeps a stream's frames on one transmit queue, with the polkit
-# rule letting the person at the computer run it. Network time comes from
-# gptpd, a package of its own.
+# which keeps a stream's frames on one transmit queue and EEE and PAUSE
+# off the link, with the polkit rule letting the person at the computer
+# run it. Network time comes from gptpd, a package of its own.
 #
 #   scripts/dist-install.sh BINARY_DIR [DESTDIR] [PREFIX]
 #

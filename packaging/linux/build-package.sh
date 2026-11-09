@@ -142,8 +142,10 @@ programs=("$work/stage/usr/bin/plaa" "$work/stage/usr/lib/plaa/plaa-netraw")
 # and what plaa loads as it runs: libass, the window system's libraries
 # and Vulkan, with Mesa's drivers, whose software one draws the picture
 # where no graphics card can: without a Vulkan driver wgpu turns to
-# OpenGL, which on some systems cannot draw in the window at all. setcap
-# grants the helper its capability as the package installs.
+# OpenGL, which on some systems cannot draw in the window at all. Then
+# ethtool, which plaa-link@ turns EEE and PAUSE off with, and iproute2,
+# whose ip and tc it sets the link and its queue up with. setcap grants
+# the helper its capability as the package installs.
 config=$work/nfpm.yaml
 cp "$root/packaging/nfpm.yaml" "$config"
 list() { sed 's/^/        - /'; }
@@ -157,7 +159,7 @@ if [ $kind = deb ]; then
         echo "  deb:"
         echo "    depends:"
         printf '%s\n' "$linked" libass9 libcap2-bin libvulkan1 mesa-vulkan-drivers libwayland-client0 \
-            libxkbcommon0 | list
+            libxkbcommon0 ethtool iproute2 | list
         echo "    recommends:"
         printf '%s\n' gptpd | list
         echo "    suggests:"
@@ -170,7 +172,7 @@ else
         echo "  rpm:"
         echo "    depends:"
         printf '%s\n' "$linked" libass libcap vulkan-loader mesa-vulkan-drivers libwayland-client \
-            libxkbcommon | list
+            libxkbcommon ethtool iproute | list
         echo "    recommends:"
         printf '%s\n' gptpd | list
         echo "    suggests:"

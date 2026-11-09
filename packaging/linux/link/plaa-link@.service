@@ -1,18 +1,81 @@
 [Unit]
-Description=One transmit queue on %i for plaa
+Description=One transmit queue on %i for plaa, kept moving, with EEE and PAUSE off
+Documentation=man:ethtool(8)
 After=sys-subsystem-net-devices-%i.device
+Before=gptpd@%i.service
 
 # Every CPU's frames go out on the interface's first transmit queue. A
 # card with several, as the Intel I210 has four, otherwise spreads frames
 # over them by a hash of their first octets, a stream's own sequence
 # number among them, and they leave out of order as the queues drain.
+#
+# That queue lets about 130 us of the link through to the card, 16 KiB
+# at a gigabit, before byte queue limits stop it to wait for the card to
+# report frames sent. The limit otherwise shrinks to a few of a stream's
+# small frames, so a report coming late, as when a busy desktop holds up
+# the card's interrupt, leaves frames sent on time waiting in the queue.
+# Scaled by the link's speed, other traffic let through ahead of a
+# stream's frame takes no longer to send at 100 Mb/s than at a gigabit.
+# A higher floor set elsewhere stays. The speed shows only once the link
+# is up, so on an interface brought up, it waits up to 10 s for that.
+#
+# That queue gets fq_codel, whatever the system's default, which sends
+# frames in the order they come. fq, which holds a frame until the
+# departure time a talker stamps on it, made a stream's frames leave
+# late on a busy computer, stamped or not: departure times wait for a
+# card that keeps them itself. A card with one transmit queue gets
+# fq_codel at its root. Replacing the root drops whatever the queues
+# hold, so it is done only where the queues are not like that already;
+# an fq_codel already there is kept, and anything else, such as an fq
+# the system makes its default, is replaced. avb-link@ does the same.
+#
+# Energy-Efficient Ethernet and PAUSE stay off the link, as the AVB Lite
+# profile asks of an endpoint: a link waking from EEE, or a PAUSE frame
+# from the switch, holds up frames already due. Changing them
+# renegotiates the link, after which some drivers (atlantic) leave their
+# hardware time stamps on received PTP frames, so where they changed on
+# an interface that is up, it goes down and up again. That happens once:
+# the interface keeps them until its driver starts again. Drivers that
+# cannot force PAUSE (r8169) keep negotiating it, offering none.
+#
 # plaa runs it again as its entity starts, since a driver starting afresh
-# forgets it. triib-link@ does the same for triib.
+# forgets all of these. triib-link@ does the same for triib.
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/sh -c '\
+    state() { ethtool --show-eee "$$1"; ethtool --show-pause "$$1"; } 2>/dev/null; \
+    up() { [ $$(( $$(cat "/sys/class/net/$$1/flags" 2>/dev/null || echo 0) & 1 )) -eq 1 ]; }; \
     for queue in /sys/class/net/"$$1"/queues/tx-*; do \
         echo 0 >"$$queue/xps_cpus"; done 2>/dev/null; \
-    cat /proc/irq/default_smp_affinity \
-        >"/sys/class/net/$$1/queues/tx-0/xps_cpus" 2>/dev/null; true' sh %i
+    cat /proc/irq/default_smp_affinity 2>/dev/null \
+        >"/sys/class/net/$$1/queues/tx-0/xps_cpus"; \
+    speed=0; tries=0; \
+    while up "$$1" && [ "$$tries" -lt 100 ]; do \
+        speed=$$(cat "/sys/class/net/$$1/speed" 2>/dev/null) || speed=0; \
+        [ "$${speed:-0}" -gt 0 ] && break; \
+        tries=$$((tries + 1)); sleep 0.1; done; \
+    floor=$$(( $${speed:-0} * 16384 / 1000 )); \
+    limits=/sys/class/net/$$1/queues/tx-0/byte_queue_limits; \
+    [ "$$floor" -gt "$$(cat "$$limits/limit_min" 2>/dev/null || echo "$$floor")" ] && \
+        echo "$$floor" 2>/dev/null >"$$limits/limit_min"; \
+    queues=0; for queue in /sys/class/net/"$$1"/queues/tx-*; do \
+        [ -e "$$queue" ] && queues=$$((queues + 1)); done; \
+    if [ $$queues -gt 1 ]; then \
+        tc qdisc show dev "$$1" 2>/dev/null | grep -q "^qdisc mq 1: root" \
+            || tc qdisc replace dev "$$1" root handle 1: mq 2>/dev/null; \
+        tc qdisc show dev "$$1" 2>/dev/null \
+            | grep -Eq "^qdisc fq_codel [0-9a-f]+: parent 1:1 " \
+            || tc qdisc replace dev "$$1" parent 1:1 fq_codel 2>/dev/null; \
+    elif [ $$queues -eq 1 ]; then \
+        tc qdisc show dev "$$1" 2>/dev/null \
+            | grep -Eq "^qdisc fq_codel [0-9a-f]+: root " \
+            || tc qdisc replace dev "$$1" root fq_codel 2>/dev/null; \
+    fi; \
+    before=$$(state "$$1"); \
+    ethtool --set-eee "$$1" eee off 2>/dev/null; \
+    ethtool --pause "$$1" autoneg off rx off tx off 2>/dev/null || \
+        ethtool --pause "$$1" rx off tx off 2>/dev/null; \
+    [ "$$(state "$$1")" = "$$before" ] && exit 0; \
+    up "$$1" || exit 0; \
+    ip link set "$$1" down && ip link set "$$1" up' sh %i
