@@ -398,9 +398,9 @@ dependencies = [
 
 [[package]]
 name = "avb-net"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0725c7f21993ef12bdc2e228ec4fb27a326e0639879385fc3f6067e355b765ef"
+checksum = "6a7363c4ea3b6fd90b639555d081ceddf83154600770278922043d0ef74f9408"
 dependencies = [
  "libc",
  "raw-ether",
@@ -408,9 +408,9 @@ dependencies = [
 
 [[package]]
 name = "avb-stream"
-version = "0.3.1"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b191d00974a19629a2ce6abd28bcdfe7cbe53032e09a1c22be94d0d33380832"
+checksum = "f203f864620750fb6c6dfa9e703c806981a01c7713632ddcf6ec89112494f633"
 dependencies = [
  "atdecc",
  "avb-net",
