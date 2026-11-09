@@ -4,10 +4,12 @@
   pkg option, filling in the fields between at signs. It refuses a macOS
   older than the app needs, and as it opens, it warns when the Mac has no
   AVB Ethernet port, which sending what plays to AVB speakers and
-  amplifiers requires.
+  amplifiers requires. Its first page says what installing changes on
+  the Mac and why (welcome.html).
 -->
 <installer-gui-script minSpecVersion="2">
     <title>@NAME@</title>
+    <welcome file="welcome.html" mime-type="text/html" />
     <options customize="never" require-scripts="false" hostArchitectures="@ARCH@" />
     <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false" />
     <allowed-os-versions>

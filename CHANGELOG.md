@@ -29,9 +29,14 @@
   holds up frames already due. Where either was on, the link goes down
   and up once as plaa's entity starts. The packages depend on ethtool
   for it.
+- Installing says what it changes on the system and why: Linux packages
+  as they install, and the macOS installer on its first page.
 
 ### Fixed
 
+- AVB streams' threads run at realtime priority on every Linux system:
+  the packages depend on RealtimeKit, which raises them, where they ran
+  at normal priority without a word on a system that lacked it.
 - plaa quits as its Quit does when the system asks it to, with SIGTERM
   at logout or shutdown, or SIGINT and SIGHUP from the terminal it runs
   in: its entity departs and its stream is withdrawn, rather than left

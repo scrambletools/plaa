@@ -61,9 +61,11 @@ are development builds, which keep their own.
   and PAUSE off the link, and a polkit rule letting the person at the
   computer run it, as plaa does as its entity starts, and stop the
   ptp4l services an older plaa ran. They depend on ethtool and iproute2
-  for it. There is no plain archive, AppImage or Flatpak, as none can
-  carry the capability, and an archive would hold one release's FFmpeg
-  names.
+  for it, and on RealtimeKit, which runs the AVB streams' threads at
+  realtime priority, and say as they install what they change on the
+  system and why. The macOS installer's first page does the same. There
+  is no plain archive, AppImage or Flatpak, as none can carry the
+  capability, and an archive would hold one release's FFmpeg names.
 - **macOS:** FFmpeg and libass, from Homebrew, inside plaa.app, built on
   the oldest macOS supported, as Homebrew builds them for the macOS it
   runs on; the app claims the newest macOS any of its parts needs, and

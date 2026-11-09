@@ -125,9 +125,12 @@ grep -q 'set-eee' "/usr/lib/systemd/system/plaa-link@.service" ||
     fail "plaa-link@.service does not keep EEE and PAUSE off the link"
 grep -q 'parent 1:1 fq_codel' "/usr/lib/systemd/system/plaa-link@.service" ||
     fail "plaa-link@.service does not give the stream's queue fq_codel"
-# They come in as dependencies: ethtool and iproute2's tc for plaa-link@.
+# They come in as dependencies: ethtool and iproute2's tc for plaa-link@,
+# RealtimeKit for the AVB streams' realtime threads.
 command -v ethtool >/dev/null || fail "ethtool did not come in with plaa"
 command -v tc >/dev/null || fail "tc did not come in with plaa"
+[ -f /usr/share/dbus-1/system-services/org.freedesktop.RealtimeKit1.service ] ||
+    fail "RealtimeKit did not come in with plaa"
 # Network time comes from gptpd, which plaa recommends and plays without;
 # its own ptp4l services are gone, an upgrade's among them.
 recommended "$package" | grep -qw gptpd || fail "the package does not recommend gptpd"
@@ -153,6 +156,13 @@ section "No interface for AVB streams"
 grep -q 'requires an AVB' /tmp/install.log ||
     fail "installing did not say that no interface can send AVB streams"
 echo "said so as it installed"
+
+# Installing says what it changes on the system and why.
+section "What installing changes"
+for said in CAP_NET_RAW RealtimeKit plaa-link@.service; do
+    grep -q "$said" /tmp/install.log || fail "installing did not explain $said"
+done
+echo "explained as it installed"
 
 section "Shared libraries"
 for program in /usr/bin/plaa /usr/lib/plaa/plaa-netraw; do

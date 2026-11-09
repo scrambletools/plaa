@@ -143,8 +143,9 @@ programs=("$work/stage/usr/bin/plaa" "$work/stage/usr/lib/plaa/plaa-netraw")
 # and Vulkan, with Mesa's drivers, whose software one draws the picture
 # where no graphics card can: without a Vulkan driver wgpu turns to
 # OpenGL, which on some systems cannot draw in the window at all. Then
-# ethtool, which plaa-link@ turns EEE and PAUSE off with, and iproute2,
-# whose ip and tc it sets the link and its queue up with. setcap grants
+# ethtool, which plaa-link@ turns EEE and PAUSE off with, iproute2, whose
+# ip and tc it sets the link and its queue up with, and RealtimeKit,
+# which runs AVB streams' threads at realtime priority. setcap grants
 # the helper its capability as the package installs.
 config=$work/nfpm.yaml
 cp "$root/packaging/nfpm.yaml" "$config"
@@ -159,7 +160,7 @@ if [ $kind = deb ]; then
         echo "  deb:"
         echo "    depends:"
         printf '%s\n' "$linked" libass9 libcap2-bin libvulkan1 mesa-vulkan-drivers libwayland-client0 \
-            libxkbcommon0 ethtool iproute2 | list
+            libxkbcommon0 ethtool iproute2 rtkit | list
         echo "    recommends:"
         printf '%s\n' gptpd | list
         echo "    suggests:"
@@ -172,7 +173,7 @@ else
         echo "  rpm:"
         echo "    depends:"
         printf '%s\n' "$linked" libass libcap vulkan-loader mesa-vulkan-drivers libwayland-client \
-            libxkbcommon ethtool iproute | list
+            libxkbcommon ethtool iproute rtkit | list
         echo "    recommends:"
         printf '%s\n' gptpd | list
         echo "    suggests:"

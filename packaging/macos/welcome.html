@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!--
+  The installer's first page: what installing plaa changes on the Mac
+  beyond the app itself, and why, so nothing it does is a surprise.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font: 13px -apple-system, "Helvetica Neue", sans-serif; line-height: 1.45; }
+h1 { font-size: 15px; margin: 0 0 8px; }
+li { margin-bottom: 6px; }
+code { font: 12px ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<h1>What installing plaa changes</h1>
+<p>plaa goes into Applications. So that it can send what plays to AVB
+speakers and amplifiers without running as an administrator, installing
+it also:</p>
+<ul>
+<li>adds you to the <code>access_bpf</code> group, creating it if it is
+not there yet, the same group Wireshark and triib use;</li>
+<li>installs a launch daemon, <code>run.plaa.bpf</code>, which at every
+start lets that group open the Mac's packet capture devices
+(<code>/dev/bpf*</code>), so plaa can send and receive AVB's own network
+frames.</li>
+</ul>
+<p>Nothing else on the system changes. To take plaa and the launch daemon
+out again, run <code>sudo "/Library/Application Support/plaa/uninstall"</code>.
+The <code>access_bpf</code> group stays, as other apps may use it.</p>
+</body>
+</html>

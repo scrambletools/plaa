@@ -20,8 +20,9 @@
 # alone at every start. The package installs a launch daemon that opens
 # them to the access_bpf group at each start, as Wireshark's ChmodBPF and
 # triib do with the same group, and adds the user installing it to the
-# group. As it opens, the installer warns when the Mac has no AVB
-# Ethernet port (distribution.xml).
+# group. Its first page says so and why (welcome.html), and as it
+# opens, it warns when the Mac has no AVB Ethernet port
+# (distribution.xml).
 #
 # PLAA_PRODUCTION=1 makes a release build, as in CI; without it the app
 # is the development build, with its own settings and cache.
@@ -339,7 +340,9 @@ if $pkg; then
         "$here/distribution.xml" >"$distribution"
     package="$out/$name-$version-$(uname -m).pkg"
     rm -f "$package"
-    product=(--distribution "$distribution" --package-path "$component")
+    resources=$(mktemp -d)
+    cp "$here/welcome.html" "$resources/"
+    product=(--distribution "$distribution" --package-path "$component" --resources "$resources")
     if [ -n "${PLAA_INSTALLER_IDENTITY:-}" ]; then
         product+=(--sign "$PLAA_INSTALLER_IDENTITY" --timestamp)
         if [ -n "${PLAA_SIGN_KEYCHAIN:-}" ]; then

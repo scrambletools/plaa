@@ -300,8 +300,11 @@ profile asks of an endpoint, since a link waking from EEE or a PAUSE
 frame from the switch holds up frames already due: where either was on,
 the link goes down and up once. It also gives that queue fq_codel,
 whatever the system's default, which sends frames in the order they
-come. Packages depend on ethtool and iproute2 for the service. For dev
-builds, `scripts/dev-link.sh` installs the service and the rule under
+come. Packages depend on ethtool and iproute2 for the service. The
+stream's threads run at realtime priority through RealtimeKit, as
+PipeWire's do, so packages depend on rtkit too, and say as they install
+what they change on the system and why. For dev builds,
+`scripts/dev-link.sh` installs the service and the rule under
 `/usr/local` and `/etc`, and takes out the ptp4l services the older
 `scripts/dev-ptp4l.sh` put there; `scripts/dev-link.sh remove` takes it
 out before a package goes in.
