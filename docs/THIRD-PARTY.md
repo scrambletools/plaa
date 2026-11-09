@@ -47,7 +47,7 @@ bitflags 1.3.2, core_detect 1.0.0, coreaudio-rs 0.14.2, downcast-rs 1.2.1, etage
 
 ### Apache-2.0
 
-ab_glyph 0.2.32, ab_glyph_rasterizer 0.1.10, clang-sys 1.9.1, clipboard_macos 0.1.1, clipboard_wayland 0.2.2, codespan-reporting 0.12.0, cpal 0.18.2, gethostname 1.1.0, gl_generator 0.14.0, glutin_wgl_sys 0.6.1, khronos_api 3.1.0, mundy 0.2.3, owned_ttf_parser 0.25.1, rmcp 3.6.0, spirv 0.3.0+sdk-1.3.268.0, sync_wrapper 1.0.2, unicode-linebreak 0.1.5, winit 0.30.13
+ab_glyph 0.2.32, ab_glyph_rasterizer 0.1.10, clang-sys 1.9.1, clipboard_macos 0.1.1, clipboard_wayland 0.2.2, codespan-reporting 0.12.0, cpal 0.18.2, gethostname 1.1.0, gl_generator 0.14.0, glutin_wgl_sys 0.6.1, khronos_api 3.1.0, mundy 0.2.3, owned_ttf_parser 0.25.1, rmcp 3.9.0, spirv 0.3.0+sdk-1.3.268.0, sync_wrapper 1.0.2, unicode-linebreak 0.1.5, winit 0.30.13
 
 ### Unicode-3.0
 
