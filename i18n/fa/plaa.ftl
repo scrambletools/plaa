@@ -270,10 +270,7 @@ settings-avb-interface-note-mac = درگاه سیمی‌ای که plaa فرست�
 settings-avb-talker-note-mac = plaa صدای پنجره‌ای را که آخرین بار پخش شده، از راه موجودیت AVB خود این Mac به گیرنده‌های متصل به آن می‌فرستد.
 settings-avb-talker = ارسال آنچه پخش می‌شود
 settings-avb-talker-note = plaa یک فرستندهٔ Milan می‌شود و صدای پنجره‌ای را که آخرین بار پخش شده، به گیرنده‌های متصل به آن می‌فرستد.
-settings-avb-name = نام روی شبکه
-settings-avb-name-note = کنترل‌گرها plaa را با نام «{ $name }» نشان می‌دهند. برای تغییر نام، Enter را فشار دهید.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa روی { $computer }
 avb-could-not-start = استفاده از { $interface } ممکن نشد: { $error }
 network-title = صدای شبکه
 network-off = برای پخش روی شبکه، «ارسال آنچه پخش می‌شود» را در تنظیمات روشن کنید.
@@ -303,12 +300,10 @@ network-choose-format = قالبی برای پخش روی { $listener } انتخ
 network-failed = اتصال ممکن نشد: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = برای پخش در اینجا، triib را به‌روز کنید.
 network-choose = یک گیرنده انتخاب کنید تا ببینید جریانش را چگونه دریافت می‌کند.
 network-no-sources = هیچ فرستنده‌ای روی شبکه با قالبی که plaa پخش می‌کند ارسال نمی‌کند و نمی‌تواند به چنین قالبی تغییر کند.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = توقف گوش دادن به { $talker }
-network-listen-update-triib = برای گوش دادن در اینجا، triib را به‌روز کنید: plaa فقط چیزی را پخش می‌کند که در هر صورت به این رایانه می‌رسد.
 network-listen-lite = درگاه با AVB Lite کار می‌کند که هیچ جریانی را رزرو نمی‌کند: plaa فقط چیزی را پخش می‌کند که در هر صورت به این رایانه می‌رسد.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

@@ -270,10 +270,7 @@ settings-avb-interface-note-mac = Az a vezetékes port, amelyen a plaa AVB- és 
 settings-avb-talker-note-mac = A plaa a legutóbb lejátszó ablak hangját ennek a Macnek a saját AVB-entitásán keresztül küldi a hozzá csatlakozó vevőknek.
 settings-avb-talker = Lejátszott hang küldése
 settings-avb-talker-note = A plaa Milan-adóvá válik, és a legutóbb lejátszó ablak hangját a hozzá csatlakozó vevőknek küldi.
-settings-avb-name = Név a hálózaton
-settings-avb-name-note = A vezérlőkben a plaa „{ $name }” néven jelenik meg. Az átnevezéshez nyomja meg az Enter billentyűt.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa ({ $computer })
 avb-could-not-start = A(z) { $interface } csatoló nem használható: { $error }
 network-title = Hálózati hang
 network-off = A hálózaton való lejátszáshoz kapcsolja be a Beállításokban a Lejátszott hang küldése lehetőséget.
@@ -303,12 +300,10 @@ network-choose-format = Válasszon formátumot a lejátszáshoz itt: { $listener
 network-failed = Nem sikerült kapcsolódni: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Az itteni lejátszáshoz frissítse a triib alkalmazást.
 network-choose = Válasszon egy vevőt, hogy lássa, hogyan fogadja az adatfolyamát.
 network-no-sources = A hálózaton egyetlen adó sem küld olyan formátumban, amelyet a plaa lejátszik, és nem is tud ilyenre váltani.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Hallgatás leállítása: { $talker }
-network-listen-update-triib = Az itteni hallgatáshoz frissítse a triib alkalmazást: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
 network-listen-lite = A port AVB Lite módban fut, amely nem foglal adatfolyamokat: a plaa csak azt játssza le, ami amúgy is eljut ehhez a számítógéphez.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

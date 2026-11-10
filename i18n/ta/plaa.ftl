@@ -277,10 +277,7 @@ settings-avb-interface-note-mac = plaa, AVB மற்றும் Milan Talkers-
 settings-avb-talker-note-mac = கடைசியாக இயக்கிய சாளரத்தின் ஒலியை plaa இந்த Mac-இன் சொந்த AVB entity வழியாக, அதனுடன் இணைக்கப்பட்ட Listeners-க்கு அனுப்பும்.
 settings-avb-talker = இயங்குவதை அனுப்பு
 settings-avb-talker-note = plaa ஒரு Milan Talker ஆகி, கடைசியாக இயக்கிய சாளரத்தின் ஒலியை அதனுடன் இணைக்கப்பட்ட Listeners-க்கு அனுப்பும்.
-settings-avb-name = நெட்வொர்க்கில் பெயர்
-settings-avb-name-note = Controllers plaa-வை “{ $name }” எனக் காட்டும். பெயரை மாற்ற Enter-ஐ அழுத்தவும்.
 # plaa's name as a Milan entity, by default.
-avb-default-name = { $computer } இல் plaa
 avb-could-not-start = { $interface }-ஐப் பயன்படுத்த முடியவில்லை: { $error }
 network-title = நெட்வொர்க் ஆடியோ
 network-off = நெட்வொர்க்கில் இயக்க, அமைப்புகளில் “இயங்குவதை அனுப்பு” என்பதை இயக்கவும்.
@@ -310,12 +307,10 @@ network-choose-format = { $listener }-இல் இயக்குவதற்�
 network-failed = இணைக்க முடியவில்லை: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = இங்கே இயக்க triib-ஐப் புதுப்பிக்கவும்.
 network-choose = ஒரு Listener தன் stream-ஐ எப்படிப் பெறுகிறது என்பதைப் பார்க்க, அதைத் தேர்ந்தெடுக்கவும்.
 network-no-sources = plaa இயக்கும் format-இல் அனுப்பும் அல்லது அதற்கு மாறக்கூடிய Talker எதுவும் நெட்வொர்க்கில் இல்லை.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = { $talker }-ஐக் கேட்பதை நிறுத்து
-network-listen-update-triib = இங்கே கேட்க triib-ஐப் புதுப்பிக்கவும்: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
 network-listen-lite = இந்த port AVB Lite-இல் இயங்குகிறது, அது எந்த stream-ஐயும் reserve செய்வதில்லை: எப்படியும் இந்தக் கணினியை வந்தடைவதை மட்டுமே plaa இயக்கும்.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

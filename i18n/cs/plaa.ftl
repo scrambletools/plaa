@@ -282,10 +282,7 @@ settings-avb-interface-note-mac = Kabelový port, na kterém plaa hledá vysíla
 settings-avb-talker-note-mac = plaa odesílá zvuk okna, které přehrávalo naposledy, přes vlastní entitu AVB tohoto Macu přijímačům, které jsou k ní připojené.
 settings-avb-talker = Odesílat přehrávaný zvuk
 settings-avb-talker-note = plaa se stane vysílačem Milan a odesílá zvuk okna, které přehrávalo naposledy, přijímačům, které jsou k němu připojené.
-settings-avb-name = Název v síti
-settings-avb-name-note = Řídicí aplikace zobrazují plaa jako „{ $name }“. Stisknutím klávesy Enter ho přejmenujete.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa na { $computer }
 avb-could-not-start = Rozhraní { $interface } se nepodařilo použít: { $error }
 network-title = Síťový zvuk
 network-off = Chcete-li přehrávat v síti, zapněte v Nastavení volbu Odesílat přehrávaný zvuk.
@@ -315,12 +312,10 @@ network-choose-format = Vyberte formát pro přehrávání na přijímači { $li
 network-failed = Nepodařilo se připojit: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Chcete-li přehrávat zde, aktualizujte triib.
 network-choose = Vyberte přijímač a uvidíte, jak přijímá svůj stream.
 network-no-sources = Žádný vysílač v síti neodesílá ve formátu, který plaa přehrává, ani na takový formát nemůže přejít.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Přestat poslouchat vysílač { $talker }
-network-listen-update-triib = Chcete-li poslouchat zde, aktualizujte triib: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
 network-listen-lite = Port používá AVB Lite, který nerezervuje žádné streamy: plaa přehrává jen to, co k tomuto počítači dorazí i tak.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

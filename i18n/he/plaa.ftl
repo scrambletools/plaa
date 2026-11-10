@@ -279,10 +279,7 @@ settings-avb-interface-note-mac = היציאה הקווית שבה plaa מוצא
 settings-avb-talker-note-mac = plaa שולח את הצליל של החלון האחרון שהתנגן דרך ישות ה-AVB של ה-Mac הזה, אל המאזינים שמחוברים אליה.
 settings-avb-talker = שליחת מה שמתנגן
 settings-avb-talker-note = plaa הופך למשדר Milan ושולח את הצליל של החלון האחרון שהתנגן אל המאזינים שמחוברים אליו.
-settings-avb-name = שם ברשת
-settings-avb-name-note = בקרים מציגים את plaa בשם "{ $name }". כדי לשנות את השם יש להקיש Enter.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa ב-{ $computer }
 avb-could-not-start = לא ניתן להשתמש ב-{ $interface }: { $error }
 network-title = שמע ברשת
 network-off = כדי לנגן ברשת, יש להפעיל את "שליחת מה שמתנגן" בהגדרות.
@@ -312,12 +309,10 @@ network-choose-format = בחירת פורמט לניגון ב-{ $listener }
 network-failed = לא ניתן להתחבר: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = כדי לנגן כאן, יש לעדכן את triib.
 network-choose = יש לבחור מאזין כדי לראות איך הוא מקבל את הזרם שלו.
 network-no-sources = אין ברשת משדר ששולח בפורמט ש-plaa מנגן, או שיכול לעבור לפורמט כזה.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = הפסקת ההאזנה ל-{ $talker }
-network-listen-update-triib = כדי להאזין כאן, יש לעדכן את triib: plaa מנגן רק את מה שמגיע ממילא למחשב הזה.
 network-listen-lite = היציאה פועלת ב-AVB Lite, שאינו מקצה רוחב פס לזרמים: plaa מנגן רק את מה שמגיע ממילא למחשב הזה.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

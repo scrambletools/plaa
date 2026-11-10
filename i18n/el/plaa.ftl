@@ -276,10 +276,7 @@ settings-avb-interface-note-mac = Η ενσύρματη θύρα στην οπο
 settings-avb-talker-note-mac = Το plaa στέλνει τον ήχο του παραθύρου που έπαιξε τελευταίο μέσω της οντότητας AVB αυτού του Mac, στους δέκτες που είναι συνδεδεμένοι σε αυτήν.
 settings-avb-talker = Αποστολή του ήχου αναπαραγωγής
 settings-avb-talker-note = Το plaa γίνεται πομπός Milan και στέλνει τον ήχο του παραθύρου που έπαιξε τελευταίο στους δέκτες που είναι συνδεδεμένοι σε αυτόν.
-settings-avb-name = Όνομα στο δίκτυο
-settings-avb-name-note = Οι ελεγκτές εμφανίζουν το plaa ως «{ $name }». Πατήστε Enter για μετονομασία.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa στο { $computer }
 avb-could-not-start = Δεν ήταν δυνατή η χρήση της διεπαφής { $interface }: { $error }
 network-title = Ήχος δικτύου
 network-off = Ενεργοποιήστε την «Αποστολή του ήχου αναπαραγωγής» στις Ρυθμίσεις για αναπαραγωγή στο δίκτυο.
@@ -309,12 +306,10 @@ network-choose-format = Επιλέξτε μορφή για αναπαραγωγ�
 network-failed = Δεν ήταν δυνατή η σύνδεση: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Ενημερώστε το triib για αναπαραγωγή εδώ.
 network-choose = Επιλέξτε έναν δέκτη για να δείτε πώς λαμβάνει τη ροή του.
 network-no-sources = Κανένας πομπός στο δίκτυο δεν στέλνει σε μορφή που αναπαράγει το plaa, ούτε μπορεί να αλλάξει σε τέτοια μορφή.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Διακοπή ακρόασης του { $talker }
-network-listen-update-triib = Ενημερώστε το triib για ακρόαση εδώ: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
 network-listen-lite = Η θύρα λειτουργεί με AVB Lite, που δεν κάνει κράτηση ροών: το plaa αναπαράγει μόνο ό,τι φτάνει έτσι κι αλλιώς σε αυτόν τον υπολογιστή.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

@@ -65,8 +65,6 @@ pub enum SettingsMessage {
     AvbInterface(Option<String>),
     AvbTalker(bool),
     /// The entity's name as typed, and Enter.
-    AvbName(String),
-    AvbNameDone,
     OutsideControl(bool),
     /// The allowed agents are asked about again.
     ForgetAgents,
@@ -699,24 +697,9 @@ impl Plaa {
             self.settings.avb_talker,
             SettingsMessage::AvbTalker,
         ));
-        // macOS names the Mac's own entity, in Audio MIDI Setup.
-        if cfg!(target_os = "macos") {
-            return content;
-        }
-        content = content.push(component::text_field(
-            crate::fl!("settings-avb-name"),
-            &self.settings.avb_name,
-            Backdrop::ContainerHigh,
-            |input| {
-                input
-                    .on_input(SettingsMessage::AvbName)
-                    .on_submit(SettingsMessage::AvbNameDone)
-            },
-        ));
-        content.push(note(crate::fl!(
-            "settings-avb-name-note",
-            name = self.avb_name()
-        )))
+        // The entity's name is its own: macOS's on a Mac, the computer's on
+        // Linux, which controllers can change.
+        content
     }
 
     /// The quality streams play in: as tall as the screen, the best, or
@@ -1458,13 +1441,6 @@ impl Plaa {
             SettingsMessage::AvbTalker(on) => {
                 self.settings.avb_talker = on;
                 self.apply_avb();
-            }
-            SettingsMessage::AvbName(name) => self.settings.avb_name = name,
-            // The entity starts again under its new name.
-            SettingsMessage::AvbNameDone => {
-                if self.settings.avb_talker {
-                    self.apply_avb();
-                }
             }
             SettingsMessage::OutsideControl(on) => {
                 self.settings.outside_control = on;

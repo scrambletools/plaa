@@ -109,11 +109,9 @@ pub struct Settings {
     /// The wired interface plaa looks for AVB talkers and listeners on, by
     /// name; none keeps plaa off the AVB network.
     pub avb_interface: Option<String>,
-    /// Whether plaa sends what it plays from a Milan entity of its own.
+    /// Whether plaa sends what it plays: on Linux from this computer's
+    /// entity, which avb-endpointd runs, on a Mac from the Mac's own.
     pub avb_talker: bool,
-    /// That entity's name, as controllers show it; empty for plaa's own
-    /// with the computer's name.
-    pub avb_name: String,
     /// Where frames saved as pictures go.
     #[serde(with = "home_path")]
     pub screenshots: PathBuf,
@@ -180,7 +178,6 @@ impl Default for Settings {
             input_gains: BTreeMap::new(),
             avb_interface: None,
             avb_talker: false,
-            avb_name: String::new(),
             screenshots: paths::default_screenshots(),
             outside_control: true,
             allowed_agents: Vec::new(),

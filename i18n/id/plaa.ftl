@@ -270,10 +270,7 @@ settings-avb-interface-note-mac = Port kabel tempat plaa menemukan talker dan li
 settings-avb-talker-note-mac = plaa mengirim suara dari jendela yang terakhir diputar melalui entitas AVB milik Mac ini sendiri, ke listener yang terhubung dengannya.
 settings-avb-talker = Kirim yang sedang diputar
 settings-avb-talker-note = plaa menjadi talker Milan, yang mengirim suara dari jendela yang terakhir diputar ke listener yang terhubung dengannya.
-settings-avb-name = Nama di jaringan
-settings-avb-name-note = Controller menampilkan plaa sebagai “{ $name }”. Tekan Enter untuk mengganti namanya.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa di { $computer }
 avb-could-not-start = Tidak dapat memakai { $interface }: { $error }
 network-title = Audio Jaringan
 network-off = Nyalakan “Kirim yang sedang diputar” di Pengaturan untuk memutar di jaringan.
@@ -303,12 +300,10 @@ network-choose-format = Pilih format untuk memutar di { $listener }
 network-failed = Tidak dapat terhubung: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Perbarui triib untuk memutar di sini.
 network-choose = Pilih listener untuk melihat cara ia menerima stream.
 network-no-sources = Tidak ada talker di jaringan yang mengirim dalam format yang diputar plaa, atau dapat beralih ke format tersebut.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Berhenti mendengarkan { $talker }
-network-listen-update-triib = Perbarui triib untuk mendengarkan di sini: plaa hanya memutar apa yang memang sampai ke komputer ini.
 network-listen-lite = Port menjalankan AVB Lite, yang tidak melakukan reservasi stream: plaa hanya memutar apa yang memang sampai ke komputer ini.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

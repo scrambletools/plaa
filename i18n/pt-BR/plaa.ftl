@@ -276,10 +276,7 @@ settings-avb-interface-note-mac = A porta com fio em que o plaa encontra talkers
 settings-avb-talker-note-mac = O plaa envia o som da última janela reproduzida pela entidade AVB própria deste Mac aos listeners conectados a ela.
 settings-avb-talker = Enviar o que está tocando
 settings-avb-talker-note = O plaa se torna um talker Milan e envia o som da última janela reproduzida aos listeners conectados a ele.
-settings-avb-name = Nome na rede
-settings-avb-name-note = Os controladores mostram o plaa como “{ $name }”. Pressione Enter para renomeá-lo.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa em { $computer }
 avb-could-not-start = Não foi possível usar { $interface }: { $error }
 network-title = Áudio em rede
 network-off = Ative “Enviar o que está tocando” nos Ajustes para reproduzir na rede.
@@ -309,12 +306,10 @@ network-choose-format = Escolha um formato para reproduzir em { $listener }
 network-failed = Não foi possível conectar: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Atualize o triib para reproduzir aqui.
 network-choose = Escolha um listener para ver como ele recebe o stream.
 network-no-sources = Nenhum talker na rede envia em um formato que o plaa reproduz, nem pode mudar para um.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Parar de ouvir { $talker }
-network-listen-update-triib = Atualize o triib para ouvir aqui: o plaa só reproduz o que chega a este computador de qualquer forma.
 network-listen-lite = A porta usa AVB Lite, que não reserva streams: o plaa só reproduz o que chega a este computador de qualquer forma.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

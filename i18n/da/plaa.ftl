@@ -276,10 +276,7 @@ settings-avb-interface-note-mac = Den kablede port, hvor plaa finder AVB- og Mil
 settings-avb-talker-note-mac = plaa sender lyden fra det vindue, der sidst afspillede, gennem denne Macs egen AVB-entitet til de modtagere, der er forbundet til den.
 settings-avb-talker = Send det, der afspilles
 settings-avb-talker-note = plaa bliver en Milan-sender og sender lyden fra det vindue, der sidst afspillede, til de modtagere, der er forbundet til den.
-settings-avb-name = Navn på netværket
-settings-avb-name-note = Controllere viser plaa som “{ $name }”. Tryk på Enter for at omdøbe den.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa på { $computer }
 avb-could-not-start = { $interface } kunne ikke bruges: { $error }
 network-title = Netværkslyd
 network-off = Slå “Send det, der afspilles” til i Indstillinger for at afspille på netværket.
@@ -309,12 +306,10 @@ network-choose-format = Vælg et format til afspilning på { $listener }
 network-failed = Kunne ikke forbinde: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Opdater triib for at afspille her.
 network-choose = Vælg en modtager for at se, hvordan den tager imod sin stream.
 network-no-sources = Ingen sender på netværket sender i et format, som plaa afspiller, eller kan skifte til et.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Stop med at lytte til { $talker }
-network-listen-update-triib = Opdater triib for at lytte her: plaa afspiller kun det, der alligevel når frem til denne computer.
 network-listen-lite = Porten kører AVB Lite, som ikke reserverer streams: plaa afspiller kun det, der alligevel når frem til denne computer.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

@@ -4,6 +4,17 @@
 
 ### Changed
 
+- On Linux, what plaa plays goes to the network through this computer's
+  entity, which avb-endpointd runs, the daemon in the person's session
+  that runs every AVB entity on the computer, rather than through an
+  entity in plaa. It stays on the network after plaa quits, and any app
+  can play into its playback device, as plaa plays what the media window
+  plays; plaa plays its recording device while a controller binds its
+  input. plaa starts and enables the daemon's user service, and the
+  entity keeps the ID plaa's had. plaa's controller takes its raw
+  sockets from the daemon's avb-netraw, and the daemon runs avb-link@ in
+  place of plaa-link@. The entity's name is the computer's, which
+  controllers change, so plaa's setting for it is gone.
 - plaa keeps network time with gptpd, shared with triib's entity
   service, in place of its own ptp4l services. Its packages recommend
   gptpd where they recommended linuxptp, plaa starts `gptpd@<interface>`

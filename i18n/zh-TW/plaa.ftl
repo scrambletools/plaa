@@ -268,10 +268,7 @@ settings-avb-interface-note-mac = plaa 會在此有線連接埠上尋找 AVB 和
 settings-avb-talker-note-mac = plaa 會透過這部 Mac 本身的 AVB 實體，將最後播放的視窗的聲音傳送給與其連接的接收端。
 settings-avb-talker = 傳送正在播放的內容
 settings-avb-talker-note = plaa 會成為 Milan 傳送端，將最後播放的視窗的聲音傳送給與其連接的接收端。
-settings-avb-name = 網路上的名稱
-settings-avb-name-note = 控制器會將 plaa 顯示為「{ $name }」。按下 Enter 即可重新命名。
 # plaa's name as a Milan entity, by default.
-avb-default-name = { $computer } 上的 plaa
 avb-could-not-start = 無法使用 { $interface }：{ $error }
 network-title = 網路音訊
 network-off = 在「設定」中開啟「傳送正在播放的內容」，即可在網路上播放。
@@ -301,12 +298,10 @@ network-choose-format = 選擇要在 { $listener } 上播放的格式
 network-failed = 無法連線：{ $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = 請更新 triib 以在此播放。
 network-choose = 選擇一個接收端，查看它如何接收串流。
 network-no-sources = 網路上沒有以 plaa 能播放的格式傳送、或能切換為這種格式的傳送端。
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = 停止收聽 { $talker }
-network-listen-update-triib = 請更新 triib 以在此收聽：plaa 只會播放本來就送達這台電腦的內容。
 network-listen-lite = 此連接埠執行 AVB Lite，不會預留任何串流：plaa 只會播放本來就送達這台電腦的內容。
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

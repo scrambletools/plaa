@@ -276,10 +276,7 @@ settings-avb-interface-note-mac = El port amb cable on el plaa troba emissors i 
 settings-avb-talker-note-mac = El plaa envia el so de l'última finestra que ha reproduït a través de l'entitat AVB pròpia d'aquest Mac, als receptors que hi estan connectats.
 settings-avb-talker = Envia el que es reprodueix
 settings-avb-talker-note = El plaa es converteix en un emissor Milan i envia el so de l'última finestra que ha reproduït als receptors que hi estan connectats.
-settings-avb-name = Nom a la xarxa
-settings-avb-name-note = Els controladors mostren el plaa com a «{ $name }». Prem Enter per canviar-li el nom.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa a { $computer }
 avb-could-not-start = No s'ha pogut utilitzar { $interface }: { $error }
 network-title = Àudio en xarxa
 network-off = Activa «Envia el que es reprodueix» a Configuració per reproduir a la xarxa.
@@ -309,12 +306,10 @@ network-choose-format = Tria un format per reproduir a { $listener }
 network-failed = No s'ha pogut connectar: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Actualitza el triib per reproduir aquí.
 network-choose = Tria un receptor per veure com rep el flux.
 network-no-sources = Cap emissor de la xarxa no envia en un format que el plaa reprodueix, ni pot passar a un d'aquests formats.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Deixa d'escoltar { $talker }
-network-listen-update-triib = Actualitza el triib per escoltar aquí: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
 network-listen-lite = El port fa servir AVB Lite, que no reserva fluxos: el plaa només reprodueix el que arriba de totes maneres a aquest ordinador.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

@@ -282,10 +282,7 @@ settings-avb-interface-note-mac = Port przewodowy, na którym plaa wyszukuje nad
 settings-avb-talker-note-mac = plaa wysyła dźwięk okna odtwarzanego jako ostatnie przez własną jednostkę AVB tego Maca do podłączonych do niej odbiorników.
 settings-avb-talker = Wysyłaj odtwarzany dźwięk
 settings-avb-talker-note = plaa staje się nadajnikiem Milan i wysyła dźwięk okna odtwarzanego jako ostatnie do podłączonych do niego odbiorników.
-settings-avb-name = Nazwa w sieci
-settings-avb-name-note = Kontrolery pokazują plaa jako „{ $name }”. Naciśnij Enter, aby zmienić nazwę.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa na { $computer }
 avb-could-not-start = Nie można użyć interfejsu { $interface }: { $error }
 network-title = Dźwięk sieciowy
 network-off = Włącz „Wysyłaj odtwarzany dźwięk” w Ustawieniach, aby odtwarzać w sieci.
@@ -315,12 +312,10 @@ network-choose-format = Wybierz format odtwarzania na { $listener }
 network-failed = Nie można nawiązać połączenia: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Zaktualizuj triib, aby odtwarzać tutaj.
 network-choose = Wybierz odbiornik, aby zobaczyć, jak odbiera strumień.
 network-no-sources = Żaden nadajnik w sieci nie wysyła w formacie, który plaa odtwarza, ani nie może się na taki przełączyć.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Przestań słuchać nadajnika { $talker }
-network-listen-update-triib = Zaktualizuj triib, aby słuchać tutaj: plaa odtwarza tylko to, co i tak dociera do tego komputera.
 network-listen-lite = Port działa w trybie AVB Lite, który nie rezerwuje strumieni: plaa odtwarza tylko to, co i tak dociera do tego komputera.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

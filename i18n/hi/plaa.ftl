@@ -270,10 +270,7 @@ settings-avb-interface-note-mac = वह वायर्ड पोर्ट, ज
 settings-avb-talker-note-mac = plaa आखिरी बार चलाई गई विंडो की ध्वनि, इस Mac की अपनी AVB entity के ज़रिए, उससे कनेक्ट Listeners को भेजता है।
 settings-avb-talker = जो चल रहा है, उसे भेजें
 settings-avb-talker-note = plaa एक Milan Talker बन जाता है, और आखिरी बार चलाई गई विंडो की ध्वनि उससे कनेक्ट Listeners को भेजता है।
-settings-avb-name = नेटवर्क पर नाम
-settings-avb-name-note = Controller plaa को “{ $name }” के रूप में दिखाते हैं। नाम बदलने के लिए Enter दबाएँ।
 # plaa's name as a Milan entity, by default.
-avb-default-name = { $computer } पर plaa
 avb-could-not-start = { $interface } इस्तेमाल नहीं किया जा सका: { $error }
 network-title = नेटवर्क ऑडियो
 network-off = नेटवर्क पर चलाने के लिए सेटिंग्स में “जो चल रहा है, उसे भेजें” चालू करें।
@@ -303,12 +300,10 @@ network-choose-format = { $listener } पर चलाने के लिए �
 network-failed = कनेक्ट नहीं किया जा सका: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = यहाँ चलाने के लिए triib अपडेट करें।
 network-choose = कोई Listener चुनें, यह देखने के लिए कि वह अपनी stream कैसे लेता है।
 network-no-sources = नेटवर्क पर कोई भी Talker ऐसे फ़ॉर्मेट में नहीं भेज रहा जिसे plaa चलाता है, और न ही ऐसे फ़ॉर्मेट में बदल सकता है।
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = { $talker } को सुनना बंद करें
-network-listen-update-triib = यहाँ सुनने के लिए triib अपडेट करें: plaa केवल वही चलाता है जो वैसे भी इस कंप्यूटर तक पहुँचता है।
 network-listen-lite = पोर्ट AVB Lite पर चल रहा है, जो कोई stream reserve नहीं करता: plaa केवल वही चलाता है जो वैसे भी इस कंप्यूटर तक पहुँचता है।
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

@@ -260,61 +260,47 @@ and `--picture` to try edits that mix files, and `--picture-filter` and
 
 ### AVB on Linux
 
-Raw Ethernet needs `CAP_NET_RAW`, which plaa itself never holds, so the
-desktop's portals keep answering it: a tiny helper built beside it,
-`plaa-netraw`, holds the capability, opens the raw sockets and passes
-them to plaa. Grant it after each build with `sudo setcap cap_net_raw+ep
-target/release/plaa-netraw` (packages will). Sending
-also needs gptpd keeping gPTP on the interface, which must have a PTP
-hardware clock. gptpd is a package of its own, which plaa's packages
-recommend and plaa's and triib's releases offer, and plaa plays
-everything else without it. Where it does not run yet, plaa starts
-`gptpd@<interface>`, which gptpd's package installs with a polkit rule
-letting the person at the computer start it, and triib's entity service
-starts the same one, so the two share it. plaa takes the stream's time
-from the record gptpd keeps in `/run/gptpd/<interface>.time`, and gPTP's
-state from its socket beside it; Network Audio says when gptpd keeps no
-time for plaa's stream, and why, and shows this computer's priority1 as
-grandmaster, which `/etc/gptpd/<interface>.conf` sets. Where triib's
-entity service runs on the interface, plaa reserves its stream in the
-service's MRP participant, which the service shares, as two on one port
-withdraw each other's declarations; beside an older service, which does
-not share it, plaa's entity steps aside. Without the service, plaa runs
-MSRP and MVRP itself, and where gptpd finds no bridge reserving streams
-it falls back to the AVB Lite PTP profile, and plaa to AVB Lite with it,
-until gptpd returns to gPTP as the link comes up again. Meanwhile it
-holds an interface that filters VLANs in hardware, as the I210 does,
-promiscuous, so it hears CVU SRP's commands in the media VLAN.
+On Linux, what plaa plays goes to the network through this computer's
+own entity, which avb-endpointd runs: the daemon, from
+[scrambletools/Linux-AVB-Endpoint](https://github.com/scrambletools/Linux-AVB-Endpoint),
+in the person's session that runs every AVB entity on the
+computer's interface, whichever app made it, triib's among them. With
+"Send what plays" on, plaa starts and enables `avb-endpointd@<interface>`,
+a user service that then starts at each login, so the computer stays on
+the network after plaa quits, and plays what it plays into the default
+entity's PipeWire playback device, `avb-<entity ID>-out-1`, as any other
+app can. While a controller binds the entity's input, plaa plays its
+recording device. The default entity, named for the computer, takes
+instance 0x70 of the interface's address, plaa's own entity's before, so
+controllers' bindings to it go on. Turning sending off stops plaa playing
+into it, and leaves the service running, as other apps may use it.
+Network Audio shows the entity's state, and gptpd's, from the daemon's
+status file.
 
-As its entity starts, plaa also runs `plaa-link@<interface>`, which its
-packages install with a polkit rule, to have every CPU send the
-interface's frames on its first transmit queue, as triib's link service
-does: a card with several, as the I210 has four, otherwise spreads a
-stream's frames over them by a hash that takes in its sequence number,
-and they leave out of order. It also lets about 130 us of the link
-through that queue to the card, 16 KiB at a gigabit, before byte queue
-limits stop it, so frames sent on time don't wait there when a busy
-desktop holds up the card's report of frames sent. And it keeps
-Energy-Efficient Ethernet and PAUSE off the link, as the AVB Lite
-profile asks of an endpoint, since a link waking from EEE or a PAUSE
-frame from the switch holds up frames already due: where either was on,
-the link goes down and up once. It also gives that queue fq_codel,
-whatever the system's default, which sends frames in the order they
-come. Packages depend on ethtool and iproute2 for the service. The
-stream's threads run at realtime priority through RealtimeKit, as
-PipeWire's do, so packages depend on rtkit too, and say as they install
-what they change on the system and why. For dev builds,
-`scripts/dev-link.sh` installs the service and the rule under
-`/usr/local` and `/etc`, and takes out the ptp4l services the older
-`scripts/dev-ptp4l.sh` put there; `scripts/dev-link.sh remove` takes it
-out before a package goes in.
+The daemon does what plaa's own entity did: ADP, AECP, ACMP, MAAP, and
+MSRP and MVRP in one participant it shares with other programs on the
+port; AVB Lite where gptpd falls back to its PTP profile; gptpd and
+avb-link@ started on the interface, which keeps its frames on its first
+transmit queue under fq_codel, that queue moving, and EEE and PAUSE off
+the link; and the stream's threads at realtime priority through
+RealtimeKit. Earlier dev builds put plaa-link@ in with
+`scripts/dev-link.sh`; `sudo rm /usr/local/lib/systemd/system/plaa-link@.service
+/etc/polkit-1/rules.d/50-plaa-link.rules` takes it out.
+
+plaa's controller opens raw sockets of its own, which need
+`CAP_NET_RAW`. plaa itself never holds it, so the desktop's portals keep
+answering it: `avb-netraw`, the daemon's helper, holds it, and opens the
+sockets and passes them to plaa as it does to the daemon. Sending needs
+gptpd keeping gPTP on the interface, which must have a PTP hardware
+clock; gptpd is a package of its own, and plaa plays everything else
+without it.
 
 The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
-and `gptp`, which reads gptpd, from [scrambletools/gptp](https://github.com/scrambletools/gptp),
-by their versions on crates.io. To change them alongside, `cargo --config
+and the daemon's library, `avb-endpointd`, from Linux-AVB-Endpoint, by
+their versions on crates.io. To change them alongside, `cargo --config
 .cargo/avb-local.toml build` builds against checkouts beside this one,
 from a git-ignored file with `[patch.crates-io]` path entries for
-`atdecc`, `avb-lite`, `avb-mrp`, `avb-net`, `avb-stream` and `gptp`.
+`atdecc`, `avb-endpointd`, `avb-net` and `avb-stream`.
 
 ### AVB on a Mac
 

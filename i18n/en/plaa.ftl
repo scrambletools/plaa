@@ -271,10 +271,7 @@ settings-avb-interface-note-mac = The wired port plaa finds AVB and Milan talker
 settings-avb-talker-note-mac = plaa sends the sound of the window last played through this Mac's own AVB entity, to the listeners connected to it.
 settings-avb-talker = Send what plays
 settings-avb-talker-note = plaa becomes a Milan talker, sending the sound of the window last played to the listeners connected to it.
-settings-avb-name = Name on the network
-settings-avb-name-note = Controllers show plaa as “{ $name }”. Press Enter to rename it.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa on { $computer }
 avb-could-not-start = Could not use { $interface }: { $error }
 network-title = Network Audio
 network-off = Turn on Send what plays in Settings to play on the network.
@@ -304,12 +301,10 @@ network-choose-format = Choose a format to play on { $listener } in
 network-failed = Could not connect: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Update triib to play here.
 network-choose = Choose a listener to see how it takes its stream.
 network-no-sources = No talker on the network sends in a format plaa plays, or can change to one.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Stop listening to { $talker }
-network-listen-update-triib = Update triib to listen here: plaa plays only what reaches this computer anyway.
 network-listen-lite = The port runs AVB Lite, which reserves no streams: plaa plays only what reaches this computer anyway.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,
