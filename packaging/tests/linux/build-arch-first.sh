@@ -26,5 +26,6 @@ cp "$recipe"/* "$build/"
 chown -R builder "$build"
 mkdir -p "$out"
 (cd "$build" && runuser -u builder -- makepkg --nocheck --noconfirm --nodeps)
-cp "$build"/*.pkg.tar.* "$out/"
+# Not the debug package makepkg splits off beside it.
+find "$build" -maxdepth 1 -name '*.pkg.tar.*' ! -name '*-debug-*' -exec cp {} "$out/" \;
 ls -l "$out"

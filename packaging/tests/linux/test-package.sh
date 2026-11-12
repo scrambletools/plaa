@@ -101,7 +101,8 @@ install_first() {
     arch)
         for package_file in "${packages[@]}"; do
             bsdtar -xOf "$package_file" .PKGINFO | sed -n 's/^depend = //p' |
-                sed 's/[<>=].*//' | grep -vx gptpd | xargs -r pacman -S --noconfirm --needed
+                sed 's/[<>=].*//' | { grep -vx gptpd || true; } |
+                xargs -r pacman -S --noconfirm --needed
         done
         pacman -Udd --noconfirm "${packages[@]}"
         ;;
