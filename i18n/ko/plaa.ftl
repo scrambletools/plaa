@@ -269,10 +269,7 @@ settings-avb-interface-note-mac = plaa가 AVB 및 Milan 토커와 리스너를 �
 settings-avb-talker-note-mac = plaa는 마지막으로 재생한 창의 사운드를 이 Mac 자체의 AVB 엔티티를 거쳐 연결된 리스너로 보냅니다.
 settings-avb-talker = 재생 중인 사운드 보내기
 settings-avb-talker-note = plaa가 Milan 토커가 되어, 마지막으로 재생한 창의 사운드를 연결된 리스너로 보냅니다.
-settings-avb-name = 네트워크상의 이름
-settings-avb-name-note = 컨트롤러에 plaa가 “{ $name }”(으)로 표시됩니다. 이름을 바꾸려면 Enter를 누르세요.
 # plaa's name as a Milan entity, by default.
-avb-default-name = { $computer }의 plaa
 avb-could-not-start = { $interface }을(를) 사용할 수 없습니다: { $error }
 network-title = 네트워크 오디오
 network-off = 네트워크에서 재생하려면 설정에서 재생 중인 사운드 보내기를 켜세요.
@@ -302,12 +299,10 @@ network-choose-format = { $listener }에서 재생할 포맷 선택
 network-failed = 연결할 수 없습니다: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = 여기서 재생하려면 triib을 업데이트하세요.
 network-choose = 리스너를 선택하면 스트림을 받는 방식이 표시됩니다.
 network-no-sources = 네트워크에 plaa가 재생하는 포맷으로 보내거나 그런 포맷으로 바꿀 수 있는 토커가 없습니다.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = { $talker } 듣기 중지
-network-listen-update-triib = 여기서 들으려면 triib을 업데이트하세요: plaa는 어차피 이 컴퓨터에 도달하는 것만 재생합니다.
 network-listen-lite = 이 포트는 스트림을 예약하지 않는 AVB Lite로 실행 중입니다: plaa는 어차피 이 컴퓨터에 도달하는 것만 재생합니다.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

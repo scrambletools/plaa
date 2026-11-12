@@ -270,10 +270,7 @@ settings-avb-interface-note-mac = plaa'nın AVB ve Milan konuşmacılarını ve 
 settings-avb-talker-note-mac = plaa, en son oynatılan pencerenin sesini bu Mac'in kendi AVB varlığı üzerinden ona bağlı dinleyicilere gönderir.
 settings-avb-talker = Oynatılanı gönder
 settings-avb-talker-note = plaa bir Milan konuşmacısı olur ve en son oynatılan pencerenin sesini ona bağlı dinleyicilere gönderir.
-settings-avb-name = Ağdaki ad
-settings-avb-name-note = Denetleyiciler plaa'yı “{ $name }” olarak gösterir. Yeniden adlandırmak için Enter'a basın.
 # plaa's name as a Milan entity, by default.
-avb-default-name = { $computer } üzerindeki plaa
 avb-could-not-start = { $interface } kullanılamadı: { $error }
 network-title = Ağ Sesi
 network-off = Ağda oynatmak için Ayarlar'da Oynatılanı gönder seçeneğini açın.
@@ -303,12 +300,10 @@ network-choose-format = { $listener } üzerinde oynatmak için bir biçim seçin
 network-failed = Bağlanılamadı: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Burada oynatmak için triib'i güncelleyin.
 network-choose = Akışını nasıl aldığını görmek için bir dinleyici seçin.
 network-no-sources = Ağda plaa'nın oynattığı bir biçimde gönderen ya da böyle bir biçime geçebilen konuşmacı yok.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = { $talker } konuşmacısını dinlemeyi durdur
-network-listen-update-triib = Burada dinlemek için triib'i güncelleyin: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
 network-listen-lite = Bağlantı noktası, hiçbir akışı rezerve etmeyen AVB Lite ile çalışıyor: plaa yalnızca bu bilgisayara zaten ulaşanı oynatır.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

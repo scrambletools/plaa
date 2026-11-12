@@ -279,10 +279,7 @@ settings-avb-interface-note-mac = Portul cu fir pe care plaa găsește emițăto
 settings-avb-talker-note-mac = plaa trimite sunetul ferestrei redate ultima dată prin entitatea AVB proprie a acestui Mac, către receptorii conectați la ea.
 settings-avb-talker = Trimite ce se redă
 settings-avb-talker-note = plaa devine un emițător Milan și trimite sunetul ferestrei redate ultima dată către receptorii conectați la el.
-settings-avb-name = Nume în rețea
-settings-avb-name-note = Controlerele afișează plaa ca „{ $name }”. Apasă Enter pentru a-l redenumi.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa pe { $computer }
 avb-could-not-start = Nu s-a putut folosi { $interface }: { $error }
 network-title = Audio în rețea
 network-off = Activează „Trimite ce se redă” în Configurări pentru a reda în rețea.
@@ -312,12 +309,10 @@ network-choose-format = Alege formatul în care să redai pe { $listener }
 network-failed = Nu s-a putut conecta: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Actualizează triib pentru a reda aici.
 network-choose = Alege un receptor pentru a vedea cum își primește fluxul.
 network-no-sources = Niciun emițător din rețea nu trimite într-un format pe care plaa îl redă și nici nu poate trece la unul.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Nu mai asculta { $talker }
-network-listen-update-triib = Actualizează triib pentru a asculta aici: plaa redă doar ce ajunge oricum la acest computer.
 network-listen-lite = Portul folosește AVB Lite, care nu rezervă fluxuri: plaa redă doar ce ajunge oricum la acest computer.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

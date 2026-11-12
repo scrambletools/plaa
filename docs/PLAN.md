@@ -41,7 +41,7 @@ look follows Material Design 3, as in prev.
 | Settings | `~/.config/plaa.toml` (`%APPDATA%\plaa\plaa.toml`, `~/Library/Application Support/plaa/plaa.toml`), with a `[keys]` table as prev's; where files were left off in the state folder |
 | Interface languages | Fluent files in `i18n/`, English first, and the 38 languages prev has |
 | Assistant and MCP | As prev: one tool registry for MCP clients (`plaa --mcp`) and an assistant panel with the user's own model |
-| AVB and Milan | plaa's own Milan entity on Linux, and the Mac's own entity on macOS, with the `atdecc`, `avb-lite`, `avb-mrp`, `avb-net` and `avb-stream` crates of scrambletools/avb and `gptp` of scrambletools/gptp from crates.io: a talker of what plays, and a listener to play or record a stream. gptpd, shared with triib, on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
+| AVB and Milan | plaa's Milan entity in avb-endpointd on Linux, the daemon that runs every entity on the computer, and the Mac's own entity on macOS, with the `atdecc`, `avb-net` and `avb-stream` crates of scrambletools/avb and `avb-endpointd` of scrambletools/Linux-AVB-Endpoint from crates.io: a talker of what plays, and a listener to play or record a stream. gptpd, shared with triib, on Linux; audio first (AAF, AM824), IEEE 1722 CVF video later |
 | Distribution | A .deb for each Debian and Ubuntu release and an .rpm for Fedora's, each built against its FFmpeg, a PKGBUILD, an MSI and zip for Windows and an installer package for macOS ([Releasing](RELEASING.md)); no AppImage, Flatpak or plain archive for Linux, as none can grant the raw socket capability AVB needs |
 
 ## Scope
@@ -421,44 +421,51 @@ next pixel, so it moves a pixel at a time at any width.
 ### AVB and Milan
 
 plaa uses the AVB crates triib grew, which moved for it to their own
-repository, scrambletools/avb: `atdecc` for ATDECC's controller and
-entity state machines, `avb-mrp` for MSRP and MVRP, `avb-net` for raw
-Ethernet, and `avb-stream` for AAF talkers paced on gPTP time. The
-`plaa-avb` crate runs them on one thread for the interface Settings
-choose, as triib's endpoint daemon does.
+repository, scrambletools/avb: `atdecc` for ATDECC's controller, `avb-net`
+for raw Ethernet, `avb-stream` for the audio between plaa and its entity's
+device; and on Linux the files of avb-endpointd, the daemon in
+scrambletools/Linux-AVB-Endpoint. The `plaa-avb` crate runs the
+controller on one thread for the interface Settings choose.
 
 Its controller, on every system, reads each entity's names, streams,
 formats and bindings, and binds a listener's input to a talker's output,
 setting the input to the talker's format first where it lists it, as
 Milan listeners only take a stream in their own format.
 
-On Linux, plaa's entity has one stream output, "Playback", of two
-channels at 48 kHz, AAF in 32 or 24 bits, six samples a frame (class A),
-its entity ID the interface address with 0xff70 in the middle, beside
-triib's 0xff00 and up. MAAP claims its multicast address; MSRP declares
-it on VLAN 2 with class A and B's domains, as MVRP joins the VLAN; gPTP
-comes from gptpd's socket, plaa starting gptpd@ where it does not run
-yet, and the stream's presentation times from the record of the
-grandmaster's time gptpd keeps, which steers no clock. When MSRP says a
-listener is ready, the talker starts and stops again when none is. It
-sends what the media window plays: plaa's audio output hands a copy of
-each chunk it gives its device, in stereo after the volume, to a buffer
-the talker drains on gPTP time, resampling between the two clocks by
-how full it keeps.
+plaa's talker and listener are an entity another program runs, which
+plaa plays into and plays from (`feed.rs`): what the media window plays,
+a copy of each chunk plaa's audio output gives its device, in stereo after
+the volume, goes through a buffer into the entity's playback device,
+steering both sides to their clocks; and while a controller binds the
+entity's input, the input's device plays in a player window, or on the
+sound output.
 
-The entity also has one stream input, "Listen", in the same formats,
-which the Network Audio sheet binds to a talker's output, as any Milan
-controller can. Once the probe finds the talker's stream, plaa declares
-its listener in MSRP, Ready or Asking Failed as the talker's
-declaration is registered, and plays the stream on the sound output
-through `avb-stream`'s listener, with Milan's input counters.
+On Linux the entity is this computer's default entity, which
+avb-endpointd runs (`daemon.rs`): the daemon in the person's session
+that runs every entity on the interface, whichever app made it (Linux-AVB-Endpoint's
+`docs/endpointd.md`). There is one on each interface the daemon runs on,
+named for the computer, with a two-channel output, "Playback", and input,
+"Listen", each with a PipeWire device, `avb-<entity ID>-out-1` and
+`-in-1`, which plaa finds by those node names. It takes instance 0x70,
+so its entity ID is the interface address with 0xff70 in the middle, as
+plaa's own entity's was, and controllers' bindings to it stay. With
+sending on, plaa starts and enables `avb-endpointd@<interface>`; quitting
+plaa, or turning sending off, leaves it running for other apps. The
+daemon does the rest: ADP, AECP and ACMP, MAAP, MSRP and MVRP in one
+participant it shares, AVB Lite where gptpd falls back to its profile,
+gptpd and avb-link@ on the interface, and the stream threads at realtime
+priority. plaa reads the default entity's state, why a stream is
+blocked, and gptpd's state from the daemon's status file, and the unit's
+state where the daemon does not run. An older plaa, whose own entity has
+the default entity's ID, holds the default entity off while it runs, and
+the status says so.
 
 plaa holds no capability: a program holding one runs as one other
 programs may not look into, and the desktop portal then refuses it file
-dialogs and screen sharing. `plaa-netraw`, built beside it, is the one
-file granted CAP_NET_RAW. plaa starts it once, and every raw socket the
-avb crates open comes from it, passed over a Unix socket
-(`avb_net::broker`), as triib's binaries get theirs too.
+dialogs and screen sharing. avb-endpointd's `avb-netraw` is the one file
+granted CAP_NET_RAW; plaa starts it once, and its controller's raw
+sockets come from it, passed over a Unix socket (`avb_net::broker`), as
+the daemon's do.
 
 On a Mac, the talker is the Mac's own entity, which macOS runs once AVB
 is on for the port in Audio MIDI Setup: macOS never shows its AVB stack
@@ -466,53 +473,16 @@ what a program writes to BPF, so the controller sends that entity its
 commands through Apple's AudioVideoBridging framework
 (`atdecc::blocking::Local`), which answers them, and the Network Audio
 sheet offers the entity's first output as plaa's. While one of its
-stream outputs is connected, macOS makes a Core Audio device of it; plaa
-plays into its first two channels from the same buffer the Linux talker
-drains, steering both sides to their clocks (`host.rs`).
+stream outputs is connected, macOS makes a Core Audio device of it,
+which plaa plays into and from as above (`host.rs`).
 
-Two MRP participants on one port withdraw each other's declarations, so
-where triib's entity service runs on the interface, the entity reserves
-its stream in the service's participant (`avb_mrp::sharing`, a socket in
-the user's runtime folder): the service declares the stream and tells
-plaa its listeners; from version 2 of the protocol it also listens for
-plaa, declaring plaa's listener merged with its own and telling plaa the
-stream's talker. While the port runs AVB Lite, the service keeps both,
-declaring them by CVU SRP in the name of plaa's entity, which plaa names
-as it connects: it admits listeners for every talker on the computer and
-tells plaa where to send each copy of its stream, and with which VLAN
-tag, and plaa takes a stream sent to this computer's own address or the
-multicast address it escalates to. plaa's entity answers GET_LITE_STATUS
-from what the service says and gptpd, and passes a controller's
-SET_LITE_CONFIG on to the service, which decides escalation for the
-port. Beside an older service, plaa plays what reaches the port anyway,
-and says to update triib; one without AVB Lite stops plaa's stream while
-the port runs it.
-When the service goes, plaa waits 15 s for triib to bring it back, as it
-does within seconds, then runs its own participants, and shares the
-service's again when it is back. On its own participants plaa runs AVB
-Lite itself, with avb's avb-lite crate, which triib's service is to move
-onto: where gptpd finds from the Pdelay exchange that no bridge reserves
-streams and falls back to the AVB Lite PTP profile, plaa falls back with
-it, declaring by CVU SRP in its entity's name and sending a unicast copy
-to each listener it admits within its fan-out, 5 by default, and 75% of
-the link, until gptpd returns to gPTP as the link comes up again.
-Meanwhile it holds the interface promiscuous where it filters VLANs in
-hardware, as the I210 does, which otherwise drops CVU
-SRP's commands, tagged in the media VLAN. Beside an older service,
-which does not share it, or another program declaring MRP from this
-computer's address, the entity steps aside. Tested against an ESP32
-Milan listener through a MOTU AVB switch: the listener locked to the
-stream, 8,000 frames a second, none late or early, with plaa on its own
-participants and through triib's, the service stopped and started again
-while it streamed. In AVB Lite, with the port on a switch without AVB
-beside an AVB Lite endpoint, plaa's stream reached triib's entity as a
-unicast copy, plaa took one sent to this computer, escalation set on
-either entity reached the other, and plaa went back to MSRP as the port
-returned to an AVB switch. On plaa's own participants, triib's service
-stopped, its MSRP streamed both ways through the MOTU switch, and on the
-switch without AVB it fell back within 3 s and streamed both ways with
-an ESP32 AVB Lite endpoint by unicast copy, none late, staying in AVB
-Lite with a MOTU 8D, which has no AVB Lite, answering Pdelay there too.
+Until November 2026 plaa ran its own entity in its process on Linux, with
+its own MRP participants, sharing triib's where triib's entity service
+ran, and AVB Lite with avb's avb-lite crate. It was tested against an
+ESP32 Milan listener through a MOTU AVB switch, and in AVB Lite against
+an ESP32 endpoint and triib's. That entity moved into avb-endpointd, so
+that any app can play into it without plaa running and one daemon keeps
+the port's reservations.
 
 ## Dependency and license policy
 

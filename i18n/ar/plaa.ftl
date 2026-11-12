@@ -288,10 +288,7 @@ settings-avb-interface-note-mac = المنفذ السلكي الذي يبحث ف
 settings-avb-talker-note-mac = يرسل plaa صوت آخر نافذة جرى التشغيل فيها عبر كيان AVB الخاص بجهاز Mac هذا، إلى المستقبِلات المتصلة به.
 settings-avb-talker = إرسال ما يُشغَّل
 settings-avb-talker-note = يصبح plaa مُرسِل Milan، فيرسل صوت آخر نافذة جرى التشغيل فيها إلى المستقبِلات المتصلة به.
-settings-avb-name = الاسم على الشبكة
-settings-avb-name-note = تعرض وحدات التحكم plaa باسم “{ $name }”. اضغط Enter لإعادة تسميته.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa على { $computer }
 avb-could-not-start = تعذّر استخدام { $interface }: { $error }
 network-title = الصوت عبر الشبكة
 network-off = شغّل “إرسال ما يُشغَّل” في الإعدادات للتشغيل على الشبكة.
@@ -321,12 +318,10 @@ network-choose-format = اختر تنسيقًا للتشغيل على { $listene
 network-failed = تعذّر الاتصال: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = حدّث triib للتشغيل هنا.
 network-choose = اختر مستقبِلًا لترى كيف يستقبل تدفقه.
 network-no-sources = لا يوجد على الشبكة مُرسِل يرسل بتنسيق يشغّله plaa، أو يمكنه التحوّل إلى تنسيق كهذا.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = إيقاف الاستماع إلى { $talker }
-network-listen-update-triib = حدّث triib للاستماع هنا: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
 network-listen-lite = يعمل المنفذ بنظام AVB Lite الذي لا يحجز أي تدفقات: لا يشغّل plaa إلا ما يصل إلى هذا الكمبيوتر على أي حال.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

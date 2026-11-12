@@ -1,30 +1,27 @@
 //! plaa on an AVB network: a controller that finds the talkers and
 //! listeners there and connects them, and a talker sending what plaa
-//! plays once a listener is ready for it: on Linux plaa's own Milan
-//! entity, whose one stream output sends it and whose one stream input
-//! plays what a controller binds it to, and on a Mac the Mac's own
-//! entity, which macOS runs and plaa plays into (`host`).
+//! plays once a listener is ready for it, from an entity another program
+//! runs, which plaa plays into as any app can: on Linux this computer's
+//! default entity, which avb-endpointd runs with every other entity on
+//! the computer (`daemon`), whose first stream output sends what plays
+//! into its playback device and whose first stream input plays what a
+//! controller binds it to from its recording device; on a Mac the Mac's
+//! own entity, which macOS runs (`host`).
 //!
-//! One thread runs it all on the interface, as triib's endpoint daemon
-//! does: frames from raw sockets, the controller's and the entity's state
-//! machines from the avb crates, MAAP for the stream's address, MSRP and
-//! MVRP for its reservation, and gPTP from gptpd. Two MRP participants on
-//! one port withdraw each other's declarations, so where triib's endpoint
-//! daemon runs on the interface, the entity reserves its stream in the
-//! daemon's participant, which it shares.
+//! One thread runs the controller on the interface: frames from a raw
+//! socket, and the controller's state machine from atdecc.
 
 #[cfg(target_os = "linux")]
-mod gptp;
+mod daemon;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+mod feed;
 #[cfg(target_os = "macos")]
 mod host;
-#[cfg(target_os = "linux")]
-mod own;
-#[cfg(target_os = "linux")]
-mod ptp;
-#[cfg(target_os = "linux")]
-mod reservation;
 mod runtime;
 mod sound;
+
+#[cfg(target_os = "linux")]
+pub use daemon::enable as enable_daemon;
 
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -43,13 +40,8 @@ use runtime::Input;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     pub interface: String,
-    /// Send what plaa plays from an entity of its own.
+    /// Send what plaa plays, from this computer's entity.
     pub talker: bool,
-    /// The entity's name, as controllers show it.
-    pub name: String,
-    /// Where plaa keeps its stream's address between runs, to send to it
-    /// again at once while MAAP claims it anew.
-    pub address_file: Option<std::path::PathBuf>,
 }
 
 /// A stream output or input of an entity on the network.
@@ -102,9 +94,6 @@ pub enum TalkerState {
 /// takes only what comes to the port anyway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListenBlocked {
-    /// triib's entity service, whose participant plaa shares, is too old
-    /// to listen for it.
-    OldService,
     /// The port runs AVB Lite, which reserves no streams.
     AvbLite,
 }
@@ -146,10 +135,6 @@ pub struct Snapshot {
     pub talker: TalkerState,
     /// The last command that failed, and why.
     pub failure: Option<String>,
-    /// Listeners on this computer get no stream from plaa: the
-    /// participant plaa shares tells it only the network's listeners, as
-    /// triib's entity service did before it said hello.
-    pub local_unserved: bool,
     pub ptp: Ptp,
     pub listen_blocked: Option<ListenBlocked>,
 }
@@ -281,16 +266,17 @@ impl Drop for Network {
     }
 }
 
-/// The helper that opens raw sockets for plaa, the one file granted
-/// CAP_NET_RAW, as packages and builds put it.
+/// The helper that opens raw sockets for plaa's controller, the one file
+/// granted CAP_NET_RAW: avb-endpointd's, which opens the daemon's too.
 #[cfg(target_os = "linux")]
-pub const HELPER: &str = "plaa-netraw";
+pub const HELPER: &str = "avb-netraw";
 
 /// Has every raw socket come from the helper, started once: plaa itself
 /// holds no capability, so the desktop's portals keep answering it.
 #[cfg(target_os = "linux")]
 fn use_helper() -> io::Result<()> {
-    let folders = ["/usr/lib/plaa", "/usr/libexec/plaa"].map(std::path::Path::new);
+    let folders =
+        ["/usr/lib/avb-endpointd", "/usr/libexec/avb-endpointd"].map(std::path::Path::new);
     avb_net::broker::use_helper(HELPER, &folders)
 }
 

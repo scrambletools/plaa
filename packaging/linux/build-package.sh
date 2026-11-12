@@ -129,24 +129,26 @@ fi
 
 # The installed copy, with its own settings and cache, not a dev build.
 PLAA_PRODUCTION=1 cargo build --release --locked --manifest-path "$root/Cargo.toml" \
-    -p plaa -p plaa-avb --bin plaa --bin plaa-netraw "${targeting[@]}"
+    -p plaa --bin plaa "${targeting[@]}"
 "$binaries/plaa" --version
 
 work=$(mktemp -d)
 "$root/scripts/dist-install.sh" "$binaries" "$work/stage" /usr
 mkdir -p "$work/packaging/linux"
 cp "$root/packaging/linux/postinstall.sh" "$work/packaging/linux/"
-programs=("$work/stage/usr/bin/plaa" "$work/stage/usr/lib/plaa/plaa-netraw")
+programs=("$work/stage/usr/bin/plaa")
+# The daemon at least as new as the library plaa is built with.
+endpointd=$(sed -n 's/^avb-endpointd = "\(.*\)"/\1/p' "$root/Cargo.toml")
+[ -n "$endpointd" ] || { echo "build-package.sh: no avb-endpointd version in Cargo.toml" >&2; exit 2; }
 
-# What the programs link, as package names or as the libraries' names,
+# What the program links, as package names or as the libraries' names,
 # and what plaa loads as it runs: libass, the window system's libraries
 # and Vulkan, with Mesa's drivers, whose software one draws the picture
 # where no graphics card can: without a Vulkan driver wgpu turns to
 # OpenGL, which on some systems cannot draw in the window at all. Then
-# ethtool, which plaa-link@ turns EEE and PAUSE off with, iproute2, whose
-# ip and tc it sets the link and its queue up with, and RealtimeKit,
-# which runs AVB streams' threads at realtime priority. setcap grants
-# the helper its capability as the package installs.
+# avb-endpointd, which runs this computer's AVB entity that plaa plays
+# into and whose avb-netraw opens raw sockets for plaa's controller; it
+# brings gptpd, avb-link@ and RealtimeKit with it.
 config=$work/nfpm.yaml
 cp "$root/packaging/nfpm.yaml" "$config"
 list() { sed 's/^/        - /'; }
@@ -159,10 +161,8 @@ if [ $kind = deb ]; then
         echo "overrides:"
         echo "  deb:"
         echo "    depends:"
-        printf '%s\n' "$linked" libass9 libcap2-bin libvulkan1 mesa-vulkan-drivers libwayland-client0 \
-            libxkbcommon0 ethtool iproute2 rtkit | list
-        echo "    recommends:"
-        printf '%s\n' gptpd | list
+        printf '%s\n' "$linked" libass9 libvulkan1 mesa-vulkan-drivers libwayland-client0 \
+            libxkbcommon0 "avb-endpointd (>= $endpointd)" | list
         echo "    suggests:"
         printf '%s\n' yt-dlp | list
     } >>"$config"
@@ -172,10 +172,8 @@ else
         echo "overrides:"
         echo "  rpm:"
         echo "    depends:"
-        printf '%s\n' "$linked" libass libcap vulkan-loader mesa-vulkan-drivers libwayland-client \
-            libxkbcommon ethtool iproute rtkit | list
-        echo "    recommends:"
-        printf '%s\n' gptpd | list
+        printf '%s\n' "$linked" libass vulkan-loader mesa-vulkan-drivers libwayland-client \
+            libxkbcommon "avb-endpointd >= $endpointd" | list
         echo "    suggests:"
         printf '%s\n' yt-dlp | list
     } >>"$config"

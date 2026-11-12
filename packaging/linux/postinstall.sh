@@ -1,30 +1,28 @@
 #!/bin/sh
-# Lets plaa send and receive raw Ethernet for AVB without root, through
-# plaa-netraw, the one program granted CAP_NET_RAW, which opens its raw
-# sockets. Says what installing changes on the system and why, then when
-# no interface can send plaa's AVB stream, and stops the ptp4l services
-# an older plaa ran.
-program=/usr/lib/plaa/plaa-netraw
-if ! setcap cap_net_raw+ep "$program"; then
-    echo "plaa: could not grant $program CAP_NET_RAW; run: sudo setcap cap_net_raw+ep $program" >&2
-fi
+# Says what installing changes on the system and why, then when no
+# interface can send plaa's AVB stream, and stops the services an older
+# plaa ran: its ptp4l services, and plaa-link@, which avb-link@ replaced.
 cat <<'EOF'
 plaa: for sending what plays to AVB speakers and amplifiers, this package
-  - gives /usr/lib/plaa/plaa-netraw CAP_NET_RAW, so only that small
-    helper opens raw network sockets and plaa itself runs without root;
-  - relies on RealtimeKit (rtkit), as PipeWire does, to run plaa's AVB
-    stream threads at realtime priority, so a busy computer doesn't
-    hold up their audio;
-  - installs plaa-link@.service and a polkit rule that lets you run it.
-    When plaa starts AVB on an interface, it keeps plaa's frames on one
-    transmit queue, under fq_codel, and turns Energy-Efficient
-    Ethernet and PAUSE off, reconnecting the link once if they were on.
-Nothing on an interface changes until plaa starts AVB there.
+  - depends on avb-endpointd, which runs this computer's AVB entity in
+    your avb-endpointd@INTERFACE user service, for plaa and any other
+    app to play into through PipeWire. Its avb-netraw holds CAP_NET_RAW
+    and opens raw network sockets for the daemon and for plaa's
+    controller, so plaa itself runs without root;
+  - starts and enables that service when you turn "Send what plays" on,
+    so it then starts at each login. The daemon starts gptpd and
+    avb-link@ on the interface, which keeps the stream's frames on one
+    transmit queue and turns Energy-Efficient Ethernet and PAUSE off,
+    reconnecting the link once if they were on.
+Nothing on an interface changes until AVB starts there.
 EOF
 /usr/lib/plaa/avb-check || true
 # plaa's ptp4l services gave way to gptpd: any an older plaa started would
-# keep gptpd off its interface.
+# keep gptpd off its interface. plaa-link@'s unit is gone with the
+# upgrade; stopping what is left of it changes nothing on the interface.
 if [ -d /run/systemd/system ]; then
-    systemctl stop 'plaa-ptp4l@*.service' 'plaa-ptp4l-lite@*.service' 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl stop 'plaa-ptp4l@*.service' 'plaa-ptp4l-lite@*.service' \
+        'plaa-link@*.service' 2>/dev/null || true
 fi
 exit 0

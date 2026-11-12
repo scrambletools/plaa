@@ -1,7 +1,9 @@
-//! plaa's AVB side on its own: lists the entities on an interface, or runs
-//! plaa's entity sending a quiet tone or silence, or connects and
-//! disconnects streams as plaa's controller would. Raw Ethernet needs
-//! CAP_NET_RAW on Linux (`sudo setcap cap_net_raw+ep <this program>`).
+//! plaa's AVB side on its own: lists the entities on an interface, or
+//! plays a quiet tone or silence into plaa's entity, or connects and
+//! disconnects streams as plaa's controller would. On Linux, raw Ethernet
+//! comes through avb-endpointd's helper, avb-netraw, and `talk` plays into
+//! plaa's entity as avb-endpointd runs it, once plaa has listed it with
+//! "Send what plays" on.
 //!
 //! cargo run -p plaa-avb --example avb -- list <interface>
 //! cargo run -p plaa-avb --example avb -- talk <interface> <seconds> [--tone]
@@ -59,8 +61,6 @@ fn open(interface: &str, talker: bool) -> Network {
     let config = Config {
         interface: interface.to_owned(),
         talker,
-        name: "plaa test".into(),
-        address_file: None,
     };
     Network::start(config, || {}).unwrap_or_else(|error| {
         eprintln!("could not start on {interface}: {error}");

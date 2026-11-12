@@ -4,15 +4,32 @@
 
 ### Changed
 
+- On Linux, what plaa plays goes to the network through this computer's
+  entity, which avb-endpointd runs, the daemon in the person's session
+  that runs every AVB entity on the computer, rather than through an
+  entity in plaa. It stays on the network after plaa quits, and any app
+  can play into its playback device, as plaa plays what the media window
+  plays; plaa plays its recording device while a controller binds its
+  input. plaa starts and enables the daemon's user service, and the
+  entity keeps the ID plaa's had. plaa's controller takes its raw
+  sockets from the daemon's avb-netraw, and the daemon runs avb-link@ in
+  place of plaa-link@. The entity's name is the computer's, which
+  controllers change, so plaa's setting for it is gone.
+- plaa's Linux packages depend on avb-endpointd's, which bring the
+  daemon, avb-netraw, avb-link@ and gptpd, and no longer carry
+  plaa-netraw or plaa-link@; an upgrade stops what is left of
+  plaa-link@. Each release carries avb-endpointd's and gptpd's debs and
+  rpms beside plaa's, as no distribution has them.
 - plaa keeps network time with gptpd, shared with triib's entity
-  service, in place of its own ptp4l services. Its packages recommend
-  gptpd where they recommended linuxptp, plaa starts `gptpd@<interface>`
-  where it does not run yet, and Network Audio says why where gptpd
-  refused to run. The stream takes its time from gptpd's record of the
-  grandmaster's time, which steers no clock, so a new grandmaster, a
-  restart or a link bounce no longer slews the clock the neighbor
-  measures the link by, and streams follow a new grandmaster within a
-  Sync or two. gptpd sends PTP 2.0 on every distribution.
+  service, in place of its own ptp4l services. Its packages bring
+  gptpd, through avb-endpointd's, where they recommended linuxptp, plaa
+  starts `gptpd@<interface>` where it does not run yet, and Network
+  Audio says why where gptpd refused to run. The stream takes its time
+  from gptpd's record of the grandmaster's time, which steers no clock,
+  so a new grandmaster, a restart or a link bounce no longer slews the
+  clock the neighbor measures the link by, and streams follow a new
+  grandmaster within a Sync or two. gptpd sends PTP 2.0 on every
+  distribution.
 - AVB Lite's fallback is gptpd's to decide, one decision for the port
   that plaa and triib both follow: plaa sends no peer delay requests of
   its own any more, and gptpd corrects for the grandmaster's link speed.

@@ -1,6 +1,6 @@
 [package]
 name = "plaa-avb"
-description = "plaa on an AVB network: a Milan controller, and a talker sending what plays, on Linux plaa's own entity, on a Mac the Mac's own"
+description = "plaa on an AVB network: a Milan controller, and a talker sending what plays, on Linux from plaa's entity in avb-endpointd, on a Mac from the Mac's own"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,14 +12,15 @@ workspace = true
 
 [dependencies]
 atdecc.workspace = true
-avb-lite.workspace = true
-avb-mrp.workspace = true
 avb-net.workspace = true
 avb-stream.workspace = true
 
-# gptpd's status, on Linux, where it keeps gPTP for plaa's entity.
+# On Linux, avb-endpointd's files, which list plaa's entity for the daemon
+# and say how it stands, and the daemon's audio devices, found through the
+# sound server by their node names.
 [target.'cfg(target_os = "linux")'.dependencies]
-gptp.workspace = true
+avb-endpointd.workspace = true
+cpal = { version = "0.18", features = ["pulseaudio"] }
 
 # The Mac's own AVB entity's Core Audio device, found by its UID.
 [target.'cfg(target_os = "macos")'.dependencies]

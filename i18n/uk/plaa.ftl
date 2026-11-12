@@ -282,10 +282,7 @@ settings-avb-interface-note-mac = Дротовий порт, на якому pla
 settings-avb-talker-note-mac = plaa надсилає звук вікна, яке відтворювало останнім, через власну сутність AVB цього Mac до підключених до неї приймачів.
 settings-avb-talker = Надсилати те, що відтворюється
 settings-avb-talker-note = plaa стає передавачем Milan і надсилає звук вікна, яке відтворювало останнім, підключеним до нього приймачам.
-settings-avb-name = Назва в мережі
-settings-avb-name-note = Контролери показують plaa як «{ $name }». Натисніть Enter, щоб перейменувати.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa на { $computer }
 avb-could-not-start = Не вдалося використати { $interface }: { $error }
 network-title = Мережеве аудіо
 network-off = Щоб відтворювати в мережі, увімкніть «Надсилати те, що відтворюється» в параметрах.
@@ -315,12 +312,10 @@ network-choose-format = Виберіть формат для відтворен�
 network-failed = Не вдалося підключитися: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Оновіть triib, щоб відтворювати тут.
 network-choose = Виберіть приймач, щоб побачити, як він отримує потік.
 network-no-sources = У мережі немає передавача, що надсилає у форматі, який відтворює plaa, або може на нього перемкнутися.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Перестати слухати передавач { $talker }
-network-listen-update-triib = Оновіть triib, щоб слухати тут: plaa відтворює лише те, що й так доходить до цього комп’ютера.
 network-listen-lite = Порт працює в режимі AVB Lite, який не резервує потоків: plaa відтворює лише те, що й так доходить до цього комп’ютера.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

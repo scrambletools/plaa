@@ -277,10 +277,7 @@ settings-avb-interface-note-mac = Langallinen portti, josta plaa etsii AVB- ja M
 settings-avb-talker-note-mac = plaa lähettää viimeksi toistaneen ikkunan äänen tämän Macin oman AVB-entiteetin kautta siihen yhdistetyille vastaanottimille.
 settings-avb-talker = Lähetä toistettava ääni
 settings-avb-talker-note = plaasta tulee Milan-lähetin, joka lähettää viimeksi toistaneen ikkunan äänen siihen yhdistetyille vastaanottimille.
-settings-avb-name = Nimi verkossa
-settings-avb-name-note = Ohjaimet näyttävät plaan nimellä ”{ $name }”. Nimeä uudelleen painamalla Enter.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa ({ $computer })
 avb-could-not-start = Liitännän { $interface } käyttäminen epäonnistui: { $error }
 network-title = Verkkoääni
 network-off = Ota Asetuksissa käyttöön ”Lähetä toistettava ääni”, niin voit toistaa verkossa.
@@ -310,12 +307,10 @@ network-choose-format = Valitse muoto toistoon laitteella { $listener }
 network-failed = Yhdistäminen epäonnistui: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Päivitä triib, niin voit toistaa tässä.
 network-choose = Valitse vastaanotin nähdäksesi, miten se ottaa virtansa vastaan.
 network-no-sources = Mikään verkon lähetin ei lähetä muodossa, jota plaa toistaa, eikä voi vaihtaa sellaiseen.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Lopeta lähettimen { $talker } kuuntelu
-network-listen-update-triib = Päivitä triib, niin voit kuunnella tässä: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
 network-listen-lite = Portissa on käytössä AVB Lite, joka ei varaa virtoja: plaa toistaa vain sen, mikä tulee tälle tietokoneelle muutenkin.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

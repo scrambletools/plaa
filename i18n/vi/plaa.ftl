@@ -269,10 +269,7 @@ settings-avb-interface-note-mac = Cổng có dây mà plaa dùng để tìm Talk
 settings-avb-talker-note-mac = plaa gửi âm thanh của cửa sổ phát gần nhất qua thực thể AVB riêng của máy Mac này, tới các Listener đã kết nối với nó.
 settings-avb-talker = Gửi nội dung đang phát
 settings-avb-talker-note = plaa trở thành một Talker Milan, gửi âm thanh của cửa sổ phát gần nhất tới các Listener đã kết nối với nó.
-settings-avb-name = Tên trên mạng
-settings-avb-name-note = Các bộ điều khiển hiển thị plaa là “{ $name }”. Nhấn Enter để đổi tên.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa trên { $computer }
 avb-could-not-start = Không thể dùng { $interface }: { $error }
 network-title = Âm thanh qua mạng
 network-off = Hãy bật “Gửi nội dung đang phát” trong Cài đặt để phát qua mạng.
@@ -302,12 +299,10 @@ network-choose-format = Chọn định dạng để phát trên { $listener }
 network-failed = Không thể kết nối: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Hãy cập nhật triib để phát ở đây.
 network-choose = Chọn một Listener để xem cách nó nhận luồng.
 network-no-sources = Không có Talker nào trên mạng gửi ở định dạng mà plaa phát, hoặc có thể chuyển sang định dạng đó.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Dừng nghe { $talker }
-network-listen-update-triib = Hãy cập nhật triib để nghe ở đây: plaa chỉ phát những gì vốn đã đến được máy tính này.
 network-listen-lite = Cổng đang chạy AVB Lite, không đặt trước luồng nào: plaa chỉ phát những gì vốn đã đến được máy tính này.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

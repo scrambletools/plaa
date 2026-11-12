@@ -1,9 +1,10 @@
-//! The thread plaa's network side runs on: frames from the sockets'
-//! reader threads and commands from the app come in on one channel; the
-//! controller, and on Linux plaa's entity, run their timers and send what
-//! they queue; and what the controller has read is laid out for the app.
-//! On a Mac, commands to the Mac's own entity, plaa's talker there, go
-//! through Apple's AVB framework, which answers them.
+//! The thread plaa's network side runs on: frames from the socket's
+//! reader thread and commands from the app come in on one channel; the
+//! controller runs its timers and sends what it queues; and what it has
+//! read is laid out for the app. plaa's talker is an entity another
+//! program runs: avb-endpointd on Linux (`daemon`), and on a Mac the Mac's
+//! own entity, whose commands go through Apple's AVB framework, which
+//! answers them (`host`).
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
@@ -22,11 +23,9 @@ use atdecc::{ADP_ACMP_MULTICAST, AcmpStatus, AecpMessageType, EntityId, Instant,
 use avb_net::Socket;
 
 #[cfg(target_os = "linux")]
-use crate::gptp;
+use crate::daemon::Daemon;
 #[cfg(target_os = "macos")]
 use crate::host::Host;
-#[cfg(target_os = "linux")]
-use crate::own::{self, Own};
 use crate::sound::Sound;
 use crate::{Config, Found, Ptp, Snapshot, Stream, TalkerState};
 
@@ -93,21 +92,8 @@ struct OnThread(Option<atdecc::blocking::Local>);
 unsafe impl Send for OnThread {}
 
 pub(crate) enum Input {
-    /// An ATDECC or MAAP frame, who sent it, and whether to a group
-    /// address.
-    Avtp(MacAddress, bool, Vec<u8>),
-    #[cfg(target_os = "linux")]
-    Msrp(MacAddress, Vec<u8>),
-    #[cfg(target_os = "linux")]
-    Mvrp(MacAddress, Vec<u8>),
-    #[cfg(target_os = "linux")]
-    Gptp(Option<gptp::Status>),
-    /// What the program sharing its port's participant says.
-    #[cfg(target_os = "linux")]
-    Shared(avb_mrp::sharing::Notice),
-    /// Its connection of this generation closed.
-    #[cfg(target_os = "linux")]
-    SharedClosed(u64),
+    /// An AVTP frame, and who sent it.
+    Avtp(MacAddress, Vec<u8>),
     /// Binds a listener's input to a talker's output, both in a format
     /// given, or the talker's.
     Connect(End, End, Option<StreamFormat>),
@@ -127,13 +113,12 @@ pub(crate) enum Input {
 }
 
 /// Reads `socket`'s frames into `sender` on a thread of its own, until
-/// `stop`, each with its source and whether it went to a group address.
-pub(crate) fn read_into(
+/// `stop`, each with its source.
+fn read_into(
     socket: Arc<Socket>,
     stop: Arc<AtomicBool>,
     sender: Sender<Input>,
     name: &str,
-    wrap: fn(MacAddress, bool, Vec<u8>) -> Input,
 ) -> io::Result<()> {
     std::thread::Builder::new()
         .name(name.into())
@@ -143,10 +128,7 @@ pub(crate) fn read_into(
                 match socket.receive(&mut buffer, Some(Duration::from_millis(200))) {
                     Ok(Some(received)) => {
                         let bytes = buffer[..received.length].to_vec();
-                        if sender
-                            .send(wrap(received.source, received.group, bytes))
-                            .is_err()
-                        {
+                        if sender.send(Input::Avtp(received.source, bytes)).is_err() {
                             return;
                         }
                     }
@@ -170,13 +152,7 @@ pub(crate) fn start(
     avtp.join_multicast(ADP_ACMP_MULTICAST)?;
     let (sender, inputs) = mpsc::channel();
     sound.tell(sender.clone());
-    read_into(
-        avtp.clone(),
-        stop.clone(),
-        sender.clone(),
-        "plaa-avtp",
-        Input::Avtp,
-    )?;
+    read_into(avtp.clone(), stop.clone(), sender.clone(), "plaa-avtp")?;
     let mac = avtp.mac();
     let [a, b, c, d, e, f] = mac.0;
     let controller_id = EntityId(u64::from_be_bytes([
@@ -216,7 +192,7 @@ pub(crate) fn start(
         pending: HashMap::new(),
         unbinds: HashSet::new(),
         #[cfg(target_os = "linux")]
-        own: None,
+        daemon: None,
         #[cfg(target_os = "macos")]
         interface: config.interface.clone(),
         #[cfg(target_os = "macos")]
@@ -235,12 +211,7 @@ pub(crate) fn start(
     };
     #[cfg(target_os = "linux")]
     if config.talker {
-        // MAAP, for the stream's address.
-        runtime.avtp.join_multicast(own::MAAP_DESTINATION)?;
-        match Own::new(&config, mac, runtime.avtp.clone(), &sender, &stop, sound) {
-            Ok(own) => runtime.own = Some(own),
-            Err(error) => runtime.talker = TalkerState::Blocked(error.to_string()),
-        }
+        runtime.daemon = Some(Daemon::new(&config.interface, mac, sound));
     }
     #[cfg(target_os = "macos")]
     if config.talker {
@@ -285,8 +256,9 @@ struct Runtime {
     pending: HashMap<CommandId, VecDeque<Step>>,
     /// The unbinds sent, not yet answered.
     unbinds: HashSet<CommandId>,
+    /// avb-endpointd, running plaa's entity, as plaa's talker.
     #[cfg(target_os = "linux")]
-    own: Option<Own>,
+    daemon: Option<Daemon>,
     #[cfg(target_os = "macos")]
     interface: String,
     /// The controller's, to start it again once the framework opens.
@@ -321,13 +293,6 @@ impl Runtime {
     fn run(mut self) {
         #[cfg(target_os = "macos")]
         self.open_local();
-        #[cfg(target_os = "linux")]
-        {
-            let (now, since) = (self.now(), self.since());
-            if let Some(own) = &mut self.own {
-                own.begin(now, since);
-            }
-        }
         self.controller.discover(None);
         self.publish();
         while !self.stop.load(Ordering::Relaxed) {
@@ -339,13 +304,6 @@ impl Runtime {
             }
             self.turn();
         }
-        #[cfg(target_os = "linux")]
-        {
-            let since = self.since();
-            if let Some(own) = &mut self.own {
-                own.end(since);
-            }
-        }
         self.controller.depart();
         self.flush();
     }
@@ -356,22 +314,16 @@ impl Runtime {
             .controller
             .poll_timeout()
             .map(|at| at.saturating_duration_since(now));
-        #[cfg(target_os = "linux")]
-        let own = self
-            .own
-            .as_ref()
-            .and_then(|own| own.poll_timeout(now, self.since()));
-        #[cfg(not(target_os = "linux"))]
-        let own = None;
         #[cfg(target_os = "macos")]
-        let own = self
+        let local = self
             .local
             .0
             .as_ref()
             .is_some_and(atdecc::blocking::Local::waiting)
-            .then_some(LOCAL_WAIT)
-            .or(own);
-        [controller, own, Some(MOST_WAIT)]
+            .then_some(LOCAL_WAIT);
+        #[cfg(not(target_os = "macos"))]
+        let local = None;
+        [controller, local, Some(MOST_WAIT)]
             .into_iter()
             .flatten()
             .min()
@@ -381,42 +333,7 @@ impl Runtime {
     fn handle(&mut self, input: Input) {
         let now = self.now();
         match input {
-            Input::Avtp(source, group, bytes) => self.heard(now, source, group, &bytes),
-            #[cfg(target_os = "linux")]
-            Input::Msrp(source, bytes) => {
-                let since = self.since();
-                if let Some(own) = &mut self.own {
-                    own.handle_msrp(now, since, source, &bytes);
-                }
-            }
-            #[cfg(target_os = "linux")]
-            Input::Mvrp(source, bytes) => {
-                let since = self.since();
-                if let Some(own) = &mut self.own {
-                    own.handle_mvrp(now, since, source, &bytes);
-                }
-            }
-            #[cfg(target_os = "linux")]
-            Input::Gptp(status) => {
-                let since = self.since();
-                if let Some(own) = &mut self.own {
-                    own.handle_gptp(now, since, status);
-                }
-            }
-            #[cfg(target_os = "linux")]
-            Input::Shared(notice) => {
-                let since = self.since();
-                if let Some(own) = &mut self.own {
-                    own.handle_shared(since, notice);
-                }
-            }
-            #[cfg(target_os = "linux")]
-            Input::SharedClosed(generation) => {
-                let since = self.since();
-                if let Some(own) = &mut self.own {
-                    own.shared_closed(since, generation);
-                }
-            }
+            Input::Avtp(source, bytes) => self.heard(now, source, &bytes),
             Input::Connect(talker, listener, format) => {
                 self.connect(now, talker, listener, format);
             }
@@ -435,8 +352,8 @@ impl Runtime {
             }
             Input::ListenInto(buffer) => {
                 #[cfg(target_os = "linux")]
-                if let Some(own) = &mut self.own {
-                    own.listen_into(buffer);
+                if let Some(daemon) = &mut self.daemon {
+                    daemon.listen_into(buffer);
                 }
                 #[cfg(target_os = "macos")]
                 if let Some(host) = &mut self.host {
@@ -447,8 +364,8 @@ impl Runtime {
             }
             Input::SoundRate => {
                 #[cfg(target_os = "linux")]
-                if let Some(own) = &mut self.own {
-                    own.sound_changed();
+                if let Some(daemon) = &mut self.daemon {
+                    daemon.sound_changed();
                 }
                 #[cfg(target_os = "macos")]
                 if let Some(host) = &mut self.host {
@@ -459,23 +376,16 @@ impl Runtime {
         }
     }
 
-    /// A frame from the network, or from plaa's own entity or controller,
-    /// which the socket does not bring back: each hears the other.
-    fn heard(&mut self, now: Instant, source: MacAddress, group: bool, bytes: &[u8]) {
-        if bytes.first() != Some(&atdecc::avtp::subtype::MAAP) {
-            if let Some(entity) = notifier(bytes, self.controller.entity_id()) {
-                self.watch.notifying.insert(entity);
-            }
-            let _ = self.controller.handle_frame(now, source, bytes);
+    /// A frame from the network, or from an entity on this computer, as
+    /// another program's frames come back to plaa's socket.
+    fn heard(&mut self, now: Instant, source: MacAddress, bytes: &[u8]) {
+        if bytes.first() == Some(&atdecc::avtp::subtype::MAAP) {
+            return;
         }
-        #[cfg(target_os = "linux")]
-        {
-            let since = self.since();
-            if let Some(own) = &mut self.own {
-                own.handle_avtp(now, since, source, group, bytes);
-            }
+        if let Some(entity) = notifier(bytes, self.controller.entity_id()) {
+            self.watch.notifying.insert(entity);
         }
-        let _ = group;
+        let _ = self.controller.handle_frame(now, source, bytes);
     }
 
     /// Binds `listener` to `talker` in `format`, or in the talker's: the
@@ -637,15 +547,10 @@ impl Runtime {
         self.controller.handle_timeout(now);
         self.refresh(now, since);
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        let talker_before = (
-            self.talker_state(),
-            self.local_unserved(),
-            self.ptp(),
-            self.listen_blocked(),
-        );
+        let talker_before = (self.talker_state(), self.ptp(), self.listen_blocked());
         #[cfg(target_os = "linux")]
-        if let Some(own) = &mut self.own {
-            own.turn(now, since);
+        if let Some(daemon) = &mut self.daemon {
+            daemon.turn(&self.controller);
         }
         #[cfg(target_os = "macos")]
         if let Some(host) = &mut self.host {
@@ -656,22 +561,13 @@ impl Runtime {
         }
         let _ = since;
         let mut changed = false;
-        loop {
-            while let Some(event) = self.controller.poll_event() {
-                changed |= self.controller_event(now, event);
-            }
-            if !self.flush() {
-                break;
-            }
+        while let Some(event) = self.controller.poll_event() {
+            changed |= self.controller_event(now, event);
         }
+        self.flush();
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
-            changed |= (
-                self.talker_state(),
-                self.local_unserved(),
-                self.ptp(),
-                self.listen_blocked(),
-            ) != talker_before;
+            changed |= (self.talker_state(), self.ptp(), self.listen_blocked()) != talker_before;
         }
         if changed {
             self.publish();
@@ -713,16 +609,10 @@ impl Runtime {
         }
     }
 
-    /// Sends what the controller and the entity queued, handing each the
-    /// other's frames, as the socket does not bring its own back. Says
-    /// whether any were handed over.
-    fn flush(&mut self) -> bool {
-        let now = self.now();
-        // Only plaa's entity, on Linux, hands frames over.
-        #[cfg_attr(not(target_os = "linux"), expect(unused_mut))]
-        let mut handed = false;
+    /// Sends what the controller queued: on a Mac, commands to the Mac's
+    /// own entity through the framework.
+    fn flush(&mut self) {
         let mut out = [0u8; 1500];
-        let mut from_controller = Vec::new();
         while let Ok(Some(transmit)) = self.controller.poll_transmit(&mut out) {
             let bytes = &out[..transmit.length];
             #[cfg(target_os = "macos")]
@@ -730,34 +620,7 @@ impl Runtime {
                 continue;
             }
             let _ = self.avtp.send(transmit.destination, bytes);
-            if transmit.destination == ADP_ACMP_MULTICAST || transmit.destination == self.mac {
-                from_controller.push(bytes.to_vec());
-            }
         }
-        #[cfg(target_os = "linux")]
-        let since = self.since();
-        #[cfg(target_os = "linux")]
-        if let Some(own) = &mut self.own {
-            for bytes in &from_controller {
-                own.handle_avtp(now, since, self.mac, true, bytes);
-                handed = true;
-            }
-            let mut from_entity = Vec::new();
-            while let Some((destination, bytes)) = own.poll_transmit() {
-                let _ = self.avtp.send(destination, &bytes);
-                if destination == ADP_ACMP_MULTICAST || destination == self.mac {
-                    from_entity.push(bytes);
-                }
-            }
-            own.send_mrp();
-            own.send_lite();
-            for bytes in from_entity {
-                let _ = self.controller.handle_frame(now, self.mac, &bytes);
-                handed = true;
-            }
-        }
-        let _ = (now, from_controller);
-        handed
     }
 
     /// Opens Apple's framework on the interface once AVB is on for it: a
@@ -812,8 +675,8 @@ impl Runtime {
     /// time.
     fn ptp(&self) -> Ptp {
         #[cfg(target_os = "linux")]
-        if let Some(own) = &self.own {
-            return own.ptp();
+        if let Some(daemon) = &self.daemon {
+            return daemon.ptp();
         }
         Ptp::Unknown
     }
@@ -821,25 +684,16 @@ impl Runtime {
     /// Why plaa's input cannot reserve its stream, where it cannot.
     fn listen_blocked(&self) -> Option<crate::ListenBlocked> {
         #[cfg(target_os = "linux")]
-        if let Some(own) = &self.own {
-            return own.listen_blocked();
+        if let Some(daemon) = &self.daemon {
+            return daemon.listen_blocked();
         }
         None
     }
 
-    /// Whether listeners on this computer go without plaa's stream.
-    fn local_unserved(&self) -> bool {
-        #[cfg(target_os = "linux")]
-        if let Some(own) = &self.own {
-            return own.local_unserved();
-        }
-        false
-    }
-
     fn talker_state(&self) -> TalkerState {
         #[cfg(target_os = "linux")]
-        if let Some(own) = &self.own {
-            return own.state();
+        if let Some(daemon) = &self.daemon {
+            return daemon.state();
         }
         #[cfg(target_os = "macos")]
         if let Some(host) = &self.host {
@@ -917,7 +771,7 @@ impl Runtime {
     /// plaa's own entity, where it has one.
     fn own_entity(&self) -> Option<EntityId> {
         #[cfg(target_os = "linux")]
-        let own = self.own.as_ref().map(Own::entity_id);
+        let own = self.daemon.as_ref().map(Daemon::entity_id);
         #[cfg(target_os = "macos")]
         let own = self.host.as_ref().and_then(Host::entity_id);
         #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -958,7 +812,6 @@ impl Runtime {
             entities,
             talker: self.talker_state(),
             failure: self.failure.clone(),
-            local_unserved: self.local_unserved(),
             ptp: self.ptp(),
             listen_blocked: self.listen_blocked(),
         };

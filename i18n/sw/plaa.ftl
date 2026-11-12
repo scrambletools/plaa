@@ -271,10 +271,7 @@ settings-avb-interface-note-mac = Mlango wa waya ambao plaa hutumia kupata talke
 settings-avb-talker-note-mac = plaa hutuma sauti ya dirisha lililocheza mwisho kupitia huluki ya AVB ya Mac hii yenyewe, kwa listener zilizounganishwa nayo.
 settings-avb-talker = Tuma kinachocheza
 settings-avb-talker-note = plaa inakuwa talker ya Milan, ikituma sauti ya dirisha lililocheza mwisho kwa listener zilizounganishwa nayo.
-settings-avb-name = Jina kwenye mtandao
-settings-avb-name-note = Controller huonyesha plaa kama “{ $name }”. Bonyeza Enter ili kuipa jina jipya.
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa kwenye { $computer }
 avb-could-not-start = Haiwezi kutumia { $interface }: { $error }
 network-title = Sauti ya Mtandao
 network-off = Washa “Tuma kinachocheza” katika Mipangilio ili kucheza kwenye mtandao.
@@ -304,12 +301,10 @@ network-choose-format = Chagua umbizo la kucheza kwenye { $listener }
 network-failed = Imeshindwa kuunganisha: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = Sasisha triib ili kucheza hapa.
 network-choose = Chagua listener ili kuona jinsi inavyopokea mtiririko wake.
 network-no-sources = Hakuna talker kwenye mtandao inayotuma katika umbizo ambalo plaa hucheza, au inayoweza kubadilika kuwa umbizo hilo.
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = Acha kusikiliza { $talker }
-network-listen-update-triib = Sasisha triib ili kusikiliza hapa: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
 network-listen-lite = Mlango unatumia AVB Lite, ambayo haihifadhi mitiririko: plaa hucheza tu kile ambacho hufika kwenye kompyuta hii vyovyote vile.
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

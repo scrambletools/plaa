@@ -269,10 +269,7 @@ settings-avb-interface-note-mac = พอร์ตแบบมีสายที�
 settings-avb-talker-note-mac = plaa ส่งเสียงของหน้าต่างที่เล่นล่าสุดผ่านเอนทิตี AVB ของ Mac เครื่องนี้เอง ไปยัง Listener ที่เชื่อมต่ออยู่กับเอนทิตีนั้น
 settings-avb-talker = ส่งสิ่งที่กำลังเล่น
 settings-avb-talker-note = plaa จะเป็น Talker ของ Milan และส่งเสียงของหน้าต่างที่เล่นล่าสุดไปยัง Listener ที่เชื่อมต่ออยู่
-settings-avb-name = ชื่อบนเครือข่าย
-settings-avb-name-note = คอนโทรลเลอร์จะแสดง plaa เป็น “{ $name }” กด Enter เพื่อเปลี่ยนชื่อ
 # plaa's name as a Milan entity, by default.
-avb-default-name = plaa บน { $computer }
 avb-could-not-start = ใช้ { $interface } ไม่ได้: { $error }
 network-title = เสียงผ่านเครือข่าย
 network-off = เปิด “ส่งสิ่งที่กำลังเล่น” ในการตั้งค่าเพื่อเล่นบนเครือข่าย
@@ -302,12 +299,10 @@ network-choose-format = เลือกรูปแบบที่จะใช�
 network-failed = เชื่อมต่อไม่ได้: { $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = อัปเดต triib เพื่อเล่นที่นี่
 network-choose = เลือก Listener เพื่อดูว่ารับสตรีมอย่างไร
 network-no-sources = ไม่มี Talker บนเครือข่ายที่ส่งในรูปแบบที่ plaa เล่น หรือเปลี่ยนเป็นรูปแบบนั้นได้
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = หยุดฟัง { $talker }
-network-listen-update-triib = อัปเดต triib เพื่อฟังที่นี่: plaa เล่นเฉพาะสิ่งที่มาถึงคอมพิวเตอร์เครื่องนี้อยู่แล้ว
 network-listen-lite = พอร์ตใช้ AVB Lite ซึ่งไม่จองสตรีม: plaa เล่นเฉพาะสิ่งที่มาถึงคอมพิวเตอร์เครื่องนี้อยู่แล้ว
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,

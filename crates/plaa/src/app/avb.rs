@@ -30,14 +30,19 @@ impl Plaa {
         if cfg!(target_os = "windows") {
             return;
         }
+        // On Linux, this computer's entity runs in avb-endpointd, which
+        // sending starts and enables on the interface; it stays on when
+        // sending goes off, as other apps may use it too.
+        #[cfg(target_os = "linux")]
+        if let (Some(interface), true) = (&self.settings.avb_interface, self.settings.avb_talker) {
+            plaa_avb::enable_daemon(interface);
+        }
         let Some(interface) = self.settings.avb_interface.clone() else {
             return;
         };
         let config = plaa_avb::Config {
             interface: interface.clone(),
             talker: self.settings.avb_talker,
-            name: self.avb_name(),
-            address_file: plaa_store::paths::state_dir().map(|dir| dir.join("avb-address")),
         };
         match Network::start(config, || crate::post(External::Avb)) {
             Ok(network) => self.avb = Some(network),
@@ -50,17 +55,6 @@ impl Plaa {
             }
         }
         self.feed_avb();
-    }
-
-    /// The entity's name: the one Settings give, or plaa's with the
-    /// computer's.
-    pub(crate) fn avb_name(&self) -> String {
-        let name = self.settings.avb_name.trim();
-        if name.is_empty() {
-            default_name()
-        } else {
-            name.to_owned()
-        }
     }
 
     /// The network changed: the windows show it anew.
@@ -298,18 +292,5 @@ impl Plaa {
                 self.avb_disconnect(ours);
             }
         }
-    }
-}
-
-/// plaa's entity name, with the computer's name where it can be read.
-fn default_name() -> String {
-    let computer = std::fs::read_to_string("/proc/sys/kernel/hostname")
-        .ok()
-        .or_else(|| std::env::var("COMPUTERNAME").ok())
-        .map(|name| name.trim().to_owned())
-        .filter(|name| !name.is_empty());
-    match computer {
-        Some(computer) => crate::fl!("avb-default-name", computer = computer),
-        None => "plaa".to_owned(),
     }
 }

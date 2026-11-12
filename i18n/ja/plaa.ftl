@@ -269,10 +269,7 @@ settings-avb-interface-note-mac = plaaがAVBやMilanのトーカーとリスナ�
 settings-avb-talker-note-mac = plaaは最後に再生したウインドウのサウンドを、このMac自身のAVBエンティティを通じて、接続されているリスナーに送信します。
 settings-avb-talker = 再生中のサウンドを送信
 settings-avb-talker-note = plaaがMilanトーカーになり、最後に再生したウインドウのサウンドを、接続されているリスナーに送信します。
-settings-avb-name = ネットワーク上の名前
-settings-avb-name-note = コントローラにはplaaが「{ $name }」と表示されます。Enterキーを押すと名前が変わります。
 # plaa's name as a Milan entity, by default.
-avb-default-name = { $computer }のplaa
 avb-could-not-start = { $interface }を使用できませんでした：{ $error }
 network-title = ネットワークオーディオ
 network-off = ネットワークで再生するには、「設定」で「再生中のサウンドを送信」をオンにしてください。
@@ -302,12 +299,10 @@ network-choose-format = { $listener }で再生するフォーマットを選択
 network-failed = 接続できませんでした：{ $reason }
 # Under a listener on this computer, such as one of triib's entities, while
 # triib's entity service is too old to pass plaa's stream to it.
-network-update-triib = ここで再生するには、triibをアップデートしてください。
 network-choose = リスナーを選ぶと、ストリームの受け取り状況が表示されます。
 network-no-sources = ネットワーク上に、plaaで再生できるフォーマットで送信している、またはそのフォーマットに切り替えられるトーカーがありません。
 # $talker is a talker's name, or its name and its output's.
 network-listen-stop = { $talker }を聴くのを停止
-network-listen-update-triib = ここで聴くには、triibをアップデートしてください：plaaは、もともとこのコンピュータに届くものだけを再生します。
 network-listen-lite = このポートは、ストリームを予約しないAVB Liteで動作しています：plaaは、もともとこのコンピュータに届くものだけを再生します。
 
 # The Connect menu: the talkers on the AVB network plaa can listen to,
