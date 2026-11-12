@@ -17,9 +17,12 @@ out=${2:?usage: build-arch.sh SOURCE OUT}
 recipe=$(cd "$(dirname "$0")/../../arch/plaa" && pwd)
 
 pacman -Syu --noconfirm --needed base-devel
-# makepkg runs as a regular user, so the dependencies go in first.
+# makepkg runs as a regular user, so the dependencies go in first;
+# avb-endpointd, which Arch does not carry, the build does not need.
 # shellcheck source=/dev/null disable=SC2154
-(. "$recipe/PKGBUILD" && pacman -S --noconfirm --needed "${depends[@]}" "${makedepends[@]}")
+(. "$recipe/PKGBUILD" &&
+    printf '%s\n' "${depends[@]}" "${makedepends[@]}" | grep -v '^avb-endpointd' |
+    xargs pacman -S --noconfirm --needed)
 useradd -m builder
 if [ -d /avb ]; then
     export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=url.file:///avb.insteadOf
@@ -31,6 +34,6 @@ build=$(mktemp -d)
 cp "$recipe/PKGBUILD" "$recipe/plaa.install" "$source_archive" "$build/"
 chown -R builder "$build"
 mkdir -p "$out"
-(cd "$build" && runuser -u builder -- makepkg --nocheck --noconfirm)
+(cd "$build" && runuser -u builder -- makepkg --nocheck --noconfirm --nodeps)
 cp "$build"/plaa-[0-9]*.pkg.tar.* "$out/"
 ls -l "$out"

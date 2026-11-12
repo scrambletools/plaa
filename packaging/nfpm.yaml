@@ -5,7 +5,8 @@
 # build-package.sh there appends the dependencies it reads from the
 # programs, overrides.deb or overrides.rpm, and runs nfpm.
 #
-# Installing grants plaa-netraw CAP_NET_RAW (packaging/linux).
+# AVB comes from avb-endpointd, a package of its own that plaa depends
+# on: its avb-netraw holds CAP_NET_RAW, and plaa none (packaging/linux).
 name: plaa
 arch: ${ARCH}
 platform: linux

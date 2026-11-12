@@ -30,19 +30,22 @@ env:
   FFMPEG_SERIES: '9.0'
   # The vcpkg that builds libass and the libraries it needs for Windows.
   VCPKG_COMMIT: 857036234d15fbed8f30fed66e898d7725446c0c
-  # gptpd's release, whose Debian and RPM packages this release carries
-  # too, as no distribution has gptpd.
+  # gptpd's release and avb-endpointd's, whose Debian and RPM packages
+  # this release carries too, as no distribution has them: the Linux
+  # packages depend on avb-endpointd, which depends on gptpd. The
+  # install tests put them in first.
   GPTPD_VERSION: 0.1.0
+  AVB_ENDPOINTD_VERSION: 0.2.2
 
 jobs:
   linux:
     # Each package is built in a container of the release it is for, as
     # FFmpeg's libraries change names from release to release: a .deb for
     # each Debian and Ubuntu, an .rpm for Fedora, each depending on what
-    # the programs link (packaging/linux/build.sh). They grant plaa-netraw,
-    # which opens plaa's raw sockets, CAP_NET_RAW as they install. No plain
-    # archive, AppImage or Flatpak: none can carry the capability, and an
-    # archive would hold one release's FFmpeg names.
+    # the program links (packaging/linux/build.sh), and on avb-endpointd,
+    # whose avb-netraw opens plaa's raw sockets. No plain archive, AppImage
+    # or Flatpak: none can depend on the daemon's package, and an archive
+    # would hold one release's FFmpeg names.
     if: ${{ !inputs.only || inputs.only == 'all' || inputs.only == 'linux' }}
     name: linux (${{ matrix.image }}, ${{ matrix.arch }})
     strategy:
@@ -454,6 +457,21 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: ${{ matrix.cross }}
+      - name: Packages no distribution carries
+        run: |
+          case $ARCH in x86_64) deb=amd64 ;; aarch64) deb=arm64 ;; *) deb=$ARCH ;; esac
+          if ls packages/*.rpm >/dev/null 2>&1; then
+            gptpd="gptpd-*.$ARCH.rpm" endpointd="avb-endpointd-*.$ARCH.rpm"
+          else
+            gptpd="gptpd_*_$deb.deb" endpointd="avb-endpointd_*_$deb.deb"
+          fi
+          gh release download "v$GPTPD_VERSION" -R scrambletools/gptp -D first -p "$gptpd"
+          gh release download "avb-endpointd-v$AVB_ENDPOINTD_VERSION" \
+            -R scrambletools/Linux-AVB-Endpoint -D first -p "$endpointd"
+          ls -l first
+        env:
+          ARCH: ${{ matrix.arch }}
+          GH_TOKEN: ${{ github.token }}
       - name: Install, upgrade, run, play and remove
         run: |
           package=$(ls packages/*.deb packages/*.rpm 2>/dev/null | head -1)
@@ -462,6 +480,7 @@ jobs:
         env:
           IMAGE: ${{ matrix.image }}
           GH_TOKEN: ${{ github.token }}
+          PLAA_TEST_FIRST: first
           PLAA_TEST_SHOTS: shots
       - if: always()
         uses: actions/upload-artifact@v4
@@ -489,9 +508,20 @@ jobs:
           git archive --prefix="plaa-$pkgver/" -o "plaa-$pkgver.tar.gz" HEAD
           docker run --rm -v "$PWD:/work" -w /work archlinux:latest \
             packaging/tests/linux/build-arch.sh "plaa-$pkgver.tar.gz" dist-arch
+      # Arch carries neither avb-endpointd nor gptpd: avb-endpointd's
+      # package is built from its release's PKGBUILD, and goes in first.
+      - name: avb-endpointd's package
+        run: |
+          gh release download "avb-endpointd-v$AVB_ENDPOINTD_VERSION" \
+            -R scrambletools/Linux-AVB-Endpoint -D endpointd-arch -p PKGBUILD -p avb-endpointd.install
+          docker run --rm -v "$PWD:/work" -w /work archlinux:latest \
+            packaging/tests/linux/build-arch-first.sh endpointd-arch first
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Install, run, play and remove
         run: packaging/tests/linux/run.sh archlinux:latest dist-arch/plaa-[0-9]*.pkg.tar.zst
         env:
+          PLAA_TEST_FIRST: first
           PLAA_TEST_SHOTS: shots
       - if: always()
         uses: actions/upload-artifact@v4
@@ -614,9 +644,13 @@ jobs:
           cp artifacts/linux-*/* artifacts/windows-*/* artifacts/macos-*/* upload/
           # The PKGBUILD and its install file, to build the Arch package.
           cp artifacts/aur/* upload/
-          # gptpd's packages, for the AVB talker; its PKGBUILD stays with
-          # gptpd's release, as this one has a PKGBUILD of its own.
+          # avb-endpointd's packages, which the Linux packages depend on,
+          # and gptpd's, which avb-endpointd's depend on; their PKGBUILDs
+          # stay with their own releases, as this one has a PKGBUILD of
+          # its own.
           gh release download "v$GPTPD_VERSION" -R scrambletools/gptp -D upload -p 'gptpd*.deb' -p 'gptpd*.rpm'
+          gh release download "avb-endpointd-v$AVB_ENDPOINTD_VERSION" -R scrambletools/Linux-AVB-Endpoint \
+            -D upload -p 'avb-endpointd*.deb' -p 'avb-endpointd*.rpm'
           # GitHub names uploads with a dot for a tilde, so the .debs take
           # those names before their checksums are written.
           for file in upload/*~*; do

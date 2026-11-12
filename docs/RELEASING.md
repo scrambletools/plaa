@@ -9,8 +9,8 @@ Everything a release ships is built from this repository:
 | `data/icons/hicolor/scalable/apps/run.plaa.svg` | The app icon, which `scripts/make-icons.sh` renders into the hicolor PNGs every package picks up, `data/icons/plaa-1024.png` for macOS and `packaging/windows/plaa.ico` |
 | `packaging/licenses/` | The licenses of the fonts plaa carries, from scramble-ui |
 | `docs/THIRD-PARTY.md` | The libraries, fonts and crates plaa is built from or carries, with their licenses, written by `scripts/third-party.py`, to run again after dependencies change, as CI fails while it is out of date; every package carries it |
-| `scripts/dist-install.sh` | Installs a build of plaa and plaa-netraw and the files above into a system layout; the Linux packages use it |
-| `packaging/linux/` | Debian and RPM packages, each built by `build.sh` in a container of the release it is for and made with nfpm (`packaging/nfpm.yaml`); they grant `plaa-netraw` `CAP_NET_RAW` as they install and run `avb-check` |
+| `scripts/dist-install.sh` | Installs a build of plaa and the files above into a system layout; the Linux packages use it |
+| `packaging/linux/` | Debian and RPM packages, each built by `build.sh` in a container of the release it is for and made with nfpm (`packaging/nfpm.yaml`); they depend on avb-endpointd and run `avb-check` |
 | `packaging/arch/plaa/` | AUR package, whose install script does the same |
 | `packaging/windows/` | Windows MSI (WiX 5) and zip, made by `build.ps1`, carrying FFmpeg's DLLs and libass's, which `libass.ps1` builds with vcpkg; `ffmpeg-sources.sh` gathers the sources of the FFmpeg build |
 | `packaging/macos/` | plaa.app, carrying FFmpeg and libass, and its installer package, made by `bundle.sh --pkg` around `distribution.xml`, signed and notarized as [macOS signing](#macos-signing) says, with the BPF access helper |
@@ -49,23 +49,24 @@ are development builds, which keep their own.
   configuring the window under some systems, as on Ubuntu 26.04 without
   a GPU); the Arch package only suggests a Vulkan driver, as pacman
   would otherwise pick NVIDIA's for anyone without one, and Arch's
-  OpenGL draws where there is none. AVB needs `CAP_NET_RAW`, held only
-  by `/usr/lib/plaa/plaa-netraw`, which opens raw sockets for plaa; the
-  packages set it as they install (`setcap`, from libcap), recommend
-  gptpd, its own package from the gptp repository, which the AVB talker
-  needs keeping gPTP (each release carries gptpd's debs and rpms too, of
-  the version `GPTPD_VERSION` in release.yml names), and say when no
-  wired interface has a PTP hardware clock. They bring
-  `plaa-link@.service`, which keeps the frames plaa sends on one
-  transmit queue, under fq_codel, and keeps that queue moving, with EEE
-  and PAUSE off the link, and a polkit rule letting the person at the
-  computer run it, as plaa does as its entity starts, and stop the
-  ptp4l services an older plaa ran. They depend on ethtool and iproute2
-  for it, and on RealtimeKit, which runs the AVB streams' threads at
-  realtime priority, and say as they install what they change on the
-  system and why. The macOS installer's first page does the same. There
-  is no plain archive, AppImage or Flatpak, as none can carry the
-  capability, and an archive would hold one release's FFmpeg names.
+  OpenGL draws where there is none. AVB comes from avb-endpointd, the
+  daemon from the Linux-AVB-Endpoint repository that runs this
+  computer's AVB entity, which the packages depend on, at least the
+  version plaa is built with: its package grants its `avb-netraw`
+  `CAP_NET_RAW`, which opens raw sockets for the daemon and for plaa's
+  controller, so plaa holds no capability; it brings `avb-link@`, which
+  keeps a stream's frames on one transmit queue with EEE and PAUSE off
+  the link, RealtimeKit, ethtool and iproute2, and depends on gptpd,
+  from the gptp repository. No distribution carries either, so each
+  release carries their debs and rpms too, of the versions
+  `AVB_ENDPOINTD_VERSION` and `GPTPD_VERSION` in release.yml name, and
+  the Arch package needs avb-endpointd's PKGBUILD built first. The
+  packages say when no wired interface has a PTP hardware clock, stop
+  the ptp4l services and plaa-link@ an older plaa ran, and say as they
+  install what they change on the system and why. The macOS installer's
+  first page does the same. There is no plain archive, AppImage or
+  Flatpak, as none can depend on the daemon's package, and an archive
+  would hold one release's FFmpeg names.
 - **macOS:** FFmpeg and libass, from Homebrew, inside plaa.app, built on
   the oldest macOS supported, as Homebrew builds them for the macOS it
   runs on; the app claims the newest macOS any of its parts needs, and
@@ -148,7 +149,10 @@ to, which can hide what a package leaves out. So the release workflow
 tests each package in a clean system, as someone installing it would
 meet it, and drafts the release only once every test passes. Each test
 installs the last release's package first, when there is an older one,
-so the new one upgrades it, and removes plaa at the end. Each also plays
+so the new one upgrades it, and removes plaa at the end. The Linux tests
+put avb-endpointd's and gptpd's packages in before plaa's, from their
+releases, as no distribution carries them; the Arch test has no gptpd
+package to put in. Each also plays
 `packaging/tests/media/test-clip.webm`, a few seconds of VP9 and Opus,
 which every FFmpeg decodes, Fedora's without patented codecs too, and
 looks for the yellow, cyan and magenta bars of its test pattern in the
@@ -156,16 +160,17 @@ window.
 
 | Package | Where | What |
 |---|---|---|
-| .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, and of the Debian and Ubuntu releases for RISC-V under QEMU, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
-| Arch | A fresh Arch container | `build-arch.sh` builds the PKGBUILD from this tree, then the same test |
+| .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, and of the Debian and Ubuntu releases for RISC-V under QEMU, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, that none an older plaa installed for AVB is left, its dependency on avb-endpointd, that only avb-endpointd's `avb-netraw` holds `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user through `avb-netraw` (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
+| Arch | A fresh Arch container | `build-arch.sh` builds the PKGBUILD from this tree and `build-arch-first.sh` avb-endpointd's from its release, then the same test |
 | MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa, FFmpeg and libass import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, Default apps, the version line and the FFmpeg and libass it names, the window and the clip played; then that uninstalling leaves nothing |
 | MSI, x64 | A Windows Server 2022 container, which has nothing installed | The same, without the window and the clip |
 | .pkg | Fresh macOS 14, 15 and 26 runners | `packaging/tests/macos/test-pkg.sh`: Gatekeeper's verdict on a downloaded copy, that plaa and every library it carries link only macOS's own libraries and each other, look nowhere outside the app, and run on the oldest macOS the app claims, then installs and checks the app, the version line, the BPF launch daemon and access for the user, the window and the clip played; then that the uninstall script leaves nothing |
 
 To run one by hand:
 
-- Linux, with Docker: `packaging/linux/build.sh debian:13 dist`, then
-  `packaging/tests/linux/run.sh debian:13
+- Linux, with Docker: `packaging/linux/build.sh debian:13 dist`, then,
+  with avb-endpointd's and gptpd's packages of the same kind in `first`,
+  `PLAA_TEST_FIRST=first packaging/tests/linux/run.sh debian:13
   dist/plaa_X.Y.Z-1~debian13_amd64.deb [previous.deb]`.
 - Windows, on a computer without plaa installed, as it installs and
   removes it: `powershell -ExecutionPolicy Bypass -File

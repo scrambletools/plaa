@@ -3,9 +3,12 @@
 # QEMU when the package's architecture is not the host's:
 #
 #   packaging/tests/linux/run.sh IMAGE PACKAGE [PREVIOUS]
-#   packaging/tests/linux/run.sh debian:13 dist/plaa_0.1.0-1~debian13_amd64.deb
+#   PLAA_TEST_FIRST=first packaging/tests/linux/run.sh debian:13 dist/plaa_0.1.0-1~debian13_amd64.deb
 #
-# PLAA_TEST_SHOTS names a directory for screenshots of the window.
+# PLAA_TEST_FIRST names a directory of the packages plaa depends on that
+# no distribution carries, avb-endpointd's and gptpd's, of the same kind
+# and architecture, which go in first. PLAA_TEST_SHOTS names a directory
+# for screenshots of the window.
 set -euo pipefail
 
 image=${1:?usage: run.sh IMAGE PACKAGE [PREVIOUS]}
@@ -25,6 +28,9 @@ emulated=
 options=(--rm --platform "linux/$platform" -e PLAA_TEST_EMULATED="$emulated"
     -v "$tests:/tests:ro" -v "$package:/packages/$(basename "$package"):ro")
 arguments=("/packages/$(basename "$package")")
+if [ -n "${PLAA_TEST_FIRST:-}" ]; then
+    options+=(-v "$(readlink -f "$PLAA_TEST_FIRST"):/first:ro" -e PLAA_TEST_FIRST=/first)
+fi
 if [ -n "$previous" ]; then
     options+=(-v "$previous:/packages/previous/$(basename "$previous"):ro")
     arguments+=("/packages/previous/$(basename "$previous")")

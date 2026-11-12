@@ -290,10 +290,12 @@ RealtimeKit. Earlier dev builds put plaa-link@ in with
 plaa's controller opens raw sockets of its own, which need
 `CAP_NET_RAW`. plaa itself never holds it, so the desktop's portals keep
 answering it: `avb-netraw`, the daemon's helper, holds it, and opens the
-sockets and passes them to plaa as it does to the daemon. Sending needs
-gptpd keeping gPTP on the interface, which must have a PTP hardware
-clock; gptpd is a package of its own, and plaa plays everything else
-without it.
+sockets and passes them to plaa as it does to the daemon. plaa's Linux
+packages depend on avb-endpointd's, which bring the daemon, avb-netraw
+and avb-link@, and depend on gptpd's; no distribution carries those, so
+plaa's releases carry their packages beside its own. Sending needs gptpd
+keeping gPTP on the interface, which must have a PTP hardware clock, and
+plaa plays everything else without one.
 
 The AVB crates come from [scrambletools/avb](https://github.com/scrambletools/avb),
 and the daemon's library, `avb-endpointd`, from Linux-AVB-Endpoint, by

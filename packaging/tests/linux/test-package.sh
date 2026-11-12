@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # Installs a plaa package in a fresh container, as root, and checks it as
 # someone installing it would meet it: its dependencies alone are enough,
-# the files and capability it sets up, the program and the FFmpeg it
-# finds, raw Ethernet as a regular user, the window under a headless
-# Wayland compositor, a video played in it, and what removing it leaves
-# behind. run.sh beside it starts the container.
+# with the packages no distribution carries first, the files it sets up,
+# the program and the FFmpeg it finds, raw Ethernet as a regular user
+# through avb-endpointd's helper, the window under a headless Wayland
+# compositor, a video played in it, and what removing it leaves behind.
+# run.sh beside it starts the container.
 #
 #   test-package.sh PACKAGE [PREVIOUS]
 #
 # PACKAGE is a .deb, .rpm or Arch package. PREVIOUS, an older package of
 # the same kind, goes in first, so PACKAGE upgrades it.
+# PLAA_TEST_FIRST names a directory of the packages plaa depends on that
+# no distribution carries, avb-endpointd's and, but for Arch, gptpd's,
+# which go in before either.
 # PLAA_TEST_EMULATED=1, for an architecture running under QEMU, leaves
 # out raw Ethernet and the window. PLAA_TEST_SHOTS names a directory for
 # screenshots of the window.
@@ -18,6 +22,7 @@ set -euo pipefail
 package=$(readlink -f "${1:?usage: test-package.sh PACKAGE [PREVIOUS]}")
 previous=${2:+$(readlink -f "$2")}
 emulated=${PLAA_TEST_EMULATED:-}
+first=${PLAA_TEST_FIRST:-}
 shots=${PLAA_TEST_SHOTS:-}
 here=$(cd "$(dirname "$0")" && pwd)
 id=run.plaa
@@ -72,11 +77,34 @@ package_version() {
     arch) pacman -Qp "$1" | cut -d' ' -f2 ;;
     esac
 }
-recommended() {
+depended() {
     case $kind in
-    deb) dpkg-deb -f "$1" Recommends ;;
-    rpm) rpm -qp --recommends "$1" ;;
-    arch) bsdtar -xOf "$1" .PKGINFO | sed -n 's/^optdepend = //p' ;;
+    deb) dpkg-deb -f "$1" Depends ;;
+    rpm) rpm -qp --requires "$1" ;;
+    arch) bsdtar -xOf "$1" .PKGINFO | sed -n 's/^depend = //p' ;;
+    esac
+}
+# The packages no distribution carries. Arch has no gptpd package to put
+# in with avb-endpointd's, so that goes in without its dependency check,
+# after the rest of what it needs.
+install_first() {
+    local packages=()
+    case $kind in
+    deb) packages=("$first"/*.deb) ;;
+    rpm) packages=("$first"/*.rpm) ;;
+    arch) packages=("$first"/*.pkg.tar.*) ;;
+    esac
+    [ -e "${packages[0]}" ] || fail "no package of avb-endpointd in $first"
+    case $kind in
+    deb) apt-get install -y --no-install-recommends "${packages[@]}" ;;
+    rpm) dnf install -y --setopt=install_weak_deps=False "${packages[@]}" ;;
+    arch)
+        for package_file in "${packages[@]}"; do
+            bsdtar -xOf "$package_file" .PKGINFO | sed -n 's/^depend = //p' |
+                sed 's/[<>=].*//' | grep -vx gptpd | xargs -r pacman -S --noconfirm --needed
+        done
+        pacman -Udd --noconfirm "${packages[@]}"
+        ;;
     esac
 }
 
@@ -88,6 +116,11 @@ deb)
     ;;
 arch) pacman -Syu --noconfirm ;;
 esac
+
+# plaa depends on avb-endpointd, so it cannot go in without it.
+[ -n "$first" ] || fail "PLAA_TEST_FIRST names no directory holding avb-endpointd's package"
+section "Install what no distribution carries: $(cd "$first" && echo *)"
+install_first
 
 if [ -n "$previous" ]; then
     section "Install $(basename "$previous"), to upgrade from"
@@ -103,7 +136,6 @@ version=${want%-*}
 section Files
 [ -x /usr/bin/plaa ] || fail "/usr/bin/plaa is missing"
 for file in \
-    /usr/lib/plaa/plaa-netraw \
     /usr/lib/plaa/avb-check \
     "/usr/share/applications/$id.desktop" \
     "/usr/share/metainfo/$id.metainfo.xml" \
@@ -112,42 +144,28 @@ for file in \
     /usr/share/licenses/plaa/LICENSE \
     /usr/share/licenses/plaa/THIRD-PARTY.md \
     /usr/share/licenses/plaa/fonts/OFL.txt \
-    /usr/share/licenses/plaa/fonts/LICENSE-MaterialSymbols.txt \
-    "/usr/lib/systemd/system/plaa-link@.service" \
-    /usr/share/polkit-1/rules.d/50-plaa-link.rules; do
+    /usr/share/licenses/plaa/fonts/LICENSE-MaterialSymbols.txt; do
     [ -f "$file" ] || fail "$file is missing"
 done
-grep -q 'tx-0/xps_cpus' "/usr/lib/systemd/system/plaa-link@.service" ||
-    fail "plaa-link@.service does not keep the interface's frames on one queue"
-grep -q 'limit_min' "/usr/lib/systemd/system/plaa-link@.service" ||
-    fail "plaa-link@.service does not keep the interface's queue moving"
-grep -q 'set-eee' "/usr/lib/systemd/system/plaa-link@.service" ||
-    fail "plaa-link@.service does not keep EEE and PAUSE off the link"
-grep -q 'parent 1:1 fq_codel' "/usr/lib/systemd/system/plaa-link@.service" ||
-    fail "plaa-link@.service does not give the stream's queue fq_codel"
-# They come in as dependencies: ethtool and iproute2's tc for plaa-link@,
-# RealtimeKit for the AVB streams' realtime threads.
-command -v ethtool >/dev/null || fail "ethtool did not come in with plaa"
-command -v tc >/dev/null || fail "tc did not come in with plaa"
-[ -f /usr/share/dbus-1/system-services/org.freedesktop.RealtimeKit1.service ] ||
-    fail "RealtimeKit did not come in with plaa"
-# Network time comes from gptpd, which plaa recommends and plays without;
-# its own ptp4l services are gone, an upgrade's among them.
-recommended "$package" | grep -qw gptpd || fail "the package does not recommend gptpd"
-! command -v gptpd >/dev/null || fail "gptpd came in, though plaa only recommends it"
-for path in /usr/share/plaa/ptp4l-gptp.cfg /usr/share/plaa/ptp4l-lite.cfg \
+# AVB comes from avb-endpointd, which the package depends on: its own
+# helper, link unit and ptp4l services are gone, an upgrade's among them.
+depended "$package" | grep -qw avb-endpointd || fail "the package does not depend on avb-endpointd"
+for path in /usr/lib/plaa/plaa-netraw "/usr/lib/systemd/system/plaa-link@.service" \
+    /usr/share/polkit-1/rules.d/50-plaa-link.rules \
+    /usr/share/plaa/ptp4l-gptp.cfg /usr/share/plaa/ptp4l-lite.cfg \
     "/usr/lib/systemd/system/plaa-ptp4l@.service" "/usr/lib/systemd/system/plaa-ptp4l-lite@.service" \
     /usr/share/polkit-1/rules.d/50-plaa-ptp4l.rules; do
-    [ ! -e "$path" ] || fail "$path is left from plaa's ptp4l services"
+    [ ! -e "$path" ] || fail "$path is left from an older plaa"
 done
 echo "all there"
 
-# Only the helper holds the capability; plaa gets its raw sockets from
-# it.
+# Only avb-endpointd's helper holds the capability; plaa gets its raw
+# sockets from it.
 section Capabilities
-capabilities=$(getcap /usr/lib/plaa/plaa-netraw)
+capabilities=$(getcap /usr/lib/avb-endpointd/avb-netraw)
 echo "$capabilities"
-grep -Eq 'cap_net_raw[+=]ep' <<<"$capabilities" || fail "/usr/lib/plaa/plaa-netraw lacks CAP_NET_RAW"
+grep -Eq 'cap_net_raw[+=]ep' <<<"$capabilities" ||
+    fail "/usr/lib/avb-endpointd/avb-netraw lacks CAP_NET_RAW"
 [ -z "$(getcap /usr/bin/plaa)" ] || fail "/usr/bin/plaa holds a capability"
 
 # A container's interfaces have no PTP hardware clock, so installing must
@@ -159,16 +177,14 @@ echo "said so as it installed"
 
 # Installing says what it changes on the system and why.
 section "What installing changes"
-for said in CAP_NET_RAW RealtimeKit plaa-link@.service; do
+for said in avb-endpointd avb-netraw CAP_NET_RAW avb-link@; do
     grep -q "$said" /tmp/install.log || fail "installing did not explain $said"
 done
 echo "explained as it installed"
 
 section "Shared libraries"
-for program in /usr/bin/plaa /usr/lib/plaa/plaa-netraw; do
-    missing=$(ldd "$program" | grep 'not found' || true)
-    [ -z "$missing" ] || fail "$program needs libraries the package does not bring: $missing"
-done
+missing=$(ldd /usr/bin/plaa | grep 'not found' || true)
+[ -z "$missing" ] || fail "/usr/bin/plaa needs libraries the package does not bring: $missing"
 echo "all found"
 
 # Its version line names the FFmpeg it found, so FFmpeg's libraries load.
@@ -292,8 +308,7 @@ section Remove
 remove_package
 leftovers=()
 for path in /usr/bin/plaa /usr/lib/plaa "/usr/share/applications/$id.desktop" \
-    "/usr/share/metainfo/$id.metainfo.xml" /usr/share/licenses/plaa /usr/share/plaa \
-    "/usr/lib/systemd/system/plaa-link@.service" /usr/share/polkit-1/rules.d/50-plaa-link.rules; do
+    "/usr/share/metainfo/$id.metainfo.xml" /usr/share/licenses/plaa /usr/share/plaa; do
     [ -e "$path" ] && leftovers+=("$path")
 done
 [ ${#leftovers[@]} -eq 0 ] || fail "removing left ${leftovers[*]}"
