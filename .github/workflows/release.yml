@@ -35,7 +35,7 @@ env:
   # packages depend on avb-endpointd, which depends on gptpd. The
   # install tests put them in first.
   GPTPD_VERSION: 0.1.0
-  AVB_ENDPOINTD_VERSION: 0.2.2
+  AVB_ENDPOINTD_VERSION: 0.2.3
 
 jobs:
   linux:
