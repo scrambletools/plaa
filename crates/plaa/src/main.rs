@@ -253,6 +253,11 @@ fn main() -> iced::Result {
             None => Source::File(argument.into()),
         });
     }
+    // Before anything looks for a sound device, so cpal reaches the sound
+    // server and not ALSA behind it.
+    #[cfg(target_os = "linux")]
+    plaa_media::pulse_cookie::ensure();
+
     let (sender, receiver) = mpsc::unbounded();
     let _ = EXTERNAL_SENDER.set(sender);
 

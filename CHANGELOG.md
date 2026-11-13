@@ -51,6 +51,11 @@
 
 ### Fixed
 
+- On Linux, plaa reaches PipeWire's PulseAudio server where no program
+  had made a PulseAudio cookie yet. The server refused plaa's empty
+  cookie, so plaa fell back to ALSA, where it could not find
+  avb-endpointd's devices, and what it played never reached the
+  network. plaa now makes the cookie, as libpulse does on first use.
 - AVB streams' threads run at realtime priority on every Linux system:
   the packages depend on RealtimeKit, which raises them, where they ran
   at normal priority without a word on a system that lacked it.

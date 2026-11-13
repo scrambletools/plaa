@@ -18,6 +18,8 @@ mod lanes;
 mod layer;
 mod mix;
 pub mod player;
+#[cfg(target_os = "linux")]
+pub mod pulse_cookie;
 mod queue;
 pub mod read;
 pub mod record;
