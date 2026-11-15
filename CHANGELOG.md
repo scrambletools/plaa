@@ -15,11 +15,11 @@
   sockets from the daemon's avb-netraw, and the daemon runs avb-link@ in
   place of plaa-link@. The entity's name is the computer's, which
   controllers change, so plaa's setting for it is gone.
-- plaa's Linux packages depend on avb-endpointd's, which bring the
-  daemon, avb-netraw, avb-link@ and gptpd, and no longer carry
-  plaa-netraw or plaa-link@; an upgrade stops what is left of
-  plaa-link@. Each release carries avb-endpointd's and gptpd's debs and
-  rpms beside plaa's, as no distribution has them.
+- plaa's Linux packages depend on avb-endpointd's, 0.3.1 or later,
+  which bring the daemon, avb-netraw, avb-link@ and gptpd, and no
+  longer carry plaa-netraw or plaa-link@; an upgrade stops what is
+  left of plaa-link@. Each release carries avb-endpointd's and gptpd's
+  debs and rpms beside plaa's, as no distribution has them.
 - plaa keeps network time with gptpd, shared with triib's entity
   service, in place of its own ptp4l services. Its packages bring
   gptpd, through avb-endpointd's, where they recommended linuxptp, plaa
@@ -36,7 +36,7 @@
 - plaa's entity reports this computer's clock as gptpd ranks it,
   grandmaster capable below priority1 255, and Network Audio shows its
   priority1, which `/etc/gptpd/<interface>.conf` sets. On atdecc 0.2,
-  avb-stream 0.2 and gptp 0.1.
+  avb-endpointd 0.3, avb-stream 0.4 and gptp 0.2.
 - `scripts/dev-ptp4l.sh` gave way to `scripts/dev-link.sh`, which
   installs plaa-link@ for dev builds and takes the old ptp4l services
   out.
