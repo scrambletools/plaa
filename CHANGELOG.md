@@ -2,7 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- A macOS package for Intel Macs, `plaa-X.Y.Z-x86_64.pkg`, beside the
+  one for Apple Silicon, for macOS 15 and later, with the sources of
+  the libraries it carries.
+
 ### Changed
+
+- The macOS packages need macOS 15 or later, as Homebrew, whose FFmpeg
+  and libass plaa.app carries, no longer builds for macOS 14. Each
+  package's library sources are named for its processor,
+  `plaa-X.Y.Z-macos-arm64-library-sources.tar` and
+  `plaa-X.Y.Z-macos-x86_64-library-sources.tar`.
 
 - On Linux, what plaa plays goes to the network through this computer's
   entity, which avb-endpointd runs, the daemon in the person's session

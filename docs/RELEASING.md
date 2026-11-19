@@ -20,13 +20,24 @@ Everything a release ships is built from this repository:
 | `BUILD`, `.gitattributes` | The commit, which `git archive` and GitHub's source archives write into `BUILD` for the version line of a build without `.git`, as the AUR's |
 
 The Linux packages are built for x86_64 and ARM64 on GitHub's runners of
-that architecture, the Windows ones for x64 and ARM64; the macOS package
-is built for Apple Silicon only. GitHub has no RISC-V runners, so the
-RISC-V .debs, for Debian 13 and Ubuntu 24.04 and 26.04, are built on
-x86_64 against each release's riscv64 libraries installed beside its own
-(`PLAA_CROSS=riscv64 packaging/linux/build.sh IMAGE OUT`), and tested
-under QEMU, which leaves out raw Ethernet and the window. Fedora has no
-RISC-V release to build for.
+that architecture, the Windows ones for x64 and ARM64, and the macOS
+ones for Apple Silicon and Intel Macs. The Intel one is built on
+GitHub's last Intel runner, macos-15-intel, where Homebrew, which has
+made no Intel bottles since 7.0, builds FFmpeg, libass and what they
+need from source; `packaging/macos/homebrew-cache.sh` keeps those
+builds in the Actions cache, one for each set of versions, as they take
+hours. A tag's run sees only its own cache and main's, so after a new
+FFmpeg or libass, run the workflow by hand on main with only macOS
+before tagging. The Intel package can be built this way until
+Homebrew stops running on Intel Macs, in September 2027, or GitHub
+retires the runner, in the fall of 2027.
+
+GitHub has no RISC-V runners, so the RISC-V .debs, for Debian 13 and
+Ubuntu 24.04 and 26.04, are built on x86_64 against each release's
+riscv64 libraries installed beside its own (`PLAA_CROSS=riscv64
+packaging/linux/build.sh IMAGE OUT`), and tested under QEMU, which
+leaves out raw Ethernet and the window. Fedora has no RISC-V release to
+build for.
 
 Packages are built with `PLAA_PRODUCTION=1`, which makes the installed
 copy: settings in `plaa.toml` (`~/.config` on Linux, `%APPDATA%\plaa` on
@@ -68,8 +79,8 @@ are development builds, which keep their own.
   Flatpak, as none can depend on the daemon's package, and an archive
   would hold one release's FFmpeg names.
 - **macOS:** FFmpeg and libass, from Homebrew, inside plaa.app, built on
-  the oldest macOS supported, as Homebrew builds them for the macOS it
-  runs on; the app claims the newest macOS any of its parts needs, and
+  the oldest macOS supported, macOS 15, as Homebrew builds them for the
+  macOS it runs on and no longer builds for macOS 14; the app claims the newest macOS any of its parts needs, and
   the installer refuses an older one. `Contents/Resources/licenses/
   libraries.txt` names each library, its version, license and source,
   and the release carries those sources. For AVB, plaa needs the BPF
@@ -97,7 +108,9 @@ are development builds, which keep their own.
   that `default_app.rs` counts the same ones.
 
 The release offers the corresponding source of everything GPL it
-carries: the macOS job attaches the sources Homebrew built from; the
+carries: each macOS job attaches the sources Homebrew built from
+(`*-macos-arm64-library-sources.tar` and
+`*-macos-x86_64-library-sources.tar`); the
 Windows jobs attach the source archives vcpkg built from
 (`*-windows-library-sources.zip`) and, for FFmpeg, FFmpeg's source at
 the commit of the build, BtbN's scripts at theirs and each library
@@ -164,7 +177,7 @@ window.
 | Arch | A fresh Arch container | `build-arch.sh` builds the PKGBUILD from this tree and `build-arch-first.sh` avb-endpointd's from its release, then the same test |
 | MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa, FFmpeg and libass import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, Default apps, the version line and the FFmpeg and libass it names, the window and the clip played; then that uninstalling leaves nothing |
 | MSI, x64 | A Windows Server 2022 container, which has nothing installed | The same, without the window and the clip |
-| .pkg | Fresh macOS 14, 15 and 26 runners | `packaging/tests/macos/test-pkg.sh`: Gatekeeper's verdict on a downloaded copy, that plaa and every library it carries link only macOS's own libraries and each other, look nowhere outside the app, and run on the oldest macOS the app claims, then installs and checks the app, the version line, the BPF launch daemon and access for the user, the window and the clip played; then that the uninstall script leaves nothing |
+| .pkg | Fresh macOS 15 and 26 runners on Apple Silicon and a macOS 15 runner on Intel, each with its package | `packaging/tests/macos/test-pkg.sh`: Gatekeeper's verdict on a downloaded copy, that plaa and every library it carries link only macOS's own libraries and each other, look nowhere outside the app, and run on the oldest macOS the app claims, then installs and checks the app, the version line, the BPF launch daemon and access for the user, the window and the clip played; then that the uninstall script leaves nothing |
 
 To run one by hand:
 
@@ -177,7 +190,8 @@ To run one by hand:
   packaging\tests\windows\test-msi.ps1 -Msi plaa-X.Y.Z-x64.msi`. For a
   fully clean Windows 11, run it in Windows Sandbox.
 - macOS, on a Mac without plaa installed, with sudo:
-  `packaging/tests/macos/test-pkg.sh plaa-X.Y.Z-arm64.pkg`.
+  `packaging/tests/macos/test-pkg.sh plaa-X.Y.Z-arm64.pkg`, or
+  `plaa-X.Y.Z-x86_64.pkg` on an Intel Mac.
 
 When a new DLL fails the Windows check, link it in or install it beside
 plaa; add it to the script's list only when every Windows plaa supports

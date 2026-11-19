@@ -25,7 +25,7 @@ look follows Material Design 3, as in prev.
 | Area | Decision |
 |---|---|
 | License | GPL-3.0-or-later, so packages can bundle a full FFmpeg build, GPL parts included |
-| Platforms | Linux (Wayland first, X11 supported), Windows 10 and 11, macOS 14 and later on Apple Silicon, the oldest the FFmpeg it carries there is built for |
+| Platforms | Linux (Wayland first, X11 supported), Windows 10 and 11, macOS 15 and later on Apple Silicon and Intel, the oldest the FFmpeg it carries there is built for |
 | Language | Rust, stable toolchain, edition 2024, minimum Rust 1.95 |
 | GUI | iced 0.14 with scramble-ui's Material 3 components; the picture through a wgpu shader widget of plaa's own |
 | Media engine | FFmpeg's libraries (libavformat, libavcodec, libavfilter, libswresample, libswscale) through `ffmpeg-next`, all inside `plaa-media` ([ADR 0001](decisions/0001-media-engine.md)) |
@@ -57,8 +57,8 @@ Playback as QuickTime Player and IINA have it, and beyond them:
 - being an AVB/Milan talker and listener;
 - the assistant panel and MCP server prev has.
 
-Not in scope: a media library, DVD and Blu-ray menus, editing beyond
-trimming and splitting, and Intel Macs.
+Not in scope: a media library, DVD and Blu-ray menus, and editing
+beyond trimming and splitting.
 
 ## Milestones
 

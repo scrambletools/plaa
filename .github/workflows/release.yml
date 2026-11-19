@@ -289,34 +289,77 @@ jobs:
           path: dist/*
 
   macos:
-    # plaa.app in an installer package for Apple Silicon, carrying
-    # Homebrew's FFmpeg and libass, built on the oldest macOS supported, as
-    # Homebrew builds them for the macOS it runs on; the package also lets
-    # plaa reach the network for AVB (packaging/macos). The sources of the
-    # libraries it carries go with the release. Once the repository
-    # variable MACOS_APP_IDENTITY is set (see docs/RELEASING.md), the app
-    # and package carry Scramble Tools' Developer ID signatures and the
-    # package is notarized; until then they are signed ad hoc. The
-    # certificates and the App Store Connect API key are secrets of the
-    # environment "release".
+    # plaa.app in an installer package for Apple Silicon and one for Intel
+    # Macs, each carrying Homebrew's FFmpeg and libass, built on the oldest
+    # macOS supported, as Homebrew builds them for the macOS it runs on;
+    # the package also lets plaa reach the network for AVB
+    # (packaging/macos). The sources of the libraries each carries go with
+    # the release. Once the repository variable MACOS_APP_IDENTITY is set
+    # (see docs/RELEASING.md), the apps and packages carry Scramble Tools'
+    # Developer ID signatures and the packages are notarized; until then
+    # they are signed ad hoc. The certificates and the App Store Connect
+    # API key are secrets of the environment "release".
+    name: macos (${{ matrix.arch }})
     if: ${{ !inputs.only || inputs.only == 'all' || inputs.only == 'macos' }}
     environment: release
-    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          # GitHub's last Intel runner. Homebrew makes no Intel bottles
+          # since 7.0, so it builds FFmpeg, libass and the formulae they
+          # need from source here, which takes hours; packaging/macos/
+          # homebrew-cache.sh keeps the builds of each set of versions.
+          # A tag's run sees only its own cache and main's, so running
+          # this workflow by hand on main fills it for the next tag.
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
     env:
       SIGNING: ${{ vars.MACOS_APP_IDENTITY != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Homebrew's formulae
+        id: formulae
+        run: |
+          brew update
+          echo "HOMEBREW_NO_AUTO_UPDATE=1" >>"$GITHUB_ENV"
+          echo "key=$(packaging/macos/homebrew-cache.sh key ffmpeg libass pkgconf)" >>"$GITHUB_OUTPUT"
+      - if: matrix.arch == 'x86_64'
+        id: kegs
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/homebrew-kegs
+          key: homebrew-${{ matrix.arch }}-${{ steps.formulae.outputs.key }}
+      - if: steps.kegs.outputs.cache-hit == 'true'
+        name: Homebrew's builds, from the cache
+        run: packaging/macos/homebrew-cache.sh restore ~/homebrew-kegs
       - name: FFmpeg and libass
         id: brew
         run: |
           brew install ffmpeg libass pkgconf
           echo "versions=$(brew list --versions ffmpeg libass | cut -d' ' -f2 | paste -sd- -)" >>"$GITHUB_OUTPUT"
+      # Kept at once, so a later step that fails does not cost the build;
+      # a cache that cannot be kept only costs the next run time.
+      - if: matrix.arch == 'x86_64' && steps.kegs.outputs.cache-hit != 'true'
+        name: Keep Homebrew's builds
+        id: keep
+        continue-on-error: true
+        run: packaging/macos/homebrew-cache.sh save ~/homebrew-kegs ffmpeg libass pkgconf
+      - if: steps.keep.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ~/homebrew-kegs
+          key: homebrew-${{ matrix.arch }}-${{ steps.formulae.outputs.key }}
       - uses: dtolnay/rust-toolchain@stable
       # Build scripts keep Homebrew's Cellar paths, which name the version,
       # so new FFmpeg or libass versions need a cache of their own.
       - uses: Swatinem/rust-cache@v2
         with:
-          key: macos-${{ steps.brew.outputs.versions }}
+          key: macos-${{ matrix.arch }}-${{ steps.brew.outputs.versions }}
       - name: libclang for bindgen
         run: echo "LIBCLANG_PATH=$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib" >>"$GITHUB_ENV"
       # A keychain of its own holding the two Developer ID identities, for
@@ -400,10 +443,10 @@ jobs:
             curl -sSLf --retry 3 --retry-all-errors -o "sources/$(basename "$url")" "$url"
           done
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          tar -cf "dist/plaa-$version-macos-library-sources.tar" -C sources .
+          tar -cf "dist/plaa-$version-macos-${{ matrix.arch }}-library-sources.tar" -C sources .
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-arm64
+          name: macos-${{ matrix.arch }}
           path: |
             dist/*.pkg
             dist/*-library-sources.tar
@@ -585,18 +628,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "the test failed in the container" }
 
   macos-install:
-    # Each macOS that GitHub runs, each a fresh machine.
+    # Each macOS that GitHub runs, each a fresh machine, with the package
+    # for its processor.
+    name: macos-install (${{ matrix.runner }})
     needs: macos
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-14, macos-15, macos-26]
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-26
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: macos-arm64
+          name: macos-${{ matrix.arch }}
           path: packages
       - name: Install, upgrade, run, play and remove
         run: |

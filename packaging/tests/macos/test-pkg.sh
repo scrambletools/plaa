@@ -44,9 +44,11 @@ section "macOS $(sw_vers -productVersion), $(uname -m)"
 work=$(mktemp -d)
 pkgutil --expand-full "$package" "$work/expanded"
 want=$(xmllint --xpath 'string(//pkg-ref[@version]/@version)' "$work/expanded/Distribution")
+arch=$(xmllint --xpath 'string(//options/@hostArchitectures)' "$work/expanded/Distribution")
 bundle="$work/expanded/$id.pkg/Payload/Applications/plaa.app"
 [ -d "$bundle" ] || fail "the package has no plaa.app"
-echo "plaa $want"
+[ -n "$arch" ] || fail "the package names no processor"
+echo "plaa $want, for $arch"
 
 section "Gatekeeper, for a downloaded copy"
 if [ "${PLAA_EXPECT_SIGNED:-}" = true ]; then
@@ -86,7 +88,7 @@ while IFS= read -r -d '' binary; do
         *) problems+=("$name looks for libraries in $path") ;;
         esac
     done < <(otool -l "$binary" | awk '$1 == "cmd" && $2 == "LC_RPATH" {getline; getline; print $2}')
-    lipo -archs "$binary" | grep -qw arm64 || problems+=("$name has no arm64 code")
+    lipo -archs "$binary" | grep -qw "$arch" || problems+=("$name has no $arch code")
     minos=$(vtool -show-build "$binary" | awk '$1 == "minos" {print $2; exit}')
     at_most "$minos" "$minimum" || problems+=("$name needs macOS $minos, the app claims $minimum")
 done < <(find "$bundle/Contents/MacOS" "$bundle/Contents/Frameworks" -type f -print0)
