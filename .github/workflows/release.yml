@@ -339,7 +339,17 @@ jobs:
       - name: FFmpeg and libass
         id: brew
         run: |
-          brew install ffmpeg libass pkgconf
+          # On Intel the post-install steps of some formulae it builds, such
+          # as ca-certificates' and python's, fail, and brew exits 1 though
+          # every formula is installed; none of those steps matter here, so
+          # it is the formulae that are checked.
+          brew install ffmpeg libass pkgconf || echo "::warning::brew install exited $?"
+          for formula in ffmpeg libass pkgconf; do
+              [ -n "$(brew list --versions "$formula")" ] || {
+                  echo "::error::$formula is not installed"
+                  exit 1
+              }
+          done
           echo "versions=$(brew list --versions ffmpeg libass | cut -d' ' -f2 | paste -sd- -)" >>"$GITHUB_OUTPUT"
       # Kept at once, so a later step that fails does not cost the build;
       # a cache that cannot be kept only costs the next run time.

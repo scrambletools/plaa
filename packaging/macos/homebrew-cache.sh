@@ -36,15 +36,22 @@ save)
     shift
     mkdir -p "$dir"
     cellar=$(brew --cellar)
-    formulae "$@" >"$dir/formulae.tsv"
+    # One not installed, such as one macOS provides, is left out: brew
+    # install builds it again after a restore, which only costs time.
     kegs=()
-    while IFS=$'\t' read -r name version _; do
-        [ -d "$cellar/$name/$version" ] || {
-            echo "$name $version is not installed" >&2
-            exit 1
-        }
-        kegs+=("$name/$version")
-    done <"$dir/formulae.tsv"
+    : >"$dir/formulae.tsv"
+    while IFS=$'\t' read -r name version keg_only; do
+        if [ -d "$cellar/$name/$version" ]; then
+            kegs+=("$name/$version")
+            printf '%s\t%s\t%s\n' "$name" "$version" "$keg_only" >>"$dir/formulae.tsv"
+        else
+            echo "::warning::$name $version is not installed, so not kept"
+        fi
+    done < <(formulae "$@")
+    [ ${#kegs[@]} -gt 0 ] || {
+        echo "none of the formulae is installed" >&2
+        exit 1
+    }
     tar -czf "$dir/kegs.tar.gz" -C "$cellar" "${kegs[@]}"
     echo "kept ${#kegs[@]} kegs, $(du -h "$dir/kegs.tar.gz" | cut -f1)"
     ;;
