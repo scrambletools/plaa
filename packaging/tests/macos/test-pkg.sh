@@ -171,32 +171,40 @@ echo "the window opened"
 quit_plaa
 
 # A clip of VP9 and Opus, its test pattern's yellow, cyan and magenta
-# bars in the window once its pictures are drawn. plaa draws them with
-# Metal, which every Mac that runs macOS 15 has, but a virtual one, such
-# as CI's Intel runner, may not.
+# bars in the window once its pictures are drawn. plaa writes FFmpeg's
+# log for it, which shows how its pictures were decoded.
 section "A video, played"
-if gpu=$("$work/windows" metal); then
-    echo "drawn by $gpu"
-    cp "$here/../media/test-clip.webm" "$work/test-clip.webm"
-    chmod 644 "$work/test-clip.webm"
-    chmod 755 "$work"
-    sudo -u "$console" open -n "$app" --args "$work/test-clip.webm"
-    seen=0
-    for _ in $(seq 40); do
-        sleep 0.5
-        window=$(plaa_windows | head -1)
-        [ -n "$window" ] || continue
-        screencapture -x -o -l "$window" "$work/video.png" 2>/dev/null || continue
-        seen=$("$work/windows" bars "$work/video.png")
-        [ "$seen" -ge 100 ] && break
-    done
+echo "drawn by $("$work/windows" metal || echo "no Metal device")"
+cp "$here/../media/test-clip.webm" "$work/test-clip.webm"
+chmod 644 "$work/test-clip.webm"
+chmod 755 "$work"
+: >"$work/plaa.log"
+chmod 666 "$work/plaa.log"
+sudo -u "$console" open -n --env PLAA_FFMPEG_LOG=1 --stderr "$work/plaa.log" \
+    "$app" --args "$work/test-clip.webm"
+seen=0
+for _ in $(seq 40); do
+    sleep 0.5
+    window=$(plaa_windows | head -1)
+    [ -n "$window" ] || continue
+    screencapture -x -o -l "$window" "$work/video.png" 2>/dev/null || continue
+    seen=$("$work/windows" bars "$work/video.png")
+    [ "$seen" -ge 100 ] && break
+done
+if ! pgrep -x plaa >/dev/null || [ "$seen" -lt 100 ]; then
+    # PLAA_TEST_KEEP, a folder, gets the window's picture and the log.
+    if [ -n "${PLAA_TEST_KEEP:-}" ]; then
+        mkdir -p "$PLAA_TEST_KEEP"
+        cp "$work/plaa.log" "$PLAA_TEST_KEEP/"
+        [ -f "$work/video.png" ] && cp "$work/video.png" "$PLAA_TEST_KEEP/"
+    fi
+    echo "plaa's log, its last 40 lines:"
+    tail -n 40 "$work/plaa.log"
     pgrep -x plaa >/dev/null || fail "plaa quit while playing"
-    [ "$seen" -ge 100 ] || fail "the video's pictures did not show; the window is in $work/video.png"
-    echo "it played, each bar $((seen / 100)).$((seen % 100 / 10))% of the window"
-    quit_plaa
-else
-    echo "this Mac has no Metal device to draw pictures with, so skipped"
+    fail "the video's pictures did not show; the window is in $work/video.png"
 fi
+echo "it played, each bar $((seen / 100)).$((seen % 100 / 10))% of the window"
+quit_plaa
 
 section "Uninstall"
 sudo "$support/uninstall"
