@@ -192,14 +192,21 @@ for _ in $(seq 40); do
     [ "$seen" -ge 100 ] && break
 done
 if ! pgrep -x plaa >/dev/null || [ "$seen" -lt 100 ]; then
-    # PLAA_TEST_KEEP, a folder, gets the window's picture and the log.
+    # PLAA_TEST_KEEP, a folder, gets the window's picture, the log, the
+    # Mac's sound devices and where each of plaa's threads was waiting.
     if [ -n "${PLAA_TEST_KEEP:-}" ]; then
         mkdir -p "$PLAA_TEST_KEEP"
         cp "$work/plaa.log" "$PLAA_TEST_KEEP/"
         [ -f "$work/video.png" ] && cp "$work/video.png" "$PLAA_TEST_KEEP/"
+        system_profiler SPAudioDataType >"$PLAA_TEST_KEEP/sound.txt" 2>&1 || true
+        if pid=$(pgrep -x plaa | head -1); then
+            sudo sample "$pid" 3 -file "$PLAA_TEST_KEEP/sample.txt" >/dev/null 2>&1 || true
+        fi
     fi
     echo "plaa's log, its last 40 lines:"
     tail -n 40 "$work/plaa.log"
+    echo "this Mac's sound devices:"
+    system_profiler SPAudioDataType 2>&1 | sed -n '1,30p'
     pgrep -x plaa >/dev/null || fail "plaa quit while playing"
     fail "the video's pictures did not show; the window is in $work/video.png"
 fi
