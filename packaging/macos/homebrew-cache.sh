@@ -61,11 +61,14 @@ restore)
     tar -xzf "$dir/kegs.tar.gz" -C "$(brew --cellar)"
     mkdir -p "$prefix/opt"
     while IFS=$'\t' read -r name version keg_only; do
+        # The runner may have an older version of it linked. brew unlink
+        # unlinks the version the opt path names, so this comes first.
+        if [ "$keg_only" = false ]; then
+            brew unlink "$name" >/dev/null 2>&1 || true
+        fi
         # Libraries name the others by their opt paths.
         ln -sfn "../Cellar/$name/$version" "$prefix/opt/$name"
         if [ "$keg_only" = false ]; then
-            # The runner may have an older version of it linked.
-            brew unlink "$name" >/dev/null 2>&1 || true
             brew link --overwrite "$name" >/dev/null
         fi
     done <"$dir/formulae.tsv"
