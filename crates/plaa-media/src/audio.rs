@@ -3,8 +3,8 @@
 //! the media time of the sound it is about to play.
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU8, AtomicU32, Ordering};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, mpsc};
 use std::time::{Duration, Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -23,9 +23,21 @@ const RECENT: usize = 16_384;
 /// visualizer comes to rest.
 const STALE: Duration = Duration::from_millis(150);
 
+/// How long a device may take to open before playback goes on without
+/// it. A sound server that never answers, as macOS's coreaudiod at times
+/// does, would otherwise hold playback up for good.
+const OPEN_WAIT: Duration = Duration::from_secs(2);
+
+/// How many opens were given up on and are still waiting for the system.
+/// While one is, outputs open silent at once rather than wait again.
+static UNANSWERED: AtomicIsize = AtomicIsize::new(0);
+
 #[derive(Debug)]
 pub enum OutputError {
     NoDevice,
+    /// The device did not open within `OPEN_WAIT`, or one before it is
+    /// still opening.
+    NoAnswer,
     Device(String),
 }
 
@@ -33,6 +45,7 @@ impl std::fmt::Display for OutputError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NoDevice => formatter.write_str("no audio output device"),
+            Self::NoAnswer => formatter.write_str("the audio output device did not answer"),
             Self::Device(error) => write!(formatter, "audio output: {error}"),
         }
     }
@@ -397,9 +410,8 @@ pub struct Output {
 
 /// Where the sound goes: a device, or nowhere.
 enum Sink {
-    Device {
-        _stream: cpal::Stream,
-    },
+    /// The thread that opened the device, which keeps its stream.
+    Device { _keeper: Keeper },
     /// A thread that takes the sound as a device would, in time, without
     /// playing it: for when no device opens, so playback goes on silently.
     Silent {
@@ -419,19 +431,126 @@ impl Drop for Sink {
     }
 }
 
+/// A thread holding what it opened, such as a device's stream, until
+/// this is dropped, which closes it before the drop returns.
+struct Keeper {
+    stop: Option<mpsc::Sender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Drop for Keeper {
+    fn drop(&mut self) {
+        // The thread's wait ends as the sender goes.
+        drop(self.stop.take());
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+/// Where an open on a thread of its own stands.
+const WAITING: u8 = 0;
+const ANSWERED: u8 = 1;
+const GIVEN_UP: u8 = 2;
+
+/// Runs `open` on a thread of its own, which keeps what it opens, and
+/// waits up to `wait` for it. When it takes longer, the open is given up
+/// on: `unanswered` counts it until it returns, whatever it opened then
+/// closing at once, and while it does, opens fail at once.
+fn open_kept<K: 'static>(
+    wait: Duration,
+    unanswered: &'static AtomicIsize,
+    open: impl FnOnce() -> Result<(K, Arc<Shared>), OutputError> + Send + 'static,
+) -> Result<(Arc<Shared>, Keeper), OutputError> {
+    if unanswered.load(Ordering::Acquire) > 0 {
+        return Err(OutputError::NoAnswer);
+    }
+    let state = Arc::new(AtomicU8::new(WAITING));
+    let (answer, answered) = mpsc::channel();
+    let thread = {
+        let state = state.clone();
+        std::thread::Builder::new()
+            .name("plaa-sound-out".into())
+            .spawn(move || {
+                let opened = open();
+                if state.swap(ANSWERED, Ordering::AcqRel) == GIVEN_UP {
+                    // Closed before opens go on.
+                    drop(opened);
+                    unanswered.fetch_sub(1, Ordering::AcqRel);
+                    return;
+                }
+                let (kept, shared) = match opened {
+                    Ok(opened) => opened,
+                    Err(error) => {
+                        let _ = answer.send(Err(error));
+                        return;
+                    }
+                };
+                let (stop, stopped) = mpsc::channel::<()>();
+                if answer.send(Ok((shared, stop))).is_ok() {
+                    // Until the keeper's sender is dropped.
+                    let _ = stopped.recv();
+                }
+                drop(kept);
+            })
+            .map_err(|error| OutputError::Device(error.to_string()))?
+    };
+    let result = match answered.recv_timeout(wait) {
+        Ok(result) => result,
+        Err(_) => {
+            unanswered.fetch_add(1, Ordering::AcqRel);
+            if state
+                .compare_exchange(WAITING, GIVEN_UP, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                // Left to finish by itself.
+                return Err(OutputError::NoAnswer);
+            }
+            // It answered as the wait ran out.
+            unanswered.fetch_sub(1, Ordering::AcqRel);
+            answered.recv().unwrap_or(Err(OutputError::NoAnswer))
+        }
+    };
+    let (shared, stop) = result?;
+    Ok((
+        shared,
+        Keeper {
+            stop: Some(stop),
+            thread: Some(thread),
+        },
+    ))
+}
+
 /// How much sound the silent output takes at a time.
 const SILENT_PERIOD: Duration = Duration::from_millis(10);
 
 impl Output {
-    /// Opens the default output device at its own rate and channels.
     /// Opens output device `device`, by its id, or the system's default
-    /// when it is none or gone.
+    /// when it is none or gone, at its own rate and channels. A device
+    /// that has not opened within `OPEN_WAIT` is given up on.
     pub fn open(
         clock: Arc<Clock>,
         volume: f32,
         muted: bool,
         device: Option<&str>,
     ) -> Result<Self, OutputError> {
+        let device = device.map(str::to_owned);
+        let (shared, keeper) = open_kept(OPEN_WAIT, &UNANSWERED, move || {
+            Self::open_device(clock, volume, muted, device.as_deref())
+        })?;
+        Ok(Self {
+            _sink: Sink::Device { _keeper: keeper },
+            shared,
+        })
+    }
+
+    /// Opens and starts a device's stream, on the thread that keeps it.
+    fn open_device(
+        clock: Arc<Clock>,
+        volume: f32,
+        muted: bool,
+        device: Option<&str>,
+    ) -> Result<(cpal::Stream, Arc<Shared>), OutputError> {
         let host = cpal::default_host();
         let chosen = device.and_then(|wanted| {
             host.output_devices()
@@ -479,10 +598,7 @@ impl Output {
         stream
             .play()
             .map_err(|error| OutputError::Device(error.to_string()))?;
-        Ok(Self {
-            _sink: Sink::Device { _stream: stream },
-            shared,
-        })
+        Ok((stream, shared))
     }
 
     /// An output that plays nothing but takes the sound in time, so the
@@ -698,5 +814,73 @@ mod tests {
         assert!((shared.gain() - 0.125).abs() < 1e-6);
         shared.set_muted(true);
         assert_eq!(shared.gain(), 0.0);
+    }
+
+    /// Something opened that says when it is closed.
+    struct Opened(Arc<AtomicBool>);
+
+    impl Drop for Opened {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::Release);
+        }
+    }
+
+    #[test]
+    fn an_open_in_time_is_kept_until_dropped() {
+        static UNANSWERED: AtomicIsize = AtomicIsize::new(0);
+        let closed = Arc::new(AtomicBool::new(false));
+        let kept = closed.clone();
+        let (_, keeper) = open_kept(Duration::from_secs(5), &UNANSWERED, move || {
+            Ok((Opened(kept), Arc::new(shared())))
+        })
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(!closed.load(Ordering::Acquire));
+        drop(keeper);
+        assert!(closed.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn a_failed_open_says_why() {
+        static UNANSWERED: AtomicIsize = AtomicIsize::new(0);
+        let result = open_kept(Duration::from_secs(5), &UNANSWERED, || {
+            Err::<((), Arc<Shared>), _>(OutputError::Device("gone".to_owned()))
+        });
+        assert!(matches!(result, Err(OutputError::Device(error)) if error == "gone"));
+        assert_eq!(UNANSWERED.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn an_open_that_does_not_answer_is_given_up_on() {
+        static UNANSWERED: AtomicIsize = AtomicIsize::new(0);
+        let closed = Arc::new(AtomicBool::new(false));
+        let kept = closed.clone();
+        let started = Instant::now();
+        let result = open_kept(Duration::from_millis(50), &UNANSWERED, move || {
+            std::thread::sleep(Duration::from_millis(400));
+            Ok((Opened(kept), Arc::new(shared())))
+        });
+        assert!(matches!(result, Err(OutputError::NoAnswer)));
+        assert!(started.elapsed() < Duration::from_millis(300));
+        // While it waits, the next open does not even try.
+        let tried = Arc::new(AtomicBool::new(false));
+        let trying = tried.clone();
+        let result = open_kept(Duration::from_secs(5), &UNANSWERED, move || {
+            trying.store(true, Ordering::Release);
+            Ok(((), Arc::new(shared())))
+        });
+        assert!(matches!(result, Err(OutputError::NoAnswer)));
+        assert!(!tried.load(Ordering::Acquire));
+        // Once it answers, what it opened is closed and opens go on.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while UNANSWERED.load(Ordering::Acquire) > 0 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(UNANSWERED.load(Ordering::Acquire), 0);
+        assert!(closed.load(Ordering::Acquire));
+        let again = open_kept(Duration::from_secs(5), &UNANSWERED, || {
+            Ok(((), Arc::new(shared())))
+        });
+        assert!(again.is_ok());
     }
 }

@@ -63,6 +63,10 @@
 
 ### Fixed
 
+- A file with sound no longer stays at its spinner when the sound device
+  never answers, as when macOS's coreaudiod hangs. plaa gives the device
+  two seconds to open, then plays silently and says the device did not
+  answer; until that device answers, later files play silently at once.
 - On Linux, plaa reaches PipeWire's PulseAudio server where no program
   had made a PulseAudio cookie yet. The server refused plaa's empty
   cookie, so plaa fell back to ALSA, where it could not find
