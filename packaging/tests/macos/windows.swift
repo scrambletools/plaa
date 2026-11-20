@@ -4,9 +4,12 @@
 //   windows bars PNG    the fewest pixels of any of the yellow, cyan and
 //                       magenta bars of the test clip in a picture, in
 //                       hundredths of the picture
+//   windows metal       the name of this Mac's Metal device; with none,
+//                       it fails
 import CoreGraphics
 import Foundation
 import ImageIO
+import Metal
 
 let arguments = CommandLine.arguments
 switch arguments.count > 1 ? arguments[1] : "" {
@@ -46,7 +49,10 @@ case "bars" where arguments.count > 2:
         }
     }
     print(min(yellow, cyan, magenta) * 10000 / max(width * height, 1))
+case "metal":
+    guard let device = MTLCreateSystemDefaultDevice() else { exit(1) }
+    print(device.name)
 default:
-    FileHandle.standardError.write("usage: windows list | windows bars PNG\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: windows list | windows bars PNG | windows metal\n".data(using: .utf8)!)
     exit(2)
 }
