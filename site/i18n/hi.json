@@ -296,7 +296,7 @@
  "0a999012ffb8": "पैकेज",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13, Ubuntu 24.04 और 26.04, Fedora 44, Arch; Wayland और X11",
- "d54168005f4f": "x86_64, ARM64; Debian और Ubuntu पर RISC-V",
+ "e845c029371c": "x86_64, ARM64; Debian, Ubuntu, Fedora और Arch पर RISC-V",
  "d270cea31435": "हर रिलीज़ के लिए .deb और .rpm, Arch के लिए PKGBUILD",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64, ARM64",

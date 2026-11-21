@@ -296,7 +296,7 @@
  "0a999012ffb8": "Pakej",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13, Ubuntu 24.04 dan 26.04, Fedora 44, Arch; Wayland dan X11",
- "d54168005f4f": "x86_64, ARM64; RISC-V pada Debian dan Ubuntu",
+ "e845c029371c": "x86_64, ARM64; RISC-V pada Debian, Ubuntu, Fedora dan Arch",
  "d270cea31435": ".deb dan .rpm untuk setiap keluaran, PKGBUILD untuk Arch",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64, ARM64",

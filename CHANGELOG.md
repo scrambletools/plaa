@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- A RISC-V .rpm for Fedora 44, which builds RISC-V as an alternative
+  architecture, beside the RISC-V .debs, and riscv64 in the PKGBUILD,
+  for Arch's RISC-V port.
+
 ### Changed
 
 - plaa's Linux packages depend on avb-endpointd's, 0.3.4 or later, and

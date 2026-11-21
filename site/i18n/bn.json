@@ -296,7 +296,7 @@
  "0a999012ffb8": "প্যাকেজ",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13, Ubuntu 24.04 ও 26.04, Fedora 44, Arch; Wayland ও X11",
- "d54168005f4f": "x86_64, ARM64; Debian ও Ubuntu-তে RISC-V",
+ "e845c029371c": "x86_64, ARM64; Debian, Ubuntu, Fedora ও Arch-এ RISC-V",
  "d270cea31435": "প্রতিটি রিলিজের জন্য .deb ও .rpm, Arch-এর জন্য PKGBUILD",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64, ARM64",

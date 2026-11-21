@@ -296,7 +296,7 @@
  "0a999012ffb8": "پیکیجز",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13، Ubuntu 24.04 اور 26.04، Fedora 44، Arch؛ Wayland اور X11",
- "d54168005f4f": "x86_64، ARM64؛ Debian اور Ubuntu پر RISC-V",
+ "e845c029371c": "x86_64، ARM64؛ Debian، Ubuntu، Fedora اور Arch پر RISC-V",
  "d270cea31435": "ہر ریلیز کے لیے .deb اور .rpm، Arch کے لیے PKGBUILD",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64، ARM64",

@@ -199,10 +199,12 @@ notification area while a screen recording runs hidden. The
 ## Packages
 
 Each release has packages for Debian 13, Ubuntu 24.04 and 26.04,
-Fedora 44 and Arch (x86_64 and ARM64, and RISC-V for Debian and Ubuntu),
-Windows (an MSI and a zip, x64 and ARM64) and macOS (Apple Silicon and
-Intel, macOS 15 and later), each installed, upgraded, run, made to play
-a video and removed in a clean system before the release goes out. On
+Fedora 44 and Arch (x86_64 and ARM64, and RISC-V for Debian, Ubuntu
+and Fedora), Windows (an MSI and a zip, x64 and ARM64) and macOS (Apple
+Silicon and Intel, macOS 15 and later), each installed, upgraded, run,
+made to play a video and removed in a clean system before the release
+goes out. The PKGBUILD also lists riscv64, for Arch's RISC-V port, which
+no test runs. On
 Linux the packages use the system's FFmpeg, each built for its
 release; on Windows and macOS they carry their own. Download them from
 [plaa.run](https://plaa.run#download), which says how to install each,
