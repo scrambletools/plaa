@@ -296,7 +296,7 @@
  "0a999012ffb8": "패키지",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13, Ubuntu 24.04 및 26.04, Fedora 44, Arch. Wayland와 X11",
- "d54168005f4f": "x86_64, ARM64. Debian과 Ubuntu에서는 RISC-V도 지원",
+ "e845c029371c": "x86_64, ARM64. Debian, Ubuntu, Fedora, Arch에서는 RISC-V도 지원",
  "d270cea31435": "릴리스별 .deb와 .rpm, Arch용 PKGBUILD",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64, ARM64",

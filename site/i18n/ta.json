@@ -296,7 +296,7 @@
  "0a999012ffb8": "தொகுப்புகள்",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13, Ubuntu 24.04, 26.04, Fedora 44, Arch; Wayland, X11",
- "d54168005f4f": "x86_64, ARM64; Debian, Ubuntu-இல் RISC-V",
+ "e845c029371c": "x86_64, ARM64; Debian, Ubuntu, Fedora, Arch-இல் RISC-V",
  "d270cea31435": "ஒவ்வொரு வெளியீட்டுக்கும் .deb, .rpm, Arch-க்கு PKGBUILD",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64, ARM64",

@@ -32,12 +32,18 @@ before tagging. The Intel package can be built this way until
 Homebrew stops running on Intel Macs, in September 2027, or GitHub
 retires the runner, in the fall of 2027.
 
-GitHub has no RISC-V runners, so the RISC-V .debs, for Debian 13 and
-Ubuntu 24.04 and 26.04, are built on x86_64 against each release's
-riscv64 libraries installed beside its own (`PLAA_CROSS=riscv64
+GitHub has no RISC-V runners, so the RISC-V packages, .debs for Debian
+13 and Ubuntu 24.04 and 26.04 and an .rpm for Fedora 44, are built on
+x86_64 against each release's riscv64 libraries (`PLAA_CROSS=riscv64
 packaging/linux/build.sh IMAGE OUT`), and tested under QEMU, which
-leaves out raw Ethernet and the window. Fedora has no RISC-V release to
-build for.
+leaves out raw Ethernet and the window. Debian and Ubuntu install them
+beside their own; Fedora builds RISC-V as an alternative architecture,
+whose libraries come from its RISC-V koji
+(`riscv-koji.fedoraproject.org/repos-dist/f44`), unsigned, into a root
+of their own, and the test runs in Fedora's RISC-V container image from
+its alternative architectures' downloads, checked against its published
+checksum. Arch's PKGBUILD lists riscv64 for Arch's RISC-V port, which
+no test runs.
 
 Packages are built with `PLAA_PRODUCTION=1`, which makes the installed
 copy: settings in `plaa.toml` (`~/.config` on Linux, `%APPDATA%\plaa` on
@@ -177,7 +183,7 @@ window.
 
 | Package | Where | What |
 |---|---|---|
-| .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, and of the Debian and Ubuntu releases for RISC-V under QEMU, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, that none an older plaa installed for AVB is left, its dependency on avb-endpointd, that only avb-endpointd's `avb-netraw` holds `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user through `avb-netraw` (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
+| .deb, .rpm | Fresh containers of Debian 13, Ubuntu 24.04 and 26.04 and Fedora 44, x86_64 and ARM64, and of the Debian, Ubuntu and Fedora releases for RISC-V under QEMU, each with its own package | `packaging/tests/linux/test-package.sh`: installs with the package's dependencies only, then checks its files, that none an older plaa installed for AVB is left, its dependency on avb-endpointd, that only avb-endpointd's `avb-netraw` holds `CAP_NET_RAW`, the AVB check's warning, that every shared library is found, the version line and the FFmpeg it names as a regular user, raw Ethernet as that user through `avb-netraw` (`plaa --interfaces`), and the window opening, drawing and playing the clip under a headless sway, with no sound device; then that removing leaves nothing |
 | Arch | A fresh Arch container | `build-arch.sh` builds the PKGBUILD from this tree and `build-arch-first.sh` avb-endpointd's from its release, then the same test |
 | MSI | GitHub's Windows Server 2025 and Windows 11 ARM runners | `packaging/tests/windows/test-msi.ps1`: checks every DLL plaa, FFmpeg and libass import against those Windows itself provides, then installs and checks the files, the entry in Apps, the Start menu shortcut, Open With, Default apps, the version line and the FFmpeg and libass it names, the window and the clip played; then that uninstalling leaves nothing |
 | MSI, x64 | A Windows Server 2022 container, which has nothing installed | The same, without the window and the clip |

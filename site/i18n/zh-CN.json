@@ -296,7 +296,7 @@
  "0a999012ffb8": "软件包",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13、Ubuntu 24.04 和 26.04、Fedora 44、Arch；Wayland 和 X11",
- "d54168005f4f": "x86_64、ARM64；Debian 和 Ubuntu 上还支持 RISC-V",
+ "e845c029371c": "x86_64、ARM64；Debian、Ubuntu、Fedora 和 Arch 上还支持 RISC-V",
  "d270cea31435": "每个发行版版本都有 .deb 和 .rpm，Arch 使用 PKGBUILD",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64、ARM64",

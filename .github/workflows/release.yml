@@ -58,9 +58,10 @@ jobs:
             runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
-          # RISC-V .debs, for the releases that have the architecture,
-          # built on x86_64 with its libraries beside, for want of RISC-V
-          # runners (PLAA_CROSS), and tested under QEMU.
+          # RISC-V packages, for the releases that have the architecture,
+          # Fedora's as an alternative architecture: built on x86_64 with
+          # its libraries beside, for want of RISC-V runners (PLAA_CROSS),
+          # and tested under QEMU.
           - arch: riscv64
             image: 'debian:13'
             runner: ubuntu-24.04
@@ -71,6 +72,10 @@ jobs:
             cross: riscv64
           - arch: riscv64
             image: 'ubuntu:26.04'
+            runner: ubuntu-24.04
+            cross: riscv64
+          - arch: riscv64
+            image: 'fedora:44'
             runner: ubuntu-24.04
             cross: riscv64
     runs-on: ${{ matrix.runner }}
@@ -479,9 +484,10 @@ jobs:
             runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
-          # RISC-V .debs, for the releases that have the architecture,
-          # built on x86_64 with its libraries beside, for want of RISC-V
-          # runners (PLAA_CROSS), and tested under QEMU.
+          # RISC-V packages, for the releases that have the architecture,
+          # Fedora's as an alternative architecture: built on x86_64 with
+          # its libraries beside, for want of RISC-V runners (PLAA_CROSS),
+          # and tested under QEMU.
           - arch: riscv64
             image: 'debian:13'
             runner: ubuntu-24.04
@@ -492,6 +498,10 @@ jobs:
             cross: riscv64
           - arch: riscv64
             image: 'ubuntu:26.04'
+            runner: ubuntu-24.04
+            cross: riscv64
+          - arch: riscv64
+            image: 'fedora:44'
             runner: ubuntu-24.04
             cross: riscv64
     runs-on: ${{ matrix.runner }}
@@ -510,6 +520,20 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: ${{ matrix.cross }}
+      # Docker Hub's Fedora has no RISC-V image, so Fedora's own, from its
+      # RISC-V release, checked against the checksum Fedora published.
+      - if: matrix.cross && startsWith(matrix.image, 'fedora:')
+        id: fedora
+        run: |
+          name=Fedora-Container-Base-Generic-44-20260604.0.riscv64.oci.tar.xz
+          curl -sSfLO "https://dl.fedoraproject.org/pub/alt/risc-v/release/44/Container/riscv64/images/$name"
+          echo "198c75fe6f58fea77e539fd29a3103407c0923833c7192c5e962a008c0595f31  $name" | sha256sum -c
+          # An OCI archive, which docker load cannot read; skopeo brings it
+          # into Docker.
+          xz -d "$name"
+          tar -tf "${name%.xz}" | head -5
+          skopeo copy "oci-archive:${name%.xz}" docker-daemon:plaa-test/fedora:44-riscv64
+          echo "image=plaa-test/fedora:44-riscv64" >>"$GITHUB_OUTPUT"
       - name: Packages no distribution carries
         run: |
           case $ARCH in x86_64) deb=amd64 ;; aarch64) deb=arm64 ;; *) deb=$ARCH ;; esac
@@ -531,7 +555,7 @@ jobs:
           previous=$(packaging/tests/previous-release.sh "$package" previous)
           packaging/tests/linux/run.sh "$IMAGE" "$package" $previous
         env:
-          IMAGE: ${{ matrix.image }}
+          IMAGE: ${{ steps.fedora.outputs.image || matrix.image }}
           GH_TOKEN: ${{ github.token }}
           PLAA_TEST_FIRST: first
           PLAA_TEST_SHOTS: shots

@@ -11,10 +11,11 @@
 # The source is this script's tree, which may be read-only. Builds go to
 # CARGO_TARGET_DIR, /target by default. VERSION_SUFFIX, such as
 # ~debian13, names the release in the package's version; it defaults to
-# one made from /etc/os-release. PLAA_CROSS, a Debian architecture such
-# as riscv64, builds a .deb for it on this one, with that architecture's
-# libraries installed beside this one's, where no computer of its kind
-# builds; its programs run here through QEMU, as binfmt_misc lets them.
+# one made from /etc/os-release. PLAA_CROSS, an architecture such as
+# riscv64, builds a package for it on this one, where no computer of its
+# kind builds: on Debian and Ubuntu with that architecture's libraries
+# installed beside this one's, on Fedora in a root of their own; its
+# programs run here through QEMU, as binfmt_misc lets them.
 set -euo pipefail
 
 out=${1:?usage: build-package.sh OUT}
@@ -52,18 +53,34 @@ debian | ubuntu)
     apt-get install -y --no-install-recommends "${tools[@]}" "${libraries[@]}"
     ;;
 fedora)
-    if [ -n "$cross" ]; then
-        echo "build-package.sh: PLAA_CROSS builds only .deb packages" >&2
-        exit 2
-    fi
     kind=rpm
     suffix=${VERSION_SUFFIX:-.fc$VERSION_ID}
-    dnf install -y --setopt=install_weak_deps=False \
-        gcc gcc-c++ clang clang-devel pkgconf-pkg-config curl git file rpm-build \
-        libavcodec-free-devel libavformat-free-devel libavutil-free-devel \
-        libavfilter-free-devel libavdevice-free-devel libswscale-free-devel \
-        libswresample-free-devel pipewire-devel alsa-lib-devel fontconfig-devel \
-        freetype-devel libxkbcommon-devel wayland-devel
+    libraries=(libavcodec-free-devel libavformat-free-devel libavutil-free-devel
+        libavfilter-free-devel libavdevice-free-devel libswscale-free-devel
+        libswresample-free-devel pipewire-devel alsa-lib-devel fontconfig-devel
+        freetype-devel libxkbcommon-devel wayland-devel)
+    tools=(gcc gcc-c++ clang clang-devel pkgconf-pkg-config curl git file rpm-build)
+    if [ -n "$cross" ]; then
+        # dnf puts one architecture in a root, so the other's libraries,
+        # headers and C runtime go in a root of their own, which clang
+        # builds against. Fedora builds RISC-V as an alternative
+        # architecture, on its own koji, whose packages are not signed.
+        sysroot=/sysroot
+        dnf install -y --setopt=install_weak_deps=False "${tools[@]}" lld
+        # Fedora's links from / into /usr, which the filesystem package's
+        # own scriptlet makes where scriptlets run; here none do.
+        mkdir -p "$sysroot/usr/bin" "$sysroot/usr/lib" "$sysroot/usr/lib64"
+        for link in bin lib lib64 sbin; do
+            ln -sfn "usr/$link" "$sysroot/$link"
+        done
+        dnf install -y --installroot="$sysroot" --forcearch="$cross" --releasever="$VERSION_ID" \
+            --repofrompath="fedora-$cross,https://riscv-koji.fedoraproject.org/repos-dist/f$VERSION_ID/latest/$cross/" \
+            --repo="fedora-$cross" --setopt="fedora-$cross.gpgcheck=0" \
+            --setopt=install_weak_deps=False --setopt=tsflags=noscripts \
+            glibc-devel gcc libstdc++-devel "${libraries[@]}"
+    else
+        dnf install -y --setopt=install_weak_deps=False "${tools[@]}" "${libraries[@]}"
+    fi
     ;;
 *)
     echo "build-package.sh: no package for $ID" >&2
@@ -93,25 +110,50 @@ targeting=()
 if [ -n "$cross" ]; then
     # The other architecture's compilers, libraries and headers, for Rust,
     # the C its crates build, pkg-config and bindgen alike.
-    gnu=$(dpkg-architecture -a"$cross" -qDEB_HOST_GNU_TYPE 2>/dev/null)
     target=$rust_arch-unknown-linux-gnu
     rustup target add "$target"
     target_variable=$(tr 'a-z-' 'A-Z_' <<<"$target")
-    export "CARGO_TARGET_${target_variable}_LINKER=$gnu-gcc"
-    export "CC_${target//-/_}=$gnu-gcc" "CXX_${target//-/_}=$gnu-g++"
-    export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_LIBDIR=/usr/lib/$gnu/pkgconfig:/usr/share/pkgconfig
-    export BINDGEN_EXTRA_CLANG_ARGS="--target=$gnu -I/usr/include/$gnu"
+    if [ $kind = deb ]; then
+        gnu=$(dpkg-architecture -a"$cross" -qDEB_HOST_GNU_TYPE 2>/dev/null)
+        export "CARGO_TARGET_${target_variable}_LINKER=$gnu-gcc"
+        export "CC_${target//-/_}=$gnu-gcc" "CXX_${target//-/_}=$gnu-g++"
+        export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_LIBDIR=/usr/lib/$gnu/pkgconfig:/usr/share/pkgconfig
+        export BINDGEN_EXTRA_CLANG_ARGS="--target=$gnu -I/usr/include/$gnu"
+        foreign=/usr/include/$gnu
+    else
+        # clang for the other architecture, against the root its
+        # libraries went in.
+        gnu=$cross-redhat-linux
+        for compiler in clang clang++; do
+            printf '#!/bin/sh\nexec %s --target=%s --sysroot=%s -fuse-ld=lld "$@"\n' \
+                "$compiler" "$gnu" "$sysroot" >"/usr/local/bin/$gnu-$compiler"
+            chmod +x "/usr/local/bin/$gnu-$compiler"
+        done
+        export "CARGO_TARGET_${target_variable}_LINKER=$gnu-clang"
+        export "CC_${target//-/_}=$gnu-clang" "CXX_${target//-/_}=$gnu-clang++"
+        export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_SYSROOT_DIR=$sysroot
+        export PKG_CONFIG_LIBDIR=$sysroot/usr/lib64/pkgconfig:$sysroot/usr/share/pkgconfig
+        export BINDGEN_EXTRA_CLANG_ARGS="--target=$gnu --sysroot=$sysroot"
+        # Its programs' loader and libraries, for QEMU to find.
+        export QEMU_LD_PREFIX=$sysroot
+        foreign=$sysroot/usr/include
+    fi
     # ffmpeg-sys-next compiles a check of FFmpeg's version for this
-    # computer with the other architecture's include folder, whose C
+    # computer with the other architecture's include folders, whose C
     # library headers this one's compiler cannot take: it looks there
     # last, past its own.
     cat >/usr/local/bin/plaa-host-cc <<SCRIPT
 #!/bin/bash
 arguments=()
 while [ \$# -gt 0 ]; do
-    if [ "\$1" = -I ] && [ "\$2" = /usr/include/$gnu ]; then
+    if [ "\$1" = -I ] && [[ "\$2" == $foreign* ]]; then
         arguments+=(-idirafter "\$2")
         shift 2
+        continue
+    fi
+    if [[ "\$1" == -I$foreign* ]]; then
+        arguments+=(-idirafter "\${1#-I}")
+        shift
         continue
     fi
     arguments+=("\$1")

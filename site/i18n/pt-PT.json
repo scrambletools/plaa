@@ -296,7 +296,7 @@
  "0a999012ffb8": "Pacotes",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13, Ubuntu 24.04 e 26.04, Fedora 44, Arch; Wayland e X11",
- "d54168005f4f": "x86_64, ARM64; RISC-V no Debian e no Ubuntu",
+ "e845c029371c": "x86_64, ARM64; RISC-V no Debian, no Ubuntu, no Fedora e no Arch",
  "d270cea31435": ".deb e .rpm para cada versão, PKGBUILD para Arch",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64, ARM64",

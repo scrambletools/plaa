@@ -296,7 +296,7 @@
  "0a999012ffb8": "بسته‌ها",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13، Ubuntu 24.04 و 26.04، Fedora 44، Arch؛ Wayland و X11",
- "d54168005f4f": "x86_64، ARM64؛ RISC-V روی Debian و Ubuntu",
+ "e845c029371c": "x86_64، ARM64؛ RISC-V روی Debian، Ubuntu، Fedora و Arch",
  "d270cea31435": ".deb و .rpm برای هر نسخه، PKGBUILD برای Arch",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64، ARM64",

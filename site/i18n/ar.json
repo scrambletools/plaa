@@ -296,7 +296,7 @@
  "0a999012ffb8": "الحزم",
  "83ad8510bbd3": "Linux",
  "6456b5b05b07": "Debian 13 وUbuntu 24.04 و26.04 وFedora 44 وArch؛ Wayland وX11",
- "d54168005f4f": "x86_64 وARM64؛ RISC-V على Debian وUbuntu",
+ "e845c029371c": "x86_64 وARM64؛ RISC-V على Debian وUbuntu وFedora وArch",
  "d270cea31435": ".deb و.rpm لكل إصدار، وPKGBUILD لـ Arch",
  "26d9c28d789c": "Windows",
  "0346c8a43cf8": "x64، ARM64",

@@ -1205,9 +1205,9 @@
   "page": "specs.html",
   "text": "Debian 13, Ubuntu 24.04 and 26.04, Fedora 44, Arch; Wayland and X11"
  },
- "d54168005f4f": {
+ "e845c029371c": {
   "page": "specs.html",
-  "text": "x86_64, ARM64; RISC-V on Debian and Ubuntu"
+  "text": "x86_64, ARM64; RISC-V on Debian, Ubuntu, Fedora and Arch"
  },
  "d270cea31435": {
   "page": "specs.html",

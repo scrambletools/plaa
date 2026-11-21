@@ -9,7 +9,7 @@
 # The container is of this computer's architecture, whatever the image's
 # tag last pulled. Cargo's downloads and the build stay in Docker volumes
 # named for the image, so a second build is quicker. PLAA_CROSS, such as
-# riscv64, builds a .deb for that architecture instead. PLAA_DOCKER_CPUS,
+# riscv64, builds the package for that architecture instead. PLAA_DOCKER_CPUS,
 # such as 4, limits the processors the build takes, leaving room on a
 # computer keeping network time with gptpd.
 set -euo pipefail
@@ -22,7 +22,7 @@ volume=plaa-build-$(tr -c 'a-z0-9\n' - <<<"$image")
 options=(--rm --platform "linux/$(docker version -f '{{.Server.Arch}}')"
     -v "$root:/src:ro" -v "$out:/out" -v "$volume-cargo:/cargo" -v "$volume-target:/target"
     -e CARGO_HOME=/cargo -e RUSTUP_HOME=/cargo/rustup -e CARGO_TERM_COLOR=always)
-# A .deb for another architecture, built on this one's (build-package.sh).
+# A package for another architecture, built on this one's (build-package.sh).
 if [ -n "${PLAA_CROSS:-}" ]; then
     options+=(-e "PLAA_CROSS=$PLAA_CROSS")
 fi
