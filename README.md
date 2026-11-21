@@ -147,10 +147,13 @@ Download it from [plaa.run](https://plaa.run#download) or the
   plaa connects, with the other listeners that would cut off. The
   stream plays in a window as a file plays, and its inspector shows the
   talker and the stream as it comes, and changes its format.
-- **AVB Lite** where the switch has no AVB: plaa finds that no bridge
-  reserves its streams and falls back, as triib's entity service does,
-  sending each listener, up to five, a copy of its own, and playing a
-  stream sent to this computer, on its own or through triib's service.
+- **AVB Lite** where the switch has no AVB: when gptpd falls back to the
+  AVB Lite profile, the computer's entity in avb-endpointd follows,
+  reserving with CVU SRP and sending each listener a copy of its own,
+  up to five unless a controller or the daemon's file sets another
+  number. plaa plays a stream sent to this computer through the entity
+  as it does over AVB. triib's entities, in the same daemon, follow the
+  same decision.
 - **Cast** to a Chromecast, or a TV, speaker or program that plays DLNA
   (UPnP AV), found on the network as the Cast menu opens: plaa serves
   the file to it, or hands it a stream's address, and its controls and
