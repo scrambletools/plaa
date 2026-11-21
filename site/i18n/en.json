@@ -151,9 +151,9 @@
   "page": "index.html",
   "text": "Network audio, built in"
  },
- "07775cbd1a39": {
+ "5d351ad03ddb": {
   "page": "index.html",
-  "text": "plaa is an AVB and Milan entity of its own on Linux, and uses the Mac's on macOS, so what it plays goes straight to the speakers, amplifiers and interfaces on your AVB network, in time with them. On Windows it does not send or play AVB streams."
+  "text": "plaa sends and plays through the computer's own AVB and Milan entity, which avb-endpointd runs on Linux and macOS runs on a Mac, so what it plays goes straight to the speakers, amplifiers and interfaces on your AVB network, in time with them. On Windows it does not send or play AVB streams."
  },
  "15c0d13f2d6e": {
   "page": "index.html",
@@ -614,9 +614,9 @@
   "page": "tour.html",
   "text": "Network audio"
  },
- "476b7ba3c758": {
+ "0b2a1e08ede8": {
   "page": "tour.html",
-  "text": "plaa takes part in AVB and Milan networks, the kind that links professional speakers, amplifiers and audio interfaces. In Settings, Network, choose the wired interface the network is on. With Send what plays on, plaa becomes a Milan talker of its own on Linux, and sends through the Mac's own AVB entity on macOS: the sound of the window last played goes out as a stream on the network's clock, which any Milan controller can connect. On Windows plaa does not send or play AVB streams."
+  "text": "plaa takes part in AVB and Milan networks, the kind that links professional speakers, amplifiers and audio interfaces. In Settings, Network, choose the wired interface the network is on. With Send what plays on, plaa sends through the computer's own AVB entity, which avb-endpointd runs on Linux and macOS runs on a Mac: the sound of the window last played goes out as a stream on the network's clock, which any Milan controller can connect. On Windows plaa does not send or play AVB streams."
  },
  "f8e8b84bedc3": {
   "page": "tour.html",
@@ -1513,9 +1513,9 @@
   "page": "specs.html",
   "text": "Role"
  },
- "20d0d6ebdec4": {
+ "68de32575118": {
   "page": "specs.html",
-  "text": "A Milan talker and listener of its own on Linux; on macOS, a talker and listener through the Mac's own AVB entity; on Windows, neither"
+  "text": "A Milan talker and listener through the computer's own AVB entity, which avb-endpointd runs on Linux and macOS runs on a Mac; on Windows, neither"
  },
  "3c59147d5761": {
   "page": "specs.html",

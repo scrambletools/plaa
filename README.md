@@ -127,15 +127,15 @@ Download it from [plaa.run](https://plaa.run#download) or the
   and rates; the recording itself is as the camera sees. Screen and
   camera recordings go to a folder apart from sound's, Videos (Movies
   on macOS) unless Settings choose another, and are named the same way.
-- **Send what plays over AVB** (Milan): on Linux plaa becomes a talker
-  entity of its own, named as Settings say, with a stereo stream on gPTP
-  time in the formats the avb crates set for every endpoint: the AVB
-  community's Basic and Extended Audio profiles' AAF, in class A or B at
-  48, 96 or 192 kHz, and AM824 as MOTU's, Apple's and PreSonus's
-  endpoints send, of 2 channels or 8. Any Milan controller can connect
-  it, and it sends the sound of the window last played once a listener
-  is ready; on a Mac it sends through the Mac's own AVB entity, as triib
-  does.
+- **Send what plays over AVB** (Milan): on Linux plaa sends through the
+  computer's own entity, which avb-endpointd runs and names for the
+  computer, with a stereo stream on gPTP time in the formats the avb
+  crates set for every endpoint: the AVB community's Basic and Extended
+  Audio profiles' AAF, in class A or B at 48, 96 or 192 kHz, and AM824
+  as MOTU's, Apple's and PreSonus's endpoints send, of 2 channels or 8.
+  Any Milan controller can connect it, and it sends the sound of the
+  window last played once a listener is ready; on a Mac it sends
+  through the Mac's own AVB entity, as triib does.
 - **Network Audio**: the listeners on the interface Settings choose that
   can play what plays, by name, each with one button: play there, stop,
   or the formats both share, the listener's format following plaa's.
