@@ -21,7 +21,7 @@ plaa-store = { path = "crates/plaa-store", version = "0.6.0" }
 # both (see the README). avb-endpointd without its daemon is the files
 # plaa shares with the daemon that runs its entity on Linux.
 atdecc = "0.2.2"
-avb-endpointd = "0.3.1"
+avb-endpointd = "0.3.4"
 avb-net = "0.1.6"
 avb-stream = "0.4.0"
 # Material Design 3 for iced, shared by Scramble Tools apps. A git-ignored

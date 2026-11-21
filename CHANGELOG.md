@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- plaa's Linux packages depend on avb-endpointd's, 0.3.4 or later, and
+  each release carries its debs and rpms. Apps with no controller of
+  their own bind their entity's streams through the daemon, and
+  `avb-endpointd log` follows the log a device such as an ESP32 board
+  keeps. On avb-endpointd 0.3.4 and atdecc 0.2.4.
+
 ## [0.6.0] - 2026-11-21
 
 ### Added

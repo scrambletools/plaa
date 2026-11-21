@@ -354,9 +354,9 @@ dependencies = [
 
 [[package]]
 name = "atdecc"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9abcb607f3eb4722a1770bf7cd489da633f7fee18aa3464451eda58687baff49"
+checksum = "b71b2eaf9679ef6889f786b57adb14c52a00f4bbe571b893b615cb3062df2bff"
 dependencies = [
  "avb-mrp",
  "avb-net",
@@ -379,9 +379,9 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "avb-endpointd"
-version = "0.3.1"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3d724c63b8b660f38b8ca9409100a9d5d863e762f917f8dd4ed34995d1c061b"
+checksum = "3c89f129c9c469c09e0d460f8bd8dd0eed8ca91aa119b37abfd14dcdf5f08abd"
 dependencies = [
  "atdecc",
  "avb-net",
@@ -498,7 +498,7 @@ dependencies = [
  "regex",
  "rustc-hash 2.1.3",
  "shlex 2.0.1",
- "syn 2.0.119",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -5479,7 +5479,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.61.2",
