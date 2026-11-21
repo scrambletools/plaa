@@ -11,13 +11,20 @@ for search engines, and right to left where the language reads so.
 
   site-i18n.py extract           writes site/i18n/en.json, the source
   site-i18n.py check [LANG...]   says what each language lacks or breaks
-  site-i18n.py build OUT         writes the pages into OUT
+  site-i18n.py build OUT RELEASE writes the pages into OUT
 
 In the catalog, a tag with attributes stands as a short name, such as
 <a1>...</a1> for the block's first link, which the build puts back from
 the English, and release numbers such as 0.1.0 stand as {v}: so a
 translator sees only the words, and a new release or link does not make
 the translations of a block stale.
+
+The build fills in the download table from RELEASE, the latest release
+as GitHub's API describes it: the release number the pages show, each
+row's links from the files the release has, a .deb or .rpm row once for
+each distribution it has packages for, and the links to avb-endpointd's
+and gptpd's PKGBUILDs for the versions it carries. A row whose files the
+release lacks is left out.
 """
 
 import hashlib
@@ -387,7 +394,137 @@ def redirect_script(names):
     return REDIRECT % json.dumps(table, sort_keys=True)
 
 
-def build_page(page, language, names, source_texts):
+# The download table's rows, by the files that fill them in: each
+# pattern takes the release number, and names the processor and, for
+# Linux, the distribution.
+RELEASE_FILES = {
+    "msi": r"plaa-{v}-(?P<arch>[^-]+)\.msi",
+    "zip": r"plaa-{v}-(?P<arch>[^-]+)-windows\.zip",
+    "pkg": r"plaa-{v}-(?P<arch>[^-]+)\.pkg",
+    "deb": r"plaa_{v}-1\.(?P<distro>[^_]+)_(?P<arch>[^.]+)\.deb",
+    "rpm": r"plaa-{v}-1\.(?P<distro>[^.]+)\.(?P<arch>[^.]+)\.rpm",
+}
+# What each processor is called, and in what order, in a row of each kind.
+PROCESSORS = {"x64": "x64", "x86_64": "x86_64", "amd64": "x86_64",
+              "arm64": "ARM64", "aarch64": "ARM64", "riscv64": "RISC-V"}
+MAC_PROCESSORS = {"arm64": "Apple Silicon", "x86_64": "Intel"}
+PROCESSOR_ORDER = ["x64", "x86_64", "amd64", "arm64", "aarch64", "riscv64"]
+MAC_ORDER = ["arm64", "x86_64"]
+# Where the packages a release carries beside plaa's come from.
+COMPANIONS = {
+    "gptpd": "https://github.com/scrambletools/gptp/releases/download/v{version}/{file}",
+    "avb-endpointd": "https://github.com/scrambletools/Linux-AVB-Endpoint/releases/download/avb-endpointd-v{version}/{file}",
+}
+
+
+def page_version():
+    """The release number the English pages show, which the build
+    replaces with the latest release's."""
+    numbers = set()
+    for page in PAGES:
+        _, found = segments(page)
+        for _, _, content in found.blocks:
+            numbers.update(template(content)[2])
+    if len(numbers) != 1:
+        sys.exit(f"the pages should show one release number, not {sorted(numbers)}")
+    return numbers.pop()
+
+
+def distro_label(name):
+    family = re.fullmatch(r"(debian|ubuntu)([\d.]+)", name)
+    if family:
+        return f"{family.group(1).title()} {family.group(2)}"
+    fedora = re.fullmatch(r"fc(\d+)", name)
+    return f"Fedora {fedora.group(1)}" if fedora else name
+
+
+def distro_order(name):
+    families = ["debian", "ubuntu", "fc"]
+    family = re.match(r"[a-z]+", name).group(0)
+    rank = families.index(family) if family in families else len(families)
+    return rank, [int(part) for part in re.findall(r"\d+", name)], name
+
+
+def fill_release(out, release, shown):
+    """A built page with its download table filled in from the release,
+    and the release number SHOWN in its text made the release's."""
+    version = release["tag_name"].removeprefix("v")
+    files = {asset["name"]: asset["browser_download_url"] for asset in release["assets"]}
+
+    def found(kind):
+        pattern = re.compile(RELEASE_FILES[kind].replace("{v}", re.escape(version)))
+        return [(match, files[name]) for name in files if (match := pattern.fullmatch(name))]
+
+    def links(matches, mac=False):
+        names, order = (MAC_PROCESSORS, MAC_ORDER) if mac else (PROCESSORS, PROCESSOR_ORDER)
+
+        def rank(entry):
+            arch = entry[0]["arch"]
+            return (order.index(arch) if arch in order else len(order), arch)
+
+        return " · ".join(
+            f'<a href="{url}">{names.get(match["arch"], match["arch"])}</a>'
+            for match, url in sorted(matches, key=rank)
+        )
+
+    def row(match):
+        kind, body = match.group(1), match.group(2)
+        if kind == "arch":
+            return f"<tr>{body}</tr>" if "PKGBUILD" in files else ""
+        if kind not in RELEASE_FILES:
+            sys.exit(f"no files fill in a {kind} row")
+        matches = found(kind)
+        if kind in ("deb", "rpm"):
+            distros = {}
+            for entry in matches:
+                distros.setdefault(entry[0]["distro"], []).append(entry)
+            return "\n          ".join(
+                "<tr>"
+                + body.replace("<td data-release-label></td>", f"<td>{distro_label(distro)}</td>")
+                .replace("<span data-release-links></span>", links(distros[distro]))
+                .replace("{distro}", distro)
+                + "</tr>"
+                for distro in sorted(distros, key=distro_order)
+            )
+        if not matches:
+            return ""
+        return "<tr>" + body.replace(
+            "<span data-release-links></span>", links(matches, mac=kind == "pkg")
+        ) + "</tr>"
+
+    out = re.sub(r'<tr data-release="([a-z]+)">(.*?)</tr>', row, out, flags=re.S)
+
+    def asset_link(match):
+        name = match.group(1)
+        if name not in files:
+            sys.exit(f"the latest release, {release['tag_name']}, has no {name}")
+        return f'href="{files[name]}"'
+
+    out = re.sub(r'href="[^"]*" data-asset="([^"]+)"', asset_link, out)
+
+    def companion_link(match):
+        package, file = match.group(1), match.group(2)
+        versions = {
+            carried.group(1)
+            for name in files
+            if (carried := re.match(re.escape(package) + r"[_-](\d+\.\d+\.\d+)-", name))
+        }
+        if len(versions) != 1:
+            sys.exit(f"the latest release should carry one {package}, not {sorted(versions)}")
+        return 'href="%s"' % COMPANIONS[package].format(version=versions.pop(), file=file)
+
+    out = re.sub(r'href="[^"]*" data-companion="([^" ]+) ([^"]+)"', companion_link, out)
+    # The release number in the text, not in links or attributes.
+    return re.sub(
+        r">([^<]*)<",
+        lambda m: ">" + VERSION.sub(
+            lambda n: version if n.group(0) == shown else n.group(0), m.group(1)
+        ) + "<",
+        out,
+    )
+
+
+def build_page(page, language, names, source_texts, release, shown):
     source, found = segments(page)
     found_translations = {} if language == "en" else translations(language)
     replacements = []
@@ -434,7 +571,7 @@ def build_page(page, language, names, source_texts):
             count=1,
             flags=re.S,
         )
-    return out
+    return fill_release(out, release, shown)
 
 
 def main(argv):
@@ -460,16 +597,18 @@ def main(argv):
             else:
                 print(f"{language}: ok")
         sys.exit(1 if failed else 0)
-    elif command == "build" and len(argv) == 3:
+    elif command == "build" and len(argv) == 4:
         out = Path(argv[2])
+        release = json.loads(Path(argv[3]).read_text())
+        shown = page_version()
         names = languages()
         texts = catalog()
         for language in names:
             folder = out if language == "en" else out / language
             folder.mkdir(parents=True, exist_ok=True)
             for page in PAGES:
-                (folder / page).write_text(build_page(page, language, names, texts))
-        print(f"Built {len(PAGES)} pages in {len(names)} languages")
+                (folder / page).write_text(build_page(page, language, names, texts, release, shown))
+        print(f"Built {len(PAGES)} pages in {len(names)} languages, for {release['tag_name']}")
     else:
         sys.exit(__doc__)
 

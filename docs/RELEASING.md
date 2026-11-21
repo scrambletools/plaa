@@ -16,7 +16,7 @@ Everything a release ships is built from this repository:
 | `packaging/macos/` | plaa.app, carrying FFmpeg and libass, and its installer package, made by `bundle.sh --pkg` around `distribution.xml`, signed and notarized as [macOS signing](#macos-signing) says, with the BPF access helper |
 | `.github/workflows/release.yml` | Builds all of them for a tag and drafts the GitHub release once the installer tests pass |
 | `packaging/tests/` | The installer tests: each package installed, upgraded, run, made to play a video and removed in a clean system, as [Installer tests](#installer-tests) says |
-| `site/`, `.github/workflows/site.yml` | The website, plaa.run, published to GitHub Pages whenever it changes on main |
+| `site/`, `.github/workflows/site.yml` | The website, plaa.run, published to GitHub Pages whenever it changes on main and when a release is published, its download table filled in from the latest release |
 | `BUILD`, `.gitattributes` | The commit, which `git archive` and GitHub's source archives write into `BUILD` for the version line of a build without `.git`, as the AUR's |
 
 The Linux packages are built for x86_64 and ARM64 on GitHub's runners of
@@ -148,7 +148,11 @@ x264 and x265 encoders, as other free players' downloads do
    checks that the tag matches `Cargo.toml`, builds the packages and
    drafts a release with them, `SHA256SUMS`, and a `PKGBUILD` with the
    source checksum filled in, beside its `plaa.install`. Check the draft
-   and publish it.
+   and publish it. Publishing rebuilds plaa.run, whose download table
+   lists the release's files: a row for each kind of package it has, and
+   a .deb or .rpm row for each distribution. The pages need a change only
+   for what the files' names don't say, such as a new macOS minimum or a
+   new kind of package.
 5. AUR: in a clone of `ssh://aur@aur.archlinux.org/plaa.git`, replace
    `PKGBUILD` with the one from the release and copy
    `packaging/arch/plaa/plaa.install`, run

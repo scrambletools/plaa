@@ -195,9 +195,9 @@
   "page": "index.html",
   "text": "On Linux, plaa keeps network time with gptpd, and shares it and the network's reservations with triib's entity service where that runs."
  },
- "5e8a7051c9d0": {
+ "b6a9c54fcc48": {
   "page": "index.html",
-  "text": "plaa {v} for Linux and Windows on x86_64 and ARM64, Linux on RISC-V, and macOS on Apple Silicon. Every file is on the <a1>release page</a1>, with <a2>checksums</a2>. On Linux each package uses its release's own FFmpeg; on Windows and macOS plaa carries its own."
+  "text": "plaa {v} for Linux, Windows and macOS. Every file is on the <a1>release page</a1>, with <a2>checksums</a2>. On Linux each package uses its release's own FFmpeg; on Windows and macOS plaa carries its own."
  },
  "bc0792d8dc81": {
   "page": "index.html",
@@ -211,9 +211,9 @@
   "page": "index.html",
   "text": "Windows 10 and 11"
  },
- "304ebb08851b": {
+ "6c17be6fc87e": {
   "page": "index.html",
-  "text": "Installer (.msi): <a1>x64</a1> · <a2>ARM64</a2>"
+  "text": "Installer (.msi): <span1></span1>"
  },
  "266dca3640a2": {
   "page": "index.html",
@@ -223,65 +223,41 @@
   "page": "index.html",
   "text": "Windows, portable"
  },
- "c6562b548a86": {
+ "ac9e045e513d": {
   "page": "index.html",
-  "text": ".zip: <a1>x64</a1> · <a2>ARM64</a2>"
+  "text": ".zip: <span1></span1>"
  },
  "d813bfe8feb3": {
   "page": "index.html",
   "text": "Unpack it anywhere and run <code>plaa.exe</code>"
  },
- "f6f4e84c2d4a": {
+ "3eb945fb74c5": {
   "page": "index.html",
-  "text": "macOS 14 and later, Apple Silicon"
+  "text": "macOS 15 and later"
  },
- "1444a039b47d": {
+ "f2f8f511fff5": {
   "page": "index.html",
-  "text": "Installer package (.pkg): <a1>Apple Silicon</a1>"
+  "text": "Installer package (.pkg): <span1></span1>"
  },
  "c10c7bf238c9": {
   "page": "index.html",
   "text": "Open it. It lets plaa reach your AVB network too"
  },
- "f03c1c4c6d56": {
+ "5c2ceb011c6e": {
   "page": "index.html",
-  "text": "Debian 13"
+  "text": ".deb: <span1></span1>"
  },
- "d2d0a2426b0f": {
+ "3be06e476ff0": {
   "page": "index.html",
-  "text": ".deb: <a1>x86_64</a1> · <a2>ARM64</a2> · <a3>RISC-V</a3>"
+  "text": "<code>sudo apt install ./gptpd_*.deb ./avb-endpointd_*.deb ./plaa_{v}-1.{distro}_*.deb</code>"
  },
- "f4e5feb0454d": {
+ "cce5a375a053": {
   "page": "index.html",
-  "text": "<code>sudo apt install ./plaa_{v}-1.debian13_*.deb</code>"
+  "text": ".rpm: <span1></span1>"
  },
- "16b8952c48f9": {
+ "6294571b556f": {
   "page": "index.html",
-  "text": "Ubuntu 24.04"
- },
- "88fa6ce1816a": {
-  "page": "index.html",
-  "text": "<code>sudo apt install ./plaa_{v}-1.ubuntu24.04_*.deb</code>"
- },
- "87db66c888a2": {
-  "page": "index.html",
-  "text": "Ubuntu 26.04"
- },
- "2bf528aa536d": {
-  "page": "index.html",
-  "text": "<code>sudo apt install ./plaa_{v}-1.ubuntu26.04_*.deb</code>"
- },
- "5693d641dc57": {
-  "page": "index.html",
-  "text": "Fedora 44"
- },
- "3989655ccf61": {
-  "page": "index.html",
-  "text": ".rpm: <a1>x86_64</a1> · <a2>ARM64</a2>"
- },
- "51db2a3d4540": {
-  "page": "index.html",
-  "text": "<code>sudo dnf install ./plaa-{v}-1.fc44.*.rpm</code>"
+  "text": "<code>sudo dnf install ./gptpd-*.rpm ./avb-endpointd-*.rpm ./plaa-{v}-1.{distro}.*.rpm</code>"
  },
  "f96ddf323d80": {
   "page": "index.html",
@@ -294,6 +270,10 @@
  "70a4bfafdc84": {
   "page": "index.html",
   "text": "<code>makepkg -si</code> in a folder with both"
+ },
+ "42c15b0b35f2": {
+  "page": "index.html",
+  "text": "On Linux, plaa needs avb-endpointd and gptpd, which no distribution carries yet: their packages are on the <a1>release page</a1> beside plaa's, and the commands above install all three. On Arch, first build gptpd's <a2>PKGBUILD</a2>, then avb-endpointd's <a3>PKGBUILD</a3> with <a4>avb-endpointd.install</a4>, each with <code>makepkg -si</code>."
  },
  "19585a33a02f": {
   "page": "index.html",
@@ -1249,13 +1229,13 @@
   "page": "specs.html",
   "text": "macOS"
  },
- "6611c3a85967": {
+ "5e72604844d4": {
   "page": "specs.html",
-  "text": "macOS 14 or later"
+  "text": "macOS 15 or later"
  },
- "5b7657e40c32": {
+ "0e5a98cf3a70": {
   "page": "specs.html",
-  "text": "Apple Silicon"
+  "text": "Apple Silicon, Intel"
  },
  "d347bc820ad2": {
   "page": "specs.html",
