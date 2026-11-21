@@ -6,7 +6,8 @@
 
 - A RISC-V .rpm for Fedora 44, which builds RISC-V as an alternative
   architecture, beside the RISC-V .debs, and riscv64 in the PKGBUILD,
-  for Arch's RISC-V port.
+  for Arch's RISC-V port. Releases carry avb-endpointd 0.3.5's
+  packages, whose PKGBUILD builds on RISC-V too.
 
 ### Changed
 
