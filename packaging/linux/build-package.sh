@@ -67,6 +67,12 @@ fedora)
         # architecture, on its own koji, whose packages are not signed.
         sysroot=/sysroot
         dnf install -y --setopt=install_weak_deps=False "${tools[@]}" lld
+        # Fedora's links from / into /usr, which the filesystem package's
+        # own scriptlet makes where scriptlets run; here none do.
+        mkdir -p "$sysroot/usr/bin" "$sysroot/usr/lib" "$sysroot/usr/lib64"
+        for link in bin lib lib64 sbin; do
+            ln -sfn "usr/$link" "$sysroot/$link"
+        done
         dnf install -y --installroot="$sysroot" --forcearch="$cross" --releasever="$VERSION_ID" \
             --repofrompath="fedora-$cross,https://riscv-koji.fedoraproject.org/repos-dist/f$VERSION_ID/latest/$cross/" \
             --repo="fedora-$cross" --setopt="fedora-$cross.gpgcheck=0" \
