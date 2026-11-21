@@ -528,8 +528,11 @@ jobs:
           name=Fedora-Container-Base-Generic-44-20260604.0.riscv64.oci.tar.xz
           curl -sSfLO "https://dl.fedoraproject.org/pub/alt/risc-v/release/44/Container/riscv64/images/$name"
           echo "198c75fe6f58fea77e539fd29a3103407c0923833c7192c5e962a008c0595f31  $name" | sha256sum -c
-          loaded=$(xz -dc "$name" | docker load | tail -1)
-          docker tag "${loaded##* }" plaa-test/fedora:44-riscv64
+          # An OCI archive, which docker load cannot read; skopeo brings it
+          # into Docker.
+          xz -d "$name"
+          tar -tf "${name%.xz}" | head -5
+          skopeo copy "oci-archive:${name%.xz}" docker-daemon:plaa-test/fedora:44-riscv64
           echo "image=plaa-test/fedora:44-riscv64" >>"$GITHUB_OUTPUT"
       - name: Packages no distribution carries
         run: |
