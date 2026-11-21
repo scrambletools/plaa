@@ -77,6 +77,12 @@
   </provides>
 
   <releases>
+    <release version="0.6.1" date="2026-11-21">
+      <description>
+        <p>A RISC-V package for Fedora and RISC-V in the Arch recipe; on Linux, avb-endpointd 0.3.4 or later, with 0.3.5's packages beside plaa's.</p>
+      </description>
+      <url type="details">https://github.com/scrambletools/plaa/releases/tag/v0.6.1</url>
+    </release>
     <release version="0.6.0" date="2026-11-21">
       <description>
         <p>A package for Intel Macs; on Linux, what plays goes to the network through avb-endpointd, the computer's shared AVB entity, with gptpd keeping time; and streams that keep their timing on a busy computer.</p>
