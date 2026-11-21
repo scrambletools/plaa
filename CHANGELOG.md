@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.6.0] - 2026-11-21
 
 ### Added
 
@@ -24,17 +24,19 @@
   plays; plaa plays its recording device while a controller binds its
   input. plaa starts and enables the daemon's user service, and the
   entity keeps the ID plaa's had. plaa's controller takes its raw
-  sockets from the daemon's avb-netraw, and the daemon runs avb-link@ in
-  place of plaa-link@. The entity's name is the computer's, which
-  controllers change, so plaa's setting for it is gone.
+  sockets from the daemon's avb-netraw, in place of plaa-netraw, and the
+  daemon starts gptpd and avb-link@ on the interface. The entity's name
+  is the computer's, which controllers change, so plaa's setting for it
+  is gone.
 - plaa's Linux packages depend on avb-endpointd's, 0.3.1 or later,
-  which bring the daemon, avb-netraw, avb-link@ and gptpd, and no
-  longer carry plaa-netraw or plaa-link@; an upgrade stops what is
-  left of plaa-link@. Each release carries avb-endpointd's and gptpd's
-  debs and rpms beside plaa's, as no distribution has them.
+  which bring the daemon, avb-netraw, avb-link@, gptpd and RealtimeKit,
+  and no longer carry plaa-netraw or plaa's ptp4l services; an upgrade
+  stops any ptp4l service an older plaa started. Each release carries
+  avb-endpointd's and gptpd's debs and rpms beside plaa's, as no
+  distribution has them.
 - plaa keeps network time with gptpd, shared with triib's entity
-  service, in place of its own ptp4l services. Its packages bring
-  gptpd, through avb-endpointd's, where they recommended linuxptp, plaa
+  service, in place of its own ptp4l services. Its packages bring gptpd,
+  through avb-endpointd's, where they recommended linuxptp, the daemon
   starts `gptpd@<interface>` where it does not run yet, and Network
   Audio says why where gptpd refused to run. The stream takes its time
   from gptpd's record of the grandmaster's time, which steers no clock,
@@ -49,20 +51,22 @@
   grandmaster capable below priority1 255, and Network Audio shows its
   priority1, which `/etc/gptpd/<interface>.conf` sets. On atdecc 0.2,
   avb-endpointd 0.3, avb-stream 0.4 and gptp 0.2.
-- `scripts/dev-ptp4l.sh` gave way to `scripts/dev-link.sh`, which
-  installs plaa-link@ for dev builds and takes the old ptp4l services
-  out.
-- plaa-link@ keeps Energy-Efficient Ethernet and PAUSE off the link, as
-  the AVB Lite profile asks of an endpoint and triib's link service
-  does, since a link waking from EEE or a PAUSE frame from the switch
-  holds up frames already due. Where either was on, the link goes down
-  and up once as plaa's entity starts. The packages depend on ethtool
-  for it.
+- `scripts/dev-ptp4l.sh` is gone, as gptpd and avb-link@ come with
+  avb-endpointd's package.
+- avb-link@, which the daemon starts on the interface, keeps
+  Energy-Efficient Ethernet and PAUSE off the link, as the AVB Lite
+  profile asks of an endpoint and triib's link service does, since a
+  link waking from EEE or a PAUSE frame from the switch holds up frames
+  already due. Where either was on, the link goes down and up once as
+  the entity starts.
 - Installing says what it changes on the system and why: Linux packages
   as they install, and the macOS installer on its first page.
 
 ### Fixed
 
+- plaa builds against FFmpeg 9.1, as Arch Linux now has, whose CUDA
+  header names types FFmpeg's Rust bindings had no stand-ins for, so
+  the AUR package failed to build. On ffmpeg-next 9.1.
 - A file with sound no longer stays at its spinner when the sound device
   never answers, as when macOS's coreaudiod hangs. plaa gives the device
   two seconds to open, then plays silently and says the device did not
@@ -76,8 +80,9 @@
   avb-endpointd's devices, and what it played never reached the
   network. plaa now makes the cookie, as libpulse does on first use.
 - AVB streams' threads run at realtime priority on every Linux system:
-  the packages depend on RealtimeKit, which raises them, where they ran
-  at normal priority without a word on a system that lacked it.
+  the packages bring RealtimeKit, through avb-endpointd's, which raises
+  them, where they ran at normal priority without a word on a system
+  that lacked it.
 - plaa quits as its Quit does when the system asks it to, with SIGTERM
   at logout or shutdown, or SIGINT and SIGHUP from the terminal it runs
   in: its entity departs and its stream is withdrawn, rather than left
@@ -97,21 +102,20 @@
 - plaa takes its port again once a program it stepped aside for, one
   that declared streams there without sharing them, has gone quiet for
   30 seconds, rather than staying off the network until it restarts.
-- A stream's frames leave in order: plaa-link@, which plaa runs as its
-  entity starts, has every CPU send the interface's frames on its first
-  transmit queue, as a card with several, as the I210 has four, spread
-  a stream's frames over them by a hash that takes in its sequence
-  number.
+- A stream's frames leave in order: avb-link@, which the daemon starts
+  with the entity, has every CPU send the interface's frames on its
+  first transmit queue, as a card with several, as the I210 has four,
+  spread a stream's frames over them by a hash that takes in its
+  sequence number.
 - Frames sent on time no longer wait in that queue when a busy desktop
-  holds up the card's report of frames sent: plaa-link@ lets about
+  holds up the card's report of frames sent: avb-link@ lets about
   130 us of the link through to the card, 16 KiB at a gigabit, before
   byte queue limits stop the queue, where the limit shrank to a few of
   a stream's small frames.
 - A stream's frames leave on time where the system's default queue
-  discipline is fq, as on some tuned desktops: plaa-link@ gives the
+  discipline is fq, as on some tuned desktops: avb-link@ gives the
   interface's first transmit queue fq_codel, which sends frames in the
   order they come, where under fq a busy computer's frames left late.
-  The packages depend on iproute2 for ip and tc.
 - A stream's frames keep their order when that queue backs up, as when
   a late send catches up: they leave at priority 3, so the queue's fair
   scheduler holds them in one flow rather than a flow each. On avb-net

@@ -77,6 +77,12 @@
   </provides>
 
   <releases>
+    <release version="0.6.0" date="2026-11-21">
+      <description>
+        <p>A package for Intel Macs; on Linux, what plays goes to the network through avb-endpointd, the computer's shared AVB entity, with gptpd keeping time; and streams that keep their timing on a busy computer.</p>
+      </description>
+      <url type="details">https://github.com/scrambletools/plaa/releases/tag/v0.6.0</url>
+    </release>
     <release version="0.5.0" date="2026-10-25">
       <description>
         <p>Agents and the assistant read and edit what plays, with FFmpeg filters and other files' sound mixed in; Make Default; one side panel at a time; and AVB network audio played on a Mac.</p>
