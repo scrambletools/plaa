@@ -67,6 +67,9 @@
   never answers, as when macOS's coreaudiod hangs. plaa gives the device
   two seconds to open, then plays silently and says the device did not
   answer; until that device answers, later files play silently at once.
+- Settings opens at once when the sound server does not answer. plaa
+  lists the sound output devices on a thread of its own, and the list
+  of devices appears in Settings when the server gives it.
 - On Linux, plaa reaches PipeWire's PulseAudio server where no program
   had made a PulseAudio cookie yet. The server refused plaa's empty
   cookie, so plaa fell back to ALSA, where it could not find

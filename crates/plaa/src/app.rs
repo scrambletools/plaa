@@ -1790,13 +1790,15 @@ impl Plaa {
                 return self.quit();
             }
             Action::Settings => {
-                self.audio_devices = plaa_media::output_devices();
                 self.avb_interfaces = plaa_avb::interfaces();
                 self.yt_dlp_found = plaa_media::web::program().is_some();
                 if let Some(window) = self.windows.get_mut(&id) {
                     window.settings_open = true;
                 }
-                return crate::settings_view::refresh_default_app_status();
+                return Task::batch([
+                    crate::settings_view::refresh_default_app_status(),
+                    crate::settings_view::refresh_audio_devices(),
+                ]);
             }
             Action::PictureInPicture => return self.toggle_pip(id),
             Action::Info => {

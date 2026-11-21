@@ -2,6 +2,7 @@
 //! tabs, and below it the chosen tab's settings, which scroll.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use iced::widget::{container, mouse_area, opaque, space, toggler};
 use iced::window;
@@ -76,6 +77,8 @@ pub enum SettingsMessage {
     DefaultAppDone(Result<default_app::Outcome, default_app::Failure>),
     /// How many file types plaa opens, read again.
     DefaultAppStatus(Option<default_app::Status>),
+    /// The system's sound output devices, listed again.
+    AudioDevices(Vec<plaa_media::OutputDevice>),
 }
 
 /// The colors offered when the system's accent is not used.
@@ -203,6 +206,40 @@ pub(crate) fn refresh_default_app_status() -> Task<Message> {
     Task::perform(default_app::status(), |status| {
         Message::Settings(SettingsMessage::DefaultAppStatus(status))
     })
+}
+
+/// Lists the sound output devices again, on a thread of its own: asking
+/// the system can wait on its sound server, which may never answer, as
+/// macOS's coreaudiod sometimes does not. While one list is still being
+/// made, another is not started; that one arrives when it is done.
+pub(crate) fn refresh_audio_devices() -> Task<Message> {
+    static LISTING: AtomicBool = AtomicBool::new(false);
+    /// Held by the thread making the list; a new one may start once it
+    /// is dropped, even when that thread panicked or never started.
+    struct Listing;
+    impl Drop for Listing {
+        fn drop(&mut self) {
+            LISTING.store(false, Ordering::Release);
+        }
+    }
+    if LISTING.swap(true, Ordering::AcqRel) {
+        return Task::none();
+    }
+    let listing = Listing;
+    let (sender, receiver) = iced::futures::channel::oneshot::channel();
+    let started = std::thread::Builder::new()
+        .name("plaa-sound-devices".into())
+        .spawn(move || {
+            let devices = plaa_media::output_devices();
+            drop(listing);
+            let _ = sender.send(devices);
+        });
+    if started.is_err() {
+        return Task::none();
+    }
+    // A thread that panicked sends nothing, and the list stays as it was.
+    Task::future(async move { receiver.await.ok() })
+        .and_then(|devices| Task::done(Message::Settings(SettingsMessage::AudioDevices(devices))))
 }
 
 /// A dot for how many file types plaa opens: red for none, amber for
@@ -1328,6 +1365,10 @@ impl Plaa {
             }
             SettingsMessage::DefaultAppStatus(status) => {
                 self.default_app_status = status;
+                return Task::none();
+            }
+            SettingsMessage::AudioDevices(devices) => {
+                self.audio_devices = devices;
                 return Task::none();
             }
             SettingsMessage::Appearance(appearance) => {
